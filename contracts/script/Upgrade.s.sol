@@ -64,9 +64,9 @@ contract Upgrade is Script {
         // new implementation genuinely has no new initializer.
         bytes memory initData = vm.envOr("INIT_DATA", bytes(""));
         if (initData.length == 0) {
-            console.log("INIT_DATA kosong - pastikan implementasi baru tidak punya reinitializer");
+            console.log("INIT_DATA is empty - make sure the new implementation has no reinitializer");
         } else {
-            console.log("INIT_DATA panjang:", initData.length);
+            console.log("INIT_DATA length:", initData.length);
         }
         UUPSUpgradeable(proxy).upgradeToAndCall(newImpl, initData);
         vm.stopBroadcast();

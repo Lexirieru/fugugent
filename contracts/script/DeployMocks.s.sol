@@ -107,7 +107,7 @@ contract DeployMocks is Script {
         d.pool.supply(address(d.mUSD), SEED_LIQUIDITY_USD);
         vm.stopBroadcast();
 
-        console.log("LP (penyuplai likuid.)", lp);
+        console.log("LP (liquidity supplier)", lp);
     }
 
     /// @dev Sample position at the deployer's address: supply mBNB as collateral, then
@@ -161,7 +161,7 @@ contract DeployMocks is Script {
         require(
             diff <= HF_TOLERANCE,
             string.concat(
-                "HF posisi contoh meleset dari target: got=",
+                "the sample position's HF missed its target: got=",
                 vm.toString(healthFactor),
                 " expected~=",
                 vm.toString(TARGET_HF),
@@ -172,7 +172,7 @@ contract DeployMocks is Script {
     }
 
     function _logResult(Deployed memory d, address deployer) internal view {
-        console.log("=== Alamat ===");
+        console.log("=== Addresses ===");
         console.log("MockTokenUSD (mUSD)   ", address(d.mUSD));
         console.log("MockTokenBNB (mBNB)   ", address(d.mBNB));
         console.log("MockPriceFeedUSD      ", address(d.feedUSD));
@@ -180,7 +180,7 @@ contract DeployMocks is Script {
         console.log("MockLendingPool       ", address(d.pool));
         console.log("Deployer              ", deployer);
 
-        console.log("=== Posisi contoh ===");
+        console.log("=== Sample position ===");
         console.log("Supply mBNB (wei)     ", SAMPLE_COLLATERAL_BNB);
         console.log("Borrow mUSD (wei)     ", _computeSampleBorrowAmount());
 

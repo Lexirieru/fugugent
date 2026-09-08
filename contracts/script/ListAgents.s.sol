@@ -118,14 +118,14 @@ contract ListAgents is Script {
         address lister = vm.addr(pk);
         FuguRegistry registry = FuguRegistry(REGISTRY);
 
-        console.log("== Konteks (periksa sebelum --broadcast) ==");
+        console.log("== Context (verify before broadcasting) ==");
         console.log("chainId               ", block.chainid);
         console.log("FuguRegistry          ", REGISTRY);
-        console.log("lister (owner listing)", lister);
-        console.log("saldo lister (wei)    ", lister.balance);
-        console.log("listingCount sebelum  ", registry.listingCount());
-        console.log("harga (USD 8 desimal) ", uint256(PRICE_USD8));
-        console.log("periode (detik)       ", uint256(PERIOD_SECONDS));
+        console.log("lister (listing owner)", lister);
+        console.log("lister balance (wei)  ", lister.balance);
+        console.log("listingCount before   ", registry.listingCount());
+        console.log("price (USD, 8 dp)     ", uint256(PRICE_USD8));
+        console.log("period (seconds)      ", uint256(PERIOD_SECONDS));
 
         vm.startBroadcast(pk);
         _listAll(registry);
@@ -145,13 +145,13 @@ contract ListAgents is Script {
             AgentPlan memory p = plans[i];
             uint256 existing = registry.listingByAgentId(p.erc8004AgentId);
             if (existing != 0) {
-                console.log("dilewati (sudah terdaftar):", p.name, existing);
+                console.log("skipped (already listed):", p.name, existing);
                 continue;
             }
             uint256 listingId = registry.list(
                 p.erc8004AgentId, p.agentWallet, p.category, PRICE_USD8, PERIOD_SECONDS, _metadata(p)
             );
-            console.log("terdaftar:", p.name, listingId);
+            console.log("listed:", p.name, listingId);
         }
     }
 
@@ -163,7 +163,7 @@ contract ListAgents is Script {
         for (uint256 i = 0; i < plans.length; ++i) {
             AgentPlan memory p = plans[i];
             uint256 listingId = registry.listingByAgentId(p.erc8004AgentId);
-            if (listingId == 0) revert ListingMismatch(0, "belum terdaftar");
+            if (listingId == 0) revert ListingMismatch(0, "not listed");
             _verifyListing(registry, listingId, p);
         }
 
@@ -255,7 +255,7 @@ contract ListAgents is Script {
     }
 
     function _logResult(FuguRegistry registry) internal view {
-        console.log("== Hasil (dibaca ulang dari rantai) ==");
+        console.log("== Result (re-read from chain) ==");
         console.log("listingCount          ", registry.listingCount());
         console.log("countByCategory(0) REBALANCING  ", registry.countByCategory(Category.REBALANCING));
         console.log("countByCategory(1) GRID         ", registry.countByCategory(Category.GRID));
