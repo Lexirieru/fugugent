@@ -20,6 +20,12 @@
  * keunggulan agent dibanding manusia — bukan janji hasil di dunia nyata.
  * Dunia nyata hanya bisa membuat keunggulan ini terlihat lebih kecil, tidak
  * pernah lebih besar dari yang dilaporkan modul ini.
+ *
+ * Catatan desain (memengaruhi angka hasil): jumlah repay manusia DIHITUNG
+ * ULANG dari `decide()` pada candle kematangan (saat manusia benar-benar
+ * bertindak), bukan dibekukan dari angka yang muncul saat kebutuhan pertama
+ * terdeteksi — manusia nyata mengecek ulang situasi saat akhirnya bertindak,
+ * bukan mengeksekusi rencana lama yang sudah basi.
  * ============================================================================
  */
 import { computeHealthFactor } from "./healthFactor.js";
