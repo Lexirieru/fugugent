@@ -1,0 +1,8 @@
+# Konteks build sekecil mungkin: hanya sumber + manifest yang ikut ke daemon.
+node_modules
+dist
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
