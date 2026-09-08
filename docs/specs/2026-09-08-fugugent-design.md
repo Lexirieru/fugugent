@@ -145,9 +145,65 @@ struct Sub {
   memenuhi prinsip "semua aksi reversibel".
 - `_splitRevenue()` — potong `protocolFeeBps` ke treasury, sisanya ke owner listing.
   **Payout terlihat di explorer** — janji yang HelloMinds gagal tepati.
-- Token pembayaran: konfigurabel (tBNB native / U / USDT testnet).
+- **Pembayaran multi-token dengan harga berbasis USD** — lihat §4.3.
 
-### 4.3 `FuguReputation`
+### 4.3 `FuguPriceOracle` — user memilih token pembayaran
+
+**Keputusan:** harga langganan dinyatakan dalam **USD (8 desimal)**, dan user memilih
+token mana yang dipakai membayar. Kontrak mengonversi USD → jumlah token saat
+transaksi, memakai Chainlink price feed.
+
+Kenapa begini, bukan harga per-token: creator menetapkan harga sekali ("$5/bulan")
+dan tidak perlu memperbarui harga tiap kali BNB bergerak. User bayar dengan apa pun
+yang ada di dompetnya. Ini juga membuat perbandingan harga antar agent di
+marketplace jadi apple-to-apple — yang langsung melayani kriteria Data Quality.
+
+```solidity
+enum PriceSourceKind { CHAINLINK, FIXED_USD }
+
+struct TokenConfig {
+    PriceSourceKind kind;
+    address feed;          // AggregatorV3Interface, kosong bila FIXED_USD
+    uint32  maxStaleness;  // PER TOKEN — heartbeat tiap feed berbeda
+    uint8   tokenDecimals;
+    uint64  fixedPriceUsd; // 8 desimal, dipakai bila FIXED_USD
+    bool    enabled;
+}
+mapping(address => TokenConfig) public tokens;   // address(0) = native tBNB
+```
+
+`quote(token, usdAmount8) → tokenAmount` melakukan:
+1. baca `latestRoundData()`
+2. **tolak bila `answer <= 0`** atau `block.timestamp - updatedAt > maxStaleness`
+3. konversi dengan memperhatikan desimal token dan desimal feed
+
+**Ambang staleness harus per-token.** Terverifikasi live di testnet hari ini:
+BNB/USD baru saja update, sementara USDT/USD terakhir update ~8 jam lalu. Satu
+ambang seragam akan menolak semua pembayaran USDT. Rencana awal: BNB 1 jam,
+stablecoin 26 jam.
+
+**Token yang didukung saat peluncuran** (semua terverifikasi live di BSC testnet 97):
+
+| Token | Alamat | Desimal | Sumber harga |
+|---|---|---|---|
+| tBNB (native) | `address(0)` | 18 | Chainlink BNB/USD `0x2514895c72f50D8bd4B4F9b1110F0D6bD2c97526` |
+| USDT | `0x337610d27c682E347C9cD60BD4b3b107C9d34dDd` | **18** | Chainlink USDT/USD `0xEca2605f0BCF2BA5966372C99837b1F182d3D620` |
+| BUSD | `0xeD24FC36d5Ee211Ea25A80239Fb8C4Cfd80f12Ee` | 18 | Chainlink BUSD/USD `0x9331b55D9830EF609A2aBCfAc0FBCE050A52fdEa` |
+| U | `0xc70B8741B8B07A6d61E54fd4B20f22Fa648E5565` | 18 | `FIXED_USD` = $1,00 (tidak ada feed Chainlink; U = United Stables) |
+
+> ⚠️ **USDT di BSC 18 desimal, bukan 6.** Ini jebakan yang sudah memakan korban dan
+> harus dites eksplisit. Alamat USDT testnet alternatif yang juga hidup:
+> `0x7ef95a0FEE0Dd31b22626fA2e10Ee6A223F8a684`.
+
+**Konsekuensi desain di `FuguSubscription`:** jumlah token dikunci pada saat
+`subscribe()` (bukan dihitung ulang saat `claim`), sehingga pergerakan harga setelah
+berlangganan tidak mengubah hak siapa pun. Refund saat `cancel()` dibayarkan dalam
+token yang sama dengan yang disetor. Setiap langganan menyimpan `payToken`.
+
+**Yang bisa diubah owner:** menambah/menonaktifkan token, mengganti feed, mengubah
+staleness. Owner **tidak bisa** menyentuh dana yang sudah di escrow.
+
+### 4.4 `FuguReputation`
 
 Review anti-sybil.
 
@@ -157,7 +213,7 @@ Review anti-sybil.
 - Menyimpan agregat `sum/count` per listing untuk pembacaan murah.
 - Ini rating yang **hanya mungkin di Web3** — tidak bisa dipalsukan tanpa membayar.
 
-### 4.4 Pola upgrade
+### 4.5 Pola upgrade
 
 - Proxy: ERC1967 via `UUPSUpgradeable`. `_authorizeUpgrade` dijaga `onlyOwner`.
 - Owner awal = deployer EOA; catat rencana pindah ke multisig setelah hackathon.
@@ -408,12 +464,12 @@ jaringan Indonesia. Pakai `https://data-seed-prebsc-1-s1.bnbchain.org:8545` atau
 ## 11. Open Questions
 
 1. **R2 & R3 di atas harus diuji sebelum menulis kode agent** — ini gate teknis pertama.
-2. Apakah dGrid x402 (mainnet BSC, USD1) dipakai untuk jalur inference agent, sementara
-   agent DeFi di testnet? Perlu keputusan: konsisten testnet, atau tunjukkan jalur
-   pembayaran mainnet nominal kecil sebagai bukti bonus Altana.
+2. ~~dGrid x402 mainnet vs testnet~~ → **DIPUTUSKAN: konsisten testnet.** Agent
+   membayar inference lewat API key dGrid biasa. Jalur x402 mainnet tidak dipakai
+   untuk sekarang.
 3. API key 8004scan Pro — harus diajukan lewat form hackathon.
-4. Token pembayaran langganan di testnet: tBNB native, U (`0xc70B87…5565`), atau
-   USDT testnet?
+4. ~~Token pembayaran langganan~~ → **DIPUTUSKAN: user memilih**, harga dalam USD,
+   dikonversi lewat Chainlink. Lihat §4.3.
 5. Bagian PancakeSwap di `docs/research/04` belum selesai ditulis (agen riset terputus);
    sebagian tercakup di `06-agent-strategies.md`.
 
