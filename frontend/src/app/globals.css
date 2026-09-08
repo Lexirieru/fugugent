@@ -1,26 +1,145 @@
 @import "tailwindcss";
 
+/*
+  Fugugent — marketplace (app.fugugent.xyz).
+
+  Tema dan token dasar sengaja disamakan dengan `landingpage/src/app/globals.css`
+  supaya landing dan aplikasi terasa satu produk. Yang ditambahkan di sini adalah
+  token risiko dan token identitas agent dari `docs/brand/palet.md`, karena hanya
+  aplikasi yang menampilkan tingkat kembung sesungguhnya.
+*/
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: dark;
+
+  --bg: #05080f;
+  --bg-elev: #0a1120;
+  --surface: rgba(255, 255, 255, 0.035);
+  --surface-strong: rgba(255, 255, 255, 0.06);
+  --border: rgba(148, 176, 214, 0.16);
+  --border-strong: rgba(148, 176, 214, 0.3);
+
+  --fg: #e9eef7;
+  --fg-muted: #96a7bf;
+  --fg-faint: #6b7e97;
+
+  /* Kuning BNB Chain — hanya aksi dan penekanan, tidak pernah di komponen risiko. */
+  --accent: #f0b90b;
+  --accent-soft: rgba(240, 185, 11, 0.14);
+
+  /* docs/brand/palet.md §5 — hanya boleh muncul di dalam komponen risiko. */
+  --risk-1: #009e73;
+  --risk-2: #f0e442;
+  --risk-3: #e69f00;
+  --risk-4: #d55e00;
+  --risk-5: #a4210e;
+
+  /* docs/brand/palet.md §4 — identitas agent, tidak pernah berubah karena risiko. */
+  --agent-guardian: #0072b2;
+  --agent-rebalancer: #cc79a7;
+  --agent-grid: #56b4e9;
+  --agent-yield: #e69f00;
+
+  --foam-100: #f4f8f9;
+  --abyss-900: #05121a;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-bg: var(--bg);
+  --color-bg-elev: var(--bg-elev);
+  --color-surface: var(--surface);
+  --color-surface-strong: var(--surface-strong);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-fg: var(--fg);
+  --color-muted: var(--fg-muted);
+  --color-faint: var(--fg-faint);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+
+  --color-risk-1: var(--risk-1);
+  --color-risk-2: var(--risk-2);
+  --color-risk-3: var(--risk-3);
+  --color-risk-4: var(--risk-4);
+  --color-risk-5: var(--risk-5);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  /* Tidak pernah ada scroll horizontal di body. */
+  overflow-x: hidden;
+}
+
+/* Setiap angka metrik memakai angka tabular — lebar tidak boleh bergoyang. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+  Napas fugu. docs/brand/tingkat-kembung.md §1: tingkat 1–2 mengambang, tingkat 3
+  bergetar saat data baru, tingkat 4 berdenyut, dan tingkat 5 SENGAJA DIAM.
+  Perubahan dari bergerak ke berhenti adalah sinyalnya sendiri.
+*/
+@keyframes fugu-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3%);
+  }
+}
+
+@keyframes fugu-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+}
+
+.fugu-motion-1 {
+  animation: fugu-float 4s ease-in-out infinite;
+}
+.fugu-motion-2 {
+  animation: fugu-float 3s ease-in-out infinite;
+}
+.fugu-motion-4 {
+  animation: fugu-pulse 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+::selection {
+  background: rgba(240, 185, 11, 0.28);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
 }

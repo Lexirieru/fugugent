@@ -1,69 +1,124 @@
-import Image from "next/image";
+import { AgentCard } from "@/components/agent-card";
+import { CategoryTabs } from "@/components/category-tabs";
+import { DataNotice } from "@/components/data-notice";
+import { ProofList } from "@/components/proof";
+import { RiskLegend } from "@/components/risk-legend";
+import { ButtonLink, EmptyState, Eyebrow, Section } from "@/components/ui";
+import { CATEGORY_META, isCategory } from "@/lib/agents";
+import { source } from "@/lib/data";
+import { MARKETPLACE_CYCLE } from "@/lib/data/sample";
 
-export default function Home() {
+export default async function MarketplacePage({ searchParams }: PageProps<"/">) {
+  const sp = await searchParams;
+  const raw = typeof sp.category === "string" ? sp.category : null;
+  const category = isCategory(raw) ? raw : null;
+
+  const src = source();
+  const [page, cats] = await Promise.all([
+    src.listAgents({ category, limit: 24, offset: 0 }),
+    src.listCategories(),
+  ]);
+  const totalAll = cats.categories.reduce((sum, c) => sum + c.count, 0);
+  const meta = category ? CATEGORY_META[category] : null;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <>
+      <Section className="pt-10 sm:pt-14">
+        <Eyebrow>Agent marketplace</Eyebrow>
+        <h1 className="mt-3 text-balance text-3xl font-semibold leading-[1.15] tracking-tight sm:text-4xl">
+          Hire an agent, then check its work yourself.
+        </h1>
+        <p className="mt-4 max-w-2xl text-pretty text-base leading-relaxed text-muted">
+          Every number on these pages links to a transaction on BscScan. Where we have no proof,
+          the page says so instead of filling the gap — that failure mode is what closed
+          Giza/ARMA in February 2026, and it is the one thing we refuse to repeat.
+        </p>
+
+        <div className="mt-8">
+          <DataNotice
+            source={page.source}
+            healthy={page.healthy}
+            reason={page.reason}
+            origin={src.origin}
+          />
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
+
+        <div className="mt-8">
+          <CategoryTabs counts={cats.categories} active={category} total={totalAll} />
+          {meta ? (
+            <p className="mt-3 text-sm text-muted">
+              {meta.blurb}{" "}
+              <span className="text-faint">
+                Risk here is measured as {meta.riskMetric} — not as APR, because APR is the wrong
+                question for this category.
+              </span>
+            </p>
+          ) : (
+            <p className="mt-3 text-sm text-faint">
+              Four categories, each judged by the risk metric that actually fits it.
+            </p>
+          )}
+        </div>
+
+        <div className="mt-8">
+          {page.agents.length > 0 ? (
+            <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {page.agents.map((view) => (
+                <li key={view.record.id} className="flex">
+                  <AgentCard view={view} />
+                </li>
+              ))}
+            </ul>
+          ) : page.healthy ? (
+            <EmptyState
+              title={`Nothing in ${meta ? meta.label : "this filter"} yet`}
+              body={
+                meta
+                  ? `${meta.blurb} No agent in this category is listed on FuguRegistry today. The other categories have agents you can open right now.`
+                  : "No agents matched. The other categories have agents you can open right now."
+              }
+              actions={
+                <>
+                  <ButtonLink href="/">Show all agents</ButtonLink>
+                  <ButtonLink href="/agent/97%3A1" variant="ghost">
+                    Open Fugu Guardian
+                  </ButtonLink>
+                </>
+              }
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+          ) : (
+            <EmptyState
+              title="We have nothing we can stand behind"
+              body="The catalogue did not answer, so this list is empty on purpose. Showing a cached copy without saying so would be exactly the kind of unverifiable number this marketplace exists to stop."
+              actions={
+                <>
+                  <ButtonLink href={category ? `/?category=${category}` : "/"}>
+                    Try again
+                  </ButtonLink>
+                  <ButtonLink href="https://fugugent.xyz" variant="ghost" external>
+                    What is actually shipped ↗
+                  </ButtonLink>
+                </>
+              }
+            />
+          )}
         </div>
-      </main>
-    </div>
+      </Section>
+
+      <Section className="pt-12">
+        <RiskLegend />
+      </Section>
+
+      <Section className="pt-12">
+        <h2 className="text-lg font-semibold tracking-tight text-fg">What happens when you hire</h2>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
+          The full cycle — list, hire, the agent draws only the time it served, review gated by
+          proof of payment — has been run on BNB Chain testnet. These are those transactions.
+        </p>
+        <div className="mt-5">
+          <ProofList proofs={MARKETPLACE_CYCLE.map((p) => ({ ...p }))} />
+        </div>
+      </Section>
+    </>
   );
 }
