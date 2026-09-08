@@ -1,57 +1,57 @@
 # Fugugent — Design Spec
 
-**Tanggal:** 2026-09-08
-**Status:** menunggu review
-**Konteks:** BNB Chain Hackathon "The Smart Money Era: Build the Era"
-**Riset pendukung:** `docs/research/01`–`06`
+**Date:** 2026-09-08
+**Status:** awaiting review
+**Context:** BNB Chain Hackathon "The Smart Money Era: Build the Era"
+**Supporting research:** `docs/research/01`–`06`
 
 ---
 
-## 1. Posisi Produk
+## 1. Product Positioning
 
-**Fugugent adalah pintu depan agent ekonomi BNB Chain — tempat kamu bisa melihat apa
-yang boleh dilakukan sebuah agent terhadap uangmu, sebelum kamu menyewanya.**
+**Fugugent is the front door to the BNB Chain agent economy — the place where you can
+see what an agent is allowed to do with your money before you hire it.**
 
-Marketplace lain menampilkan agent sebagai daftar. Fugugent menampilkan agent sebagai
-**makhluk hidup dengan izin yang terlihat dan bisa dicabut**. Setiap agent adalah ikan
-fugu; ketika beban risikonya naik, fugunya mengembang. Metrik abstrak menjadi umpan
-balik yang langsung terbaca.
+Other marketplaces show agents as a list. Fugugent shows agents as
+**living creatures with permissions you can see and revoke**. Every agent is a
+fugu fish; when its risk load rises, the fugu puffs up. Abstract metrics become
+feedback you read instantly.
 
-Kalimat positioning (di atas fold): *"Kamu tidak menanyakan sesuatu ke agent. Kamu
-memberinya pekerjaan — dan batas yang tidak bisa ia lewati."*
+Positioning line (above the fold): *"You don't ask an agent a question. You
+give it a job — and limits it cannot cross."*
 
-### Mengapa ini menang
+### Why this wins
 
-| Kriteria juri | Bobot | Cara kami menang |
+| Judging criterion | Weight | How we win |
 |---|---|---|
-| Functionality | tinggi | Journey 4 langkah tanpa dead end: land → kategori → detail ber-URL → hire 1 tanda tangan. Setiap empty state preskriptif. |
-| Data Quality | tinggi | Metrik keputusan real-time yang bisa diverifikasi on-chain, bukan sekadar hitungan. Setiap angka punya tx hash. |
-| Agent Diversity | tinggi | 4 kategori dengan paritas yang ditegakkan checklist, plus 4 agent first-party kami sendiri sebagai lantai kualitas. |
+| Functionality | high | A 4-step journey with no dead ends: land → category → URL-addressable detail → hire with 1 signature. Every empty state is prescriptive. |
+| Data Quality | high | Real-time decision metrics that can be verified on-chain, not just counts. Every number has a tx hash. |
+| Agent Diversity | high | 4 categories with parity enforced by a checklist, plus our own 4 first-party agents as a quality floor. |
 
 ---
 
-## 2. Keputusan Terkunci
+## 2. Locked Decisions
 
-Lihat `docs/research/00-decisions.md` untuk 10 keputusan pertama. Tambahan dari sesi
-desain:
+See `docs/research/00-decisions.md` for the first 10 decisions. Additions from the
+design session:
 
-| # | Topik | Keputusan | Alasan |
+| # | Topic | Decision | Reason |
 |---|---|---|---|
-| 11 | Runtime agent | Scaffold `bag init --wallet-kind altana`, host sendiri di VPS | Studio tidak punya scheduler; trial cloud hanya 48 jam |
-| 12 | Smart contract | 3 kontrak UUPS: `FuguRegistry`, `FuguSubscription`, `FuguReputation` | Mengisi celah yang tidak ditutup ERC-8183 (job sekali jalan) maupun Altana (izin) |
-| 13 | Peran LLM | Deterministik untuk keputusan uang; LLM untuk penjelasan & riset | Bisa di-backtest jujur; sejalan dengan prinsip Studio "signing is fixed code" |
+| 11 | Agent runtime | Scaffold with `bag init --wallet-kind altana`, self-hosted on a VPS | Studio has no scheduler; the cloud trial lasts only 48 hours |
+| 12 | Smart contracts | 3 UUPS contracts: `FuguRegistry`, `FuguSubscription`, `FuguReputation` | Fills the gap that neither ERC-8183 (one-shot jobs) nor Altana (permissions) covers |
+| 13 | Role of the LLM | Deterministic for money decisions; LLM for explanation and research | Can be backtested honestly; matches Studio's "signing is fixed code" principle |
 
 ---
 
-## 3. Arsitektur Sistem
+## 3. System Architecture
 
 ```
                     fugugent.xyz              app.fugugent.xyz
                    ┌────────────┐            ┌──────────────────┐
                    │ landingpage│            │ frontend (Next 16)│
                    │  (Next 16) │            │ SSR discovery     │
-                   └────────────┘            │ detail ber-URL    │
-                                             │ panel izin+revoke │
+                   └────────────┘            │ URL-based detail  │
+                                             │ perms+revoke panel│
                                              └─────────┬─────────┘
                                                        │ REST + WS
                                              api.fugugent.xyz
@@ -59,14 +59,14 @@ desain:
                    │ backend (Hono)                                          │
                    │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────────┐  │
                    │  │ BFF/     │ │ indexer  │ │classifier│ │ scheduler  │  │
-                   │  │ proxy    │ │ ERC-8004 │ │ 4 kat.   │ │ BullMQ     │  │
+                   │  │ proxy    │ │ ERC-8004 │ │ 4 categ. │ │ BullMQ     │  │
                    │  │ 8004scan │ │ + Fugu*  │ │          │ │            │  │
                    │  └──────────┘ └──────────┘ └──────────┘ └─────┬──────┘  │
                    │       Postgres (Drizzle)  ·  Redis                │      │
                    └───────────────────────────────────────────────────┼──────┘
                                                                        │ trigger
                    ┌───────────────────────────────────────────────────▼──────┐
-                   │ ai/ — 4 agent Fugu (scaffold Studio, wallet altana)       │
+                   │ ai/ — 4 Fugu agents (Studio scaffold, altana wallet)      │
                    │  fugurebalancer · fugugrid · fuguyield · fuguguardian     │
                    │  A2A :9000 · MCP :8000 · x402 · sellerCore.runWork        │
                    └───────────────────────────────┬──────────────────────────┘
@@ -79,351 +79,352 @@ desain:
                    └──────────────────────────────────────────────────────────┘
 ```
 
-### Prinsip pemisahan
+### Separation principles
 
-- **Frontend tidak pernah memanggil 8004scan langsung.** Semua lewat BFF. Alasan:
-  upstream terbukti balas `500 DATABASE_ERROR` intermiten (4 dari 5 percobaan gagal
-  saat riset), menolak request tanpa User-Agent browser, dan API key tidak boleh
-  bocor ke browser.
-- **Setiap sumber data punya fallback.** 8004scan → indexer on-chain kami sendiri →
-  cache Postgres. Marketplace tidak boleh pernah kosong saat juri membukanya.
-- **Keputusan finansial tidak pernah melewati LLM.** Strategi = kode murni yang
-  di-backtest. LLM hanya menjelaskan keputusan yang sudah diambil.
+- **The frontend never calls 8004scan directly.** Everything goes through the BFF.
+  Reason: the upstream is proven to return intermittent `500 DATABASE_ERROR` (4 of 5
+  attempts failed during research), it rejects requests without a browser User-Agent,
+  and the API key must never leak into the browser.
+- **Every data source has a fallback.** 8004scan → our own on-chain indexer →
+  Postgres cache. The marketplace must never be empty when the judges open it.
+- **Financial decisions never pass through an LLM.** Strategies are pure code that
+  gets backtested. The LLM only explains decisions that were already made.
 
 ---
 
 ## 4. Smart Contracts
 
-Semua UUPS upgradeable (OpenZeppelin `UUPSUpgradeable` + `Initializable`), Foundry,
-BSC testnet. Library sudah ada di `contracts/lib/`.
+All UUPS upgradeable (OpenZeppelin `UUPSUpgradeable` + `Initializable`), Foundry,
+BSC testnet. The libraries are already in `contracts/lib/`.
 
 ### 4.1 `FuguRegistry`
 
-Katalog kurasi. Menjembatani ERC-8004 (identitas mentah, 309k agent kebanyakan spam)
-dengan marketplace yang layak ditampilkan.
+A curated catalog. It bridges ERC-8004 (raw identity, 309k agents, mostly spam)
+with a marketplace worth showing.
 
 ```solidity
 struct Listing {
-    uint256 erc8004AgentId;   // identitas kanonik di 0x8004A818…
-    address owner;            // creator, penerima revenue share
+    uint256 erc8004AgentId;   // canonical identity at 0x8004A818…
+    address owner;            // creator, receives the revenue share
     Category category;        // REBALANCING | GRID | YIELD | HEALTH_FACTOR
-    address agentWallet;      // wallet Altana milik agent
-    string  metadataURI;      // detail diperpanjang di luar ERC-8004
-    uint96  pricePerPeriod;   // harga langganan
+    address agentWallet;      // the agent's Altana wallet
+    string  metadataURI;      // extended detail beyond ERC-8004
+    uint96  pricePerPeriod;   // subscription price
     uint32  periodSeconds;
     bool    active;
 }
 ```
 
-- `list()`, `updateListing()`, `deactivate()` — hanya owner listing.
-- `setCurator()` — role untuk menandai listing terkurasi (badge di UI).
-- Event `Listed`, `Updated`, `Deactivated` → diindeks backend.
-- **Enum `Category` menjamin paritas 4 kategori** dapat dihitung on-chain, bukan
-  sekadar klaim di UI.
+- `list()`, `updateListing()`, `deactivate()` — listing owner only.
+- `setCurator()` — a role for marking a listing as curated (badge in the UI).
+- Events `Listed`, `Updated`, `Deactivated` → indexed by the backend.
+- **The `Category` enum makes 4-category parity** countable on-chain, not just a
+  claim in the UI.
 
 ### 4.2 `FuguSubscription`
 
-Escrow langganan periodik + revenue share. Inilah yang tidak dipunyai ERC-8183
-(escrow per-job sekali jalan) maupun Altana (hanya izin).
+Periodic subscription escrow plus revenue share. This is what neither ERC-8183
+(one-shot per-job escrow) nor Altana (permissions only) has.
 
 ```solidity
 struct Sub {
     uint256 listingId;
     address subscriber;
-    uint96  deposited;      // total masuk escrow
-    uint96  claimed;        // sudah ditarik agent
+    uint96  deposited;      // total placed in escrow
+    uint96  claimed;        // already withdrawn by the agent
     uint64  startedAt;
     uint64  expiresAt;
     bool    cancelled;
 }
 ```
 
-- `subscribe(listingId, periods)` — user deposit; dana **tetap di escrow**.
-- `claim(subId)` — agent hanya bisa menarik **pro-rata terhadap waktu yang sudah
-  berjalan**. Tidak ada pembayaran di muka penuh; agent yang mati tidak dibayar.
-- `cancel(subId)` — user menarik sisa yang belum di-klaim, kapan saja. Ini
-  memenuhi prinsip "semua aksi reversibel".
-- `_splitRevenue()` — potong `protocolFeeBps` ke treasury, sisanya ke owner listing.
-  **Payout terlihat di explorer** — janji yang HelloMinds gagal tepati.
-- **Pembayaran multi-token dengan harga berbasis USD** — lihat §4.3.
+- `subscribe(listingId, periods)` — the user deposits; the funds **stay in escrow**.
+- `claim(subId)` — the agent can only withdraw **pro-rata to the time that has
+  already elapsed**. There is no full up-front payment; a dead agent does not get paid.
+- `cancel(subId)` — the user withdraws whatever has not been claimed, at any time.
+  This satisfies the "all actions are reversible" principle.
+- `_splitRevenue()` — takes `protocolFeeBps` to the treasury, the rest goes to the
+  listing owner. **Payouts are visible in the explorer** — the promise HelloMinds
+  failed to keep.
+- **Multi-token payment with USD-denominated prices** — see §4.3.
 
-### 4.3 `FuguPriceOracle` — user memilih token pembayaran
+### 4.3 `FuguPriceOracle` — the user picks the payment token
 
-**Keputusan:** harga langganan dinyatakan dalam **USD (8 desimal)**, dan user memilih
-token mana yang dipakai membayar. Kontrak mengonversi USD → jumlah token saat
-transaksi, memakai Chainlink price feed.
+**Decision:** subscription prices are denominated in **USD (8 decimals)**, and the
+user picks which token to pay with. The contract converts USD → token amount at
+transaction time, using a Chainlink price feed.
 
-Kenapa begini, bukan harga per-token: creator menetapkan harga sekali ("$5/bulan")
-dan tidak perlu memperbarui harga tiap kali BNB bergerak. User bayar dengan apa pun
-yang ada di dompetnya. Ini juga membuat perbandingan harga antar agent di
-marketplace jadi apple-to-apple — yang langsung melayani kriteria Data Quality.
+Why this way, instead of per-token prices: the creator sets the price once ("$5/month")
+and never has to update it every time BNB moves. The user pays with whatever is in
+their wallet. It also makes price comparison between agents in the marketplace
+apples-to-apples — which directly serves the Data Quality criterion.
 
 ```solidity
 enum PriceSourceKind { CHAINLINK, FIXED_USD }
 
 struct TokenConfig {
     PriceSourceKind kind;
-    address feed;          // AggregatorV3Interface, kosong bila FIXED_USD
-    uint32  maxStaleness;  // PER TOKEN — heartbeat tiap feed berbeda
+    address feed;          // AggregatorV3Interface, empty when FIXED_USD
+    uint32  maxStaleness;  // PER TOKEN — each feed has a different heartbeat
     uint8   tokenDecimals;
-    uint64  fixedPriceUsd; // 8 desimal, dipakai bila FIXED_USD
+    uint64  fixedPriceUsd; // 8 decimals, used when FIXED_USD
     bool    enabled;
 }
 mapping(address => TokenConfig) public tokens;   // address(0) = native tBNB
 ```
 
-`quote(token, usdAmount8) → tokenAmount` melakukan:
-1. baca `latestRoundData()`
-2. **tolak bila `answer <= 0`** atau `block.timestamp - updatedAt > maxStaleness`
-3. konversi dengan memperhatikan desimal token dan desimal feed
+`quote(token, usdAmount8) → tokenAmount` does the following:
+1. read `latestRoundData()`
+2. **reject if `answer <= 0`** or `block.timestamp - updatedAt > maxStaleness`
+3. convert, accounting for the token decimals and the feed decimals
 
-**Ambang staleness harus per-token.** Terverifikasi live di testnet hari ini:
-BNB/USD baru saja update, sementara USDT/USD terakhir update ~8 jam lalu. Satu
-ambang seragam akan menolak semua pembayaran USDT. Rencana awal: BNB 1 jam,
-stablecoin 26 jam.
+**The staleness threshold must be per-token.** Verified live on testnet today:
+BNB/USD had just updated, while USDT/USD had last updated ~8 hours earlier. A single
+uniform threshold would reject every USDT payment. Initial plan: BNB 1 hour,
+stablecoins 26 hours.
 
-**Token yang didukung saat peluncuran** (semua terverifikasi live di BSC testnet 97):
+**Tokens supported at launch** (all verified live on BSC testnet 97):
 
-| Token | Alamat | Desimal | Sumber harga |
+| Token | Address | Decimals | Price source |
 |---|---|---|---|
 | tBNB (native) | `address(0)` | 18 | Chainlink BNB/USD `0x2514895c72f50D8bd4B4F9b1110F0D6bD2c97526` |
 | USDT | `0x337610d27c682E347C9cD60BD4b3b107C9d34dDd` | **18** | Chainlink USDT/USD `0xEca2605f0BCF2BA5966372C99837b1F182d3D620` |
 | BUSD | `0xeD24FC36d5Ee211Ea25A80239Fb8C4Cfd80f12Ee` | 18 | Chainlink BUSD/USD `0x9331b55D9830EF609A2aBCfAc0FBCE050A52fdEa` |
-| U | `0xc70B8741B8B07A6d61E54fd4B20f22Fa648E5565` | 18 | `FIXED_USD` = $1,00 (tidak ada feed Chainlink; U = United Stables) |
+| U | `0xc70B8741B8B07A6d61E54fd4B20f22Fa648E5565` | 18 | `FIXED_USD` = $1.00 (no Chainlink feed; U = United Stables) |
 
-> ⚠️ **USDT di BSC 18 desimal, bukan 6.** Ini jebakan yang sudah memakan korban dan
-> harus dites eksplisit. Alamat USDT testnet alternatif yang juga hidup:
-> `0x7ef95a0FEE0Dd31b22626fA2e10Ee6A223F8a684`.
+> ⚠️ **USDT on BSC has 18 decimals, not 6.** This is a trap that has already claimed
+> victims and must be tested explicitly. An alternative testnet USDT address that is
+> also live: `0x7ef95a0FEE0Dd31b22626fA2e10Ee6A223F8a684`.
 
-**Konsekuensi desain di `FuguSubscription`:** jumlah token dikunci pada saat
-`subscribe()` (bukan dihitung ulang saat `claim`), sehingga pergerakan harga setelah
-berlangganan tidak mengubah hak siapa pun. Refund saat `cancel()` dibayarkan dalam
-token yang sama dengan yang disetor. Setiap langganan menyimpan `payToken`.
+**Design consequence in `FuguSubscription`:** the token amount is locked at
+`subscribe()` time (not recomputed at `claim`), so price movement after subscribing
+does not change anyone's entitlement. A refund at `cancel()` is paid in the same
+token that was deposited. Every subscription stores its `payToken`.
 
-**Yang bisa diubah owner:** menambah/menonaktifkan token, mengganti feed, mengubah
-staleness. Owner **tidak bisa** menyentuh dana yang sudah di escrow.
+**What the owner can change:** add/disable tokens, swap a feed, change staleness.
+The owner **cannot** touch funds already in escrow.
 
 ### 4.4 `FuguReputation`
 
-Review anti-sybil.
+Anti-sybil reviews.
 
-- `review(listingId, score, uri)` — **hanya bisa dipanggil wallet yang punya
-  langganan berakhir/aktif terbukti di `FuguSubscription`.** Satu review per
-  langganan, bisa di-update sekali.
-- Menyimpan agregat `sum/count` per listing untuk pembacaan murah.
-- Ini rating yang **hanya mungkin di Web3** — tidak bisa dipalsukan tanpa membayar.
+- `review(listingId, score, uri)` — **can only be called by a wallet with a proven
+  expired/active subscription in `FuguSubscription`.** One review per subscription,
+  editable once.
+- Stores the `sum/count` aggregate per listing for cheap reads.
+- This is a rating that is **only possible in Web3** — it cannot be faked without paying.
 
-### 4.5 Pola upgrade
+### 4.5 Upgrade pattern
 
-- Proxy: ERC1967 via `UUPSUpgradeable`. `_authorizeUpgrade` dijaga `onlyOwner`.
-- Owner awal = deployer EOA; catat rencana pindah ke multisig setelah hackathon.
-- **Storage gap `uint256[45] __gap`** di setiap kontrak.
-- Script `contracts/script/`: `Deploy.s.sol` (deploy proxy + impl), `Upgrade.s.sol`.
-- Test wajib: initializer tidak bisa dipanggil dua kali; upgrade mempertahankan
-  storage; non-owner tidak bisa upgrade; klaim pro-rata benar di batas periode;
-  review ditolak tanpa langganan.
+- Proxy: ERC1967 via `UUPSUpgradeable`. `_authorizeUpgrade` is guarded by `onlyOwner`.
+- Initial owner = deployer EOA; note the plan to move to a multisig after the hackathon.
+- **Storage gap `uint256[45] __gap`** in every contract.
+- Scripts in `contracts/script/`: `Deploy.s.sol` (deploy proxy + impl), `Upgrade.s.sol`.
+- Required tests: the initializer cannot be called twice; an upgrade preserves
+  storage; a non-owner cannot upgrade; pro-rata claims are correct at period
+  boundaries; a review is rejected without a subscription.
 
 ---
 
-## 5. Empat Agent Fugu
+## 5. The Four Fugu Agents
 
-### 5.1 Pola bersama
+### 5.1 Shared pattern
 
-Setiap agent adalah project hasil `bag init <nama> --wallet-kind altana
---destination self --no-onboard`, dengan:
+Every agent is a project produced by `bag init <name> --wallet-kind altana
+--destination self --no-onboard`, with:
 
-- **Strategi** di `app/agent/src/strategy/` — kode deterministik murni, tanpa I/O,
-  bisa di-unit-test dan di-backtest.
-- **`sellerCore.ts` `runWork`** — menjembatani strategi ke eksekusi.
-- **Eksekusi** lewat session key Altana: `execute({ session, calls })`.
-- **Scheduler eksternal** (BullMQ di backend) yang memanggil endpoint agent, karena
-  Studio tidak punya background poller.
-- **Penjelasan** dihasilkan dGrid: "kenapa aku melakukan ini" dalam bahasa manusia,
-  dilampirkan ke setiap run.
+- **The strategy** in `app/agent/src/strategy/` — pure deterministic code, no I/O,
+  unit-testable and backtestable.
+- **`sellerCore.ts` `runWork`** — bridges the strategy to execution.
+- **Execution** through an Altana session key: `execute({ session, calls })`.
+- **An external scheduler** (BullMQ in the backend) that calls the agent endpoint,
+  because Studio has no background poller.
+- **Explanations** generated by dGrid: "why I did this" in human language,
+  attached to every run.
 
-Nama project harus ≤23 char, alfanumerik, diawali huruf (aturan AgentCore):
+Project names must be ≤23 chars, alphanumeric, starting with a letter (AgentCore rule):
 `fugurebalancer`, `fugugrid`, `fuguyield`, `fuguguardian`.
 
-### 5.2 Agent
+### 5.2 The agents
 
-| Agent | Kategori | Protokol | Trigger | Aksi |
+| Agent | Category | Protocols | Trigger | Action |
 |---|---|---|---|---|
-| **Fugu Rebalancer** | Rebalancing | PancakeSwap v3 | harga keluar range / deviasi / interval | hitung range baru, cek profitabilitas setelah gas+slippage+IL, `decreaseLiquidity`→`mint` |
-| **Fugu Grid** | Grid Trading | PancakeSwap v3 swap | keeper memantau `slot0()`; harga melintasi level grid | eksekusi swap pada level, catat fill |
-| **Fugu Yield** | Yield Optimisation | Venus, Aave v3, Lista | selisih APR melebihi ambang biaya migrasi | pindahkan posisi ke pool ber-APR-tertimbang-risiko tertinggi |
-| **Fugu Guardian** | Health Factor | Venus, Aave v3 | HF turun di bawah ambang | partial repay / top-up collateral / alert |
+| **Fugu Rebalancer** | Rebalancing | PancakeSwap v3 | price leaves range / deviation / interval | compute a new range, check profitability after gas+slippage+IL, `decreaseLiquidity`→`mint` |
+| **Fugu Grid** | Grid Trading | PancakeSwap v3 swap | keeper watches `slot0()`; price crosses a grid level | execute the swap at that level, record the fill |
+| **Fugu Yield** | Yield Optimisation | Venus, Aave v3, Lista | the APR gap exceeds the migration cost threshold | move the position to the pool with the highest risk-weighted APR |
+| **Fugu Guardian** | Health Factor | Venus, Aave v3 | HF falls below a threshold | partial repay / top up collateral / alert |
 
-Detail parameter, rumus, dan sumber data ada di `docs/research/06-agent-strategies.md`.
+Parameter details, formulas, and data sources are in `docs/research/06-agent-strategies.md`.
 
-### 5.3 Batas keras (non-negosiabel)
+### 5.3 Hard limits (non-negotiable)
 
-Setiap agent berjalan di bawah session Altana dengan:
-- **call allowlist** — hanya selector dan alamat kontrak yang dibutuhkan strateginya
-- **spend cap** — rekomendasi awal 10 U/hari
-- **expiry** — 30 hari, ditampilkan sebagai hitung mundur di UI
-- terdaftar di **Keystore** `0x6b8361C29d05D498b1a12B54A37310f94171E94A`
+Every agent runs under an Altana session with:
+- **a call allowlist** — only the selectors and contract addresses its strategy needs
+- **a spend cap** — initial recommendation 10 U/day
+- **an expiry** — 30 days, shown as a countdown in the UI
+- registered in the **Keystore** at `0x6b8361C29d05D498b1a12B54A37310f94171E94A`
 
-Tiga jebakan yang sudah diketahui dan harus dihindari (dari riset Altana):
-1. `calls: []` kosong = izin **tanpa batas**. Selalu isi eksplisit.
-2. USDT/USDC di BNB Chain **18 desimal**, bukan 6.
-3. Native spend cap juga membayar relay fee — cap terlalu kecil membuat semua
-   eksekusi `FAILED` code 300.
+Three known traps that must be avoided (from the Altana research):
+1. An empty `calls: []` means **unlimited** permission. Always fill it explicitly.
+2. USDT/USDC on BNB Chain have **18 decimals**, not 6.
+3. The native spend cap also pays the relay fee — a cap that is too small makes every
+   execution `FAILED` with code 300.
 
 
-### 5.4 Catatan implementasi dari riset strategi
+### 5.4 Implementation notes from the strategy research
 
-Dari `docs/research/06-agent-strategies.md` — semua ditandai terverifikasi live:
+From `docs/research/06-agent-strategies.md` — all marked verified live:
 
-- **Grid butuh keeper sendiri.** PancakeSwap **tidak punya order-book on-chain**;
-  "limit order"-nya bergantung pada taker off-chain. Agent Grid harus memantau
-  `slot0()` pool dan mengeksekusi swap langsung. Strategi ini secara struktural
-  mean-reversion — **rugi di pasar trending, dan itu harus dinyatakan terbuka**
-  di halaman agent. Kejujuran ini menaikkan kredibilitas, bukan menurunkannya.
-- **Rebalance hanya dieksekusi bila `ΔFee − Gas − Slippage − ΔIL > 0`.** Lebar range
-  adalah fungsi realized volatility (±k·σ), bukan persen tetap. Trigger gabungan:
-  keluar-range + deviasi >70–80% dari pusat + cooldown agar tidak churn.
-- **Health factor punya ground truth.** `Venus.getAccountLiquidity()` di Comptroller
-  `0xfD36E2c2a6789Db23113685031d7F16329158384` dan `AaveV3Pool.getUserAccountData()`
-  di `0x6807dc923806fE8Fd134338EABCA509979a7e0cB` keduanya terverifikasi live.
-  Harga dari Chainlink BNB/USD `0x0567F2323251f0Aab15c8dFb1967E4e8A7D42aeE`
-  (decimals 8, terverifikasi). Ini sebabnya Guardian dibangun pertama — kebenarannya
-  bisa dibuktikan terhadap angka on-chain.
-- **APR yield** dari DefiLlama Yields API `https://yields.llama.fi/pools`
-  (chain `"BSC"`, slug `venus-core-pool`, `aave-v3`, `lista-lending` — semua ada).
-  **Tapi `pancakeswap-amm-v3` tidak mencakup BSC di DefiLlama** — fee APR PancakeSwap
-  v3 harus dihitung sendiri dari event on-chain.
+- **Grid needs its own keeper.** PancakeSwap has **no on-chain order book**; its
+  "limit orders" depend on an off-chain taker. The Grid agent has to watch the pool's
+  `slot0()` and execute swaps itself. This strategy is structurally mean-reversion —
+  **it loses money in trending markets, and that must be stated openly**
+  on the agent page. That honesty raises credibility; it does not lower it.
+- **A rebalance is only executed when `ΔFee − Gas − Slippage − ΔIL > 0`.** The range
+  width is a function of realized volatility (±k·σ), not a fixed percentage. Combined
+  trigger: out-of-range + deviation >70–80% from the center + a cooldown to avoid churn.
+- **The health factor has a ground truth.** `Venus.getAccountLiquidity()` on the
+  Comptroller at `0xfD36E2c2a6789Db23113685031d7F16329158384` and
+  `AaveV3Pool.getUserAccountData()` at `0x6807dc923806fE8Fd134338EABCA509979a7e0cB`
+  are both verified live. Prices from Chainlink BNB/USD
+  `0x0567F2323251f0Aab15c8dFb1967E4e8A7D42aeE` (decimals 8, verified). This is why
+  Guardian is built first — its correctness can be proven against on-chain numbers.
+- **Yield APR** from the DefiLlama Yields API `https://yields.llama.fi/pools`
+  (chain `"BSC"`, slugs `venus-core-pool`, `aave-v3`, `lista-lending` — all present).
+  **But `pancakeswap-amm-v3` does not cover BSC on DefiLlama** — PancakeSwap v3 fee
+  APR has to be computed by us from on-chain events.
 
-**Alamat yang TERBUKTI SALAH — jangan dipakai:** Aave PoolAddressesProvider
-`0xA97684ea...` tidak punya kode di BSC.
+**Address PROVEN WRONG — do not use it:** the Aave PoolAddressesProvider
+`0xA97684ea...` has no code on BSC.
 
-**Masih perlu verifikasi:** alamat oracle internal Venus/Aave (berbeda dari feed
-Chainlink umum), endpoint subgraph PancakeSwap v3 BSC yang aktif (hosted service
-The Graph sudah deprecated).
+**Still needs verification:** the internal Venus/Aave oracle addresses (different from
+the common Chainlink feeds), and an active PancakeSwap v3 BSC subgraph endpoint
+(The Graph's hosted service is deprecated).
 
 ---
 
-## 6. Backend & Pipeline Data
+## 6. Backend & Data Pipeline
 
-### 6.1 Sinkronisasi agent
+### 6.1 Agent synchronization
 
 ```
 8004scan API ──cron──┐
-  semantic search     ├──► normalizer ──► Postgres ──► classifier ──► kategori
+  semantic search     ├──► normalizer ──► Postgres ──► classifier ──► category
   filtered list       │                                (rule + LLM dGrid)
 webhook realtime  ────┘
-ERC-8004 on-chain ────► indexer (eth_getLogs) ──► fallback + verifikasi
-FuguRegistry     ─────► indexer ──► listing first-party
+ERC-8004 on-chain ────► indexer (eth_getLogs) ──► fallback + verification
+FuguRegistry     ─────► indexer ──► first-party listings
 ```
 
-**Klasifikasi 4 kategori — 4 lapis** (dari riset 8004scan, terbukti bekerja live):
-1. Semantic search per kategori (`semantic_weight=0.7`, `threshold=0.55`)
-2. Pre-filter populasi (`is_registered`, `min_score`, `has_a2a`, `is_endpoint_verified`)
-3. Keyword search terarah
-4. Klasifikasi LLM atas metadata mentah, hasilnya di-cache
+**4-category classification — 4 layers** (from the 8004scan research, proven to work live):
+1. Semantic search per category (`semantic_weight=0.7`, `threshold=0.55`)
+2. Population pre-filter (`is_registered`, `min_score`, `has_a2a`, `is_endpoint_verified`)
+3. Targeted keyword search
+4. LLM classification over the raw metadata, with the result cached
 
-Skor kepercayaan disimpan; agent yang tidak lolos ambang tidak ditampilkan.
+A confidence score is stored; agents that do not clear the threshold are not shown.
 
-**Anti-spam wajib**: dari 309k agent BSC mayoritas bulk registration. Filter dengan
-`is_registered=true` + `min_score` + `has_a2a=true` + `owner_publisher_tier`.
+**Anti-spam is mandatory**: of the 309k BSC agents, most are bulk registrations. Filter
+with `is_registered=true` + `min_score` + `has_a2a=true` + `owner_publisher_tier`.
 
-### 6.2 Ketahanan (langsung menjawab kriteria Data Quality)
+### 6.2 Resilience (this answers the Data Quality criterion directly)
 
-- `User-Agent` browser + `X-API-Key` pada setiap panggilan 8004scan
-- Retry exponential backoff 3–5×, circuit breaker
-- Cache TTL: detail agent 60s · leaderboard 5m · trending 1m · global 60s
-- **Fallback berjenjang**: API → cache → on-chain → seed terkurasi
-- Health endpoint yang menampilkan status tiap sumber data (jujur ke juri)
+- Browser `User-Agent` + `X-API-Key` on every 8004scan call
+- Exponential backoff retry 3–5×, circuit breaker
+- Cache TTL: agent detail 60s · leaderboard 5m · trending 1m · global 60s
+- **Tiered fallback**: API → cache → on-chain → curated seed
+- A health endpoint that shows the status of every data source (honest with the judges)
 
-### 6.3 Metrik yang dihitung sendiri (pembeda utama)
+### 6.3 Metrics we compute ourselves (the main differentiator)
 
-Tidak diambil dari mana pun — kami hitung dari data on-chain:
+Not taken from anywhere — we compute them from on-chain data:
 
-| Metrik | Sumber perhitungan |
+| Metric | How it is computed |
 |---|---|
-| Realized APR 7d/30d | perubahan nilai posisi + fee terklaim, dari event |
-| Time-in-range % (LP) | tick posisi vs tick pool sepanjang waktu |
-| Biaya per rebalance | `gasUsed × effectiveGasPrice` dari receipt |
-| Fee vs profit ratio | fee terklaim ÷ PnL bersih |
-| Max drawdown | kurva ekuitas per langganan |
-| Jarak ke likuidasi (%) | HF on-chain + harga oracle |
-| Uptime agent | keberhasilan run terjadwal |
-| Median latency run | timestamp mulai→selesai |
-| Biaya rata-rata per run | agregat gas + LLM |
+| Realized APR 7d/30d | change in position value + claimed fees, from events |
+| Time-in-range % (LP) | position tick vs pool tick over time |
+| Cost per rebalance | `gasUsed × effectiveGasPrice` from the receipt |
+| Fee vs profit ratio | claimed fees ÷ net PnL |
+| Max drawdown | the equity curve per subscription |
+| Distance to liquidation (%) | on-chain HF + oracle price |
+| Agent uptime | success rate of scheduled runs |
+| Median run latency | start→finish timestamps |
+| Average cost per run | aggregate gas + LLM |
 
-**Setiap angka menyertakan tx hash yang bisa diklik ke BscScan.**
+**Every number carries a tx hash that is clickable through to BscScan.**
 
 ---
 
 ## 7. Frontend
 
-### 7.1 Journey (dirancang untuk "tanpa dead end")
+### 7.1 Journey (designed for "no dead ends")
 
 ```
-landing → [Lihat agent] → discovery (4 tab kategori, SSR)
-   → kartu fugu (metrik + level + badge) → detail ber-URL /agent/[id]
-   → panel "agent ini boleh apa" → Hire → 1 tanda tangan → dashboard live
+landing → [See agents] → discovery (4 category tabs, SSR)
+   → fugu card (metrics + level + badge) → URL-addressable detail /agent/[id]
+   → "what this agent may do" panel → Hire → 1 signature → live dashboard
 ```
 
-### 7.2 Anatomi kartu agent
+### 7.2 Anatomy of an agent card
 
-Karakter fugu · nama · kategori · **success rate 7d** · jumlah run · median latency ·
-biaya rata-rata/run · terakhir aktif · jumlah hirer aktif · badge trust
-(endpoint verified / publisher tier / health) · harga langganan.
+Fugu character · name · category · **7d success rate** · run count · median latency ·
+average cost/run · last active · number of active hirers · trust badges
+(endpoint verified / publisher tier / health) · subscription price.
 
-### 7.3 Halaman detail — bagian yang membedakan
+### 7.3 Detail page — the parts that set us apart
 
-- **Panel izin, ditampilkan ke calon pembeli sebelum hire**: "agent ini bisa memanggil
-  X, pada kontrak Y, maksimal Z per hari, kedaluwarsa dalam N hari" — dibaca langsung
-  dari Keystore on-chain, bukan dari klaim kami.
-- **Tombol Revoke** yang benar-benar mengirim transaksi revoke.
-- **Live run feed** via WebSocket: langkah demi langkah + tx hash.
-- Grafik ekuitas, distribusi PnL, riwayat run.
-- Review terverifikasi (hanya dari wallet yang terbukti pernah hire).
+- **A permissions panel, shown to the prospective buyer before hiring**: "this agent can
+  call X, on contract Y, at most Z per day, expiring in N days" — read straight from
+  the on-chain Keystore, not from our claims.
+- **A Revoke button** that really sends a revoke transaction.
+- **A live run feed** over WebSocket: step by step + tx hash.
+- Equity chart, PnL distribution, run history.
+- Verified reviews (only from wallets proven to have hired).
 
-### 7.4 Aturan UI yang ditegakkan
+### 7.4 Enforced UI rules
 
-- Setiap empty state menyebut aksi + menyediakan tombolnya
-- Estimasi biaya sebelum hire, bukan sekadar peringatan
-- Badge `Hired` untuk mencegah bayar dua kali
-- Detail = halaman ber-URL dengan OG image fugu, bukan modal
-- **Jangan pernah mengirim kontrol setengah jadi** — lebih baik hilangkan elemennya
+- Every empty state names an action and provides the button for it
+- A cost estimate before hiring, not just a warning
+- A `Hired` badge to prevent paying twice
+- Detail = a URL-addressable page with a fugu OG image, not a modal
+- **Never ship a half-finished control** — better to remove the element
 
 ---
 
-### 7.5 Pembeda terhadap lanskap kompetitif
+### 7.5 Differentiators against the competitive landscape
 
-Dari `docs/research/05-competitive-landscape.md`:
+From `docs/research/05-competitive-landscape.md`:
 
-1. **Badge "verified on-chain" pada setiap angka.** Setiap AUM/PnL/APR bisa diklik
-   ke tx hash. Ini menyerang kegagalan nyata pasar: **Giza/ARMA ditutup Feb 2026**
-   setelah dashboard-nya menampilkan AUM besar sementara pengukuran on-chain
-   independen menunjukkan posisi nyaris nol. Kepercayaan pada angka marketplace
-   agent sedang rusak — kami memperbaikinya dengan bukti, bukan klaim.
-2. **Leaderboard per kategori** dengan metrik seragam, bukan satu daftar global.
-3. **Perbandingan head-to-head** antar agent dalam kategori yang sama —
-   tidak ditemukan di satu pun kompetitor yang diriset.
-4. **Mode simulasi / dry-run gratis** sebelum menaruh dana nyata.
-5. **Breakdown fee vs profit** — "net setelah gas $Y + fee $Z", bukan APR headline.
-6. **Uptime & latensi sebagai metrik kepercayaan kelas satu** — untuk health factor
-   monitoring, keterlambatan adalah risiko likuidasi nyata.
-7. **Kurasi sebelum tayang** untuk agent DeFi — menghindari masalah kuantitas-tanpa-
-   kualitas (Virtuals: 18.000+ agent mayoritas tanpa produk nyata; GPT Store: spam).
-8. **Metrik yang setara-dalam per kategori** — health factor dinilai dengan
-   "jarak ke likuidasi %", bukan dipaksa memakai APR. Ini yang membuat Agent
-   Diversity benar-benar setara, bukan sekadar empat tab.
+1. **A "verified on-chain" badge on every number.** Every AUM/PnL/APR is clickable
+   through to a tx hash. This attacks a real failure in the market: **Giza/ARMA shut
+   down in Feb 2026** after its dashboard displayed a large AUM while independent
+   on-chain measurement showed positions near zero. Trust in agent marketplace numbers
+   is broken — we fix it with proof, not claims.
+2. **A leaderboard per category** with uniform metrics, not one global list.
+3. **Head-to-head comparison** between agents in the same category —
+   found in none of the competitors researched.
+4. **A free simulation / dry-run mode** before putting up real money.
+5. **A fee vs profit breakdown** — "net after $Y gas + $Z fees", not a headline APR.
+6. **Uptime and latency as first-class trust metrics** — for health factor
+   monitoring, being late is a real liquidation risk.
+7. **Curation before listing** for DeFi agents — avoiding the quantity-without-quality
+   problem (Virtuals: 18,000+ agents, mostly with no real product; GPT Store: spam).
+8. **Metrics that are equivalent within each category** — health factor is judged by
+   "distance to liquidation %", not forced onto APR. This is what makes Agent
+   Diversity genuinely equal, not just four tabs.
 
 ---
 
-## 8. Identitas Visual
+## 8. Visual Identity
 
-4 karakter fugu, masing-masing dengan state: `idle`, `working`, `alert`, `profit`.
+4 fugu characters, each with states: `idle`, `working`, `alert`, `profit`.
 
-**Mekanik inti: fugu mengembang seiring beban risiko.** Tingkat kembung dipetakan dari
-metrik risiko nyata agent (jarak ke likuidasi untuk Guardian, drawdown untuk Grid,
-waktu di luar range untuk Rebalancer). Ini mengubah angka menjadi perasaan.
+**The core mechanic: the fugu puffs up with its risk load.** The puff level is mapped
+from the agent's real risk metrics (distance to liquidation for Guardian, drawdown for
+Grid, time out of range for Rebalancer). This turns numbers into a feeling.
 
-Fugu fallback ber-warna deterministik dari ID agent untuk agent pihak ketiga —
-tidak pernah ada kartu kosong, dan identitas visual gratis untuk 309k agent.
+Fallback fugus are colored deterministically from the agent ID for third-party agents —
+there is never an empty card, and it is free visual identity for 309k agents.
 
 ---
 
@@ -431,58 +432,59 @@ tidak pernah ada kartu kosong, dan identitas visual gratis untuk 309k agent.
 
 VPS, Docker Compose + Caddy:
 
-| Service | Isi |
+| Service | Contents |
 |---|---|
-| `caddy` | TLS otomatis, reverse proxy |
+| `caddy` | automatic TLS, reverse proxy |
 | `frontend` | Next.js → `app.fugugent.xyz` |
 | `landing` | Next.js → `fugugent.xyz` |
 | `api` | Hono → `api.fugugent.xyz` |
 | `worker` | BullMQ scheduler + indexer |
-| `agent-*` | 4 agent Fugu (A2A/MCP/x402) |
+| `agent-*` | the 4 Fugu agents (A2A/MCP/x402) |
 | `postgres`, `redis` | data |
 
-`RPC_URL` **wajib** di-override — default SDK `binance.org` terbukti diblokir dari
-jaringan Indonesia. Pakai `https://data-seed-prebsc-1-s1.bnbchain.org:8545` atau
-`https://bsc-testnet-rpc.publicnode.com`.
+`RPC_URL` **must** be overridden — the SDK default `binance.org` is proven to be
+blocked from the Indonesian network. Use `https://data-seed-prebsc-1-s1.bnbchain.org:8545`
+or `https://bsc-testnet-rpc.publicnode.com`.
 
 ---
 
-## 10. Risiko & Mitigasi
+## 10. Risks & Mitigations
 
-| # | Risiko | Dampak | Mitigasi |
+| # | Risk | Impact | Mitigation |
 |---|---|---|---|
-| R1 | 8004scan `500 DATABASE_ERROR` intermiten | Marketplace kosong saat dinilai | BFF + cache + fallback on-chain + seed terkurasi |
-| R2 | **Konflik versi Altana SDK**: Studio pin 0.7.1 & tolak drift; riset Altana bilang butuh 0.9.0 untuk ERC-8183 testnet | Bisa memblokir jalur bonus ERC-8183 | **Uji lebih dulu** sebelum menulis kode. Kalau konflik nyata: pakai jalur Altana SDK terpisah di backend, bukan di dalam project Studio |
-| R3 | dGrid tidak bisa dipasang sebagai provider Studio (altana menolak pieverse) | Agent tanpa lapisan penjelasan | Pakai `--llm-provider openai` + override base URL ke dGrid; kalau ditolak, panggil dGrid dari backend, bukan dari dalam agent |
-| R4 | Session Altana kedaluwarsa saat judging | Demo mati | Expiry 30 hari + hitung mundur di UI + alert |
-| R5 | Spend cap native terlalu kecil → semua tx `FAILED` | Agent tidak pernah jalan | Cap awal longgar, uji end-to-end di testnet dulu |
-| R6 | Binance Bazaar/B402 diblokir dari Indonesia | Jalur discovery merchant mati | Bukan jalur kritis; lewati atau uji lewat VPS (VPS di luar ID) |
-| R7 | Waktu | Scope tidak selesai | Urutan: SC → agent → backend → frontend → landing (sesuai prioritas) |
+| R1 | Intermittent 8004scan `500 DATABASE_ERROR` | Empty marketplace during judging | BFF + cache + on-chain fallback + curated seed |
+| R2 | **Altana SDK version conflict**: Studio pins 0.7.1 and rejects drift; the Altana research says 0.9.0 is needed for ERC-8183 on testnet | Could block the ERC-8183 bonus track | **Test this first**, before writing code. If the conflict is real: use a separate Altana SDK path in the backend, not inside the Studio project |
+| R3 | dGrid cannot be installed as a Studio provider (altana rejects pieverse) | An agent with no explanation layer | Use `--llm-provider openai` + override the base URL to dGrid; if that is rejected, call dGrid from the backend, not from inside the agent |
+| R4 | The Altana session expires during judging | Dead demo | 30-day expiry + a countdown in the UI + alerts |
+| R5 | The native spend cap is too small → every tx `FAILED` | The agent never runs | Start with a loose cap, test end-to-end on testnet first |
+| R6 | Binance Bazaar/B402 is blocked from Indonesia | The merchant discovery path is dead | Not a critical path; skip it or test it through the VPS (the VPS is outside ID) |
+| R7 | Time | The scope does not get finished | Order: SC → agents → backend → frontend → landing (by priority) |
 
 ---
 
 ## 11. Open Questions
 
-1. **R2 & R3 di atas harus diuji sebelum menulis kode agent** — ini gate teknis pertama.
-2. ~~dGrid x402 mainnet vs testnet~~ → **DIPUTUSKAN: konsisten testnet.** Agent
-   membayar inference lewat API key dGrid biasa. Jalur x402 mainnet tidak dipakai
-   untuk sekarang.
-3. API key 8004scan Pro — harus diajukan lewat form hackathon.
-4. ~~Token pembayaran langganan~~ → **DIPUTUSKAN: user memilih**, harga dalam USD,
-   dikonversi lewat Chainlink. Lihat §4.3.
-5. Bagian PancakeSwap di `docs/research/04` belum selesai ditulis (agen riset terputus);
-   sebagian tercakup di `06-agent-strategies.md`.
+1. **R2 and R3 above must be tested before any agent code is written** — this is the
+   first technical gate.
+2. ~~dGrid x402 mainnet vs testnet~~ → **DECIDED: stay consistently on testnet.** The
+   agent pays for inference through a normal dGrid API key. The x402 mainnet path is
+   not used for now.
+3. The 8004scan Pro API key — must be requested through the hackathon form.
+4. ~~Subscription payment token~~ → **DECIDED: the user chooses**, prices in USD,
+   converted through Chainlink. See §4.3.
+5. The PancakeSwap section in `docs/research/04` was never finished (the research agent
+   was cut off); part of it is covered in `06-agent-strategies.md`.
 
 ---
 
-## 12. Urutan Kerja
+## 12. Order of Work
 
-1. **Gate teknis**: uji R2 (versi SDK Altana) & R3 (dGrid sebagai provider) — sebelum apa pun
-2. **Smart contracts**: 3 kontrak UUPS + test + deploy testnet
-3. **Satu agent utuh** (Fugu Guardian — paling mudah diverifikasi kebenarannya:
-   HF on-chain punya ground truth) sebagai pola untuk 3 sisanya
-4. **Tiga agent sisanya**
+1. **Technical gate**: test R2 (Altana SDK version) and R3 (dGrid as a provider) — before anything else
+2. **Smart contracts**: 3 UUPS contracts + tests + testnet deploy
+3. **One complete agent** (Fugu Guardian — the easiest to verify for correctness:
+   on-chain HF has a ground truth) as the pattern for the other three
+4. **The other three agents**
 5. **Backend**: indexer, BFF, classifier, scheduler
 6. **Frontend**: discovery → detail → hire → dashboard
 7. **Landing page**
-8. **Agent Advantage Report** (dijalankan paralel sejak agent pertama hidup)
+8. **Agent Advantage Report** (run in parallel from the moment the first agent is alive)

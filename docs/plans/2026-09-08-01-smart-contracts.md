@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Empat kontrak UUPS upgradeable di BSC testnet yang menjadi lapisan komersial Fugugent: katalog agent terkurasi, langganan escrow multi-token berbasis harga USD dengan klaim pro-rata dan revenue share, serta reputasi anti-sybil.
+**Goal:** Four UUPS upgradeable contracts on BSC testnet that form Fugugent's commercial layer: a curated agent catalog, multi-token escrow subscriptions priced in USD with pro-rata claims and revenue share, and anti-sybil reputation.
 
-**Architecture:** Empat kontrak terpisah dengan tanggung jawab tunggal, dihubungkan lewat alamat yang di-set saat inisialisasi. `FuguPriceOracle` mengubah harga USD menjadi jumlah token lewat Chainlink. `FuguRegistry` memegang katalog. `FuguSubscription` memegang uang dan satu-satunya yang menyentuh dana. `FuguReputation` membaca `FuguSubscription` untuk membuktikan hak review. Semua UUPS + Ownable, storage append-only.
+**Architecture:** Four separate contracts, each with a single responsibility, wired together through addresses set at initialization. `FuguPriceOracle` turns a USD price into a token amount through Chainlink. `FuguRegistry` holds the catalog. `FuguSubscription` holds the money and is the only contract that touches funds. `FuguReputation` reads `FuguSubscription` to prove the right to review. All UUPS + Ownable, append-only storage.
 
 **Tech Stack:** Solidity 0.8.30, Foundry (forge 1.7.1), OpenZeppelin Contracts & Contracts-Upgradeable 5.7.0, BSC testnet (chainId 97).
 
@@ -12,44 +12,44 @@
 
 ## Global Constraints
 
-- Solidity pragma **`^0.8.30`** di semua file `src/`.
-- OpenZeppelin **5.7.0**. Parent OZ memakai ERC-7201 namespaced storage, sehingga **tidak** menggeser slot storage kontrak turunan. Karena itu **jangan tulis `__gap`** — cukup patuhi aturan **append-only**: variabel state baru hanya boleh ditambahkan di akhir, tidak pernah disisipkan atau dihapus.
-- Semua kontrak: `Initializable` + `UUPSUpgradeable` + `OwnableUpgradeable`, dengan `_disableInitializers()` di `constructor`.
-- `_authorizeUpgrade(address) internal override onlyOwner {}` di setiap kontrak.
-- Harga USD selalu **8 desimal** (mengikuti Chainlink). Variabel bernama akhiran `Usd8`.
-- **Semua token di BSC 18 desimal, termasuk USDT.** Jangan pernah hardcode 6.
-- Native coin (tBNB) diwakili `address(0)`.
-- Custom errors, bukan `require` string.
-- Setiap kontrak punya file test sendiri di `contracts/test/`.
-- Nama file test: `<Kontrak>.t.sol`. Nama kontrak test: `<Kontrak>Test`.
-- Perintah dijalankan dari `contracts/`.
+- Solidity pragma **`^0.8.30`** in every `src/` file.
+- OpenZeppelin **5.7.0**. The OZ parents use ERC-7201 namespaced storage, so they do **not** shift the storage slots of derived contracts. For that reason **do not write `__gap`** — just obey the **append-only** rule: new state variables may only be added at the end, never inserted and never removed.
+- Every contract: `Initializable` + `UUPSUpgradeable` + `OwnableUpgradeable`, with `_disableInitializers()` in the `constructor`.
+- `_authorizeUpgrade(address) internal override onlyOwner {}` in every contract.
+- USD prices are always **8 decimals** (following Chainlink). Variables carry the `Usd8` suffix.
+- **All tokens on BSC have 18 decimals, including USDT.** Never hardcode 6.
+- The native coin (tBNB) is represented by `address(0)`.
+- Custom errors, not `require` strings.
+- Every contract has its own test file in `contracts/test/`.
+- Test file name: `<Contract>.t.sol`. Test contract name: `<Contract>Test`.
+- Commands are run from `contracts/`.
 
 ---
 
 ## File Structure
 
-| File | Tanggung jawab |
+| File | Responsibility |
 |---|---|
-| `contracts/src/FuguPriceOracle.sol` | Konversi USD(8) → jumlah token, via Chainlink atau harga tetap. Tidak menyentuh dana. |
-| `contracts/src/FuguRegistry.sol` | Katalog listing agent: kategori, harga, kepemilikan, kurasi. Tidak menyentuh dana. |
-| `contracts/src/FuguSubscription.sol` | Satu-satunya kontrak yang memegang dana. Escrow, klaim pro-rata, refund, revenue share. |
-| `contracts/src/FuguReputation.sol` | Review ber-gate bukti langganan. Tidak menyentuh dana. |
-| `contracts/src/interfaces/IAggregatorV3.sol` | Antarmuka minimal Chainlink. |
-| `contracts/src/interfaces/IFuguRegistry.sol` | Antarmuka yang dikonsumsi Subscription. |
-| `contracts/src/interfaces/IFuguSubscription.sol` | Antarmuka yang dikonsumsi Reputation. |
-| `contracts/test/mocks/MockAggregator.sol` | Feed Chainlink palsu yang bisa diatur harga & waktunya. |
-| `contracts/test/mocks/MockERC20.sol` | Token 18 desimal untuk test. |
-| `contracts/test/FuguPriceOracle.t.sol` | Test oracle. |
-| `contracts/test/FuguRegistry.t.sol` | Test katalog. |
-| `contracts/test/FuguSubscription.t.sol` | Test escrow — yang paling kritis. |
-| `contracts/test/FuguReputation.t.sol` | Test gating review. |
-| `contracts/script/Deploy.s.sol` | Deploy 4 proxy + konfigurasi awal. |
-| `contracts/script/Upgrade.s.sol` | Upgrade satu implementasi. |
-| `contracts/deployments/bsc-testnet.json` | Alamat hasil deploy (ditulis manual dari output). |
+| `contracts/src/FuguPriceOracle.sol` | Converts USD(8) → token amount, via Chainlink or a fixed price. Touches no funds. |
+| `contracts/src/FuguRegistry.sol` | Agent listing catalog: category, price, ownership, curation. Touches no funds. |
+| `contracts/src/FuguSubscription.sol` | The only contract that holds funds. Escrow, pro-rata claims, refunds, revenue share. |
+| `contracts/src/FuguReputation.sol` | Reviews gated by proof of subscription. Touches no funds. |
+| `contracts/src/interfaces/IAggregatorV3.sol` | Minimal Chainlink interface. |
+| `contracts/src/interfaces/IFuguRegistry.sol` | The interface consumed by Subscription. |
+| `contracts/src/interfaces/IFuguSubscription.sol` | The interface consumed by Reputation. |
+| `contracts/test/mocks/MockAggregator.sol` | A fake Chainlink feed whose price & timestamp can be set. |
+| `contracts/test/mocks/MockERC20.sol` | An 18-decimal token for tests. |
+| `contracts/test/FuguPriceOracle.t.sol` | Oracle tests. |
+| `contracts/test/FuguRegistry.t.sol` | Catalog tests. |
+| `contracts/test/FuguSubscription.t.sol` | Escrow tests — the most critical ones. |
+| `contracts/test/FuguReputation.t.sol` | Review gating tests. |
+| `contracts/script/Deploy.s.sol` | Deploy 4 proxies + initial configuration. |
+| `contracts/script/Upgrade.s.sol` | Upgrade a single implementation. |
+| `contracts/deployments/bsc-testnet.json` | Deployed addresses (written by hand from the output). |
 
 ---
 
-### Task 1: Bersihkan scaffold & siapkan fondasi test
+### Task 1: Clean out the scaffold & set up the test foundation
 
 **Files:**
 - Delete: `contracts/src/Counter.sol`, `contracts/test/Counter.t.sol`, `contracts/script/Counter.s.sol`
@@ -59,16 +59,16 @@
 - Create: `contracts/test/mocks/MockERC20.sol`
 
 **Interfaces:**
-- Consumes: tidak ada
-- Produces: `IAggregatorV3.latestRoundData()`, `MockAggregator(int256 price, uint8 decimals)` dengan `setPrice(int256)` dan `setUpdatedAt(uint256)`; `MockERC20(string name, string symbol)` dengan `mint(address,uint256)` dan 18 desimal.
+- Consumes: none
+- Produces: `IAggregatorV3.latestRoundData()`, `MockAggregator(int256 price, uint8 decimals)` with `setPrice(int256)` and `setUpdatedAt(uint256)`; `MockERC20(string name, string symbol)` with `mint(address,uint256)` and 18 decimals.
 
-- [ ] **Step 1: Hapus scaffold bawaan**
+- [ ] **Step 1: Delete the default scaffold**
 
 ```bash
 rm -f src/Counter.sol test/Counter.t.sol script/Counter.s.sol
 ```
 
-- [ ] **Step 2: Pin compiler dan aktifkan optimizer di `foundry.toml`**
+- [ ] **Step 2: Pin the compiler and enable the optimizer in `foundry.toml`**
 
 ```toml
 [profile.default]
@@ -91,7 +91,7 @@ bsc_testnet = "${BSC_TESTNET_RPC_URL}"
 bsc_testnet = { key = "${BSCSCAN_API_KEY}", chain = 97, url = "https://api-testnet.bscscan.com/api" }
 ```
 
-- [ ] **Step 3: Tulis antarmuka Chainlink**
+- [ ] **Step 3: Write the Chainlink interface**
 
 `src/interfaces/IAggregatorV3.sol`:
 ```solidity
@@ -108,7 +108,7 @@ interface IAggregatorV3 {
 }
 ```
 
-- [ ] **Step 4: Tulis mock aggregator**
+- [ ] **Step 4: Write the mock aggregator**
 
 `test/mocks/MockAggregator.sol`:
 ```solidity
@@ -151,7 +151,7 @@ contract MockAggregator is IAggregatorV3 {
 }
 ```
 
-- [ ] **Step 5: Tulis mock ERC20 (18 desimal)**
+- [ ] **Step 5: Write the mock ERC20 (18 decimals)**
 
 `test/mocks/MockERC20.sol`:
 ```solidity
@@ -169,16 +169,16 @@ contract MockERC20 is ERC20 {
 }
 ```
 
-- [ ] **Step 6: Verifikasi build bersih**
+- [ ] **Step 6: Verify a clean build**
 
 Run: `forge build`
-Expected: `Compiler run successful!` tanpa error.
+Expected: `Compiler run successful!` with no errors.
 
 - [ ] **Step 7: Commit**
 
 ```bash
 git add contracts/
-git commit -m "chore(contracts): hapus scaffold, tambah mock dan antarmuka Chainlink"
+git commit -m "chore(contracts): remove scaffold, add mocks and the Chainlink interface"
 ```
 
 ---
@@ -200,13 +200,13 @@ git commit -m "chore(contracts): hapus scaffold, tambah mock dan antarmuka Chain
   - `function priceUsd8(address token) external view returns (uint256)`
   - Errors: `TokenNotEnabled(address)`, `StalePrice(address,uint256)`, `InvalidPrice(int256)`, `InvalidConfig()`
 
-**Rumus konversi (satu-satunya sumber kebenaran):**
+**Conversion formula (the single source of truth):**
 ```
 tokenAmount = usdAmount8 * 10^tokenDecimals / priceUsd8
 ```
-`priceUsd8` dinormalisasi ke 8 desimal dari `feed.decimals()`.
+`priceUsd8` is normalized to 8 decimals from `feed.decimals()`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [ ] **Step 1: Write the failing tests**
 
 `test/FuguPriceOracle.t.sol`:
 ```solidity
@@ -230,7 +230,7 @@ contract FuguPriceOracleTest is Test {
         bytes memory data = abi.encodeCall(FuguPriceOracle.initialize, (owner));
         oracle = FuguPriceOracle(address(new ERC1967Proxy(address(impl), data)));
 
-        // BNB/USD = $754.46, 8 desimal — meniru feed testnet asli
+        // BNB/USD = $754.46, 8 decimals — mirrors the real testnet feed
         bnbFeed = new MockAggregator(8, 754_46000000);
 
         vm.prank(owner);
@@ -248,9 +248,9 @@ contract FuguPriceOracleTest is Test {
     }
 
     function test_quoteNativeAtKnownPrice() public view {
-        // $754.46 dalam USD8
+        // $754.46 in USD8
         uint256 oneBnbInUsd8 = 754_46000000;
-        // membeli senilai 1 BNB harus menghasilkan tepat 1e18
+        // buying the value of 1 BNB must yield exactly 1e18
         assertEq(oracle.quote(address(0), oneBnbInUsd8), 1e18);
     }
 
@@ -294,13 +294,13 @@ contract FuguPriceOracleTest is Test {
                 enabled: true
             })
         );
-        // $5 pada peg $1 = 5 token
+        // $5 at a $1 peg = 5 tokens
         assertEq(oracle.quote(u, 5_00000000), 5e18);
     }
 
     function test_normalizesFeedWithNon8Decimals() public {
         address t = address(0xCAFE);
-        MockAggregator feed18 = new MockAggregator(18, 2e18); // $2, 18 desimal
+        MockAggregator feed18 = new MockAggregator(18, 2e18); // $2, 18 decimals
         vm.prank(owner);
         oracle.setToken(
             t,
@@ -338,12 +338,12 @@ contract FuguPriceOracleTest is Test {
 }
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [ ] **Step 2: Run the tests, confirm they fail**
 
 Run: `forge test --match-contract FuguPriceOracleTest`
-Expected: gagal kompilasi — `FuguPriceOracle` belum ada.
+Expected: compilation failure — `FuguPriceOracle` does not exist yet.
 
-- [ ] **Step 3: Implementasi**
+- [ ] **Step 3: Implement**
 
 `src/FuguPriceOracle.sol`:
 ```solidity
@@ -356,9 +356,9 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {IAggregatorV3} from "./interfaces/IAggregatorV3.sol";
 
 /// @title FuguPriceOracle
-/// @notice Mengubah jumlah USD (8 desimal) menjadi jumlah token pembayaran.
-/// @dev Ambang staleness disimpan per token karena tiap feed punya heartbeat
-///      berbeda: di BSC testnet BNB/USD update jauh lebih sering daripada USDT/USD.
+/// @notice Converts a USD amount (8 decimals) into an amount of the payment token.
+/// @dev The staleness threshold is stored per token because every feed has a
+///      different heartbeat: on BSC testnet BNB/USD updates far more often than USDT/USD.
 contract FuguPriceOracle is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     enum PriceSourceKind {
         NONE,
@@ -375,7 +375,7 @@ contract FuguPriceOracle is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         bool enabled;
     }
 
-    /// @dev address(0) berarti native coin (tBNB).
+    /// @dev address(0) means the native coin (tBNB).
     mapping(address token => TokenConfig) private _tokens;
 
     event TokenConfigured(address indexed token, PriceSourceKind kind, address feed, bool enabled);
@@ -411,7 +411,7 @@ contract FuguPriceOracle is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         return _tokens[token];
     }
 
-    /// @notice Harga satu unit token dalam USD, 8 desimal.
+    /// @notice The price of one unit of the token in USD, 8 decimals.
     function priceUsd8(address token) public view returns (uint256) {
         TokenConfig memory cfg = _tokens[token];
         if (!cfg.enabled) revert TokenNotEnabled(token);
@@ -436,7 +436,7 @@ contract FuguPriceOracle is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         return price;
     }
 
-    /// @notice Berapa banyak `token` yang setara dengan `usdAmount8` USD.
+    /// @notice How much `token` is equivalent to `usdAmount8` USD.
     function quote(address token, uint256 usdAmount8) external view returns (uint256 tokenAmount) {
         TokenConfig memory cfg = _tokens[token];
         if (!cfg.enabled) revert TokenNotEnabled(token);
@@ -448,18 +448,18 @@ contract FuguPriceOracle is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 }
 ```
 
-- [ ] **Step 4: Jalankan test sampai hijau**
+- [ ] **Step 4: Run the tests until green**
 
 Run: `forge test --match-contract FuguPriceOracleTest -vv`
-Expected: semua PASS.
+Expected: all PASS.
 
-Catatan bila `test_revertsOnStalePrice` gagal karena underflow: pastikan `vm.warp` di `setUp` sudah membuat `block.timestamp` cukup besar (sudah, 1_700_000_000).
+Note if `test_revertsOnStalePrice` fails on underflow: make sure the `vm.warp` in `setUp` has already made `block.timestamp` large enough (it has, 1_700_000_000).
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add contracts/src/FuguPriceOracle.sol contracts/test/FuguPriceOracle.t.sol
-git commit -m "feat(contracts): FuguPriceOracle dengan staleness per-token"
+git commit -m "feat(contracts): FuguPriceOracle with per-token staleness"
 ```
 
 ---
@@ -472,7 +472,7 @@ git commit -m "feat(contracts): FuguPriceOracle dengan staleness per-token"
 - Test: `contracts/test/FuguRegistry.t.sol`
 
 **Interfaces:**
-- Consumes: tidak ada kontrak lain
+- Consumes: no other contract
 - Produces:
   - `enum Category { REBALANCING, GRID, YIELD, HEALTH_FACTOR }`
   - `struct Listing { uint256 erc8004AgentId; address owner; address agentWallet; Category category; uint128 priceUsd8PerPeriod; uint32 periodSeconds; bool active; bool curated; string metadataURI; }`
@@ -482,9 +482,9 @@ git commit -m "feat(contracts): FuguPriceOracle dengan staleness per-token"
   - `function countByCategory(Category) external view returns (uint256)`
   - Errors: `NotListingOwner(uint256)`, `ListingNotFound(uint256)`, `InvalidPeriod()`, `NotCurator()`
 
-`IFuguRegistry` mengekspos `getListing` dan tipe-tipenya untuk dikonsumsi `FuguSubscription`.
+`IFuguRegistry` exposes `getListing` and its types for `FuguSubscription` to consume.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [ ] **Step 1: Write the failing tests**
 
 `test/FuguRegistry.t.sol`:
 ```solidity
@@ -581,12 +581,12 @@ contract FuguRegistryTest is Test {
 }
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [ ] **Step 2: Run the tests, confirm they fail**
 
 Run: `forge test --match-contract FuguRegistryTest`
-Expected: gagal kompilasi.
+Expected: compilation failure.
 
-- [ ] **Step 3: Tulis antarmuka**
+- [ ] **Step 3: Write the interface**
 
 `src/interfaces/IFuguRegistry.sol`:
 ```solidity
@@ -618,7 +618,7 @@ interface IFuguRegistry {
 }
 ```
 
-- [ ] **Step 4: Implementasi**
+- [ ] **Step 4: Implement**
 
 `src/FuguRegistry.sol`:
 ```solidity
@@ -631,8 +631,8 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {IFuguRegistry} from "./interfaces/IFuguRegistry.sol";
 
 /// @title FuguRegistry
-/// @notice Katalog agent yang layak ditampilkan di marketplace, menjembatani
-///         identitas ERC-8004 yang mentah dengan listing yang punya harga dan kategori.
+/// @notice The catalog of agents worth showing in the marketplace, bridging
+///         raw ERC-8004 identity with listings that have a price and a category.
 contract FuguRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, IFuguRegistry {
     uint256 private _listingCount;
     mapping(uint256 listingId => Listing) private _listings;
@@ -740,23 +740,23 @@ contract FuguRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, IFu
 }
 ```
 
-- [ ] **Step 5: Jalankan test sampai hijau**
+- [ ] **Step 5: Run the tests until green**
 
 Run: `forge test --match-contract FuguRegistryTest -vv`
-Expected: semua PASS.
+Expected: all PASS.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add contracts/src/FuguRegistry.sol contracts/src/interfaces/IFuguRegistry.sol contracts/test/FuguRegistry.t.sol
-git commit -m "feat(contracts): FuguRegistry katalog agent per kategori"
+git commit -m "feat(contracts): FuguRegistry agent catalog by category"
 ```
 
 ---
 
 ### Task 4: `FuguSubscription` — escrow, pro-rata, revenue share
 
-Ini kontrak paling kritis: satu-satunya yang memegang dana. Kerjakan pelan-pelan.
+This is the most critical contract: the only one that holds funds. Work slowly.
 
 **Files:**
 - Create: `contracts/src/FuguSubscription.sol`
@@ -774,16 +774,16 @@ Ini kontrak paling kritis: satu-satunya yang memegang dana. Kerjakan pelan-pelan
   - `function hasSubscribed(uint256 listingId, address user) external view returns (bool)`
   - Errors: `ListingInactive()`, `ZeroPeriods()`, `WrongNativeAmount(uint256,uint256)`, `NotSubscriber()`, `AlreadyCancelled()`, `NothingToClaim()`, `TransferFailed()`
 
-**Aturan pro-rata (satu-satunya sumber kebenaran):**
+**Pro-rata rules (the single source of truth):**
 ```
 duration = endsAt - startedAt
 elapsed  = min(block.timestamp, endsAt) - startedAt
 earned   = deposited * elapsed / duration
 claimable = earned - claimed
 ```
-Saat `cancel`: hitung `earned` pada saat itu, refund `deposited - earned` ke subscriber, lalu **set `endsAt = block.timestamp`** supaya `earned` berhenti tumbuh, dan tandai `cancelled`. Agent tetap bisa `claim` bagian yang sudah didapat.
+On `cancel`: compute `earned` at that moment, refund `deposited - earned` to the subscriber, then **set `endsAt = block.timestamp`** so that `earned` stops growing, and mark it `cancelled`. The agent can still `claim` the portion it has already earned.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [ ] **Step 1: Write the failing tests**
 
 `test/FuguSubscription.t.sol`:
 ```solidity
@@ -850,7 +850,7 @@ contract FuguSubscriptionTest is Test {
         );
         vm.stopPrank();
 
-        // listing: $10 per 30 hari
+        // listing: $10 per 30 days
         vm.prank(creator);
         listingId = registry.list(1, address(0xA6E17), FuguRegistry.Category.GRID, 10_00000000, 30 days, "");
 
@@ -867,7 +867,7 @@ contract FuguSubscriptionTest is Test {
     function test_subscribePullsCorrectTokenAmount() public {
         uint256 before = usdt.balanceOf(user);
         _subscribeOnePeriod();
-        // $10 pada peg $1 = 10 token
+        // $10 at a $1 peg = 10 tokens
         assertEq(before - usdt.balanceOf(user), 10e18);
         assertEq(usdt.balanceOf(address(subs)), 10e18);
     }
@@ -893,7 +893,7 @@ contract FuguSubscriptionTest is Test {
         uint256 id = _subscribeOnePeriod();
         vm.warp(block.timestamp + 30 days);
         subs.claim(id);
-        // fee 5% dari 10 token
+        // a 5% fee on 10 tokens
         assertEq(usdt.balanceOf(treasury), 0.5e18);
         assertEq(usdt.balanceOf(creator), 9.5e18);
     }
@@ -914,7 +914,7 @@ contract FuguSubscriptionTest is Test {
         uint256 before = usdt.balanceOf(user);
         vm.prank(user);
         subs.cancel(id);
-        // separuh belum diperoleh agent, harus kembali
+        // half has not been earned by the agent, it must come back
         assertEq(usdt.balanceOf(user) - before, 5e18);
     }
 
@@ -934,7 +934,7 @@ contract FuguSubscriptionTest is Test {
         vm.prank(user);
         subs.cancel(id);
         subs.claim(id);
-        assertEq(usdt.balanceOf(creator), 4.75e18); // 5 dikurangi fee 5%
+        assertEq(usdt.balanceOf(creator), 4.75e18); // 5 minus the 5% fee
     }
 
     function test_onlySubscriberCanCancel() public {
@@ -1007,12 +1007,12 @@ contract FuguSubscriptionTest is Test {
 }
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [ ] **Step 2: Run the tests, confirm they fail**
 
 Run: `forge test --match-contract FuguSubscriptionTest`
-Expected: gagal kompilasi.
+Expected: compilation failure.
 
-- [ ] **Step 3: Tulis antarmuka**
+- [ ] **Step 3: Write the interface**
 
 `src/interfaces/IFuguSubscription.sol`:
 ```solidity
@@ -1024,7 +1024,7 @@ interface IFuguSubscription {
 }
 ```
 
-- [ ] **Step 4: Implementasi**
+- [ ] **Step 4: Implement**
 
 `src/FuguSubscription.sol`:
 ```solidity
@@ -1042,8 +1042,8 @@ import {IFuguSubscription} from "./interfaces/IFuguSubscription.sol";
 import {FuguPriceOracle} from "./FuguPriceOracle.sol";
 
 /// @title FuguSubscription
-/// @notice Escrow langganan agent. Agent hanya bisa menarik sebanding waktu yang
-///         sudah berjalan, dan user bisa membatalkan kapan saja untuk menarik sisanya.
+/// @notice Agent subscription escrow. The agent can only withdraw in proportion to
+///         the time already elapsed, and the user can cancel at any time to take back the rest.
 contract FuguSubscription is
     Initializable,
     UUPSUpgradeable,
@@ -1182,7 +1182,7 @@ contract FuguSubscription is
         uint256 refund = uint256(s.deposited) - earned;
 
         s.cancelled = true;
-        // hentikan pertumbuhan bagian agent
+        // stop the agent's share from growing
         if (block.timestamp < s.endsAt) {
             s.endsAt = uint64(block.timestamp);
             s.deposited = uint128(earned);
@@ -1231,21 +1231,21 @@ contract FuguSubscription is
 }
 ```
 
-> **Catatan implementasi penting.** Pada `cancel`, `deposited` diset ke `earned`
-> **setelah** refund dihitung, sehingga `_earned` berikutnya mengembalikan angka yang
-> sama dan `claimable` berhenti tumbuh. Test `test_earningsStopGrowingAfterCancel`
-> dan `test_agentStillClaimsEarnedAfterCancel` menjaga perilaku ini.
+> **Important implementation note.** On `cancel`, `deposited` is set to `earned`
+> **after** the refund has been computed, so the next `_earned` returns the same
+> number and `claimable` stops growing. The tests `test_earningsStopGrowingAfterCancel`
+> and `test_agentStillClaimsEarnedAfterCancel` guard this behavior.
 
-- [ ] **Step 5: Jalankan test sampai hijau**
+- [ ] **Step 5: Run the tests until green**
 
 Run: `forge test --match-contract FuguSubscriptionTest -vv`
-Expected: semua PASS.
+Expected: all PASS.
 
-- [ ] **Step 6: Tambahkan fuzz test invarian dana**
+- [ ] **Step 6: Add a fuzz test for the funds invariant**
 
-Tambahkan ke `test/FuguSubscription.t.sol`:
+Add to `test/FuguSubscription.t.sol`:
 ```solidity
-    /// @notice Kontrak tidak pernah membayar lebih dari yang disetor.
+    /// @notice The contract never pays out more than was deposited.
     function testFuzz_neverPaysOutMoreThanDeposited(uint32 periods, uint64 skipTime) public {
         periods = uint32(bound(periods, 1, 12));
         skipTime = uint64(bound(skipTime, 0, 400 days));
@@ -1279,7 +1279,7 @@ Expected: PASS 256 runs.
 
 ```bash
 git add contracts/src/FuguSubscription.sol contracts/src/interfaces/IFuguSubscription.sol contracts/test/FuguSubscription.t.sol
-git commit -m "feat(contracts): FuguSubscription escrow pro-rata multi-token"
+git commit -m "feat(contracts): FuguSubscription multi-token pro-rata escrow"
 ```
 
 ---
@@ -1298,7 +1298,7 @@ git commit -m "feat(contracts): FuguSubscription escrow pro-rata multi-token"
   - `function reviewCount(uint256 listingId) external view returns (uint256)`
   - Errors: `NotASubscriber()`, `InvalidScore(uint8)`, `AlreadyReviewed()`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [ ] **Step 1: Write the failing tests**
 
 `test/FuguReputation.t.sol`:
 ```solidity
@@ -1385,12 +1385,12 @@ contract FuguReputationTest is Test {
 }
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [ ] **Step 2: Run the tests, confirm they fail**
 
 Run: `forge test --match-contract FuguReputationTest`
-Expected: gagal kompilasi.
+Expected: compilation failure.
 
-- [ ] **Step 3: Implementasi**
+- [ ] **Step 3: Implement**
 
 `src/FuguReputation.sol`:
 ```solidity
@@ -1403,8 +1403,8 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {IFuguSubscription} from "./interfaces/IFuguSubscription.sol";
 
 /// @title FuguReputation
-/// @notice Review yang hanya bisa ditulis wallet yang terbukti pernah berlangganan.
-///         Rating anti-sybil — memalsukannya berarti benar-benar harus membayar.
+/// @notice Reviews that can only be written by a wallet proven to have subscribed.
+///         An anti-sybil rating — faking it means actually having to pay.
 contract FuguReputation is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     struct Agg {
         uint128 sum;
@@ -1447,7 +1447,7 @@ contract FuguReputation is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         return _agg[listingId].count;
     }
 
-    /// @return Rata-rata skor dikali 100 (mis. 450 berarti 4,50).
+    /// @return The average score times 100 (e.g. 450 means 4.50).
     function averageScoreX100(uint256 listingId) external view returns (uint256) {
         Agg memory a = _agg[listingId];
         if (a.count == 0) return 0;
@@ -1462,21 +1462,21 @@ contract FuguReputation is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 }
 ```
 
-- [ ] **Step 4: Jalankan test sampai hijau**
+- [ ] **Step 4: Run the tests until green**
 
 Run: `forge test --match-contract FuguReputationTest -vv`
-Expected: semua PASS.
+Expected: all PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add contracts/src/FuguReputation.sol contracts/test/FuguReputation.t.sol
-git commit -m "feat(contracts): FuguReputation review ber-gate langganan"
+git commit -m "feat(contracts): FuguReputation subscription-gated reviews"
 ```
 
 ---
 
-### Task 6: Test upgrade — membuktikan storage aman
+### Task 6: Upgrade tests — proving storage is safe
 
 **Files:**
 - Create: `contracts/test/Upgrade.t.sol`
@@ -1484,9 +1484,9 @@ git commit -m "feat(contracts): FuguReputation review ber-gate langganan"
 
 **Interfaces:**
 - Consumes: `FuguRegistry`
-- Produces: `FuguRegistryV2` — identik dengan V1 plus `uint256 public extraField;` di akhir dan `function version() returns (string)`.
+- Produces: `FuguRegistryV2` — identical to V1 plus `uint256 public extraField;` at the end and `function version() returns (string)`.
 
-- [ ] **Step 1: Tulis V2 mock**
+- [ ] **Step 1: Write the V2 mock**
 
 `test/mocks/FuguRegistryV2.sol`:
 ```solidity
@@ -1495,7 +1495,7 @@ pragma solidity ^0.8.30;
 
 import {FuguRegistry} from "../../src/FuguRegistry.sol";
 
-/// @dev Menambahkan variabel state BARU DI AKHIR — pola append-only.
+/// @dev Adds a NEW state variable AT THE END — the append-only pattern.
 contract FuguRegistryV2 is FuguRegistry {
     uint256 public extraField;
 
@@ -1509,7 +1509,7 @@ contract FuguRegistryV2 is FuguRegistry {
 }
 ```
 
-- [ ] **Step 2: Tulis test upgrade**
+- [ ] **Step 2: Write the upgrade tests**
 
 `test/Upgrade.t.sol`:
 ```solidity
@@ -1553,7 +1553,7 @@ contract UpgradeTest is Test {
         assertEq(upgraded.listingCount(), 1);
         assertEq(upgraded.countByCategory(FuguRegistry.Category.YIELD), 1);
 
-        // slot baru mulai dari nol dan bisa dipakai
+        // the new slot starts at zero and can be used
         assertEq(upgraded.extraField(), 0);
         upgraded.setExtraField(99);
         assertEq(upgraded.extraField(), 99);
@@ -1574,26 +1574,26 @@ contract UpgradeTest is Test {
 }
 ```
 
-- [ ] **Step 3: Jalankan test**
+- [ ] **Step 3: Run the tests**
 
 Run: `forge test --match-contract UpgradeTest -vv`
-Expected: semua PASS.
+Expected: all PASS.
 
-- [ ] **Step 4: Jalankan seluruh suite**
+- [ ] **Step 4: Run the whole suite**
 
 Run: `forge test`
-Expected: semua PASS, tanpa warning kompilasi.
+Expected: all PASS, with no compiler warnings.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add contracts/test/Upgrade.t.sol contracts/test/mocks/FuguRegistryV2.sol
-git commit -m "test(contracts): buktikan storage aman saat upgrade UUPS"
+git commit -m "test(contracts): prove storage is safe across a UUPS upgrade"
 ```
 
 ---
 
-### Task 7: Script deploy & deploy ke BSC testnet
+### Task 7: Deploy script & deploy to BSC testnet
 
 **Files:**
 - Create: `contracts/script/Deploy.s.sol`
@@ -1602,14 +1602,14 @@ git commit -m "test(contracts): buktikan storage aman saat upgrade UUPS"
 - Create: `contracts/deployments/bsc-testnet.json`
 
 **Interfaces:**
-- Consumes: keempat kontrak
-- Produces: alamat proxy yang tercatat di `deployments/bsc-testnet.json`
+- Consumes: all four contracts
+- Produces: the proxy addresses recorded in `deployments/bsc-testnet.json`
 
-- [ ] **Step 1: Tulis `.env.example`**
+- [ ] **Step 1: Write `.env.example`**
 
 `contracts/.env.example`:
 ```bash
-# Wallet BARU khusus testnet. JANGAN pakai key yang pernah menyentuh mainnet.
+# A NEW wallet, testnet only. DO NOT use a key that has ever touched mainnet.
 PRIVATE_KEY=0x
 BSC_TESTNET_RPC_URL=https://data-seed-prebsc-1-s1.bnbchain.org:8545
 BSCSCAN_API_KEY=
@@ -1617,7 +1617,7 @@ TREASURY_ADDRESS=
 PROTOCOL_FEE_BPS=500
 ```
 
-- [ ] **Step 2: Tulis script deploy**
+- [ ] **Step 2: Write the deploy script**
 
 `script/Deploy.s.sol`:
 ```solidity
@@ -1632,7 +1632,7 @@ import {FuguSubscription} from "../src/FuguSubscription.sol";
 import {FuguReputation} from "../src/FuguReputation.sol";
 
 contract Deploy is Script {
-    // Alamat BSC testnet — terverifikasi live 2026-09-08
+    // BSC testnet addresses — verified live 2026-09-08
     address constant FEED_BNB_USD = 0x2514895c72f50D8bd4B4F9b1110F0D6bD2c97526;
     address constant FEED_USDT_USD = 0xEca2605f0BCF2BA5966372C99837b1F182d3D620;
     address constant FEED_BUSD_USD = 0x9331b55D9830EF609A2aBCfAc0FBCE050A52fdEa;
@@ -1677,7 +1677,7 @@ contract Deploy is Script {
             ))
         );
 
-        // Konfigurasi token pembayaran
+        // Configure the payment tokens
         oracle.setToken(
             address(0),
             FuguPriceOracle.TokenConfig({
@@ -1694,7 +1694,7 @@ contract Deploy is Script {
             FuguPriceOracle.TokenConfig({
                 kind: FuguPriceOracle.PriceSourceKind.CHAINLINK,
                 feed: FEED_USDT_USD,
-                maxStaleness: 93_600, // 26 jam — heartbeat stablecoin testnet lambat
+                maxStaleness: 93_600, // 26 hours — the testnet stablecoin heartbeat is slow
                 tokenDecimals: 18,
                 fixedPriceUsd8: 0,
                 enabled: true
@@ -1735,16 +1735,16 @@ contract Deploy is Script {
 }
 ```
 
-- [ ] **Step 3: Simulasi deploy tanpa broadcast**
+- [ ] **Step 3: Simulate the deploy without broadcasting**
 
 ```bash
-cp .env.example .env    # isi PRIVATE_KEY dan TREASURY_ADDRESS
+cp .env.example .env    # fill in PRIVATE_KEY and TREASURY_ADDRESS
 source .env
 forge script script/Deploy.s.sol:Deploy --rpc-url "$BSC_TESTNET_RPC_URL"
 ```
-Expected: simulasi sukses, keempat alamat tercetak. Belum ada transaksi terkirim.
+Expected: the simulation succeeds and all four addresses are printed. No transaction has been sent yet.
 
-- [ ] **Step 4: Tulis script upgrade**
+- [ ] **Step 4: Write the upgrade script**
 
 `script/Upgrade.s.sol`:
 ```solidity
@@ -1754,8 +1754,8 @@ pragma solidity ^0.8.30;
 import {Script, console} from "forge-std/Script.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-/// @notice Upgrade satu proxy ke implementasi baru.
-/// @dev Jalankan dengan: PROXY=0x.. NEW_IMPL=0x.. forge script script/Upgrade.s.sol:Upgrade --broadcast
+/// @notice Upgrade one proxy to a new implementation.
+/// @dev Run with: PROXY=0x.. NEW_IMPL=0x.. forge script script/Upgrade.s.sol:Upgrade --broadcast
 contract Upgrade is Script {
     function run() external {
         uint256 pk = vm.envUint("PRIVATE_KEY");
@@ -1771,7 +1771,7 @@ contract Upgrade is Script {
 }
 ```
 
-- [ ] **Step 5: Deploy sungguhan ke testnet**
+- [ ] **Step 5: Deploy for real to testnet**
 
 ```bash
 source .env
@@ -1782,17 +1782,17 @@ forge script script/Deploy.s.sol:Deploy \
   --etherscan-api-key "$BSCSCAN_API_KEY" \
   -vvv
 ```
-Expected: 8 kontrak ter-deploy (4 implementasi + 4 proxy), verifikasi sukses di testnet.bscscan.com.
+Expected: 8 contracts deployed (4 implementations + 4 proxies), verification succeeds on testnet.bscscan.com.
 
-Jika verifikasi gagal tapi deploy sukses, jangan ulangi deploy — verifikasi terpisah:
+If verification fails but the deploy succeeded, do not redo the deploy — verify separately:
 ```bash
 forge verify-contract <IMPL_ADDRESS> src/FuguRegistry.sol:FuguRegistry \
   --chain 97 --etherscan-api-key "$BSCSCAN_API_KEY"
 ```
 
-- [ ] **Step 6: Catat alamat**
+- [ ] **Step 6: Record the addresses**
 
-`contracts/deployments/bsc-testnet.json` — isi dari output console:
+`contracts/deployments/bsc-testnet.json` — filled in from the console output:
 ```json
 {
   "chainId": 97,
@@ -1804,28 +1804,28 @@ forge verify-contract <IMPL_ADDRESS> src/FuguRegistry.sol:FuguRegistry \
 }
 ```
 
-- [ ] **Step 7: Verifikasi on-chain bahwa oracle hidup**
+- [ ] **Step 7: Verify on-chain that the oracle is alive**
 
 ```bash
 source .env
 cast call --rpc-url "$BSC_TESTNET_RPC_URL" <ORACLE_PROXY> \
   "quote(address,uint256)(uint256)" 0x0000000000000000000000000000000000000000 100000000
 ```
-Expected: mengembalikan jumlah wei tBNB senilai $1 (sekitar `1.3e15` pada harga ~$754).
+Expected: it returns the amount of tBNB wei worth $1 (around `1.3e15` at a price of ~$754).
 
 - [ ] **Step 8: Commit**
 
 ```bash
 git add contracts/script contracts/.env.example contracts/deployments
-git commit -m "feat(contracts): script deploy + deploy ke BSC testnet"
+git commit -m "feat(contracts): deploy script + deploy to BSC testnet"
 ```
 
 ---
 
 ## Definition of Done
 
-- [ ] `forge test` hijau seluruhnya, termasuk fuzz 256 runs
-- [ ] Empat proxy ter-deploy di BSC testnet dan terverifikasi di testnet.bscscan.com
-- [ ] `deployments/bsc-testnet.json` terisi
-- [ ] `cast call quote(...)` mengembalikan angka masuk akal terhadap harga BNB nyata
-- [ ] Tidak ada `__gap`, tidak ada `require` string, tidak ada pragma selain `^0.8.30`
+- [ ] `forge test` fully green, including the 256-run fuzz
+- [ ] Four proxies deployed on BSC testnet and verified on testnet.bscscan.com
+- [ ] `deployments/bsc-testnet.json` filled in
+- [ ] `cast call quote(...)` returns a sensible number against the real BNB price
+- [ ] No `__gap`, no `require` strings, no pragma other than `^0.8.30`

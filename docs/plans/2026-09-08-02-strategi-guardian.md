@@ -1,50 +1,50 @@
-# Fugu Guardian — Strategi Health Factor: Implementation Plan
+# Fugu Guardian — Health Factor Strategy: Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Fugu Guardian bisa membaca posisi pinjaman nyata di BNB Chain, memutuskan kapan harus bertindak dengan logika deterministik yang teruji, dan menjelaskan keputusannya dalam bahasa manusia — tanpa LLM pernah menyentuh keputusan finansial.
+**Goal:** Fugu Guardian can read a real borrow position on BNB Chain, decide when to act using tested deterministic logic, and explain its decision in human language — without an LLM ever touching a financial decision.
 
-**Architecture:** Tiga lapis yang dipisah tegas. **Lapis murni** (`strategy/`) berisi rumus dan keputusan sebagai fungsi tanpa I/O — bisa di-unit-test dan di-backtest. **Lapis adapter** (`strategy/chain/`) membaca on-chain dan menerjemahkan ke tipe domain. **Lapis penjelasan** (`strategy/explain.ts`) memanggil dGrid secara asinkron setelah keputusan diambil. Keputusan tidak pernah menunggu LLM.
+**Architecture:** Three strictly separated layers. **The pure layer** (`strategy/`) holds the formulas and the decisions as functions with no I/O — unit-testable and backtestable. **The adapter layer** (`strategy/chain/`) reads on-chain and translates into domain types. **The explanation layer** (`strategy/explain.ts`) calls dGrid asynchronously after the decision has been made. A decision never waits for the LLM.
 
-**Tech Stack:** TypeScript, viem (sudah ada lewat SDK), vitest, dGrid lewat `@ai-sdk/openai`.
+**Tech Stack:** TypeScript, viem (already present through the SDK), vitest, dGrid through `@ai-sdk/openai`.
 
-**Spec:** `docs/specs/2026-09-08-fugugent-design.md` (§5) dan `docs/research/06-agent-strategies.md` (§4)
+**Spec:** `docs/specs/2026-09-08-fugugent-design.md` (§5) and `docs/research/06-agent-strategies.md` (§4)
 
 ## Global Constraints
 
-- **Fungsi di `strategy/` harus MURNI**: tanpa network, tanpa `Date.now()`, tanpa `process.env`, tanpa membaca file. Waktu, harga, dan posisi masuk sebagai parameter. Ini yang membuatnya bisa di-backtest.
-- **Semua nilai on-chain sebagai `bigint`**, tidak pernah `number`. Presisi 1e18 tidak muat di float.
-- **Health factor basis 1e18.** `HF = 1.0` adalah `10n ** 18n`.
-- **Aave mengembalikan `healthFactor = 2^256-1` bila user tidak punya hutang** — terverifikasi live. Perlakukan sebagai "tak terhingga", bukan angka.
-- **LLM tidak pernah mengambil keputusan finansial.** `explain.ts` hanya menerima keputusan yang sudah jadi dan mengubahnya jadi kalimat.
-- Alamat kontrak yang dipakai **hanya** yang sudah diverifikasi live (tercantum per task). Jangan menambah alamat baru tanpa memverifikasinya dengan `cast call`.
-- Data dibaca dari **BSC mainnet (chain 56)** karena Venus dan Aave ada di sana; eksekusi transaksi tetap di testnet. Pembacaan bersifat read-only dan tidak berbiaya.
-- Custom error class, bukan `throw new Error("string")` telanjang, untuk kondisi yang bisa ditangani pemanggil.
-- Perintah dijalankan dari `ai/fuguguardian/app/agent/`.
+- **Functions in `strategy/` must be PURE**: no network, no `Date.now()`, no `process.env`, no file reads. Time, prices, and positions come in as parameters. That is what makes them backtestable.
+- **All on-chain values as `bigint`**, never `number`. 1e18 precision does not fit in a float.
+- **Health factor on a 1e18 basis.** `HF = 1.0` is `10n ** 18n`.
+- **Aave returns `healthFactor = 2^256-1` when the user has no debt** — verified live. Treat it as "infinite", not as a number.
+- **The LLM never makes a financial decision.** `explain.ts` only receives a finished decision and turns it into a sentence.
+- Only contract addresses that have been **verified live** may be used (listed per task). Do not add a new address without verifying it with `cast call`.
+- Data is read from **BSC mainnet (chain 56)** because Venus and Aave live there; transaction execution stays on testnet. The reads are read-only and cost nothing.
+- Custom error classes, not a bare `throw new Error("string")`, for conditions the caller can handle.
+- Commands are run from `ai/fuguguardian/app/agent/`.
 
 ---
 
 ## File Structure
 
-| File | Tanggung jawab |
+| File | Responsibility |
 |---|---|
-| `src/strategy/types.ts` | Tipe domain: `Position`, `Decision`, `Action`, `Thresholds`. Tidak ada logika. |
-| `src/strategy/healthFactor.ts` | Rumus murni: normalisasi HF, jarak ke likuidasi, stress test harga. |
-| `src/strategy/decide.ts` | Mesin keputusan murni: posisi + ambang → aksi + alasan. |
-| `src/strategy/chain/venus.ts` | Adapter read-only Venus (`getAccountLiquidity`). |
-| `src/strategy/chain/aave.ts` | Adapter read-only Aave v3 (`getUserAccountData`). |
-| `src/strategy/explain.ts` | Ubah `Decision` jadi kalimat lewat dGrid, asinkron, boleh gagal. |
-| `src/strategy/backtest.ts` | Harness: deret harga → berapa likuidasi dicegah vs baseline manusia. |
-| `src/strategy/__tests__/*.test.ts` | Unit test per modul. |
-| `vitest.config.ts` | Konfigurasi test. |
+| `src/strategy/types.ts` | Domain types: `Position`, `Decision`, `Action`, `Thresholds`. No logic. |
+| `src/strategy/healthFactor.ts` | Pure formulas: HF normalization, distance to liquidation, price stress test. |
+| `src/strategy/decide.ts` | The pure decision engine: position + thresholds → action + reason. |
+| `src/strategy/chain/venus.ts` | Read-only Venus adapter (`getAccountLiquidity`). |
+| `src/strategy/chain/aave.ts` | Read-only Aave v3 adapter (`getUserAccountData`). |
+| `src/strategy/explain.ts` | Turn a `Decision` into a sentence through dGrid, asynchronous, allowed to fail. |
+| `src/strategy/backtest.ts` | Harness: a price series → how many liquidations were prevented vs a human baseline. |
+| `src/strategy/__tests__/*.test.ts` | Unit tests per module. |
+| `vitest.config.ts` | Test configuration. |
 
 ---
 
-### Task 1: Fondasi test & tipe domain
+### Task 1: Test foundation & domain types
 
 **Files:**
 - Create: `vitest.config.ts`, `src/strategy/types.ts`, `src/strategy/__tests__/types.test.ts`
-- Modify: `package.json` (tambah vitest + script test)
+- Modify: `package.json` (add vitest + the test script)
 
 **Interfaces:**
 - Produces:
@@ -57,14 +57,14 @@
   - `const DEFAULT_THRESHOLDS: Thresholds`
   - `class PositionError extends Error`
 
-- [ ] **Step 1: Tambah vitest**
+- [ ] **Step 1: Add vitest**
 
 ```bash
 corepack pnpm add -D vitest
 ```
-Tambahkan ke `package.json` bagian `"scripts"`: `"test": "vitest run"`, `"test:watch": "vitest"`.
+Add to the `"scripts"` section of `package.json`: `"test": "vitest run"`, `"test:watch": "vitest"`.
 
-- [ ] **Step 2: Tulis `vitest.config.ts`**
+- [ ] **Step 2: Write `vitest.config.ts`**
 
 ```ts
 import { defineConfig } from "vitest/config";
@@ -77,7 +77,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 3: Tulis test tipe lebih dulu**
+- [ ] **Step 3: Write the type tests first**
 
 `src/strategy/__tests__/types.test.ts`:
 ```ts
@@ -110,37 +110,37 @@ describe("konstanta domain", () => {
 });
 ```
 
-- [ ] **Step 4: Jalankan, pastikan gagal**
+- [ ] **Step 4: Run them, confirm they fail**
 
 Run: `corepack pnpm test`
-Expected: gagal — `../types.js` belum ada.
+Expected: failure — `../types.js` does not exist yet.
 
-- [ ] **Step 5: Tulis `src/strategy/types.ts`**
+- [ ] **Step 5: Write `src/strategy/types.ts`**
 
 ```ts
-/** Health factor dinyatakan dalam basis 1e18, mengikuti Aave v3. HF 1.0 = 1e18. */
+/** The health factor is expressed on a 1e18 basis, following Aave v3. HF 1.0 = 1e18. */
 export const HF_ONE = 10n ** 18n;
 
 export type Protocol = "venus" | "aave";
 
 /**
- * Aksi yang boleh diambil Guardian, dari paling ringan ke paling agresif.
- * Keputusan ini SELALU dihasilkan kode deterministik, tidak pernah oleh LLM.
+ * The actions Guardian may take, from the mildest to the most aggressive.
+ * This decision is ALWAYS produced by deterministic code, never by an LLM.
  */
 export type Action = "NONE" | "WARN" | "PARTIAL_REPAY" | "DELEVERAGE" | "EMERGENCY";
 
 /**
- * Snapshot posisi pinjaman pada satu blok. Semua nilai uang dalam "base unit"
- * protokol yang bersangkutan (Aave memakai basis 8 desimal USD).
+ * A snapshot of a borrow position at a single block. Every money value is in the
+ * "base unit" of the protocol in question (Aave uses a USD basis with 8 decimals).
  */
 export interface Position {
   protocol: Protocol;
   account: `0x${string}`;
   collateralBase: bigint;
   debtBase: bigint;
-  /** Ambang likuidasi dalam basis point, mis. 8000n = 80%. */
+  /** The liquidation threshold in basis points, e.g. 8000n = 80%. */
   liquidationThresholdBps: bigint;
-  /** null berarti tidak ada hutang sama sekali — bukan berbahaya, justru paling aman. */
+  /** null means there is no debt at all — not dangerous, in fact the safest state. */
   healthFactor: bigint | null;
   blockNumber: bigint;
 }
@@ -154,17 +154,17 @@ export interface Thresholds {
 export interface Decision {
   action: Action;
   healthFactor: bigint | null;
-  /** Berapa basis point harga agunan boleh turun sebelum HF mencapai 1.0. */
+  /** How many basis points the collateral price may fall before HF reaches 1.0. */
   dropToLiquidationBps: bigint | null;
   reason: string;
-  /** Jumlah yang disarankan dibayar agar HF kembali aman; 0n bila tidak perlu. */
+  /** The amount suggested to repay so that HF returns to safety; 0n when not needed. */
   suggestedRepayBase: bigint;
 }
 
 /**
- * Ambang default dari docs/research/06 §4.2. Ini keputusan produk, bukan angka
- * baku protokol — riset kita sendiri menandainya sebagai contoh yang harus
- * dikalibrasi ulang lewat backtest untuk aset yang lebih volatil.
+ * The default thresholds from docs/research/06 §4.2. This is a product decision, not a
+ * protocol constant — our own research marks it as an example that has to be
+ * recalibrated through backtesting for more volatile assets.
  */
 export const DEFAULT_THRESHOLDS: Thresholds = {
   warn: 1_500_000_000_000_000_000n,
@@ -180,45 +180,45 @@ export class PositionError extends Error {
 }
 ```
 
-- [ ] **Step 6: Jalankan sampai hijau**
+- [ ] **Step 6: Run until green**
 
 Run: `corepack pnpm test`
-Expected: 4 test PASS.
+Expected: 4 tests PASS.
 
 - [ ] **Step 7: Commit**
 
 ```bash
 git add ai/fuguguardian/app/agent
-git commit -m "feat(guardian): fondasi test dan tipe domain strategi"
+git commit -m "feat(guardian): test foundation and strategy domain types"
 ```
 
 ---
 
-### Task 2: Rumus health factor murni
+### Task 2: Pure health factor formulas
 
 **Files:**
 - Create: `src/strategy/healthFactor.ts`, `src/strategy/__tests__/healthFactor.test.ts`
 
 **Interfaces:**
-- Consumes: `Position`, `HF_ONE`, `PositionError` dari `types.js`
+- Consumes: `Position`, `HF_ONE`, `PositionError` from `types.js`
 - Produces:
   - `function computeHealthFactor(collateralBase: bigint, debtBase: bigint, liquidationThresholdBps: bigint): bigint | null`
   - `function dropToLiquidationBps(hf: bigint | null): bigint | null`
   - `function healthFactorAfterPriceDrop(pos: Position, dropBps: bigint): bigint | null`
   - `function repayToReachTarget(pos: Position, targetHf: bigint): bigint`
 
-**Rumus yang mengikat:**
+**Binding formulas:**
 ```
 HF        = collateral × liquidationThresholdBps / 10000 × 1e18 / debt
-dropToLiq = 10000 − (10000 × 1e18 / HF)          // basis point, 0 bila HF ≤ 1
-HF setelah harga agunan turun d bps:
+dropToLiq = 10000 − (10000 × 1e18 / HF)          // basis points, 0 when HF ≤ 1
+HF after the collateral price falls by d bps:
             HF' = HF × (10000 − d) / 10000
-repay agar HF mencapai target:
+repay needed for HF to reach a target:
             debt_target = collateral × lt / 10000 × 1e18 / target
-            repay = debt − debt_target   (0 bila sudah aman)
+            repay = debt − debt_target   (0 when already safe)
 ```
 
-- [ ] **Step 1: Tulis test lebih dulu**
+- [ ] **Step 1: Write the tests first**
 
 `src/strategy/__tests__/healthFactor.test.ts`:
 ```ts
@@ -301,7 +301,7 @@ describe("repayToReachTarget", () => {
   it("menghitung pembayaran yang membawa HF ke target", () => {
     const p = pos(1000n, 800n); // HF 1.0
     const repay = repayToReachTarget(p, 1_600_000_000_000_000_000n);
-    expect(repay).toBe(300n); // sisa hutang 500 memberi HF 1.6
+    expect(repay).toBe(300n); // remaining debt of 500 gives HF 1.6
   });
 
   it("posisi yang sudah lebih aman dari target tidak perlu membayar apa pun", () => {
@@ -314,24 +314,24 @@ describe("repayToReachTarget", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [ ] **Step 2: Run them, confirm they fail**
 
 Run: `corepack pnpm test`
-Expected: gagal — modul belum ada.
+Expected: failure — the module does not exist yet.
 
-- [ ] **Step 3: Implementasi**
+- [ ] **Step 3: Implement**
 
-`src/strategy/healthFactor.ts` — semua fungsi murni, tanpa I/O:
+`src/strategy/healthFactor.ts` — every function pure, no I/O:
 ```ts
 import { HF_ONE, type Position } from "./types.js";
 
 const BPS = 10_000n;
 
 /**
- * Health factor gaya Aave v3, basis 1e18.
- * Mengembalikan null bila tidak ada hutang — itu bukan angka besar, melainkan
- * ketiadaan risiko. Aave sendiri mengembalikan 2^256-1 untuk kasus ini; kita
- * menormalkannya jadi null supaya pemanggil tidak pernah salah membandingkannya.
+ * An Aave v3 style health factor, on a 1e18 basis.
+ * Returns null when there is no debt — that is not a large number, it is the
+ * absence of risk. Aave itself returns 2^256-1 for this case; we normalize it
+ * to null so that callers can never compare it incorrectly.
  */
 export function computeHealthFactor(
   collateralBase: bigint,
@@ -342,14 +342,14 @@ export function computeHealthFactor(
   return (collateralBase * liquidationThresholdBps * HF_ONE) / (BPS * debtBase);
 }
 
-/** Berapa basis point harga agunan boleh turun sebelum HF menyentuh 1.0. */
+/** How many basis points the collateral price may fall before HF touches 1.0. */
 export function dropToLiquidationBps(hf: bigint | null): bigint | null {
   if (hf === null) return null;
   if (hf <= HF_ONE) return 0n;
   return BPS - (BPS * HF_ONE) / hf;
 }
 
-/** HF seandainya harga agunan turun sebesar `dropBps`. */
+/** The HF if the collateral price were to fall by `dropBps`. */
 export function healthFactorAfterPriceDrop(pos: Position, dropBps: bigint): bigint | null {
   if (pos.debtBase === 0n) return null;
   const sisa = dropBps >= BPS ? 0n : BPS - dropBps;
@@ -360,7 +360,7 @@ export function healthFactorAfterPriceDrop(pos: Position, dropBps: bigint): bigi
   );
 }
 
-/** Jumlah yang harus dibayar agar HF mencapai `targetHf`; 0n bila sudah aman. */
+/** The amount that must be repaid for HF to reach `targetHf`; 0n when already safe. */
 export function repayToReachTarget(pos: Position, targetHf: bigint): bigint {
   if (pos.debtBase === 0n || targetHf === 0n) return 0n;
   const hutangTarget =
@@ -370,21 +370,21 @@ export function repayToReachTarget(pos: Position, targetHf: bigint): bigint {
 }
 ```
 
-- [ ] **Step 4: Jalankan sampai hijau**
+- [ ] **Step 4: Run until green**
 
 Run: `corepack pnpm test`
-Expected: seluruh test PASS. Bila `healthFactorAfterPriceDrop` meleset satu unit karena pembulatan integer, **jangan** melonggarkan assertion — periksa urutan operasi: kalikan dulu, bagi belakangan.
+Expected: every test PASS. If `healthFactorAfterPriceDrop` is off by one unit because of integer rounding, **do not** loosen the assertion — check the order of operations: multiply first, divide last.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add ai/fuguguardian/app/agent
-git commit -m "feat(guardian): rumus health factor murni dan teruji"
+git commit -m "feat(guardian): pure and tested health factor formulas"
 ```
 
 ---
 
-### Task 3: Mesin keputusan
+### Task 3: The decision engine
 
 **Files:**
 - Create: `src/strategy/decide.ts`, `src/strategy/__tests__/decide.test.ts`
@@ -393,19 +393,19 @@ git commit -m "feat(guardian): rumus health factor murni dan teruji"
 - Consumes: `healthFactor.js`, `types.js`
 - Produces: `function decide(pos: Position, thresholds?: Thresholds): Decision`
 
-**Aturan yang mengikat** (urutan pemeriksaan dari paling gawat ke paling ringan):
-| Kondisi | Action | suggestedRepayBase |
+**Binding rules** (checked in order, from the most severe to the mildest):
+| Condition | Action | suggestedRepayBase |
 |---|---|---|
-| `hf === null` (tanpa hutang) | `NONE` | 0n |
-| `hf <= HF_ONE` | `EMERGENCY` | repay agar HF = warn |
-| `hf <= deleverage` | `DELEVERAGE` | repay agar HF = warn |
-| `hf <= partialRepay` | `PARTIAL_REPAY` | repay agar HF = warn |
+| `hf === null` (no debt) | `NONE` | 0n |
+| `hf <= HF_ONE` | `EMERGENCY` | repay to bring HF to warn |
+| `hf <= deleverage` | `DELEVERAGE` | repay to bring HF to warn |
+| `hf <= partialRepay` | `PARTIAL_REPAY` | repay to bring HF to warn |
 | `hf <= warn` | `WARN` | 0n |
-| selain itu | `NONE` | 0n |
+| otherwise | `NONE` | 0n |
 
-`reason` harus menyebut angka HF dan jarak ke likuidasi dalam persen, dalam bahasa Indonesia, tanpa jargon.
+`reason` must state the HF number and the distance to liquidation as a percentage, in Indonesian, without jargon.
 
-- [ ] **Step 1: Tulis test lebih dulu**
+- [ ] **Step 1: Write the tests first**
 
 `src/strategy/__tests__/decide.test.ts`:
 ```ts
@@ -413,9 +413,9 @@ import { describe, expect, it } from "vitest";
 import { decide } from "../decide.js";
 import { DEFAULT_THRESHOLDS, HF_ONE, type Position } from "../types.js";
 
-// helper: bangun posisi dengan HF yang diinginkan pada LT 80%
+// helper: build a position with the desired HF at an LT of 80%
 function posWithHf(hf: bigint): Position {
-  // collateral tetap 10_000; debt = collateral × lt / 10000 × 1e18 / hf
+  // collateral fixed at 10_000; debt = collateral × lt / 10000 × 1e18 / hf
   const collateral = 10_000n;
   const debt = hf === 0n ? 0n : (collateral * 8000n * HF_ONE) / (10_000n * hf);
   return {
@@ -487,34 +487,34 @@ describe("decide", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [ ] **Step 2: Run them, confirm they fail**
 
 Run: `corepack pnpm test`
 
-- [ ] **Step 3: Implementasi**
+- [ ] **Step 3: Implement**
 
-`src/strategy/decide.ts`. Fungsi murni; `reason` disusun dari angka, bukan dari LLM. Format HF dengan dua desimal dan jarak likuidasi dengan satu desimal, memakai pemisah desimal koma sesuai bahasa Indonesia. Urutan pemeriksaan persis seperti tabel di atas — dari paling gawat ke paling ringan, sehingga kasus batas jatuh ke tindakan yang lebih aman.
+`src/strategy/decide.ts`. A pure function; `reason` is assembled from numbers, not from an LLM. Format the HF with two decimals and the distance to liquidation with one decimal, using a comma as the decimal separator per Indonesian convention. The order of the checks is exactly as in the table above — from the most severe to the mildest, so that boundary cases fall to the safer action.
 
-Petunjuk implementasi yang mengikat:
-- `suggestedRepayBase` untuk `PARTIAL_REPAY`, `DELEVERAGE`, dan `EMERGENCY` dihitung dengan `repayToReachTarget(pos, thresholds.warn)` — target pemulihannya adalah ambang peringatan, bukan sekadar lewat dari ambang terdekat.
-- `WARN` dan `NONE` selalu `0n`.
-- `dropToLiquidationBps` diisi dari `dropToLiquidationBps(pos.healthFactor)`.
+Binding implementation notes:
+- `suggestedRepayBase` for `PARTIAL_REPAY`, `DELEVERAGE`, and `EMERGENCY` is computed with `repayToReachTarget(pos, thresholds.warn)` — the recovery target is the warning threshold, not merely clearing the nearest threshold.
+- `WARN` and `NONE` are always `0n`.
+- `dropToLiquidationBps` is filled from `dropToLiquidationBps(pos.healthFactor)`.
 
-- [ ] **Step 4: Jalankan sampai hijau**
+- [ ] **Step 4: Run until green**
 
 Run: `corepack pnpm test`
-Expected: seluruh test PASS.
+Expected: every test PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add ai/fuguguardian/app/agent
-git commit -m "feat(guardian): mesin keputusan deterministik dengan ambang bertingkat"
+git commit -m "feat(guardian): deterministic decision engine with tiered thresholds"
 ```
 
 ---
 
-### Task 4: Adapter on-chain Venus & Aave
+### Task 4: On-chain adapters for Venus & Aave
 
 **Files:**
 - Create: `src/strategy/chain/client.ts`, `src/strategy/chain/aave.ts`, `src/strategy/chain/venus.ts`, `src/strategy/__tests__/chain.test.ts`
@@ -522,25 +522,25 @@ git commit -m "feat(guardian): mesin keputusan deterministik dengan ambang berti
 **Interfaces:**
 - Consumes: `viem`, `types.js`
 - Produces:
-  - `chain/client.ts`: `function createReader(rpcUrl?: string)` → `{ client, readAavePosition, readVenusLiquidity }`. Ditaruh di file sendiri karena dipakai kedua adapter.
+  - `chain/client.ts`: `function createReader(rpcUrl?: string)` → `{ client, readAavePosition, readVenusLiquidity }`. It lives in its own file because both adapters use it.
   - `async function readAavePosition(client, account): Promise<Position>`
   - `async function readVenusLiquidity(client, account): Promise<{ liquidityBase: bigint; shortfallBase: bigint; blockNumber: bigint }>`
 
-**Alamat yang sudah diverifikasi live (jangan diganti tanpa verifikasi ulang):**
+**Addresses already verified live (do not swap them without re-verifying):**
 ```
 BSC mainnet RPC   https://bsc-dataseed.bnbchain.org
 Aave v3 Pool      0x6807dc923806fE8Fd134338EABCA509979a7e0cB
 Venus Comptroller 0xfD36E2c2a6789Db23113685031d7F16329158384
 ```
 
-**Fakta yang mengikat, terverifikasi live:**
-- `getUserAccountData` mengembalikan enam nilai berurutan: `totalCollateralBase, totalDebtBase, availableBorrowsBase, currentLiquidationThreshold, ltv, healthFactor`.
-- Untuk akun tanpa hutang, `healthFactor` bernilai `2n ** 256n - 1n`. Adapter **wajib** menormalkannya menjadi `null`.
-- `getAccountLiquidity` mengembalikan tiga nilai: `error, liquidity, shortfall`.
+**Binding facts, verified live:**
+- `getUserAccountData` returns six values in order: `totalCollateralBase, totalDebtBase, availableBorrowsBase, currentLiquidationThreshold, ltv, healthFactor`.
+- For an account with no debt, `healthFactor` is `2n ** 256n - 1n`. The adapter **must** normalize it to `null`.
+- `getAccountLiquidity` returns three values: `error, liquidity, shortfall`.
 
-- [ ] **Step 1: Tulis test lebih dulu**
+- [ ] **Step 1: Write the tests first**
 
-`src/strategy/__tests__/chain.test.ts`. Test ini **menyentuh jaringan sungguhan** (read-only, gratis) — beri `timeout` 30 detik per test.
+`src/strategy/__tests__/chain.test.ts`. These tests **touch the real network** (read-only, free) — give each test a 30-second `timeout`.
 ```ts
 import { describe, expect, it } from "vitest";
 import { createReader } from "../chain/client.js";
@@ -560,7 +560,7 @@ describe("adapter Aave v3 (BSC mainnet, read-only)", () => {
   it("menormalkan healthFactor tak terhingga menjadi null", { timeout: 30_000 }, async () => {
     const r = createReader();
     const pos = await r.readAavePosition(AKUN_KOSONG);
-    // akun tanpa hutang: Aave mengembalikan 2^256-1
+    // an account with no debt: Aave returns 2^256-1
     expect(pos.debtBase).toBe(0n);
     expect(pos.healthFactor).toBeNull();
   });
@@ -576,53 +576,53 @@ describe("adapter Venus (BSC mainnet, read-only)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [ ] **Step 2: Run them, confirm they fail**
 
 Run: `corepack pnpm test`
 
-- [ ] **Step 3: Implementasi**
+- [ ] **Step 3: Implement**
 
-Di `chain/client.ts`, buat `createReader(rpcUrl = "https://bsc-dataseed.bnbchain.org")` yang membangun `publicClient` viem terhadap chain `bsc`, meng-ekspos `client` mentah, lalu mendelegasikan ke `readAavePosition` dan `readVenusLiquidity` dari kedua adapter. Adapter sendiri menerima `client` sebagai parameter sehingga tetap bisa diuji terpisah.
+In `chain/client.ts`, build `createReader(rpcUrl = "https://bsc-dataseed.bnbchain.org")`, which constructs a viem `publicClient` against the `bsc` chain, exposes the raw `client`, and then delegates to `readAavePosition` and `readVenusLiquidity` from the two adapters. The adapters themselves take `client` as a parameter so they remain testable in isolation.
 
-`readAavePosition` memanggil `getUserAccountData`, lalu:
-- `healthFactor` dinormalkan: bila nilainya `2n ** 256n - 1n` **atau** `debtBase === 0n`, jadikan `null`.
-- `liquidationThresholdBps` diisi dari `currentLiquidationThreshold` (Aave sudah mengembalikannya dalam basis point).
-- `blockNumber` diambil dari `client.getBlockNumber()`.
+`readAavePosition` calls `getUserAccountData`, then:
+- `healthFactor` is normalized: if the value is `2n ** 256n - 1n` **or** `debtBase === 0n`, make it `null`.
+- `liquidationThresholdBps` is filled from `currentLiquidationThreshold` (Aave already returns it in basis points).
+- `blockNumber` is taken from `client.getBlockNumber()`.
 
-`readVenusLiquidity` memanggil `getAccountLiquidity` dan mengembalikan `liquidity` serta `shortfall`. Bila nilai `error` bukan `0n`, lempar `PositionError` dengan pesan yang menyebut kode error tersebut.
+`readVenusLiquidity` calls `getAccountLiquidity` and returns `liquidity` and `shortfall`. If the `error` value is not `0n`, throw a `PositionError` whose message names that error code.
 
-Beri komentar di kepala kedua file bahwa pembacaan dilakukan di **mainnet** karena Venus dan Aave hanya ada di sana, bersifat read-only, dan tidak berbiaya.
+Put a comment at the top of both files stating that the reads happen on **mainnet** because Venus and Aave only exist there, that they are read-only, and that they cost nothing.
 
-- [ ] **Step 4: Jalankan sampai hijau**
+- [ ] **Step 4: Run until green**
 
 Run: `corepack pnpm test`
-Expected: seluruh test PASS. Bila RPC menolak, coba `https://bsc-rpc.publicnode.com` — **jangan** memakai domain `binance.org`, terbukti diblokir dari jaringan ini.
+Expected: every test PASS. If the RPC rejects you, try `https://bsc-rpc.publicnode.com` — **do not** use a `binance.org` domain, it is proven to be blocked from this network.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add ai/fuguguardian/app/agent
-git commit -m "feat(guardian): adapter read-only Venus dan Aave v3"
+git commit -m "feat(guardian): read-only Venus and Aave v3 adapters"
 ```
 
 ---
 
-### Task 5: Lapisan penjelasan lewat dGrid
+### Task 5: The explanation layer through dGrid
 
 **Files:**
 - Create: `src/strategy/explain.ts`, `src/strategy/__tests__/explain.test.ts`
 
 **Interfaces:**
-- Consumes: `Decision`, `Position`, `buildModel` dari `../model.js`
+- Consumes: `Decision`, `Position`, `buildModel` from `../model.js`
 - Produces: `async function explainDecision(pos: Position, decision: Decision, deps?: { generate?: GenerateFn }): Promise<string>`
 
-**Aturan yang mengikat:**
-- Fungsi ini **tidak boleh** mengubah keputusan. Ia menerima `Decision` yang sudah jadi dan hanya menghasilkan kalimat.
-- Bila pemanggilan LLM gagal atau melebihi 20 detik, **kembalikan `decision.reason` apa adanya** — jangan melempar. Penjelasan yang gagal tidak boleh pernah menghentikan perlindungan posisi.
-- Prompt harus memuat angka yang sudah dihitung dan melarang model mengarang angka lain.
-- `deps.generate` ada supaya test bisa menyuntikkan fungsi palsu tanpa menyentuh jaringan.
+**Binding rules:**
+- This function **must not** change the decision. It receives a finished `Decision` and only produces a sentence.
+- If the LLM call fails or exceeds 20 seconds, **return `decision.reason` as-is** — do not throw. A failed explanation must never stop the position from being protected.
+- The prompt must carry the numbers that were already computed and must forbid the model from inventing any other number.
+- `deps.generate` exists so that tests can inject a fake function without touching the network.
 
-- [ ] **Step 1: Tulis test lebih dulu**
+- [ ] **Step 1: Write the tests first**
 
 `src/strategy/__tests__/explain.test.ts`:
 ```ts
@@ -690,33 +690,33 @@ describe("explainDecision", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [ ] **Step 2: Run them, confirm they fail**
 
 Run: `corepack pnpm test`
 
-- [ ] **Step 3: Implementasi**
+- [ ] **Step 3: Implement**
 
-`src/strategy/explain.ts`. Default `generate` memakai `generateText` dari `ai` dengan model dari `buildModel()`. Bungkus dengan `Promise.race` terhadap timeout 20 detik. Tangkap semua kegagalan dan kembalikan `decision.reason`.
+`src/strategy/explain.ts`. The default `generate` uses `generateText` from `ai` with the model from `buildModel()`. Wrap it in a `Promise.race` against a 20-second timeout. Catch every failure and return `decision.reason`.
 
-Prompt harus menyebut: protokol, angka HF terformat, jarak ke likuidasi dalam persen, aksi yang diambil, dan jumlah yang disarankan dibayar bila ada — lalu menutup dengan larangan tegas mengarang angka di luar yang diberikan.
+The prompt must state: the protocol, the formatted HF number, the distance to liquidation as a percentage, the action taken, and the amount suggested for repayment if there is one — then close with a firm prohibition against inventing numbers beyond the ones given.
 
-Beri komentar di kepala file yang menyatakan bahwa modul ini berada **di luar jalur kritis**: keputusan sudah diambil sebelum fungsi ini dipanggil, dan kegagalannya tidak pernah mengubah perlindungan yang berjalan.
+Put a comment at the top of the file stating that this module sits **outside the critical path**: the decision was already made before this function was called, and its failure never changes the protection that is running.
 
-- [ ] **Step 4: Jalankan sampai hijau**
+- [ ] **Step 4: Run until green**
 
 Run: `corepack pnpm test`
-Expected: seluruh test PASS tanpa menyentuh jaringan (semuanya memakai `deps.generate` palsu).
+Expected: every test PASS without touching the network (they all use a fake `deps.generate`).
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add ai/fuguguardian/app/agent
-git commit -m "feat(guardian): penjelasan dGrid di luar jalur kritis, gagal dengan aman"
+git commit -m "feat(guardian): dGrid explanation outside the critical path, failing safely"
 ```
 
 ---
 
-### Task 6: Harness backtest — membuktikan agent mengalahkan manusia
+### Task 6: The backtest harness — proving the agent beats a human
 
 **Files:**
 - Create: `src/strategy/backtest.ts`, `src/strategy/__tests__/backtest.test.ts`
@@ -727,15 +727,15 @@ git commit -m "feat(guardian): penjelasan dGrid di luar jalur kritis, gagal deng
   - `interface BacktestResult { candles: number; agentInterventions: number; agentLiquidations: number; humanLiquidations: number; liquidationsAvoided: number; }`
   - `function runBacktest(input: { startCollateralBase: bigint; startDebtBase: bigint; liquidationThresholdBps: bigint; priceSeriesBps: bigint[]; humanReactionCandles: number; thresholds?: Thresholds }): BacktestResult`
 
-**Model simulasi yang mengikat:**
-- `priceSeriesBps[i]` adalah harga agunan relatif terhadap harga awal, dalam basis point (`10000n` = harga awal).
-- Pada tiap candle, hitung HF dari agunan yang sudah disesuaikan harga, lalu `decide`.
-- **Agent** bertindak pada candle yang sama saat aksi bukan `NONE`/`WARN`: hutang dikurangi `suggestedRepayBase`.
-- **Manusia** baru bertindak `humanReactionCandles` candle setelah aksi pertama kali dibutuhkan.
-- Likuidasi tercatat bila HF ≤ 1.0 sebelum pihak bersangkutan sempat bertindak.
+**Binding simulation model:**
+- `priceSeriesBps[i]` is the collateral price relative to the starting price, in basis points (`10000n` = the starting price).
+- At each candle, compute the HF from the price-adjusted collateral, then `decide`.
+- **The agent** acts on the same candle where the action is not `NONE`/`WARN`: the debt is reduced by `suggestedRepayBase`.
+- **The human** only acts `humanReactionCandles` candles after the action was first needed.
+- A liquidation is recorded when HF ≤ 1.0 before the party in question got to act.
 - `liquidationsAvoided = humanLiquidations − agentLiquidations`.
 
-- [ ] **Step 1: Tulis test lebih dulu**
+- [ ] **Step 1: Write the tests first**
 
 `src/strategy/__tests__/backtest.test.ts`:
 ```ts
@@ -767,7 +767,7 @@ describe("runBacktest", () => {
   });
 
   it("penurunan tajam melikuidasi manusia yang lambat tetapi tidak melikuidasi agent", () => {
-    // agunan jatuh 45% dalam dua candle; manusia baru bereaksi lima candle kemudian
+    // the collateral falls 45% over two candles; the human only reacts five candles later
     const r = runBacktest({
       ...dasar,
       priceSeriesBps: [10_000n, 7_000n, 5_500n, 5_400n, 5_300n, 5_200n],
@@ -797,40 +797,40 @@ describe("runBacktest", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [ ] **Step 2: Run them, confirm they fail**
 
 Run: `corepack pnpm test`
 
-- [ ] **Step 3: Implementasi**
+- [ ] **Step 3: Implement**
 
-`src/strategy/backtest.ts`, fungsi murni tanpa I/O. Jalankan dua simulasi terpisah di atas deret harga yang sama: satu untuk agent, satu untuk manusia dengan penundaan reaksi. Catat likuidasi ketika HF menyentuh atau turun di bawah `HF_ONE` sebelum pihak itu sempat bertindak.
+`src/strategy/backtest.ts`, a pure function with no I/O. Run two separate simulations over the same price series: one for the agent, one for the human with the reaction delay. Record a liquidation when HF touches or falls below `HF_ONE` before that party got to act.
 
-Beri komentar di kepala file yang menyatakan keterbatasannya secara jujur: simulasi ini tidak memodelkan gas, slippage, kegagalan transaksi, maupun kongesti jaringan, sehingga angkanya adalah batas atas keunggulan agent — bukan janji.
+Put a comment at the top of the file stating its limitations honestly: this simulation does not model gas, slippage, failed transactions, or network congestion, so its numbers are an upper bound on the agent's advantage — not a promise.
 
-- [ ] **Step 4: Jalankan sampai hijau**
-
-Run: `corepack pnpm test`
-Expected: seluruh test PASS.
-
-- [ ] **Step 5: Jalankan seluruh suite dan catat jumlahnya**
+- [ ] **Step 4: Run until green**
 
 Run: `corepack pnpm test`
-Expected: seluruh test dari Task 1–6 hijau.
+Expected: every test PASS.
+
+- [ ] **Step 5: Run the whole suite and record the count**
+
+Run: `corepack pnpm test`
+Expected: every test from Task 1–6 green.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add ai/fuguguardian/app/agent
-git commit -m "feat(guardian): harness backtest likuidasi-dicegah"
+git commit -m "feat(guardian): liquidations-avoided backtest harness"
 ```
 
 ---
 
 ## Definition of Done
 
-- [ ] `corepack pnpm test` hijau seluruhnya di `ai/fuguguardian/app/agent/`
-- [ ] Seluruh fungsi di `src/strategy/` selain `chain/` dan `explain.ts` murni — tanpa network, tanpa `Date.now()`, tanpa `process.env`
-- [ ] Adapter berhasil membaca Aave dan Venus dari BSC mainnet dalam test sungguhan
-- [ ] `explainDecision` terbukti mengembalikan alasan deterministik saat LLM gagal
-- [ ] Tidak ada keputusan finansial yang melewati LLM
-- [ ] Backtest melaporkan `liquidationsAvoided` yang bisa dijelaskan asal angkanya
+- [ ] `corepack pnpm test` fully green in `ai/fuguguardian/app/agent/`
+- [ ] Every function in `src/strategy/` other than `chain/` and `explain.ts` is pure — no network, no `Date.now()`, no `process.env`
+- [ ] The adapters successfully read Aave and Venus from BSC mainnet in a real test
+- [ ] `explainDecision` is proven to return the deterministic reason when the LLM fails
+- [ ] No financial decision passes through an LLM
+- [ ] The backtest reports a `liquidationsAvoided` figure whose origin can be explained
