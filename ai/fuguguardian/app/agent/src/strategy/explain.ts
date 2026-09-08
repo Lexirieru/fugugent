@@ -63,22 +63,35 @@ async function defaultGenerate(prompt: string): Promise<string> {
   return text;
 }
 
-function timeout(ms: number): Promise<never> {
-  return new Promise((_, reject) => {
-    // Sengaja TIDAK di-unref(): timer ini adalah satu-satunya jaminan bahwa
-    // explainDecision benar-benar kembali dalam 20 detik. Meng-unref timer
-    // membuat Node bebas membiarkannya tidak pernah berbunyi bila tidak ada
-    // pekerjaan lain yang menahan event loop — melanggar batas waktu yang
-    // dijanjikan ke pemanggil (yang sedang melindungi posisi user).
-    setTimeout(() => reject(new Error(`explainDecision timeout setelah ${ms}ms`)), ms);
+/**
+ * Timer timeout dikembalikan bersama handle-nya supaya pemanggil bisa
+ * `clearTimeout` begitu race selesai — menang ataupun kalah. Tanpa ini,
+ * pada jalur paling umum (dGrid menjawab duluan, di bawah 20 detik), timer
+ * ini tetap hidup di event loop sampai waktunya habis meski hasilnya sudah
+ * tidak dipakai lagi. Guardian memanggil explainDecision berulang dalam
+ * loop pemantauan posisi — timer yang tidak dibersihkan menumpuk di siklus
+ * yang saling tumpang tindih dan menahan proses berumur pendek tetap hidup
+ * tanpa alasan.
+ *
+ * Sengaja TIDAK di-unref(): timer ini adalah satu-satunya jaminan bahwa
+ * explainDecision benar-benar kembali dalam 20 detik. Meng-unref timer
+ * membuat Node bebas membiarkannya tidak pernah berbunyi bila tidak ada
+ * pekerjaan lain yang menahan event loop — melanggar batas waktu yang
+ * dijanjikan ke pemanggil (yang sedang melindungi posisi user).
+ */
+function timeout(ms: number): { promise: Promise<never>; handle: ReturnType<typeof setTimeout> } {
+  let handle!: ReturnType<typeof setTimeout>;
+  const promise = new Promise<never>((_, reject) => {
+    handle = setTimeout(() => reject(new Error(`explainDecision timeout setelah ${ms}ms`)), ms);
   });
+  return { promise, handle };
 }
 
 /**
  * Menjelaskan `decision` yang sudah final dalam kalimat bahasa Indonesia.
  * TIDAK PERNAH mengubah `decision` atau `pos`, dan TIDAK PERNAH melempar —
- * kegagalan apa pun (network, timeout, teks kosong) jatuh kembali ke
- * `decision.reason` apa adanya.
+ * kegagalan apa pun (pembuatan prompt, network, timeout, teks kosong) jatuh
+ * kembali ke `decision.reason` apa adanya.
  */
 export async function explainDecision(
   pos: Position,
@@ -86,15 +99,18 @@ export async function explainDecision(
   deps?: { generate?: GenerateFn },
 ): Promise<string> {
   const generate = deps?.generate ?? defaultGenerate;
-  const prompt = buildPrompt(pos, decision);
+  const { promise: timeoutPromise, handle } = timeout(TIMEOUT_MS);
 
   try {
-    const teks = await Promise.race([generate(prompt), timeout(TIMEOUT_MS)]);
+    const prompt = buildPrompt(pos, decision);
+    const teks = await Promise.race([generate(prompt), timeoutPromise]);
     if (typeof teks === "string" && teks.trim().length > 0) {
       return teks;
     }
     return decision.reason;
   } catch {
     return decision.reason;
+  } finally {
+    clearTimeout(handle);
   }
 }

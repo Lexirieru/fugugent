@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { explainDecision } from "../explain.js";
 import { HF_ONE, type Decision, type Position } from "../types.js";
 
@@ -58,5 +58,21 @@ describe("explainDecision", () => {
     });
     expect(promptTertangkap).toContain("1,60");
     expect(promptTertangkap.toLowerCase()).toContain("jangan");
+  });
+
+  it("timer dibersihkan setelah generate berhasil", async () => {
+    vi.useFakeTimers();
+    try {
+      const teks = await explainDecision(pos, keputusan, {
+        generate: async () => "Selesai lebih dulu daripada timeout.",
+      });
+      expect(teks).toBe("Selesai lebih dulu daripada timeout.");
+      // Bila timer timeout 20 detik tidak di-clearTimeout setelah generate
+      // menang, ia akan tetap terdaftar di sini walau hasilnya sudah tidak
+      // dipakai lagi.
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
