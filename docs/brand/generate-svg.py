@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Generator SVG karakter Fugugent. Geometri mengikuti docs/brand/karakter.md
-dan docs/brand/tingkat-kembung.md. Semua ukuran dalam kotak 100x100 unit."""
+"""Generator SVG karakter Fugugent. Geometri mengikuti docs/brand/characters.md
+dan docs/brand/puff-levels.md. Semua ukuran dalam kotak 100x100 unit."""
 import math, os, sys
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "."

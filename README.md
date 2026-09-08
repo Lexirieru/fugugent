@@ -404,8 +404,8 @@ channel, required on every card and detail page.
 | 1 | Calm | thin, solid, 40% arc | Reef Green `#009E73` | Nothing to do. The agent is alive and watching. |
 | 2 | Watchful | solid, full, one notch | Shoal Yellow `#F0E442` | First threshold touched. Told you; spent nothing. Must **not** feel like an alarm. |
 | 3 | Strained | **dashed**, full | Tide Amber `#E69F00` | First level with a financial consequence — the agent is about to spend money. The solid→dashed change says so without colour. |
-| 4 | Critical | — | — | see [`docs/brand/tingkat-kembung.md`](docs/brand/tingkat-kembung.md) |
-| 5 | Emergency | — | — | see [`docs/brand/tingkat-kembung.md`](docs/brand/tingkat-kembung.md) |
+| 4 | Critical | — | — | see [`docs/brand/puff-levels.md`](docs/brand/puff-levels.md) |
+| 5 | Emergency | — | — | see [`docs/brand/puff-levels.md`](docs/brand/puff-levels.md) |
 
 **Absolute rule: the agent's body colour never changes with puff level.** Only the body shape
 and the ring change. A Guardian in an emergency is still cobalt; it is just round, spiked, and
@@ -651,7 +651,7 @@ stated plainly.
   through the backend, never from the browser.
 - The character art is **hand-written parametric SVG** from `docs/brand/generate-svg.py`. Zero
   images came from a generative model — both image MCP servers were disconnected when that work
-  ran, four attempts, all failed. The prompts in `docs/brand/prompt-gambar.md` have never been
+  ran, four attempts, all failed. The prompts in `docs/brand/image-prompts.md` have never been
   executed and are therefore an unverified specification, not a proven recipe.
 - No CI runs on this repository. The test counts in this README were counted by running the
   suites; the commands to recount them are in [Try it yourself](#-try-it-yourself).
@@ -693,7 +693,7 @@ that work does not have to touch `docker-compose.yml` again.
 | [`docs/research/00-decisions.md`](docs/research/00-decisions.md) | 13 locked decisions + dGrid test results |
 | [`docs/e2e/2026-09-08-e2e-testnet.md`](docs/e2e/2026-09-08-e2e-testnet.md) | Every on-chain claim in this README, with its full working |
 | [`docs/research/05-competitive-landscape.md`](docs/research/05-competitive-landscape.md) | Virtuals, Olas, Almanak, Giza/ARMA, Agentverse — sourced |
-| [`docs/brand/tingkat-kembung.md`](docs/brand/tingkat-kembung.md) | The five puff levels, all six visual channels |
+| [`docs/brand/puff-levels.md`](docs/brand/puff-levels.md) | The five puff levels, all six visual channels |
 | [`docs/setup/ENVIRONMENT.md`](docs/setup/ENVIRONMENT.md) | Credentials layout, verified addresses, network constants |
 
 *Most documents in `docs/` are written in Indonesian; identifiers and code are English.*

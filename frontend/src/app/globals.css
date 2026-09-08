@@ -5,7 +5,7 @@
 
   Tema dan token dasar sengaja disamakan dengan `landingpage/src/app/globals.css`
   supaya landing dan aplikasi terasa satu produk. Yang ditambahkan di sini adalah
-  token risiko dan token identitas agent dari `docs/brand/palet.md`, karena hanya
+  token risiko dan token identitas agent dari `docs/brand/palette.md`, karena hanya
   aplikasi yang menampilkan tingkat kembung sesungguhnya.
 */
 
@@ -27,14 +27,14 @@
   --accent: #f0b90b;
   --accent-soft: rgba(240, 185, 11, 0.14);
 
-  /* docs/brand/palet.md §5 — hanya boleh muncul di dalam komponen risiko. */
+  /* docs/brand/palette.md §5 — hanya boleh muncul di dalam komponen risiko. */
   --risk-1: #009e73;
   --risk-2: #f0e442;
   --risk-3: #e69f00;
   --risk-4: #d55e00;
   --risk-5: #a4210e;
 
-  /* docs/brand/palet.md §4 — identitas agent, tidak pernah berubah karena risiko. */
+  /* docs/brand/palette.md §4 — identitas agent, tidak pernah berubah karena risiko. */
   --agent-guardian: #0072b2;
   --agent-rebalancer: #cc79a7;
   --agent-grid: #56b4e9;
@@ -86,7 +86,7 @@ body {
 }
 
 /*
-  Napas fugu. docs/brand/tingkat-kembung.md §1: tingkat 1–2 mengambang, tingkat 3
+  Napas fugu. docs/brand/puff-levels.md §1: tingkat 1–2 mengambang, tingkat 3
   bergetar saat data baru, tingkat 4 berdenyut, dan tingkat 5 SENGAJA DIAM.
   Perubahan dari bergerak ke berhenti adalah sinyalnya sendiri.
 */

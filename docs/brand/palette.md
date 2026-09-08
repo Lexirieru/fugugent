@@ -74,7 +74,7 @@ safe — it is the starting point.
 | Yield (`YIELD`) | `agent-yield` | `#E69F00` | `#FFC24D` |
 
 Guardian, Grid, and Rebalancer will converge under dichromatic vision. That is **accepted and
-intentional**, because the main differentiator is the silhouette (see `karakter.md` §6), and
+intentional**, because the main differentiator is the silhouette (see `characters.md` §6), and
 because every card always carries the category name as text. Colour here is the third channel,
 not the first.
 

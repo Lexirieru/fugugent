@@ -1,5 +1,5 @@
 /**
- * Chip angka risiko — kanal keenam dari `docs/brand/tingkat-kembung.md` §0, dan
+ * Chip angka risiko — kanal keenam dari `docs/brand/puff-levels.md` §0, dan
  * satu-satunya yang tidak ambigu. Karena itu ia wajib ada di kartu maupun detail,
  * dan tidak boleh dihilangkan pada ukuran apa pun yang menampilkan tingkat 4–5.
  *

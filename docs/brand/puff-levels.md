@@ -36,7 +36,7 @@ becomes round, spiky, and surrounded by hazard stripes.
 
 ## 1. The five levels
 
-Geometry unit: a 100×100 unit box, 8 units of padding (see `karakter.md` §1).
+Geometry unit: a 100×100 unit box, 8 units of padding (see `characters.md` §1).
 
 ### Level 1 — **Calm**
 

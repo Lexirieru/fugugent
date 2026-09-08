@@ -65,7 +65,7 @@ const f = (n: number) => n.toFixed(2);
 
 /**
  * Warna fugu pihak ketiga: hue deterministik dari id agent, saturasi dan
- * lightness DIKUNCI (`karakter.md` §7) supaya tidak pernah ada kartu yang menyala
+ * lightness DIKUNCI (`characters.md` §7) supaya tidak pernah ada kartu yang menyala
  * lebih terang daripada agent terkurasi. Rentang hijau (95–150) dan merah (0–20)
  * dilewati — dua rentang itu milik semantik risiko, bukan milik identitas.
  */
@@ -314,7 +314,7 @@ function charFor(kind: FuguKind, seed: string): CharSpec {
 
 /**
  * Keadaan "tidak ada bacaan segar": siluet berlubang, tanpa isi, tanpa duri,
- * tanpa cincin. `tingkat-kembung.md` §3 — menebak tingkat dari data lama adalah
+ * tanpa cincin. `puff-levels.md` §3 — menebak tingkat dari data lama adalah
  * kebohongan yang paling mahal di produk ini, jadi kita menggambar ketidaktahuan
  * apa adanya.
  */

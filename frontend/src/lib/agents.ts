@@ -19,7 +19,7 @@ export interface CategoryMeta {
   kind: FuguKind;
   /** Apa yang dikerjakan agent kategori ini. */
   blurb: string;
-  /** Metrik yang memetakan ke tingkat kembung. Sumber: docs/brand/tingkat-kembung.md §3–4. */
+  /** Metrik yang memetakan ke tingkat kembung. Sumber: docs/brand/puff-levels.md §3–4. */
   riskMetric: string;
 }
 
@@ -59,7 +59,7 @@ export const CATEGORY_ORDER: Category[] = ["REBALANCING", "GRID", "YIELD", "HEAL
 
 /**
  * Id agent first-party kami. Hanya keempat ini yang boleh memakai properti khas
- * (perisai, visor, daun, lengan timbangan) — `docs/brand/karakter.md` §7. Agent
+ * (perisai, visor, daun, lengan timbangan) — `docs/brand/characters.md` §7. Agent
  * pihak ketiga selalu mendapat siluet netral berwarna deterministik, supaya empat
  * agent kami terbaca sebagai lantai kualitas, bukan sekadar empat dari 309 ribu.
  */

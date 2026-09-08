@@ -5,8 +5,8 @@
 `contracts/src/types/FuguTypes.sol` (`REBALANCING | GRID | YIELD | HEALTH_FACTOR`)
 and must not be changed from the brand side.
 
-Companion documents: `tingkat-kembung.md` (risk states), `palet.md` (colours),
-`prompt-gambar.md` (image production).
+Companion documents: `puff-levels.md` (risk states), `palette.md` (colours),
+`image-prompts.md` (image production).
 
 ---
 
@@ -205,6 +205,6 @@ Prose, UI copy, and the README all use **puff level** (the fugu *puffs up*). The
 are **Calm · Watchful · Strained · Critical · Emergency**.
 
 The code field is still named `bloatLevel`, and the frozen image prompts in
-`prompt-gambar.md` say "bloat level". Those are deliberately left alone: renaming an
+`image-prompts.md` say "bloat level". Those are deliberately left alone: renaming an
 identifier that generated assets are keyed to would break references for no reader benefit.
 When you meet `bloatLevel` in code, read it as *puff level*.

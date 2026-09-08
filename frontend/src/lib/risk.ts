@@ -1,6 +1,6 @@
 /**
  * Tingkat kembung — mekanik inti produk.
- * Sumber: `docs/brand/tingkat-kembung.md`.
+ * Sumber: `docs/brand/puff-levels.md`.
  *
  * Aturan yang paling penting di berkas ini, dan alasan tidak ada satu pun ambang
  * numerik di sini: **frontend tidak menghitung ambang.** Backend mengirim
@@ -105,7 +105,7 @@ export interface RiskReading {
 
 /**
  * Kalimat `aria-label` penuh — bukan angka telanjang.
- * `tingkat-kembung.md` §5.6 mewajibkan bentuk ini.
+ * `puff-levels.md` §5.6 mewajibkan bentuk ini.
  */
 export function riskAriaLabel(agentName: string, reading: RiskReading | null): string {
   if (!reading) {

@@ -125,7 +125,7 @@ are and **fails with a non-zero exit code** the moment one claim is not proven a
 on-chain reading — including the claim of *how much* was paid. Every "before" and "after"
 reading is anchored to its transaction's block height via an `eth_call` with an explicit
 `blockNumber`, so a public RPC answering stale causes a failure rather than a number that looks
-right. The failure path was also run for real (`E2E_PAKSA_GAGAL_SETELAH_TURUN=1`): exit 1, and
+right. The failure path was also run for real (`E2E_FORCE_FAIL_AFTER_DROP=1`): exit 1, and
 the testnet price was still restored by the `finally` block.
 
 **The bound is real, and this is the decisive evidence.** The same session, moments after
@@ -443,8 +443,8 @@ wired up first (B1).
 **Zero images were produced by a generative model.** Both image-generation MCPs in this
 environment are not connected; four attempts were made and all four replied *"MCP server is not
 connected"*. The assets that exist were drawn via `docs/brand/generate-svg.py`, which translates
-the geometry in `karakter.md` and `tingkat-kembung.md` into shapes. The prompts in
-`prompt-gambar.md` have **never been run** — treat them as a mature specification, not as a
+the geometry in `characters.md` and `puff-levels.md` into shapes. The prompts in
+`image-prompts.md` have **never been run** — treat them as a mature specification, not as a
 proven recipe. There are no PNG files; this environment has no SVG rasterizer. A dichromatic
 colour-blindness simulation has not been run either; only full grayscale.
 

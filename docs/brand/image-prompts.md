@@ -32,7 +32,7 @@ The rules that keep it consistent:
 5. **Always append the negative block** at the end if the tool supports it; if not, the
    prohibitions are already embedded inside the style block.
 
-**Settings used** (record any change in `hasil.md`):
+**Settings used** (record any change in `results.md`):
 
 | Parameter | Value |
 |---|---|
@@ -265,10 +265,10 @@ unremarkable presence next to the four named characters.
 
 > The assets that actually exist in the repo right now are **hand-drawn SVGs**
 > (`docs/brand/generate-svg.py`), not model output. The reasons are in
-> `hasil.md`. The prompts above still stand if we later want to make a richer
+> `results.md`. The prompts above still stand if we later want to make a richer
 > illustrative version for marketing material.
 
-Everything is stored in `landingpage/public/brand/` and recorded in `docs/brand/hasil.md`.
+Everything is stored in `landingpage/public/brand/` and recorded in `docs/brand/results.md`.
 
 ---
 
@@ -289,5 +289,5 @@ An image is **rejected** if any of these is true — no matter how good it looks
 Generative model images **will not** be precise on hex and ratio. That is accounted for: these
 assets are used for the landing page, the OG image, and presentation material.
 **The 48 px avatar in the marketplace must be a hand-drawn SVG** following the spec in
-`karakter.md`, not a generated PNG — because at that size geometric precision is everything,
+`characters.md`, not a generated PNG — because at that size geometric precision is everything,
 and because the avatar must be able to change its puff level directly through CSS/props.

@@ -18,17 +18,17 @@ this work was done. Tried, and failed, four times:
 
 **Zero images were produced by a generative model.** Not one file in
 `landingpage/public/brand/` comes from an image model. The prompts in
-`prompt-gambar.md` have **never been run** and are therefore not yet verified against real
+`image-prompts.md` have **never been run** and are therefore not yet verified against real
 output — treat them as a mature specification, not as a proven recipe.
 
 ## 2. What was done instead
 
 The assets were drawn by hand as **parametric SVGs**, produced by
 `docs/brand/generate-svg.py` (Python, no dependencies). That script translates the geometry in
-`karakter.md` and `tingkat-kembung.md` into shapes — the 100×100 box, the body width per level,
+`characters.md` and `puff-levels.md` into shapes — the 100×100 box, the body width per level,
 the spike angles, the ring patterns, all exactly the same numbers as in the documents.
 
-This is not merely a stopgap. `prompt-gambar.md` §7 already stated up front that the
+This is not merely a stopgap. `image-prompts.md` §7 already stated up front that the
 **48 px avatar must be a hand-drawn SVG, not a generated PNG**, because at that size geometric
 precision decides everything and because the puff level has to change via props rather than by
 swapping files. So what is in the repo now is precisely the asset the product actually needs;
@@ -46,19 +46,19 @@ All in `landingpage/public/brand/`. **13 files, all SVG.**
 
 | File | Contents | Spec reference |
 |---|---|---|
-| `guardian.svg` | Guardian, puff level 1 | `karakter.md` §2 |
-| `rebalancer.svg` | Rebalancer, puff level 1 | `karakter.md` §3 |
-| `grid.svg` | Grid, puff level 1 | `karakter.md` §4 |
-| `yield.svg` | Yield, puff level 1 | `karakter.md` §5 |
-| `guardian-kembung-1.svg` | Calm — `HF > 1.5`, `NONE` | `tingkat-kembung.md` §3 |
+| `guardian.svg` | Guardian, puff level 1 | `characters.md` §2 |
+| `rebalancer.svg` | Rebalancer, puff level 1 | `characters.md` §3 |
+| `grid.svg` | Grid, puff level 1 | `characters.md` §4 |
+| `yield.svg` | Yield, puff level 1 | `characters.md` §5 |
+| `guardian-kembung-1.svg` | Calm — `HF > 1.5`, `NONE` | `puff-levels.md` §3 |
 | `guardian-kembung-2.svg` | Watchful — `1.2 < HF ≤ 1.5`, `WARN` | same |
 | `guardian-kembung-3.svg` | Strained — `1.1 < HF ≤ 1.2`, `PARTIAL_REPAY` | same |
 | `guardian-kembung-4.svg` | Critical — `1.0 < HF ≤ 1.1`, `DELEVERAGE` | same |
 | `guardian-kembung-5.svg` | Emergency — `HF ≤ 1.0`, `EMERGENCY` | same |
-| `maskot.svg` | Primary mascot / logo | `prompt-gambar.md` §5.1 |
-| `favicon-src.svg` | Favicon source (background `#05121A`) | `prompt-gambar.md` §5.2 |
-| `og.svg` | OG image 1200×630 | `prompt-gambar.md` §5.3 |
-| `fallback.svg` | Neutral fugu for third-party agents | `karakter.md` §7 |
+| `maskot.svg` | Primary mascot / logo | `image-prompts.md` §5.1 |
+| `favicon-src.svg` | Favicon source (background `#05121A`) | `image-prompts.md` §5.2 |
+| `og.svg` | OG image 1200×630 | `image-prompts.md` §5.3 |
+| `fallback.svg` | Neutral fugu for third-party agents | `characters.md` §7 |
 
 `guardian.svg` and `guardian-kembung-1.svg` have identical contents — deliberately, so that a
 consumer can reference either one without having to know the other convention.
@@ -97,7 +97,7 @@ Three defects were found and fixed in the process, recorded here so they are not
   (`character("grid", 4)` and so on); it simply has not been written out to files, because this
   task only asked for the Guardian series. Adding it is a one-liner.
 - **The illustrative version from a generative model.** Waiting for an image MCP to come up.
-  The prompts are ready and complete in `prompt-gambar.md`.
+  The prompts are ready and complete in `image-prompts.md`.
 - **A real colour-blindness simulation** (deuteranopia/protanopia). Only full grayscale has been
   run — a harsher test for luminance ordering, but not a substitute for a dichromatic
   simulation. Run it before launch.
