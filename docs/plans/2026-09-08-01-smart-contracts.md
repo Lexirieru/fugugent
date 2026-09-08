@@ -1614,7 +1614,7 @@ git commit -m "test(contracts): buktikan storage aman saat upgrade UUPS"
 `contracts/.env.example`:
 ```bash
 # Wallet BARU khusus testnet. JANGAN pakai key yang pernah menyentuh mainnet.
-DEPLOYER_PRIVATE_KEY=0x
+PRIVATE_KEY=0x
 BSC_TESTNET_RPC_URL=https://data-seed-prebsc-1-s1.bnbchain.org:8545
 BSCSCAN_API_KEY=
 TREASURY_ADDRESS=
@@ -1645,7 +1645,7 @@ contract Deploy is Script {
     address constant TOKEN_U = 0xc70B8741B8B07A6d61E54fd4B20f22Fa648E5565;
 
     function run() external {
-        uint256 pk = vm.envUint("DEPLOYER_PRIVATE_KEY");
+        uint256 pk = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(pk);
         address treasury = vm.envAddress("TREASURY_ADDRESS");
         uint16 feeBps = uint16(vm.envUint("PROTOCOL_FEE_BPS"));
@@ -1742,7 +1742,7 @@ contract Deploy is Script {
 - [ ] **Step 3: Simulasi deploy tanpa broadcast**
 
 ```bash
-cp .env.example .env    # isi DEPLOYER_PRIVATE_KEY dan TREASURY_ADDRESS
+cp .env.example .env    # isi PRIVATE_KEY dan TREASURY_ADDRESS
 source .env
 forge script script/Deploy.s.sol:Deploy --rpc-url "$BSC_TESTNET_RPC_URL"
 ```
@@ -1762,7 +1762,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 /// @dev Jalankan dengan: PROXY=0x.. NEW_IMPL=0x.. forge script script/Upgrade.s.sol:Upgrade --broadcast
 contract Upgrade is Script {
     function run() external {
-        uint256 pk = vm.envUint("DEPLOYER_PRIVATE_KEY");
+        uint256 pk = vm.envUint("PRIVATE_KEY");
         address proxy = vm.envAddress("PROXY");
         address newImpl = vm.envAddress("NEW_IMPL");
 

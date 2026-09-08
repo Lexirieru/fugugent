@@ -60,3 +60,14 @@ Sudah ada: `contracts/lib/{forge-std, openzeppelin-contracts, openzeppelin-contr
   "agents surfaced on your marketplace must be live on BSC")?
 - Alamat kontrak Altana Keystore di BSC testnet.
 - Apakah x402 dGrid tersedia di BSC testnet atau hanya mainnet.
+
+## Hasil uji dGrid (2026-09-08)
+Model dipilih: **`openai/gpt-5.6-luna`** (murah).
+- Tool calling: **didukung**, argumen dihasilkan benar.
+- Latency: **30–46 detik** untuk prompt pendek, konsisten lintas percobaan
+  (bukan cold start).
+
+**Implikasi:** model ini TIDAK boleh berada di jalur kritis agent. Ini
+memvalidasi keputusan #13 (keputusan finansial deterministik, LLM hanya untuk
+penjelasan & riset): penjelasan dihasilkan asinkron setelah aksi dieksekusi,
+sehingga latency 45 detik tidak pernah menunda perlindungan posisi user.

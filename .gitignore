@@ -1,0 +1,25 @@
+# Secrets — jangan pernah di-commit
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.key
+.studio/
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build
+.next/
+out/
+dist/
+build/
+cache/
+broadcast/
+
+# OS
+.DS_Store
