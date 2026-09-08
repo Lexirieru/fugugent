@@ -498,4 +498,115 @@ describe("startGuardLoop", () => {
     expect(() => startGuardLoop(deps, 0, execState())).toThrow();
     expect(() => startGuardLoop(deps, -100, execState())).toThrow();
   });
+
+  it("startGuardLoop mengalirkan state eksekusi antar siklus: anggaran habis di siklus 1 menolak siklus 2, sendRepay hanya sekali", async () => {
+    // Round 2 review: test dua-siklus sebelumnya memanggil runGuardCycle
+    // langsung dan mengalirkan state secara manual di level test -- itu
+    // mengunci kontrak runGuardCycle, TAPI TIDAK mengunci bahwa startGuardLoop
+    // benar-benar melakukan pengaliran itu sendiri. Test ini menjalankan dua
+    // siklus lewat startGuardLoop sungguhan (fake timers), sehingga kalau
+    // baris yang menyimpan `outcome.nextExecuteState` ke `currentExecuteState`
+    // dihapus, test ini (bukan hanya test level runGuardCycle) yang gagal.
+    vi.useFakeTimers();
+    try {
+      const sendRepay = vi.fn(async () => "0xdeadbeef" as `0x${string}`);
+      const execDeps: ExecuteDeps = { sendRepay, now: () => 1_700_000_000 };
+      const theLimits = limits({
+        maxPerActionUsd8: 100_000_000_000n, // $1000
+        maxPerDayUsd8: 100_000_000_000n, // $1000/hari -- habis dalam satu kirim
+        minIntervalSeconds: 0, // isolasi murni pada anggaran harian, bukan cooldown
+      });
+      const execFn: ExecuteFn = (decision, pos, state) =>
+        executeDecision(decision, pos, theLimits, state, execDeps);
+
+      const deps = baseDeps({
+        readPosition: vi.fn(async () => EMERGENCY_POSITION),
+        executeDecision: execFn,
+        now: () => 1_700_000_000,
+      });
+
+      const handle = startGuardLoop(deps, 1_000, execState({ dayStartedAt: 1_700_000_000 }));
+
+      // Siklus 1 (segera): anggaran penuh -> kirim, menghabiskan seluruh
+      // anggaran harian dalam satu transaksi.
+      await vi.advanceTimersByTimeAsync(0);
+      expect(sendRepay).toHaveBeenCalledTimes(1);
+
+      // Siklus 2, dijadwalkan SENDIRI oleh loop 1000ms kemudian. Bila state
+      // eksekusi siklus 1 mengalir dengan benar ke siklus ini, anggaran
+      // harian sudah nol -> tidak boleh mengirim lagi.
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(sendRepay).toHaveBeenCalledTimes(1);
+
+      handle.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("logger yang melempar terus-menerus (jalur sukses) tidak menghentikan penjadwalan siklus berikutnya", async () => {
+    vi.useFakeTimers();
+    try {
+      const throwingLogger: Logger = {
+        info: vi.fn(() => {
+          throw new Error("EPIPE");
+        }),
+        error: vi.fn(() => {
+          throw new Error("EPIPE");
+        }),
+      };
+      const readPosition = vi.fn(async () => SAFE_POSITION);
+      const deps = baseDeps({ logger: throwingLogger, readPosition });
+
+      const handle = startGuardLoop(deps, 1_000, execState());
+
+      await vi.advanceTimersByTimeAsync(0);
+      expect(readPosition).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(readPosition).toHaveBeenCalledTimes(2);
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(readPosition).toHaveBeenCalledTimes(3);
+
+      handle.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("logger yang melempar terus-menerus (jalur gagal) tidak menghentikan penjadwalan siklus berikutnya", async () => {
+    vi.useFakeTimers();
+    try {
+      const throwingLogger: Logger = {
+        info: vi.fn(() => {
+          throw new Error("EPIPE");
+        }),
+        error: vi.fn(() => {
+          throw new Error("EPIPE");
+        }),
+      };
+      const readPosition = vi.fn(async () => {
+        throw new Error("RPC mati");
+      });
+      const deps = baseDeps({ logger: throwingLogger, readPosition });
+
+      const handle = startGuardLoop(deps, 1_000, execState());
+
+      await vi.advanceTimersByTimeAsync(0);
+      expect(readPosition).toHaveBeenCalledTimes(1);
+      expect(handle.getLastResult()?.ok).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(readPosition).toHaveBeenCalledTimes(2);
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(readPosition).toHaveBeenCalledTimes(3);
+      expect(handle.getLastResult()?.ok).toBe(false);
+
+      handle.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

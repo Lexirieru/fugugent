@@ -367,6 +367,10 @@ export function startGuardLoop(
   function scheduleNext(): void {
     if (stopped) return;
     timer = setTimeout(() => {
+      // Timer sudah menyala dan tidak lagi valid untuk di-`clearTimeout` --
+      // null-kan sebelum `tick()` supaya `stop()` yang dipanggil sesudahnya
+      // tidak memegang id basi (tidak berbahaya, tapi tidak rapi).
+      timer = null;
       void tick();
     }, intervalMs);
   }

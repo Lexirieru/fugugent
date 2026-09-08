@@ -153,7 +153,7 @@ export async function executeDecision(d: Decision, pos: Position, limits: Execut
 
 **Files:** Create `ai/.../src/strategy/guard.ts`, `ai/.../src/strategy/__tests__/guard.test.ts`
 
-**Interfaces:** `runGuardCycle(deps): Promise<CycleResult>` — satu siklus: baca posisi → `decide` → `executeDecision` → hasilkan catatan. Dan `startGuardLoop(deps, intervalMs)` yang memanggilnya berulang dengan penanganan error.
+**Interfaces:** `runGuardCycle(deps, executeState): Promise<{ result: CycleResult; nextExecuteState: ExecuteState }>` — satu siklus: baca posisi → `decide` → `executeDecision` (state eksekusi mengalir eksplisit lewat parameter dan nilai balik) → hasilkan catatan. Dan `startGuardLoop(deps, intervalMs, initialExecuteState)` yang memanggilnya berulang, menyimpan state eksekusi antar siklus sendiri, dengan penanganan error.
 
 **Aturan:**
 - Satu siklus **tidak boleh melempar**. Kegagalan pembacaan RPC dicatat dan siklus berikutnya tetap jalan — agent yang mati diam-diam lebih berbahaya daripada agent yang mengeluh.
