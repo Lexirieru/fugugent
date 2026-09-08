@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Generator SVG karakter Fugugent. Geometri mengikuti docs/brand/characters.md
-dan docs/brand/puff-levels.md. Semua ukuran dalam kotak 100x100 unit."""
+"""Fugugent character SVG generator. Geometry follows docs/brand/characters.md
+and docs/brand/puff-levels.md. All dimensions are within a 100x100 unit box."""
 import math, os, sys
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "."
@@ -11,7 +11,7 @@ FOAM = "#F4F8F9"
 FOAM2 = "#E3ECEF"
 
 RISK = {1: "#009E73", 2: "#F0E442", 3: "#E69F00", 4: "#D55E00", 5: "#A4210E"}
-# lebar,tinggi dasar per tingkat (unit)
+# base width, height per level (unit)
 LEVEL_WH = {1: (56, 52), 2: (64, 58), 3: (72, 66), 4: (80, 74), 5: (86, 82)}
 LEVEL_EXT = {1: 0.0, 2: 0.25, 3: 0.60, 4: 1.0, 5: 1.0}
 
@@ -33,7 +33,7 @@ def ell(cx, cy, rx, ry):
 
 
 def spikes(rx, ry, ext, secondary=False):
-    """Duri di lima baris mengikuti punggung dan sisi. ext 0..1."""
+    """Spikes across five rows following the back and sides. ext 0..1."""
     if ext <= 0:
         return ""
     L = 10.5 * ext
@@ -51,7 +51,7 @@ def spikes(rx, ry, ext, secondary=False):
         nx, ny = nx / n, ny / n
         tx, ty = -ny, nx
         hw = 3.8 * (0.6 if sec else 1.0)
-        tipw = 2.2 if ext < 0.5 else 0.0          # tumpul di tingkat 2
+        tipw = 2.2 if ext < 0.5 else 0.0          # blunt at level 2
         p1 = (bx + tx * hw, by + ty * hw)
         p2 = (bx - tx * hw, by - ty * hw)
         if tipw > 0:
@@ -86,26 +86,26 @@ def eyes(rx, ry, level, kind):
             g.append(f'<circle cx="{px:.2f}" cy="{py:.2f}" r="{pr:.2f}" fill="{OUTLINE}"/>')
             g.append(f'<circle cx="{px - r_ * 0.30:.2f}" cy="{py - r_ * 0.34:.2f}" '
                      f'r="{r_ * 0.15:.2f}" fill="{FOAM}"/>')
-            if level in (1, 3):  # kelopak: segmen lingkaran di atas tali busur
+            if level in (1, 3):  # eyelid: circle segment above the chord
                 kk = -0.62 * r_ if level == 1 else -0.08 * r_
                 ww = math.sqrt(max(r_ * r_ - kk * kk, 0.0))
                 yy = ny_ + kk
                 g.append(f'<path d="M{cx_ - ww:.2f},{yy:.2f} A{r_:.2f},{r_:.2f} 0 0,1 '
                          f'{cx_ + ww:.2f},{yy:.2f} Z" fill="{OUTLINE}"/>')
-    if level == 2:  # satu alis naik
+    if level == 2:  # one eyebrow raised
         g.append(f'<path d="M{nearx - er:.2f},{ny_ - er * 1.5:.2f} '
                  f'L{nearx + er:.2f},{ny_ - er * 1.9:.2f}" stroke="{OUTLINE}" '
                  f'stroke-width="3" stroke-linecap="round"/>')
-    if level == 4:  # tetes keringat
+    if level == 4:  # sweat drop
         sx, sy = nearx + er * 1.5, ny_ - er * 0.4
         g.append(f'<path d="M{sx:.2f},{sy:.2f} q3.2,4.0 0,6.4 q-3.2,-2.4 0,-6.4 Z" '
                  f'fill="{FOAM}" stroke="{OUTLINE}" stroke-width="1.6"/>')
-    if kind == "guardian" and level != 5:  # alis tebal turun ke tengah
+    if kind == "guardian" and level != 5:  # thick eyebrows angled down toward center
         for cx_, s in ((farx, 1), (nearx, 1)):
             g.append(f'<path d="M{cx_ - er * 0.95:.2f},{ny_ - er * 1.62:.2f} '
                      f'L{cx_ + er * 0.95:.2f},{ny_ - er * 1.95:.2f}" stroke="{OUTLINE}" '
                      f'stroke-width="2.8" stroke-linecap="round"/>')
-    if kind == "grid":  # visor mendatar melintasi kedua mata
+    if kind == "grid":  # horizontal visor spanning both eyes
         g.append(f'<rect x="{farx - er * 1.25:.2f}" y="{ny_ - er * 0.85:.2f}" '
                  f'width="{(nearx - farx) + er * 2.5:.2f}" height="{er * 0.55:.2f}" '
                  f'rx="{er * 0.2:.2f}" fill="{OUTLINE}"/>')
@@ -172,26 +172,26 @@ def character(kind, level, with_rim=True, with_bg=True, bgcolor=BG):
 
     g = [f'<g stroke="{OUTLINE}" stroke-width="3" stroke-linejoin="round">']
 
-    # --- bagian di belakang badan -------------------------------------------
+    # --- parts behind the body -------------------------------------------
     bx, by = CX - rx * 0.92, CY + ry * 0.08
     g.append(f'<path fill="{c["body"]}" d="M{bx:.2f},{by - 7:.2f} L{bx - 17:.2f},{by - 15:.2f} '
              f'L{bx - 12:.2f},{by - 4:.2f} L{bx - 19:.2f},{by:.2f} L{bx - 12:.2f},{by + 4:.2f} '
              f'L{bx - 17:.2f},{by + 15:.2f} L{bx:.2f},{by + 7:.2f} Z"/>')
 
-    if kind == "guardian":   # perisai punggung — tepi atas siluet jadi lurus
+    if kind == "guardian":   # back shield — flattens the silhouette's top edge
         sw, sh = rx * 1.58, ry * 0.62
         sx, sy = CX - sw / 2, CY - ry - 5.5
         g.append(f'<path fill="{FOAM2}" d="M{sx:.2f},{sy + 6:.2f} q0,-6 6,-6 '
                  f'L{sx + sw - 6:.2f},{sy:.2f} q6,0 6,6 L{sx + sw:.2f},{sy + sh:.2f} '
                  f'L{sx:.2f},{sy + sh:.2f} Z"/>')
-    if kind == "grid":       # sirip punggung segitiga tegak
+    if kind == "grid":       # upright triangular dorsal fin
         g.append(f'<path fill="{c["body"]}" d="M{CX - 9:.2f},{CY - ry + 2:.2f} '
                  f'L{CX + 1:.2f},{CY - ry - 15:.2f} L{CX + 9:.2f},{CY - ry + 2:.2f} Z"/>')
-    if kind == "yield":      # sirip punggung daun, miring ke kanan-atas
+    if kind == "yield":      # leaf-shaped dorsal fin, angled toward top-right
         g.append(f'<path fill="{c["body"]}" d="M{CX - 2:.2f},{CY - ry + 3:.2f} '
                  f'Q{CX + 14:.2f},{CY - ry - 20:.2f} {CX + 22:.2f},{CY - ry - 6:.2f} '
                  f'Q{CX + 16:.2f},{CY - ry + 3:.2f} {CX + 10:.2f},{CY - ry + 4:.2f} Z"/>')
-    if kind == "rebalancer":  # lengan timbangan mendatar, tinggi sama persis
+    if kind == "rebalancer":  # horizontal scale arms, at exactly the same height
         ay = CY - ry * 0.15
         for sgn in (-1, 1):
             x0 = CX + sgn * rx * 0.55
@@ -203,12 +203,12 @@ def character(kind, level, with_rim=True, with_bg=True, bgcolor=BG):
 
     g.append(f'<g fill="{c["body"]}">{spikes(rx, ry, ext, secondary=(level == 5))}</g>')
 
-    # --- badan ---------------------------------------------------------------
+    # --- body ---------------------------------------------------------------
     g.append(f'<path d="{body}" fill="{c["body"]}"/>')
     g.append(f'<g clip-path="url(#c{uid})" stroke="none">')
     g.append(f'<ellipse cx="{CX:.2f}" cy="{CY + 0.40 * ry:.2f}" rx="{0.84 * rx:.2f}" '
              f'ry="{0.62 * ry:.2f}" fill="{c["belly"]}"/>')
-    if kind == "grid":   # kisi 3x3 samar, satu sel terisi
+    if kind == "grid":   # faint 3x3 grid, one cell filled
         step = rx * 0.42
         for i in (-1, 0, 1):
             g.append(f'<path d="M{CX + i * step:.2f},{CY - ry:.2f} V{CY + ry:.2f}" '
@@ -217,19 +217,19 @@ def character(kind, level, with_rim=True, with_bg=True, bgcolor=BG):
                      f'stroke="{OUTLINE}" stroke-width="1.4" opacity="0.20"/>')
         g.append(f'<rect x="{CX - step * 1.5:.2f}" y="{CY - step * 1.6:.2f}" '
                  f'width="{step:.2f}" height="{step * 0.8:.2f}" fill="{OUTLINE}" opacity="0.30"/>')
-    # bayangan blok datar di kiri-bawah
+    # flat block shadow at bottom-left
     g.append(f'<path fill-rule="evenodd" fill="{OUTLINE}" opacity="0.14" '
              f'd="M0,0 H100 V100 H0 Z {ell(CX + 5, CY - 4, rx, ry)}"/>')
     g.append('</g>')
     g.append(f'<path d="{body}" fill="none"/>')
 
-    # sirip dada
+    # pectoral fin
     fx, fy = CX - 0.52 * rx, CY + 0.42 * ry
     g.append(f'<ellipse cx="{fx:.2f}" cy="{fy:.2f}" rx="{0.17 * rx:.2f}" '
              f'ry="{0.085 * ry:.2f}" fill="{c["belly"]}" stroke-width="2.4" '
              f'transform="rotate(-28 {fx:.2f} {fy:.2f})"/>')
 
-    if kind == "guardian":   # bilah meteran health factor di tepi kanan perisai
+    if kind == "guardian":   # health factor gauge bar on the shield's right edge
         fill = {1: 1.0, 2: 0.75, 3: 0.5, 4: 0.3, 5: 0.08}[level]
         gx, gy, gw, gh = CX + rx * 0.60, CY - ry - 3.5, 4.6, ry * 0.52
         g.append(f'<rect x="{gx:.2f}" y="{gy:.2f}" width="{gw}" height="{gh:.2f}" rx="1.6" '
@@ -237,7 +237,7 @@ def character(kind, level, with_rim=True, with_bg=True, bgcolor=BG):
         g.append(f'<rect x="{gx + 1.1:.2f}" y="{gy + gh * (1 - fill) + 1.1:.2f}" '
                  f'width="{gw - 2.2}" height="{max(gh * fill - 2.2, 0.8):.2f}" rx="0.8" '
                  f'fill="{RISK[level]}" stroke="none"/>')
-    if kind == "yield":      # tiga gelembung arus di belakang ekor
+    if kind == "yield":      # three current bubbles behind the tail
         for (dx, dy, r_) in ((-2, -14, 3.2), (-7, -20, 2.3), (-11, -25, 1.6)):
             g.append(f'<circle cx="{bx + dx:.2f}" cy="{by + dy:.2f}" r="{r_}" '
                      f'fill="none" stroke-width="2"/>')
@@ -260,7 +260,7 @@ def write(name, content):
     p = os.path.join(OUT, name)
     with open(p, "w") as f:
         f.write(content)
-    print("tulis", p)
+    print("wrote", p)
 
 
 os.makedirs(OUT, exist_ok=True)
@@ -268,17 +268,21 @@ os.makedirs(OUT, exist_ok=True)
 for k in ("guardian", "rebalancer", "grid", "yield"):
     write(f"{k}.svg", svg100(character(k, 1), 512))
 
+# NOTE: filenames keep the Indonesian word "kembung" ("puff" in English) —
+# they are already referenced from landingpage/public/brand/, so do not rename them.
 for lv in (1, 2, 3, 4, 5):
     write(f"guardian-kembung-{lv}.svg", svg100(character("guardian", lv), 512))
 
 write("maskot.svg", svg100(character("maskot", 2, with_rim=False), 512))
 write("fallback.svg", svg100(character("fallback", 1, with_rim=False), 512))
 
-# favicon: kepala + duri saja, disederhanakan habis
+# favicon: head + spikes only, stripped down to the essentials
 fav = character("maskot", 2, with_rim=False, bgcolor="#05121A")
 write("favicon-src.svg", svg100(fav, 256))
 
 # --- OG image 1200x630 ---------------------------------------------------
+# NOTE: the text drawn into this SVG (title, tagline) is rendered output
+# content, not a code comment — kept in Indonesian on purpose, unchanged.
 row = []
 xs = [(680, 1), (830, 2), (980, 4), (1130, 5)]
 kinds = ["guardian", "rebalancer", "grid", "yield"]
@@ -300,8 +304,8 @@ og = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="120
       + '</svg>')
 write("og.svg", og)
 
-# --- lembar kontak untuk pemeriksaan visual ------------------------------
-# Hanya ditulis bila SHEET_DIR di-set; lembar ini alat kerja, bukan aset produk.
+# --- contact sheet for visual inspection ---------------------------------
+# Only written if SHEET_DIR is set; this sheet is a working tool, not a product asset.
 sheet_dir = os.environ.get("SHEET_DIR")
 if sheet_dir:
     rows = [
@@ -321,4 +325,4 @@ if sheet_dir:
              + "".join(cells) + '</svg>')
     with open(os.path.join(sheet_dir, "_sheet.svg"), "w") as f:
         f.write(sheet)
-    print("tulis lembar kontak")
+    print("wrote contact sheet")
