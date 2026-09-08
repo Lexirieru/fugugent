@@ -1,0 +1,100 @@
+/**
+ * Lapisan penjelasan. Modul ini berada DI LUAR JALUR KRITIS Guardian:
+ * keputusan (`Decision`) sudah diambil secara deterministik oleh `decide()`
+ * sebelum fungsi di sini dipanggil sama sekali. `explainDecision` tidak
+ * pernah mengubah, menunda, atau memblokir keputusan itu — ia hanya
+ * mencoba menyusun kalimat yang lebih ramah dibaca lewat LLM di dGrid.
+ *
+ * Bila pemanggilan LLM gagal, lambat (>20 detik), atau mengembalikan teks
+ * kosong, fungsi ini WAJIB mengembalikan `decision.reason` apa adanya —
+ * tidak pernah melempar. Latensi dGrid terukur 3–46 detik dan bisa saja
+ * timeout atau error; posisi user tidak boleh menunggu atau gagal
+ * terlindungi hanya karena kalimat penjelasan gagal disusun.
+ */
+import { generateText } from "ai";
+import { buildModel } from "../model.js";
+import { HF_ONE, type Decision, type Position } from "./types.js";
+
+export type GenerateFn = (prompt: string) => Promise<string>;
+
+const TIMEOUT_MS = 20_000;
+
+/** Format health factor (basis 1e18) sebagai string dua desimal berkoma, mis. "1,60". */
+function formatHf(hf: bigint): string {
+  const bulat = hf / HF_ONE;
+  const sisa = hf % HF_ONE;
+  const desimal = (sisa * 100n) / HF_ONE;
+  return `${bulat},${desimal.toString().padStart(2, "0")}`;
+}
+
+/** Format basis point (basis 10_000) sebagai persen satu desimal berkoma, mis. "37,5". */
+function formatPercentFromBps(bps: bigint): string {
+  const persepuluhPersen = bps / 10n;
+  const bulat = persepuluhPersen / 10n;
+  const desimal = persepuluhPersen % 10n;
+  return `${bulat},${desimal}`;
+}
+
+function buildPrompt(pos: Position, decision: Decision): string {
+  const hfStr = decision.healthFactor === null ? "tidak ada (tanpa hutang)" : formatHf(decision.healthFactor);
+  const dropStr =
+    decision.dropToLiquidationBps === null
+      ? "tidak berlaku"
+      : `${formatPercentFromBps(decision.dropToLiquidationBps)}%`;
+  const repayLine =
+    decision.suggestedRepayBase > 0n
+      ? `Jumlah yang disarankan dibayar: ${decision.suggestedRepayBase.toString()} (base unit protokol).`
+      : "Tidak ada pembayaran yang disarankan saat ini.";
+
+  return [
+    "Kamu membantu menjelaskan keputusan yang SUDAH diambil oleh sistem manajemen risiko posisi pinjaman crypto.",
+    `Protokol: ${pos.protocol}.`,
+    `Health factor saat ini: ${hfStr}.`,
+    `Jarak ke likuidasi: ${dropStr} penurunan agunan sebelum HF mencapai 1,0.`,
+    `Aksi yang diambil sistem: ${decision.action}.`,
+    repayLine,
+    "Tulis satu atau dua kalimat penjelasan singkat dalam bahasa Indonesia untuk pemilik posisi, berdasarkan angka-angka di atas.",
+    "Jangan pernah mengarang angka, persentase, atau jumlah lain di luar yang sudah diberikan di atas.",
+  ].join("\n");
+}
+
+async function defaultGenerate(prompt: string): Promise<string> {
+  const { text } = await generateText({ model: buildModel(), prompt });
+  return text;
+}
+
+function timeout(ms: number): Promise<never> {
+  return new Promise((_, reject) => {
+    // Sengaja TIDAK di-unref(): timer ini adalah satu-satunya jaminan bahwa
+    // explainDecision benar-benar kembali dalam 20 detik. Meng-unref timer
+    // membuat Node bebas membiarkannya tidak pernah berbunyi bila tidak ada
+    // pekerjaan lain yang menahan event loop — melanggar batas waktu yang
+    // dijanjikan ke pemanggil (yang sedang melindungi posisi user).
+    setTimeout(() => reject(new Error(`explainDecision timeout setelah ${ms}ms`)), ms);
+  });
+}
+
+/**
+ * Menjelaskan `decision` yang sudah final dalam kalimat bahasa Indonesia.
+ * TIDAK PERNAH mengubah `decision` atau `pos`, dan TIDAK PERNAH melempar —
+ * kegagalan apa pun (network, timeout, teks kosong) jatuh kembali ke
+ * `decision.reason` apa adanya.
+ */
+export async function explainDecision(
+  pos: Position,
+  decision: Decision,
+  deps?: { generate?: GenerateFn },
+): Promise<string> {
+  const generate = deps?.generate ?? defaultGenerate;
+  const prompt = buildPrompt(pos, decision);
+
+  try {
+    const teks = await Promise.race([generate(prompt), timeout(TIMEOUT_MS)]);
+    if (typeof teks === "string" && teks.trim().length > 0) {
+      return teks;
+    }
+    return decision.reason;
+  } catch {
+    return decision.reason;
+  }
+}
