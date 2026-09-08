@@ -28,6 +28,7 @@ import {
   type SourceHealth,
 } from "../../types.js";
 import type { CachedAgentFilter } from "../../db/repo.js";
+import type { ListedAgentRecord } from "../metadata.js";
 import {
   CATEGORY_SEMANTIC_QUERIES,
   createAgentService,
@@ -2662,5 +2663,325 @@ describe("listing 1 (Guardian) carries no on-chain JSON — verified on-chain", 
     // to hide the only Health Factor agent that can be hired.
     expect(listed.fuguListing?.priceUsd8PerPeriod).toBe(1_500_000_000n);
     expect(result.healthy).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The list and the detail page must never disagree about the same agent
+// ---------------------------------------------------------------------------
+
+describe("list and detail agree for the same id", () => {
+  function metaUri(body: unknown): string {
+    return `data:application/json;base64,${Buffer.from(JSON.stringify(body), "utf8").toString("base64")}`;
+  }
+
+  function named(tokenId: string, category: Category, body: unknown): AgentRecord {
+    const base = onchainRecord(tokenId, category);
+    return {
+      ...base,
+      name: `Agent #${tokenId}`,
+      description: "",
+      fuguListing: { ...base.fuguListing!, metadataURI: metaUri(body) },
+    };
+  }
+
+  const REGISTRY: Array<[string, Category, Record<string, unknown>]> = [
+    ["8005", "REBALANCING", { name: "Fugu Rebalancer", summary: "Drift-band rebalancer.", onchainExecution: false }],
+    ["8006", "GRID", { name: "Fugu Grid", summary: "Grid trading on PancakeSwap v3.", onchainExecution: false }],
+    ["8007", "YIELD", { name: "Fugu Yield", summary: "Pool migration gated by break-even.", onchainExecution: false }],
+    ["8004", "HEALTH_FACTOR", { name: "Fugu Guardian", summary: "Repays before liquidation.", onchainExecution: true }],
+  ];
+
+  function registryPage(): AgentListPage {
+    return page(
+      REGISTRY.map(([tokenId, category, body]) => named(tokenId, category, body)),
+      { source: "onchain" },
+    );
+  }
+
+  /** Everything a card promises and a detail page must not walk back. */
+  function claims(agent: ListedAgentRecord) {
+    return {
+      id: agent.id,
+      name: agent.name,
+      description: agent.description,
+      onchainExecution: agent.onchainExecution,
+      listingMetadataName: agent.listingMetadata?.name ?? null,
+      price: agent.fuguListing?.priceUsd8PerPeriod ?? null,
+      period: agent.fuguListing?.periodSeconds ?? null,
+      category: agent.fuguListing?.category ?? null,
+    };
+  }
+
+  it.each(REGISTRY)(
+    "%s (%s): the card and the detail page make the same claims",
+    async (tokenId, category) => {
+      const h = harness();
+      h.onchain.page = registryPage();
+      h.scan.page = page([record({ tokenId: "1" })]);
+
+      const list = await h.service.getAgentsByCategory(category);
+      const fromList = list.items.find((i) => i.tokenId === tokenId)!;
+      expect(fromList).toBeDefined();
+
+      const detail = await h.service.getAgentDetail(`97:${tokenId}`);
+      expect(detail.agent).not.toBeNull();
+
+      expect(claims(detail.agent!)).toEqual(claims(fromList));
+    },
+  );
+
+  it("they agree even when the two paths are served by DIFFERENT tiers", async () => {
+    // This is the shape that produced the live mismatch: the list fell through to
+    // the overlay while the detail page was answered by the cache, which carries
+    // the listing but none of the parsed metadata.
+    const h = harness();
+    h.onchain.page = registryPage();
+    h.scan.page = page([], { healthy: false, reason: "500 DATABASE_ERROR" });
+    h.cache.items = [];
+    const list = await h.service.getAgentsByCategory("HEALTH_FACTOR");
+    const fromList = list.items.find((i) => i.tokenId === "8004")!;
+    expect(list.source).toBe("onchain");
+
+    // Now the detail path is answered from cache, with the listing but no
+    // parsed metadata — exactly what a cached row looks like.
+    const cachedRow = named("8004", "HEALTH_FACTOR", REGISTRY[3]![2]);
+    h.cache.items = [{ ...cachedRow, source: "cache" }];
+    const detail = await h.service.getAgentDetail("97:8004");
+    expect(detail.source).toBe("cache");
+
+    expect(claims(detail.agent!)).toEqual(claims(fromList));
+    expect(detail.agent!.name).toBe("Fugu Guardian");
+    expect(detail.agent!.onchainExecution).toBe(true);
+  });
+
+  it("the three states of onchainExecution stay distinct on BOTH paths", async () => {
+    const h = harness();
+    h.onchain.page = page(
+      [
+        named("8006", "GRID", { name: "No exec", onchainExecution: false }),
+        named("8004", "HEALTH_FACTOR", { name: "Executes", onchainExecution: true }),
+        // Declares a name but says nothing about execution: unknown, not false.
+        named("8007", "YIELD", { name: "Says nothing" }),
+      ],
+      { source: "onchain" },
+    );
+    h.scan.page = page([record({ tokenId: "1" })]);
+
+    const expected: Array<[string, Category, boolean | undefined]> = [
+      ["8006", "GRID", false],
+      ["8004", "HEALTH_FACTOR", true],
+      ["8007", "YIELD", undefined],
+    ];
+
+    for (const [tokenId, category, value] of expected) {
+      const list = await h.service.getAgentsByCategory(category);
+      const fromList = list.items.find((i) => i.tokenId === tokenId)!;
+      const detail = await h.service.getAgentDetail(`97:${tokenId}`);
+      expect(fromList.onchainExecution).toBe(value);
+      expect(detail.agent!.onchainExecution).toBe(value);
+      // `undefined` must not have been coerced into `false` anywhere.
+      if (value === undefined) {
+        expect(fromList.onchainExecution).not.toBe(false);
+        expect(detail.agent!.onchainExecution).not.toBe(false);
+      }
+    }
+  });
+
+  it("malformed metadata degrades identically on both paths, and never throws", async () => {
+    const h = harness();
+    const broken = onchainRecord("8006", "GRID");
+    h.onchain.page = page(
+      [
+        {
+          ...broken,
+          name: "Agent #8006",
+          description: "",
+          fuguListing: { ...broken.fuguListing!, metadataURI: "data:application/json;base64,!!!!" },
+        },
+      ],
+      { source: "onchain" },
+    );
+    h.scan.page = page([record({ tokenId: "1" })]);
+
+    const list = await h.service.getAgentsByCategory("GRID");
+    const detail = await h.service.getAgentDetail("97:8006");
+
+    const fromList = list.items.find((i) => i.tokenId === "8006")!;
+    expect(claims(detail.agent!)).toEqual(claims(fromList));
+    expect(fromList.name).toBe("Agent #8006");
+    expect(detail.agent!.name).toBe("Agent #8006");
+    // Counted on both paths, from the same held read.
+    expect(list.firstParty?.unreadableMetadata).toBe(1);
+    expect(detail.firstParty?.unreadableMetadata).toBe(1);
+    expect(list.healthy).toBe(true);
+    expect(detail.healthy).toBe(true);
+  });
+
+  it("a richer discovery name is kept on both paths, not just one", async () => {
+    const h = harness();
+    h.onchain.page = registryPage();
+    const richer = record({
+      tokenId: "8006",
+      name: "Fugu Grid (verified)",
+      description: "Grid trading bot with reputation.",
+    });
+    h.scan.page = page([richer]);
+    h.scan.detail = {
+      agent: richer,
+      source: "scan8004",
+      healthy: true,
+      reason: null,
+      fetchedAt: NOW.toISOString(),
+    };
+
+    const list = await h.service.getAgentsByCategory("GRID");
+    const detail = await h.service.getAgentDetail("97:8006");
+    const fromList = list.items.find((i) => i.tokenId === "8006")!;
+
+    expect(fromList.name).toBe("Fugu Grid (verified)");
+    expect(detail.agent!.name).toBe("Fugu Grid (verified)");
+    expect(claims(detail.agent!)).toEqual(claims(fromList));
+    // The listing still came through on both.
+    expect(fromList.fuguListing).not.toBeNull();
+    expect(detail.agent!.fuguListing).not.toBeNull();
+  });
+});
+
+describe("every tier reaches the caller through the same attach step", () => {
+  function metaUri(body: unknown): string {
+    return `data:application/json;base64,${Buffer.from(JSON.stringify(body), "utf8").toString("base64")}`;
+  }
+  function named(tokenId: string, category: Category): AgentRecord {
+    const base = onchainRecord(tokenId, category);
+    return {
+      ...base,
+      name: `Agent #${tokenId}`,
+      description: "",
+      fuguListing: {
+        ...base.fuguListing!,
+        metadataURI: metaUri({ name: "Fugu Grid", summary: "Grid trading.", onchainExecution: false }),
+      },
+    };
+  }
+
+  it.each([
+    ["scan8004", "scan8004"],
+    ["cache", "cache"],
+    ["onchain", "onchain"],
+  ] as Array<[string, string]>)(
+    "a detail page served by %s still carries the name and onchainExecution",
+    async (tier) => {
+      const h = harness();
+      h.onchain.page = page([named("8006", "GRID")], { source: "onchain" });
+
+      if (tier === "scan8004") {
+        h.scan.detail = {
+          // 8004scan knows the agent but not the listing.
+          agent: { ...record({ tokenId: "8006" }), name: "Agent #8006", description: "" },
+          source: "scan8004",
+          healthy: true,
+          reason: null,
+          fetchedAt: NOW.toISOString(),
+        };
+      } else {
+        h.scan.detail = {
+          agent: null,
+          source: "scan8004",
+          healthy: false,
+          reason: "500",
+          fetchedAt: NOW.toISOString(),
+        };
+        if (tier === "cache") {
+          h.cache.items = [{ ...named("8006", "GRID"), source: "cache" }];
+        } else {
+          h.cache.items = [];
+        }
+      }
+
+      const detail = await h.service.getAgentDetail("97:8006");
+      expect(detail.source).toBe(tier);
+      expect(detail.agent!.name).toBe("Fugu Grid");
+      expect(detail.agent!.onchainExecution).toBe(false);
+      expect(detail.agent!.fuguListing).not.toBeNull();
+    },
+  );
+});
+
+describe("a stale cached listing never outranks the live registry read", () => {
+  function metaUri(body: unknown): string {
+    return `data:application/json;base64,${Buffer.from(JSON.stringify(body), "utf8").toString("base64")}`;
+  }
+
+  it("the fresh registry listing replaces the copy a cached row carries", async () => {
+    // The live divergence: the cached row for 97:8004 still held
+    // `ipfs://fugu-guardian-v1` from before the listing was updated, so the list
+    // page (fresh overlay) said "Fugu Guardian" and the detail page (cache) said
+    // "Agent #8004". Nothing about the values was wrong — the two paths were
+    // reading two different vintages of the same listing.
+    const h = harness();
+    const base = onchainRecord("8004", "HEALTH_FACTOR");
+    const fresh: AgentRecord = {
+      ...base,
+      name: "Agent #8004",
+      description: "",
+      fuguListing: {
+        ...base.fuguListing!,
+        priceUsd8PerPeriod: 10_000_000n,
+        metadataURI: metaUri({
+          name: "Fugu Guardian",
+          summary: "Repays debt before liquidation.",
+          onchainExecution: true,
+        }),
+      },
+    };
+    h.onchain.page = page([fresh], { source: "onchain" });
+
+    // What Postgres still holds: same agent, older listing.
+    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.scan.detail = {
+      agent: null,
+      source: "scan8004",
+      healthy: false,
+      reason: "500",
+      fetchedAt: NOW.toISOString(),
+    };
+    h.cache.items = [
+      {
+        ...base,
+        source: "cache",
+        name: "Agent #8004",
+        description: "",
+        fuguListing: {
+          ...base.fuguListing!,
+          priceUsd8PerPeriod: 1n, // an old price, too
+          metadataURI: "ipfs://fugu-guardian-v1",
+        },
+      },
+    ];
+
+    const list = await h.service.getAgentsByCategory("HEALTH_FACTOR");
+    const detail = await h.service.getAgentDetail("97:8004");
+    expect(detail.source).toBe("cache");
+
+    const card = list.items.find((i) => i.tokenId === "8004")!;
+    expect(card.name).toBe("Fugu Guardian");
+    expect(detail.agent!.name).toBe("Fugu Guardian");
+    expect(detail.agent!.onchainExecution).toBe(true);
+    // The price a user pays comes from the live registry, not from a copy.
+    expect(detail.agent!.fuguListing!.priceUsd8PerPeriod).toBe(10_000_000n);
+    expect(card.fuguListing!.priceUsd8PerPeriod).toBe(10_000_000n);
+  });
+
+  it("a record with no matching listing keeps whatever it had", async () => {
+    const h = harness();
+    h.onchain.page = page([onchainRecord("8006", "GRID")], { source: "onchain" });
+    h.scan.page = page([], { healthy: false, reason: "mati" });
+    const other = onchainRecord("777", "GRID");
+    h.cache.items = [{ ...other, source: "cache" }];
+
+    const list = await h.service.getAgentsByCategory("GRID");
+    const kept = list.items.find((i) => i.tokenId === "777")!;
+    expect(kept.fuguListing?.priceUsd8PerPeriod).toBe(1_500_000_000n);
   });
 });

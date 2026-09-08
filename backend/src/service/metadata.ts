@@ -256,3 +256,81 @@ export function applyListingMetadata(record: AgentRecord): {
   }
   return { record: next, ok: true };
 }
+
+/**
+ * Whether a listing's declared metadata can be read at all.
+ *
+ * Used only to count listings that will keep a placeholder name. Deliberately
+ * separate from applying it: applying happens in exactly one place
+ * ({@link attachFirstParty}) so that no record can pick up metadata by a second
+ * route and diverge from the first.
+ */
+export function metadataReadable(record: AgentRecord): boolean {
+  const uri = record.fuguListing?.metadataURI;
+  if (typeof uri !== "string" || uri.trim() === "") return true; // nothing declared
+  return parseListingMetadata(uri) !== null;
+}
+
+/**
+ * The placeholder name `onchain.ts` gives a listing it read without metadata.
+ *
+ * Mirrors `toAgentRecord` in `src/sources/onchain.ts`, which builds
+ * `` `Agent #${tokenId}` `` because it deliberately does not fetch
+ * `metadataURI`. Compared exactly rather than by pattern: a third-party agent
+ * genuinely named "Agent #7" must not be mistaken for a placeholder.
+ */
+export function isPlaceholderName(record: AgentRecord): boolean {
+  return record.name.trim() === "" || record.name === `Agent #${record.tokenId}`;
+}
+
+/**
+ * **The single place a record acquires its first-party listing and metadata.**
+ *
+ * Both the list path and the detail path call this, and that is the whole point.
+ * They used to do it separately: the list path merged the overlay record whole,
+ * while the detail path hand-copied `fuguListing` and nothing else. The result
+ * was a card reading "Fugu Guardian · onchainExecution: true" and a detail page
+ * for the same id reading "Agent #8004 · onchainExecution: null" — the page where
+ * someone decides to pay denying what the card just promised. Two code paths that
+ * can drift is the defect; equal values today would only postpone it.
+ *
+ * Metadata is re-read from the record's own `fuguListing.metadataURI` rather than
+ * copied from the overlay, because a record that came back from the Postgres
+ * cache carries the listing but not the parsed fields — those are service-level
+ * and never stored. Parsing is deterministic and bounded, so doing it again costs
+ * nothing and removes a way for the two to disagree.
+ *
+ * Discovery metadata wins where it exists: 8004scan knows an agent's name AND its
+ * reputation, so its name is kept and ours fills in only a placeholder. Never
+ * throws; `ok: false` means this listing carried metadata that could not be read.
+ */
+export function attachFirstParty(
+  record: AgentRecord,
+  listings: readonly ListedAgentRecord[],
+): { record: ListedAgentRecord; ok: boolean } {
+  const match = listings.find((listing) => listing.id === record.id);
+  // The registry read WINS over a listing the record already carries.
+  //
+  // A record from the Postgres cache carries a *copy* of the listing as it was
+  // when it was indexed. That copy goes stale the moment the lister changes
+  // anything — and it did: the cached row for 97:8004 still held
+  // `ipfs://fugu-guardian-v1` after the listing had been updated to a `data:`
+  // URI, so the list page (served from the fresh overlay) said "Fugu Guardian"
+  // while the detail page (served from cache) said "Agent #8004". Preferring the
+  // record's own copy also means a price change would not show until the cache
+  // was rewritten, which for the one number a user pays is not acceptable.
+  const withListing =
+    match?.fuguListing != null ? { ...record, fuguListing: match.fuguListing } : record;
+
+  if (withListing.fuguListing === null) return { record: withListing, ok: true };
+
+  const applied = applyListingMetadata(withListing);
+  return {
+    record: {
+      ...applied.record,
+      name: isPlaceholderName(record) ? applied.record.name : record.name,
+      description: record.description.trim() === "" ? applied.record.description : record.description,
+    },
+    ok: applied.ok,
+  };
+}

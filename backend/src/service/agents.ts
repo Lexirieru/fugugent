@@ -81,7 +81,8 @@ import type {
   SourceHealth,
 } from "../types.js";
 import {
-  applyListingMetadata,
+  attachFirstParty,
+  metadataReadable,
   type ListedAgentRecord,
   type ListingMetadata,
 } from "./metadata.js";
@@ -694,21 +695,16 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
         registryFailure = redact(page.reason ?? "FuguRegistry read unhealthy without a reason");
         return held?.items ?? [];
       }
-      // Names, descriptions and `onchainExecution` live in each listing's
-      // `metadataURI`. It is untrusted input, so a listing whose metadata cannot
-      // be read keeps its placeholder name and is counted instead of throwing.
-      const named: ListedAgentRecord[] = [];
-      let unreadable = 0;
-      for (const item of page.items) {
-        const applied = applyListingMetadata(item);
-        if (!applied.ok) unreadable++;
-        named.push(applied.record);
-      }
-      unreadableMetadata = unreadable;
-      heldListings = { items: named, loadedAtMs: at.getTime() };
+      // Listings are held RAW. Names, descriptions and `onchainExecution` are
+      // applied in exactly one place — `attachFirstParty` — so that a record
+      // cannot acquire metadata by a second route and end up disagreeing with
+      // itself between the list and the detail page. Here we only count the
+      // listings whose metadata cannot be read, so callers can say so.
+      unreadableMetadata = page.items.filter((item) => !metadataReadable(item)).length;
+      heldListings = { items: page.items, loadedAtMs: at.getTime() };
       registryBlockedUntil = 0;
       registryFailure = null;
-      return named;
+      return page.items;
     } catch (err) {
       registryBlockedUntil = at.getTime() + upstreamCooldownMs;
       registryFailure =
@@ -778,16 +774,20 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
 
     const byId = new Map(matching.map((item) => [item.id, item]));
 
-    // Rule 2: enrich in place, and remember which listings were consumed.
+    // Rule 2: enrich in place through the SHARED attach step, and remember which
+    // listings were consumed. The detail path calls the same function, which is
+    // what stops a card and its detail page from ever disagreeing.
     const enriched = discovery.map((item) => {
       const listing = byId.get(item.id);
       if (listing === undefined) return item;
       byId.delete(item.id);
-      return item.fuguListing === null ? { ...item, fuguListing: listing.fuguListing } : item;
+      return attachFirstParty(item, matching).record;
     });
 
-    // Rule 3: only page 1 carries the leftover listings.
-    const prepend = offset === 0 ? [...byId.values()] : [];
+    // Rule 3: only page 1 carries the leftover listings. They go through the same
+    // attach step too, so there is exactly one way a listing reaches a caller.
+    const prepend =
+      offset === 0 ? [...byId.values()].map((item) => attachFirstParty(item, matching).record) : [];
     const items = [...prepend, ...enriched];
     const listed = items.filter((item) => item.fuguListing !== null).length;
     return { items, added: prepend.length, listed };
@@ -1079,10 +1079,13 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
                 item.fuguListing?.category === category ||
                 item.classification?.category === category,
             )
-            // Tier 3 reads the very same listings as the overlay, so it must show
-            // the very same names — otherwise an agent is called "Fugu Grid" while
-            // 8004scan is up and "Agent #8006" the moment it goes down.
-            .map((item) => applyListingMetadata(item).record);
+            // Tier 3 needs its own attach because the list path's `finish()`
+            // deliberately skips merging for `source === "onchain"` — tier 3 IS
+            // the registry, and merging the overlay into it would duplicate every
+            // listing. Skipping the merge must not also skip the metadata, or an
+            // agent would be "Fugu Grid" while 8004scan is up and "Agent #8006"
+            // the moment it goes down. Same shared function, called explicitly.
+            .map((item) => attachFirstParty(item, listings).record);
           const slice = matching.slice(offset, offset + limit);
           if (slice.length === 0) {
             step({ source: "onchain", outcome: "empty", reason: null, items: 0 });
@@ -1181,16 +1184,12 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       healthy: boolean,
       reason: string | null,
     ): AgentServiceDetail {
-      // Attach our own listing when the registry has one and the discovered
-      // record does not. Without this, the detail page of a rentable agent shows
-      // no price and no hire button whenever 8004scan answered first — which is
-      // the normal case.
-      let resolved = agent;
-      if (resolved !== null && resolved.fuguListing === null) {
-        const id = resolved.id;
-        const listing = listings.find((item) => item.id === id)?.fuguListing ?? null;
-        if (listing !== null) resolved = { ...resolved, fuguListing: listing };
-      }
+      // Attach our own listing AND the metadata it declares, through the same
+      // `attachFirstParty` the list path uses. Copying only `fuguListing` here —
+      // which is what this did before — gave the detail page a price but no name
+      // and no `onchainExecution`, so it contradicted the card that led here.
+      const resolved: ListedAgentRecord | null =
+        agent === null ? null : attachFirstParty(agent, listings).record;
 
       const ageSeconds = resolved === null ? null : oldestAgeSeconds([resolved], at);
       return {
@@ -1328,8 +1327,10 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
           // Dicocokkan lewat `id` utuh, yang memuat chainId. Mencocokkan
           // `tokenId` telanjang akan mengabaikan chain — token 42 di chain 1
           // dan di chain 97 adalah agent yang berbeda.
-          const found = page.items.find((item) => item.id === id);
-          const hit = found === undefined ? undefined : applyListingMetadata(found).record;
+          // No attach step here on purpose: on the detail path `finish()` runs
+          // `attachFirstParty` for whatever tier answered, so every tier is
+          // covered by one call rather than each remembering to make its own.
+          const hit = page.items.find((item) => item.id === id);
           if (hit === undefined) {
             step({ source: "onchain", outcome: "empty", reason: null, items: 0 });
           } else {
