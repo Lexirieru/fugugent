@@ -1,19 +1,18 @@
-# Hasil Gate Teknis — dijalankan 2026-09-08
+# Technical Gate Results — run 2026-09-08
 
-Dua risiko di spec (§10, R2 dan R3) diuji dengan scaffold percobaan `bag init` di
-scratchpad. Keduanya terjawab; scaffold percobaan sudah dihapus.
+Two risks from the spec (§10, R2 and R3) were tested with a throwaway `bag init` scaffold in
+the scratchpad. Both are answered; the throwaway scaffold has been deleted.
 
-## R3 — dGrid sebagai provider LLM Agent Studio: ✅ BISA
+## R3 — dGrid as the Agent Studio LLM provider: ✅ WORKS
 
-`bag init --wallet-kind altana --llm-provider openai` **diterima** (kombinasi dengan
-`pieverse-llm` yang ditolak, bukan ini).
+`bag init --wallet-kind altana --llm-provider openai` is **accepted** (the combination that
+was rejected involves `pieverse-llm`, not this one).
 
-Tapi CLI dan runtime **tidak** punya opsi base URL sama sekali — `grep base_url|baseURL`
-di `studio.toml` dan seluruh `@bnbagent/studio-runtime` tidak menemukan apa pun.
+But the CLI and the runtime have **no** base URL option at all — `grep base_url|baseURL`
+over `studio.toml` and all of `@bnbagent/studio-runtime` found nothing.
 
-**Jalannya lewat `app/agent/src/model.ts`**, yang merupakan file milik kita, bukan milik
-runtime. Ia memanggil `resolveModel()` dari runtime, tapi tidak ada yang mengharuskan kita
-memakainya. Terbukti bekerja:
+**The way in is `app/agent/src/model.ts`**, which is our file, not the runtime's. It calls
+`resolveModel()` from the runtime, but nothing forces us to use that. Proven to work:
 
 ```ts
 import { createOpenAI } from "@ai-sdk/openai";
@@ -26,45 +25,45 @@ const dgrid = createOpenAI({
 const model = dgrid.chat("openai/gpt-5.6-luna");
 ```
 
-**Tiga hal yang wajib, dan masing-masing sudah memakan waktu untuk ditemukan:**
+**Three things are mandatory, and each one took time to find:**
 
-1. **`.chat()` wajib.** Tanpa itu `@ai-sdk/openai` v4 memakai **Responses API**; dGrid
-   menjawab dengan benar tetapi dalam format yang lebih ramping sehingga SDK melempar
-   `AI_APICallError`. `.chat()` memaksa Chat Completions yang dipahami keduanya.
-2. **Header `User-Agent` browser wajib.** Tanpa itu dGrid membalas **HTTP 403** — persis
-   seperti 8004scan yang membalas 500. Terbukti: `urllib` Python gagal, `curl` dengan UA
-   berhasil.
-3. **`@ai-sdk/openai` harus ditambahkan eksplisit** (`pnpm add @ai-sdk/openai`). Ia hanya
-   dependency transitif `ai`, dan pnpm strict menolak import langsung.
+1. **`.chat()` is mandatory.** Without it, `@ai-sdk/openai` v4 uses the **Responses API**;
+   dGrid answers correctly but in a leaner format, so the SDK throws
+   `AI_APICallError`. `.chat()` forces Chat Completions, which both sides understand.
+2. **A browser `User-Agent` header is mandatory.** Without it dGrid replies **HTTP 403** —
+   exactly like 8004scan replying 500. Proven: Python `urllib` fails, `curl` with a UA
+   succeeds.
+3. **`@ai-sdk/openai` must be added explicitly** (`pnpm add @ai-sdk/openai`). It is only a
+   transitive dependency of `ai`, and strict pnpm refuses a direct import.
 
-Hasil uji: teks **3,3 detik**; tool calling **11,4 detik** dengan argumen benar
-(`{"wallet":"0xABC","protocol":"venus"}`). Latensi dGrid bervariasi 3–46 detik tergantung
-beban — bukan konstan seperti dugaan awal.
+Test results: text **3.3 seconds**; tool calling **11.4 seconds** with correct arguments
+(`{"wallet":"0xABC","protocol":"venus"}`). dGrid latency varies from 3 to 46 seconds
+depending on load — not constant, as first assumed.
 
-## R2 — konflik versi Altana SDK: ⚠️ TERKONFIRMASI
+## R2 — Altana SDK version conflict: ⚠️ CONFIRMED
 
-`bag init` menghasilkan `app/agent/package.json` yang mem-pin:
+`bag init` produces an `app/agent/package.json` that pins:
 ```
 "@bnbagent/studio-runtime": "0.0.13"
 "@bnbagent/sdk": "0.5.5"
 "@altananetwork/sdk": "0.7.1"
 ```
-Sementara riset Altana (docs/research/03) menyebut ERC-8183 di testnet revert
-`PolicyNotWhitelisted()` pada SDK ≤0.8.0 dan menuntut 0.9.0. Dokumentasi Studio sendiri
-menyatakan doctor, readiness, dan runtime loading **menolak version drift**.
+Meanwhile the Altana research (docs/research/03) says ERC-8183 on testnet reverts with
+`PolicyNotWhitelisted()` on SDK ≤0.8.0 and requires 0.9.0. The Studio documentation itself
+states that doctor, readiness, and runtime loading **reject version drift**.
 
-**Keputusan:** pakai `0.7.1` yang di-pin, jangan dipaksa naik.
-- Yang **wajib** untuk menang track Altana adalah **session key**: wallet agent sendiri,
-  session dengan call allowlist + spend cap + expiry, terdaftar di Keystore, transaksi
-  nyata lewat session key, dan revoke dari UI. Semua itu ada di 0.7.1.
-- ERC-8183 hanya **bonus**. Jalur escrow yang kita pakai untuk hiring adalah
-  `@bnbagent/sdk@0.5.5` milik Studio, bukan Altana ERC-8183 SDK.
-- Kalau nanti kita mengejar bonus ERC-8183 Altana, paketnya dipakai **terpisah di
-  `backend/`**, di luar project Studio, sehingga pin-nya tidak dilanggar.
+**Decision:** stay on the pinned `0.7.1`, do not force an upgrade.
+- What is **required** to win the Altana track is the **session key**: the agent's own
+  wallet, a session with a call allowlist + spend cap + expiry, registered in the Keystore,
+  real transactions through the session key, and revoke from the UI. All of that exists in 0.7.1.
+- ERC-8183 is only a **bonus**. The escrow path we use for hiring is Studio's
+  `@bnbagent/sdk@0.5.5`, not the Altana ERC-8183 SDK.
+- If we later go after the Altana ERC-8183 bonus, that package gets used **separately in
+  `backend/`**, outside the Studio project, so its pin is not violated.
 
-## Konfigurasi scaffold yang terverifikasi
+## Verified scaffold configuration
 
-`studio.toml` yang dihasilkan `--wallet-kind altana`:
+The `studio.toml` produced by `--wallet-kind altana`:
 ```toml
 [wallet]
 kind = "altana"
@@ -73,7 +72,7 @@ session_file = "../../.studio/wallets/altana-session.json"
 
 [llm]
 provider = "openai"
-model = "gpt-4o-mini"     # akan kita ganti lewat model.ts ke openai/gpt-5.6-luna
+model = "gpt-4o-mini"     # we will swap this via model.ts to openai/gpt-5.6-luna
 ```
-File `src/` yang dihasilkan: `agentCard.ts`, `dualMain.ts`, `executor.ts`, `mcpMain.ts`,
+The `src/` files it generates: `agentCard.ts`, `dualMain.ts`, `executor.ts`, `mcpMain.ts`,
 `model.ts`, `requestLimits.ts`, `sellerCore.ts`, `signing.ts`, `tools.ts`.

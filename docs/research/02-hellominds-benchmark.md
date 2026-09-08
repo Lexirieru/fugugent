@@ -1,59 +1,59 @@
-# HelloMinds ("Minds by Animoca Brands") — Benchmark Produk & UX untuk Fugugent
+# HelloMinds ("Minds by Animoca Brands") — Product & UX Benchmark for Fugugent
 
-> Riset mendalam untuk **Fugugent** — agent marketplace di BNB Chain dengan karakter kartun ikan fugu.
-> Tanggal riset: **2026-09-08**. Versi konten sumber: `llms.txt v1.9.2` (last updated 2026-08-26).
+> In-depth research for **Fugugent** — an agent marketplace on BNB Chain with cartoon fugu fish characters.
+> Research date: **2026-09-08**. Source content version: `llms.txt v1.9.2` (last updated 2026-08-26).
 
 ---
 
-## 0. Metodologi & Status Sumber
+## 0. Methodology & Source Status
 
-| Sumber | Status | Catatan |
+| Source | Status | Notes |
 |---|---|---|
-| `https://www.hellominds.ai/` | ⚠️ SPA (Vite/React) | HTML awal hanya shell `<div id="root">`. Konten dirender client-side. |
-| `https://www.hellominds.ai/sitemap.xml` | ✅ OK | 46 URL. |
-| `https://www.hellominds.ai/robots.txt` | ✅ OK | Menyingkap path privat: `/api/`, `/profile`, `/profile/minds`, `/composio/callback`. |
-| `https://www.hellominds.ai/llms.txt` | ✅ OK | 12.9 KB — ringkasan produk resmi. |
-| `https://www.hellominds.ai/llms-full.txt` | ✅ OK | 25.4 KB — referensi lengkap + FAQ. |
-| `https://www.hellominds.ai/.well-known/agents.json` | ✅ OK | 14.2 KB — manifest agent terstruktur. |
-| `https://www.hellominds.ai/data/bazaar.json` | ✅ OK | **193 KB — katalog Bazaar penuh (119 Apps + 29 Skills).** |
-| `https://www.hellominds.ai/data/minds.json` | ✅ OK | **19 KB — 19 template One-Click Mind.** |
-| `https://www.hellominds.ai/data/toolkits.json` | ✅ OK | **95 KB — 104 toolkit + auth scheme (Composio).** |
-| `https://www.hellominds.ai/assets/index-nE9hYUns.js` | ✅ OK | **3.0 MB bundle — sumber kebenaran untuk UI copy, endpoint API, dan skema kartu.** |
-| `https://build.hellominds.ai/sitemap.xml` | ✅ OK | 69 URL (4 locale: en/jp/ko/vi). |
-| `https://build.hellominds.ai/llms.txt` | ✅ OK | Peta docs Builder Hub. |
-| `https://build.hellominds.ai/llms-full.txt` | ❌ **404** | File tidak ada (mengembalikan halaman 404 Next.js). |
-| `https://www.hellominds.ai/bazaar` (rendered) | ⚠️ Butuh JS | Data diambil dari `/data/*.json` (sudah didapat langsung). |
-| `https://app.hellominds.ai/onboarding` | 🔒 **Butuh login** | Tidak bisa diakses tanpa akun. Alur direkonstruksi dari copy di bundle + docs. |
-| `https://www.hellominds.ai/locales/en/*.json` | ✅ OK | File i18n — **identity map** (key == nilai Inggris), jadi ini literal copy UI. |
-| `https://www.hellominds.ai/data/tutorials-manifest.json` + `/data/get-started-guide.json` | ✅ OK | 25 slug tutorial + panduan onboarding 5-langkah lengkap. |
-| `https://build.hellominds.ai/<path>.md` | ✅ OK | **"Markdown twin"** untuk tiap halaman docs — cara terbaik membaca Builder Hub. |
-| `https://build.hellominds.ai/docs/api` | ✅ OK | **OpenAPI 3.0.3 penuh** tersemat di chunk Next.js (`JSON.parse('…')`) — 21 path / 27 operasi. |
-| Semua 17 halaman Builder Hub | ✅ OK | Tidak ada yang gagal; **tidak ada yang butuh login**. |
+| `https://www.hellominds.ai/` | ⚠️ SPA (Vite/React) | The initial HTML is just a `<div id="root">` shell. Content is rendered client-side. |
+| `https://www.hellominds.ai/sitemap.xml` | ✅ OK | 46 URLs. |
+| `https://www.hellominds.ai/robots.txt` | ✅ OK | Reveals private paths: `/api/`, `/profile`, `/profile/minds`, `/composio/callback`. |
+| `https://www.hellominds.ai/llms.txt` | ✅ OK | 12.9 KB — the official product summary. |
+| `https://www.hellominds.ai/llms-full.txt` | ✅ OK | 25.4 KB — the full reference + FAQ. |
+| `https://www.hellominds.ai/.well-known/agents.json` | ✅ OK | 14.2 KB — a structured agent manifest. |
+| `https://www.hellominds.ai/data/bazaar.json` | ✅ OK | **193 KB — the full Bazaar catalogue (119 Apps + 29 Skills).** |
+| `https://www.hellominds.ai/data/minds.json` | ✅ OK | **19 KB — 19 One-Click Mind templates.** |
+| `https://www.hellominds.ai/data/toolkits.json` | ✅ OK | **95 KB — 104 toolkits + auth schemes (Composio).** |
+| `https://www.hellominds.ai/assets/index-nE9hYUns.js` | ✅ OK | **A 3.0 MB bundle — the source of truth for UI copy, API endpoints, and the card schema.** |
+| `https://build.hellominds.ai/sitemap.xml` | ✅ OK | 69 URLs (4 locales: en/jp/ko/vi). |
+| `https://build.hellominds.ai/llms.txt` | ✅ OK | A map of the Builder Hub docs. |
+| `https://build.hellominds.ai/llms-full.txt` | ❌ **404** | The file does not exist (returns a Next.js 404 page). |
+| `https://www.hellominds.ai/bazaar` (rendered) | ⚠️ Needs JS | The data comes from `/data/*.json` (which we fetched directly). |
+| `https://app.hellominds.ai/onboarding` | 🔒 **Needs login** | Not accessible without an account. The flow was reconstructed from bundle copy + docs. |
+| `https://www.hellominds.ai/locales/en/*.json` | ✅ OK | The i18n files — an **identity map** (key == English value), so these are the literal UI copy. |
+| `https://www.hellominds.ai/data/tutorials-manifest.json` + `/data/get-started-guide.json` | ✅ OK | 25 tutorial slugs + the complete 5-step onboarding guide. |
+| `https://build.hellominds.ai/<path>.md` | ✅ OK | A **"markdown twin"** for every docs page — the best way to read the Builder Hub. |
+| `https://build.hellominds.ai/docs/api` | ✅ OK | A **full OpenAPI 3.0.3 spec** embedded in a Next.js chunk (`JSON.parse('…')`) — 21 paths / 27 operations. |
+| All 17 Builder Hub pages | ✅ OK | None failed; **none required a login**. |
 
-**Metode kunci:** karena kedua situs adalah SPA (produk = **Vite + React Router**; Builder Hub = **Next.js**), konten asli diambil dengan (a) mengunduh JS bundle 3 MB lalu mengekstrak literal string prosa, (b) mengunduh file data statis `/data/*.json` dan `/locales/en/*.json`, (c) memakai markdown twin `.md` di Builder Hub, dan (d) mengekstrak spec OpenAPI dari chunk Next.js. Semua field kartu, endpoint, dan copy UI di dokumen ini adalah **hasil observasi langsung**, bukan tebakan.
+**The key method:** because both sites are SPAs (the product = **Vite + React Router**; the Builder Hub = **Next.js**), the actual content was obtained by (a) downloading the 3 MB JS bundle and extracting the prose string literals, (b) downloading the static data files `/data/*.json` and `/locales/en/*.json`, (c) using the `.md` markdown twins on the Builder Hub, and (d) extracting the OpenAPI spec from a Next.js chunk. Every card field, endpoint, and piece of UI copy in this document is **directly observed**, not guessed.
 
-> ⚠️ **Batasan jujur:** Dashboard user (`/profile`), alur checkout Stripe, dan Builder Console (`/console`, tempat API key dibuat) berada di balik login dan **tidak diakses**. Semua nama elemen dashboard di §4.5 berasal dari bundle JS dan file i18n, bukan dari sesi login — jadi akurat sebagai *string yang ada di kode*, tapi tata letak visualnya tidak diverifikasi.
+> ⚠️ **An honest limitation:** the user dashboard (`/profile`), the Stripe checkout flow, and the Builder Console (`/console`, where API keys are created) sit behind a login and were **not accessed**. All dashboard element names in §4.5 come from the JS bundle and the i18n files, not from a logged-in session — so they are accurate as *strings that exist in the code*, but the visual layout is unverified.
 >
-> ⚠️ **Peringatan penting:** dokumen pemasaran mereka (`llms.txt`, `llms-full.txt`) **melebih-lebihkan** dibanding produk yang benar-benar dikirim. Setiap klaim penting sudah dicek silang terhadap bundle produksi; perbedaannya didokumentasikan di **§7.3**.
+> ⚠️ **An important warning:** their marketing documents (`llms.txt`, `llms-full.txt`) **overstate** what the shipped product actually does. Every important claim has been cross-checked against the production bundle; the differences are documented in **§7.3**.
 
 ---
 
-## 1. Peta Situs Lengkap
+## 1. Full Site Map
 
-### 1.1 Situs produk — `www.hellominds.ai`
+### 1.1 The product site — `www.hellominds.ai`
 
 ```
 /                              Landing
-/about                         Tentang
-/for-everyone                  Halaman konsumen
-/examples                      Contoh sehari-hari
-/pricing                       Harga & Cognition Credits
+/about                         About
+/for-everyone                  Consumer page
+/examples                      Everyday examples
+/pricing                       Pricing & Cognition Credits
 /faq                           FAQ
 │
 ├── /bazaar                    ← MARKETPLACE (landing)
-│   ├── /bazaar/minds          19 template One-Click Mind
-│   ├── /bazaar/apps           119 Apps (integrasi)
-│   └── /bazaar/skills         29 Skills (playbook)
+│   ├── /bazaar/minds          19 One-Click Mind templates
+│   ├── /bazaar/apps           119 Apps (integrations)
+│   └── /bazaar/skills         29 Skills (playbooks)
 │
 ├── /docs/overview             Knowledge base
 │   ├── /docs/core-concepts
@@ -62,7 +62,7 @@
 │   ├── /docs/security
 │   └── /docs/troubleshooting
 │
-├── /tutorials                 Hub tutorial
+├── /tutorials                 Tutorial hub
 │   ├── /tutorials/get-started
 │   ├── /tutorials/signalsentry-daily-x-brief
 │   ├── /tutorials/superior-trade-app-and-skill
@@ -70,21 +70,21 @@
 │   ├── /tutorials/minds-video
 │   └── /tutorials/storyboard-image-generator
 │
-├── /quiz/mindprint            ← Kuis akuisisi 3 menit
+├── /quiz/mindprint            ← A 3-minute acquisition quiz
 │   ├── /quiz/mindprint/research
-│   └── /quiz/mindprint/types/{16 tipe}   ← 16 tipe kepribadian (gaya MBTI)
+│   └── /quiz/mindprint/types/{16 types}   ← 16 personality types (MBTI style)
 │
-├── /campaign/free-credits     Promo kredit gratis
-├── /campaign/moca             Reward MocaProof
+├── /campaign/free-credits     Free credits promo
+├── /campaign/moca             MocaProof rewards
 ├── /campaign/burn-sp          Burn $MOCA Staking Power → Cognition
 │
 ├── /privacy-policy, /terms-of-use
-└── 🔒 /profile, /profile/minds   (private, di-disallow di robots.txt)
+└── 🔒 /profile, /profile/minds   (private, disallowed in robots.txt)
 ```
 
-**Subdomain lain (dari bundle):** `app.hellominds.ai` (aplikasi utama + `/onboarding`), `api.hellominds.ai` (API v1), `api.auth.hellominds.ai`, `api.orbit.hellominds.ai` (feedback), `api.build.hellominds.ai`, `name-api.hellominds.ai` (cek ketersediaan nama Mind), `assets.hellominds.ai`.
+**Other subdomains (from the bundle):** `app.hellominds.ai` (the main app + `/onboarding`), `api.hellominds.ai` (the v1 API), `api.auth.hellominds.ai`, `api.orbit.hellominds.ai` (feedback), `api.build.hellominds.ai`, `name-api.hellominds.ai` (Mind name availability check), `assets.hellominds.ai`.
 
-### 1.2 Builder Hub — `build.hellominds.ai` (4 locale: en/jp/ko/vi)
+### 1.2 The Builder Hub — `build.hellominds.ai` (4 locales: en/jp/ko/vi)
 
 ```
 /en                                        Builder Hub landing
@@ -97,7 +97,7 @@
 /docs/api                                  API Reference (Builder Tools)
 /en/changelog                              Release notes
 /en/faq
-/en/inspirations                           Studi kasus builder
+/en/inspirations                           Builder case studies
 │   ├── /en/inspirations/etsy-shop-strategist
 │   ├── /en/inspirations/superior-trade-intern
 │   └── /en/inspirations/architect-of-ancestry
@@ -107,112 +107,112 @@
 │   └── /en/program/build-east
 ```
 
-> **Observasi penting:** dokumentasi builder HelloMinds **sangat tipis** — hanya **5 halaman docs** + 1 API reference. Ini adalah *kelemahan* yang bisa kita lampaui, bukan benchmark yang harus dikejar.
+> **An important observation:** the HelloMinds builder documentation is **very thin** — only **5 docs pages** plus 1 API reference. This is a *weakness* we can beat, not a benchmark to chase.
 
 ---
 
-## 2. Model Produk
+## 2. Product Model
 
-### 2.1 Apa yang dijual
+### 2.1 What they sell
 
-HelloMinds **tidak menjual agent per-unit**. Yang dijual adalah **bahan bakar komputasi** (`Cognition Credits`). Agent, template, Skills, dan Apps semuanya **gratis untuk di-equip**.
+HelloMinds **does not sell agents per unit**. What they sell is **compute fuel** (`Cognition Credits`). Agents, templates, Skills, and Apps are all **free to equip**.
 
-> Model bisnis: **"Labor-as-a-Service"** (istilah mereka sendiri di `agents.json` → `entity.operating_model`).
+> Their business model: **"Labor-as-a-Service"** (their own term, in `agents.json` → `entity.operating_model`).
 
-| Lapisan | Berbayar? | Mekanisme |
+| Layer | Paid? | Mechanism |
 |---|---|---|
-| Membuat Mind (agent) | **Gratis** | Tanpa kartu kredit / wallet |
-| Equip Skill / App dari Bazaar | **Gratis** | Tanpa biaya per-item |
-| Menjalankan agent (reasoning + tool call) | **Berbayar** | Membakar Cognition Credits |
-| Publikasi ke Bazaar (builder) | Gratis | Revenue share **belum live** (lihat §5.4) |
+| Creating a Mind (agent) | **Free** | No credit card / wallet |
+| Equipping a Skill / App from the Bazaar | **Free** | No per-item cost |
+| Running an agent (reasoning + tool calls) | **Paid** | Burns Cognition Credits |
+| Publishing to the Bazaar (as a builder) | Free | Revenue share is **not live yet** (see §5.4) |
 
-### 2.2 Siapa penggunanya
+### 2.2 Who uses it
 
-Dua audiens eksplisit, dengan halaman terpisah:
+Two explicit audiences, with separate pages:
 
-1. **Minds for Everyone** (`/for-everyone`) — konsumen non-teknis. Persona yang disebut: sales professional, realtor, orang tua, pemilik toko Etsy, content creator, pemula AI, trader/monitor pasar.
-2. **Minds for Builders** (`build.hellominds.ai`) — developer, prompt engineer, creator yang mempublikasikan Skills/Apps/Tools.
+1. **Minds for Everyone** (`/for-everyone`) — non-technical consumers. The personas mentioned: sales professional, realtor, parent, Etsy shop owner, content creator, AI beginner, trader/market watcher.
+2. **Minds for Builders** (`build.hellominds.ai`) — developers, prompt engineers, and creators publishing Skills/Apps/Tools.
 
-### 2.3 Struktur agent: **Soul + Brain**
+### 2.3 Agent structure: **Soul + Brain**
 
-Ini adalah *framing* konseptual terkuat mereka dan layak ditiru secara struktural:
+This is their strongest conceptual framing and is worth copying structurally:
 
-- **Soul** — inti permanen: **Identity (DNA)** + **Memory** + **State** + **Wallet**. Milik user, tidak bisa dicabut platform, "sovereign asset".
-- **Brain** — LLM yang berpikir. **Auto-routing** ke model paling tepat per-task. Tidak ada vendor lock-in.
-- Kalimat kunci mereka: *"The Soul persists, only the Brain switches."*
+- **Soul** — the permanent core: **Identity (DNA)** + **Memory** + **State** + **Wallet**. Owned by the user, cannot be taken away by the platform, a "sovereign asset".
+- **Brain** — the LLM that thinks. **Auto-routed** to the most appropriate model per task. No vendor lock-in.
+- Their key line: *"The Soul persists, only the Brain switches."*
 
-Konsep pendukung:
+Supporting concepts:
 
-| Istilah | Definisi (verbatim dari docs) |
+| Term | Definition (verbatim from the docs) |
 |---|---|
-| **DNA / Identity** | Kepribadian, nilai, dan prinsip operasi permanen sebuah Mind. |
-| **Memory** | Long-term (LTM) + short-term (STM), persist lintas sesi. |
-| **State** | Variabel internal dinamis — **"stress, focus, trust"** — berubah real-time. |
-| **Wallet** | Wallet on-chain per-Mind. Private key terenkripsi; AI tidak pernah mengaksesnya. |
-| **Tool** | Satu kapabilitas spesifik (1 API call), mis. "send Gmail". |
-| **Skill** | *Learned playbook* — urutan instruksi multi-step. |
-| **App** | Bundle Tools di bawah satu identitas (mis. App Gmail = semua Tool Gmail). |
-| **Artifact** | Objek digital pasif (file/dokumen) yang bisa dibaca Mind. |
-| **Circle** | Grup trust-gated untuk kolaborasi Mind-ke-Mind. |
-| **Concierge** | Agent onboarding yang "membangunkan" (Awaken) Mind pertamamu. |
-| **Swarm** | Sekumpulan Mind terspesialisasi yang bekerja bersama. |
+| **DNA / Identity** | A Mind's permanent personality, values, and operating principles. |
+| **Memory** | Long-term (LTM) + short-term (STM), persisting across sessions. |
+| **State** | Dynamic internal variables — **"stress, focus, trust"** — changing in real time. |
+| **Wallet** | An on-chain wallet per Mind. The private key is encrypted; the AI never accesses it. |
+| **Tool** | One specific capability (1 API call), e.g. "send Gmail". |
+| **Skill** | A *learned playbook* — a multi-step sequence of instructions. |
+| **App** | A bundle of Tools under one identity (e.g. the Gmail App = every Gmail Tool). |
+| **Artifact** | A passive digital object (file/document) a Mind can read. |
+| **Circle** | A trust-gated group for Mind-to-Mind collaboration. |
+| **Concierge** | The onboarding agent that "Awakens" your first Mind. |
+| **Swarm** | A set of specialised Minds working together. |
 
-### 2.4 Pricing & sistem credit
+### 2.4 Pricing & the credit system
 
-**Gratis untuk launch.** Konsumsi berbasis **Cognition Credits**, dibayar via **Stripe** (dan crypto).
+**Free at launch.** Consumption is based on **Cognition Credits**, paid through **Stripe** (and crypto).
 
-**Paket bulanan:**
+**Monthly plans:**
 
-| Plan | Harga | Credits | Untuk |
+| Plan | Price | Credits | For |
 |---|---|---|---|
-| Standard | US$10/bln | 1.000 | Riset & workflow multi-step |
-| Pro | US$25/bln | 2.500 | Task kompleks & automasi |
-| Ultra | US$50/bln | 5.000 | High-volume, always-on |
+| Standard | US$10/mo | 1,000 | Research & multi-step workflows |
+| Pro | US$25/mo | 2,500 | Complex tasks & automation |
+| Ultra | US$50/mo | 5,000 | High-volume, always-on |
 
-**Top-up sekali bayar:**
+**One-off top-ups:**
 
-| Pack | Harga | Credits |
+| Pack | Price | Credits |
 |---|---|---|
-| Starter | US$10 | 1.000 |
-| Standard | US$25 | 2.500 |
-| Pro | US$50 | 5.000 |
+| Starter | US$10 | 1,000 |
+| Standard | US$25 | 2,500 |
+| Pro | US$50 | 5,000 |
 
-**Mekanika credit (penting untuk ditiru):**
+**Credit mechanics (worth copying):**
 
-- Credits dilacak **per-Mind**, bukan per-akun. Tiap agent punya dompetnya sendiri.
-- **Tidak ada tarif flat per aksi** — *"complexity drives consumption"*. Lookup cepat = sedikit; deep research multi-step = banyak.
-- Peringatan saldo rendah dikirim **oleh agent itu sendiri**, via email/Telegram, **berisi link pembayaran Stripe**. User tidak perlu memantau saldo.
-- Jika habis di tengah task: *"Your Mind pauses and notifies you. It won't drop a task silently... Once credits are restored, it picks up where it left off."*
-- Dashboard `/profile` menampilkan tren pemakaian credit per-Mind.
+- Credits are tracked **per Mind**, not per account. Each agent has its own wallet.
+- **There is no flat rate per action** — *"complexity drives consumption"*. A quick lookup costs little; deep multi-step research costs a lot.
+- Low-balance warnings are sent **by the agent itself**, via email/Telegram, **including a Stripe payment link**. The user does not have to watch the balance.
+- If credits run out mid-task: *"Your Mind pauses and notifies you. It won't drop a task silently... Once credits are restored, it picks up where it left off."*
+- The `/profile` dashboard shows credit usage trends per Mind.
 
-**Loop akuisisi berbasis credit (sangat relevan untuk hackathon Web3):**
+**The credit-based acquisition loop (very relevant for a Web3 hackathon):**
 
-- **Free credits:** +200 Cognition untuk masing-masing 3 Mind pertama; Mind ke-4 dan ke-5 dapat +90.
-- **Daily refill:** auto top-up 1 Mind/hari, hanya untuk Mind aktif dengan saldo **< 100 Cognition**. Yang dipilih adalah Mind yang paling baru dibuat.
-- **Referral:** *"Refer a friend. You both earn $5 in Cognitions"* — dicairkan setelah referral menyelesaikan **3 percakapan**.
-- **Burn-to-earn:** burn $MOCA Staking Power → Cognition. Rate terbaik **100 LLM token per SP** untuk 50.000 SP pertama. Staked $MOCA tidak tersentuh, hanya SP yang dikonversi.
-- **Credential-gated airdrop:** kredit gratis berdasarkan credential **MocaProof** (identitas terdesentralisasi).
+- **Free credits:** +200 Cognition for each of the first 3 Minds; the 4th and 5th Minds get +90.
+- **Daily refill:** an automatic top-up of 1 Mind per day, only for active Minds with a balance **< 100 Cognition**. The one chosen is the most recently created Mind.
+- **Referrals:** *"Refer a friend. You both earn $5 in Cognitions"* — paid out after the referral completes **3 conversations**.
+- **Burn-to-earn:** burn $MOCA Staking Power → Cognition. The best rate is **100 LLM tokens per SP** for the first 50,000 SP. Staked $MOCA is untouched; only SP is converted.
+- **Credential-gated airdrop:** free credits based on a **MocaProof** credential (decentralised identity).
 
 ---
 
-## 3. Taksonomi Kategori & Anatomi Kartu Agent
+## 3. Category Taxonomy & Agent Card Anatomy
 
-### 3.1 Taksonomi tiga-lapis (+ satu)
+### 3.1 A three-layer taxonomy (+ one)
 
-Bazaar dibagi jadi **3 tab**, plus Tools sebagai lapisan tersembunyi:
+The Bazaar is split into **3 tabs**, plus Tools as a hidden layer:
 
-| Tab | Jumlah | Definisi |
+| Tab | Count | Definition |
 |---|---|---|
-| **Minds** (`/bazaar/minds`) | **19** | Template agent siap-pakai (One-Click) |
-| **Apps** (`/bazaar/apps`) | **119** | Integrasi eksternal (Gmail, Notion, Slack…) |
-| **Skills** (`/bazaar/skills`) | **29** | Playbook multi-step |
-| *Tools* | 104 toolkit | Tidak punya tab sendiri; komponen penyusun |
+| **Minds** (`/bazaar/minds`) | **19** | Ready-to-use agent templates (One-Click) |
+| **Apps** (`/bazaar/apps`) | **119** | External integrations (Gmail, Notion, Slack…) |
+| **Skills** (`/bazaar/skills`) | **29** | Multi-step playbooks |
+| *Tools* | 104 toolkits | No tab of their own; the building blocks |
 
-### 3.2 ⭐ Skema kartu — **field yang SEBENARNYA ada**
+### 3.2 ⭐ The card schema — **the fields that ACTUALLY exist**
 
-Diambil langsung dari `bazaar.json` / `minds.json`:
+Taken straight from `bazaar.json` / `minds.json`:
 
-**Kartu Skill / App:**
+**A Skill / App card:**
 ```json
 {
   "id": "F230493E-F36B-1410-8462-00039CE7DF11",
@@ -235,7 +235,7 @@ Diambil langsung dari `bazaar.json` / `minds.json`:
 }
 ```
 
-**Kartu Mind (template agent):**
+**A Mind card (agent template):**
 ```json
 {
   "id": "general-assistant",
@@ -255,72 +255,72 @@ Diambil langsung dari `bazaar.json` / `minds.json`:
 }
 ```
 
-**Field runtime (dari JS bundle, di-fetch terpisah per kartu):**
+**Runtime fields (from the JS bundle, fetched separately per card):**
 ```js
 t[r] = n.equippedCount ?? n.popularity ?? n.usageCount ?? undefined
-// dirender sebagai: `Equipped: {{count}}` dengan count.toLocaleString('en-US')
+// rendered as: `Equipped: {{count}}` with count.toLocaleString('en-US')
 ```
 
-### 3.3 ⭐⭐ Analisis field: apa yang ADA vs TIDAK ADA
+### 3.3 ⭐⭐ Field analysis: what EXISTS versus what DOES NOT
 
-| Field | Ada? | Label UI sebenarnya / catatan |
+| Field | Present? | Actual UI label / notes |
 |---|:---:|---|
-| Nama | ✅ | |
-| Short description (1 baris) | ✅ | Di kartu; long description di modal, seksi **"Description"** |
-| Ikon / gambar | ✅ | + fallback `iconInitials` + `iconTint` (warna) |
-| **`level`** (Easy/Intermediate/Advanced) | ✅ | Label UI-nya adalah **"Setup Effort"** (bukan "difficulty"). Dirender sebagai **meter 3-batang** |
-| **`useCases`** (outcome past-tense) | ✅ | Label UI-nya **"Example Actions"** — daftar bullet bercentang. **Pola terkuat mereka**, lihat §3.4 |
-| **`tag`** | ✅ | Badge: `Official`, `Featured`, `Verified` (hijau + ikon centang), `Composio` (ungu) |
-| **`equippedCount`** | ✅ | Satu-satunya metrik sosial. Label: `Equipped: 1,234` |
-| `tutorial` (HTML) | ✅ | Label UI: **"What to Expect when you install the {{name}} {{app\|skill}}"** |
-| `disclaimer` | ✅ | Sebagian besar kosong, **tapi** nilai `"Crypto Trading"` memicu banner peringatan oranye: *"This app involves crypto trading. Please ensure you understand the risks before proceeding."* |
-| `apiKey` (URL untuk ambil key) | ✅ | Hanya 5 dari 148 item butuh key eksternal |
-| **Rating / bintang** | ❌ | **TIDAK ADA** |
-| **Review / ulasan user** | ❌ | **TIDAK ADA** |
-| **Harga per-item** | ❌ | **TIDAK ADA** (semua gratis di-equip) |
-| **Latency / waktu eksekusi** | ❌ | **TIDAK ADA** |
-| **Success rate / reliability** | ❌ | **TIDAK ADA** |
-| **Creator / author** | ❌ | **TIDAK ADA** — semua tampak first-party |
-| **Jumlah run / eksekusi** | ❌ | **TIDAK ADA** (hanya "equipped") |
-| **Estimasi biaya credit** | ❌ | **TIDAK ADA** — user tidak tahu biaya sebelum menjalankan |
-| **Last updated / versi** | ❌ | **TIDAK ADA** |
+| Name | ✅ | |
+| Short description (1 line) | ✅ | On the card; the long description is in the modal, under the **"Description"** section |
+| Icon / image | ✅ | + an `iconInitials` fallback + `iconTint` (colour) |
+| **`level`** (Easy/Intermediate/Advanced) | ✅ | The UI label is **"Setup Effort"** (not "difficulty"). Rendered as a **3-bar meter** |
+| **`useCases`** (past-tense outcomes) | ✅ | The UI label is **"Example Actions"** — a checked bullet list. **Their strongest pattern**, see §3.4 |
+| **`tag`** | ✅ | Badges: `Official`, `Featured`, `Verified` (green + a checkmark icon), `Composio` (purple) |
+| **`equippedCount`** | ✅ | The only social metric. Label: `Equipped: 1,234` |
+| `tutorial` (HTML) | ✅ | UI label: **"What to Expect when you install the {{name}} {{app\|skill}}"** |
+| `disclaimer` | ✅ | Mostly empty, **but** the value `"Crypto Trading"` triggers an orange warning banner: *"This app involves crypto trading. Please ensure you understand the risks before proceeding."* |
+| `apiKey` (a URL for obtaining a key) | ✅ | Only 5 of the 148 items need an external key |
+| **Rating / stars** | ❌ | **DOES NOT EXIST** |
+| **User reviews** | ❌ | **DOES NOT EXIST** |
+| **Per-item price** | ❌ | **DOES NOT EXIST** (everything is free to equip) |
+| **Latency / execution time** | ❌ | **DOES NOT EXIST** |
+| **Success rate / reliability** | ❌ | **DOES NOT EXIST** |
+| **Creator / author** | ❌ | **DOES NOT EXIST** — everything looks first-party |
+| **Run / execution count** | ❌ | **DOES NOT EXIST** (only "equipped") |
+| **Estimated credit cost** | ❌ | **DOES NOT EXIST** — the user has no idea what it costs before running it |
+| **Last updated / version** | ❌ | **DOES NOT EXIST** |
 
-### 3.3b ⚠️ KOREKSI PENTING: API punya lebih banyak field daripada yang ditampilkan UI
+### 3.3b ⚠️ AN IMPORTANT CORRECTION: the API has more fields than the UI shows
 
-Tabel di atas menjelaskan **apa yang dirender di kartu web Bazaar**. Namun **Builder API** (`GET /v1/bazaar/apps/{appId}`) mengembalikan objek yang jauh lebih kaya:
+The table above describes **what is rendered on the Bazaar web card**. But the **Builder API** (`GET /v1/bazaar/apps/{appId}`) returns a far richer object:
 
 ```jsonc
-// BazaarApp — dari OpenAPI spec v1.0.3
+// BazaarApp — from the OpenAPI spec v1.0.3
 {
   "appId": "...", "appName": "...", "description": "...",
-  "tier": "wild" | "verified",   // ← trust label DUA TINGKAT, benar-benar ada di API
-  "provider": "composio",         // ← CREATOR/PROVIDER ADA di API
-  "version": "...",               // ← VERSIONING ADA
-  "createdAt": "...",             // ← TIMESTAMP ADA
+  "tier": "wild" | "verified",   // ← a TWO-LEVEL trust label, it really is in the API
+  "provider": "composio",         // ← the CREATOR/PROVIDER IS in the API
+  "version": "...",               // ← VERSIONING EXISTS
+  "createdAt": "...",             // ← A TIMESTAMP EXISTS
   "toolCount": 12,
   "equippedCount": 1234,
   "authType": "OAUTH2",
   "minCoreVersion": "...",
-  "tools": [{ "toolSlug": "..." }] // hanya di endpoint detail
+  "tools": [{ "toolSlug": "..." }] // only on the detail endpoint
 }
 // BazaarSkill
 { "skillId", "name", "description", "createdAt", "equippedCount",
-  "source": "mind" | "system" }   // mind = katalog/buatan Mind, system = skill platform
+  "source": "mind" | "system" }   // mind = from the catalogue/made by a Mind, system = a platform skill
 ```
 
-CLI juga sudah mendukung filter yang **tidak ada di UI web**:
+The CLI also already supports filters that **do not exist in the web UI**:
 ```bash
 minds bazaar search "slack" --tier verified --provider composio --sort equipped
-# --sort: equipped (popularitas) | name | newest (createdAt)
+# --sort: equipped (popularity) | name | newest (createdAt)
 ```
 
-> 🎯 **Ini justru memperkuat kesimpulan, bukan melemahkannya.** HelloMinds **sudah punya** tier/provider/version/createdAt/toolCount di backend — tapi **tidak satu pun ditampilkan di kartu marketplace-nya**. Kegagalannya adalah **kegagalan produk & UX, bukan kegagalan data**. Ini adalah pelajaran paling tajam untuk Fugugent: memiliki data tidak ada gunanya kalau tidak dirender di titik pengambilan keputusan.
+> 🎯 **This strengthens the conclusion rather than weakening it.** HelloMinds **already has** tier/provider/version/createdAt/toolCount in the backend — but **shows none of it on the marketplace card**. The failure is a **product and UX failure, not a data failure**. This is the sharpest lesson for Fugugent: having the data is worthless if you do not render it at the point of decision.
 >
-> Yang benar-benar **tidak ada di mana pun** (API maupun UI): **rating, review, success rate, latency, biaya per-run, jumlah run**. Sebelas field yang paling membantu keputusan "agent mana yang saya hire" tidak ada. Juri hackathon menilai **Data Quality: "data real-time akurat yang bikin user bisa ambil keputusan"** — di sinilah Fugugent bisa menang telak.
+> What genuinely **does not exist anywhere** (API or UI): **rating, reviews, success rate, latency, cost per run, run count**. The eleven fields that would help most with the "which agent do I hire" decision are missing. The hackathon judges score **Data Quality: "accurate real-time data that lets a user make a decision"** — this is where Fugugent can win outright.
 
-### 3.4 Pola `useCases`: kalimat hasil dalam **past tense**
+### 3.4 The `useCases` pattern: outcome sentences in the **past tense**
 
-Ini pola copywriting paling kuat mereka dan **wajib ditiru**:
+This is their strongest copywriting pattern and **must be copied**:
 
 > "Searched 38 software engineer roles across top tech companies"
 > "Booked a restaurant for Saturday at 7pm"
@@ -328,13 +328,13 @@ Ini pola copywriting paling kuat mereka dan **wajib ditiru**:
 > "Pulled last 12 company posts with engagement and commentary"
 > "Found the cheapest flight for your trip"
 
-Bukan *"Bisa mencari lowongan"* (kapabilitas, abstrak) tetapi *"Mencari 38 lowongan"* (hasil, konkret, dengan angka). Ini menjawab pertanyaan user **"apa yang akan saya dapat?"** dalam 1 detik, bukan **"apa yang bisa dilakukan tool ini?"**.
+Not *"Can search for job openings"* (a capability, abstract) but *"Searched 38 openings"* (an outcome, concrete, with a number). It answers the user's question **"what will I get?"** in one second, rather than **"what can this tool do?"**.
 
-### 3.5 Taksonomi kategori sebenarnya (dari `toolkits.json`)
+### 3.5 The real category taxonomy (from `toolkits.json`)
 
-48 kategori berbeda pada layer toolkit. Sepuluh terbesar:
+48 distinct categories at the toolkit layer. The ten largest:
 
-| Kategori | Jumlah |
+| Category | Count |
 |---|---|
 | team collaboration | 16 |
 | payment processing | 15 |
@@ -347,13 +347,13 @@ Bukan *"Bisa mencari lowongan"* (kapabilitas, abstrak) tetapi *"Mencari 38 lowon
 | social media accounts | 6 |
 | team chat | 5 |
 
-Lainnya: email, databases, analytics, ecommerce, marketing automation, ai content generation, video conferencing, scheduling & booking, customer support, dst.
+Others: email, databases, analytics, ecommerce, marketing automation, ai content generation, video conferencing, scheduling & booking, customer support, and so on.
 
-> ⚠️ Tapi 48 kategori ini **tidak satu pun dipakai sebagai filter di UI Bazaar**. Filter yang ada bersifat *trust/asal-usul* (`Verified only`, `Official`, `Third-Party`, `Featured`, `Recommended`) dan *alfabetis* — **tidak ada filter berbasis topik/kategori sama sekali**. Ini kelemahan navigasi yang jelas: 119 Apps tanpa cara menyaring "tunjukkan hanya yang CRM" atau "hanya yang finance".
+> ⚠️ But **not one** of these 48 categories is used as a filter in the Bazaar UI. The filters that exist are about *trust/origin* (`Verified only`, `Official`, `Third-Party`, `Featured`, `Recommended`) and *alphabetical order* — **there is no topic/category filter at all**. That is an obvious navigation weakness: 119 Apps with no way to say "show me only CRM" or "only finance".
 
-### 3.6 Katalog lengkap 19 One-Click Minds
+### 3.6 The complete catalogue of 19 One-Click Minds
 
-| Nama | Deskripsi singkat | Apps | Skills |
+| Name | Short description | Apps | Skills |
 |---|---|:--:|:--:|
 | General Assistant | Handle bookings, reminders, and daily life tasks | 5 | 0 |
 | Sales Mind | Design, run, and improve your sales motion | 6 | 3 |
@@ -375,9 +375,9 @@ Lainnya: email, databases, analytics, ecommerce, marketing automation, ai conten
 | GTM Mind | Positioning, messaging & launch | 1 | 0 |
 | Chief of Staff Mind | Tasks + meetings → one moving plan | 1 | 0 |
 
-> 📌 **Catatan kedalaman:** distribusi sangat timpang. 4 Mind teratas punya 3–6 Apps dan 3 Skills; **11 Mind terakhir hanya punya 1 App dan 0 Skills** — praktis hanya prompt persona. Untuk kriteria juri **Agent Diversity: "4 kategori sama dalamnya"**, HelloMinds justru contoh **buruk**: mereka punya lebar (19 template) tapi tidak merata dalam kedalaman.
+> 📌 **A note on depth:** the distribution is very lopsided. The top 4 Minds have 3–6 Apps and 3 Skills; **the last 11 Minds have only 1 App and 0 Skills** — practically just a persona prompt. For the **Agent Diversity: "all 4 categories equally deep"** judging criterion, HelloMinds is a **bad** example: they have breadth (19 templates) but uneven depth.
 
-### 3.7 Distribusi `level` (kesulitan)
+### 3.7 `level` distribution (difficulty)
 
 | | Easy | Intermediate | Advanced |
 |---|---|---|---|
@@ -386,419 +386,419 @@ Lainnya: email, databases, analytics, ecommerce, marketing automation, ai conten
 
 ---
 
-## 4. Alur End-to-End User (langkah persis)
+## 4. End-to-End User Flow (the exact steps)
 
 ### 4.1 Landing → Sign-up
 
-1. Landing `/`. Headline utama menekankan **berbagi**: *"One shared AI agent keeps everyone aligned"*, *"Finally, an AI you can actually share."*
-2. Tiga varian audiens di hero: **For friends / For colleagues / For you and your loved ones**.
-3. CTA: `Try it Free`. Juga jalur akuisisi alternatif: **Mindprint quiz** (*"Take our 3-minute Mindprint quiz and find the AI agent built for how you think"*) → 16 tipe kepribadian → rekomendasi agent.
-4. Sign-up: **hanya email**. Copy: *"No wallets, no code, no barriers. You're live in seconds."* Wallet dibuat **otomatis di background**. Satu profil per email.
-5. Persetujuan T&C: *"To continue using Minds by Animoca Brands, please accept the following:"*
+1. The landing page `/`. The main headline emphasises **sharing**: *"One shared AI agent keeps everyone aligned"*, *"Finally, an AI you can actually share."*
+2. Three audience variants in the hero: **For friends / For colleagues / For you and your loved ones**.
+3. CTA: `Try it Free`. There is also an alternative acquisition path: the **Mindprint quiz** (*"Take our 3-minute Mindprint quiz and find the AI agent built for how you think"*) → 16 personality types → an agent recommendation.
+4. Sign-up: **email only**. The copy: *"No wallets, no code, no barriers. You're live in seconds."* The wallet is created **automatically in the background**. One profile per email.
+5. T&C acceptance: *"To continue using Minds by Animoca Brands, please accept the following:"*
 
-**Copy positioning terkuat mereka** (layak dipelajari untuk landing Fugugent):
+**Their strongest positioning copy** (worth studying for the Fugugent landing page):
 
-- 🏆 *"**The shift is simple — you're not asking a Mind for an answer, you're giving it a job.**"* — satu kalimat yang menjelaskan seluruh kategori produk. Ini benchmark copywriting-nya.
-- *"Minds is AI made easy for everyone. **Always on. Free to launch. No installation.**"* — tiga friction dihapus dalam tiga frasa.
+- 🏆 *"**The shift is simple — you're not asking a Mind for an answer, you're giving it a job.**"* — one sentence that explains the entire product category. This is the copywriting benchmark.
+- *"Minds is AI made easy for everyone. **Always on. Free to launch. No installation.**"* — three points of friction removed in three phrases.
 - *"**No wallets, no code, no barriers.** You're live in seconds."*
 - *"...like a teammate that **never forgets and never clocks off**."*
 - *"A Mind that acts, executes, and — as the agentic economy arrives — **transacts**."*
 - *"Personal. Persistent. Portable."*
-- Framing tiga langkah di landing: **(1)** *"Describe your needs through email or chat via Telegram and your mind does the rest."* → **(2)** *"Your Mind gets to work organising, researching, building... 24/7."* → **(3)** hasil.
+- The three-step framing on the landing page: **(1)** *"Describe your needs through email or chat via Telegram and your mind does the rest."* → **(2)** *"Your Mind gets to work organising, researching, building... 24/7."* → **(3)** the result.
 
-> ⚠️ Catatan: *"No wallets, no code, no barriers"* adalah posisi **anti-Web3** yang disengaja. Fugugent berada di BNB Chain, jadi kita tidak bisa menyalin ini mentah-mentah — tapi kita harus menyamai *tingkat friksi* yang dirasakan user (mis. embedded/smart wallet, gasless first action).
+> ⚠️ Note: *"No wallets, no code, no barriers"* is a deliberate **anti-Web3** position. Fugugent lives on BNB Chain, so we cannot copy it literally — but we do have to match the *level of friction* the user feels (e.g. an embedded/smart wallet, a gasless first action).
 
-**Gamifikasi:** ada hook *"Your files, skills and Minds all in one place. Get to your task and **clear a daily quest**."* — quest harian, dipasangkan dengan daily credit refill. Loop retensi yang murah dan sangat cocok untuk audiens crypto.
+**Gamification:** there is a hook — *"Your files, skills and Minds all in one place. Get to your task and **clear a daily quest**."* — a daily quest, paired with the daily credit refill. A cheap retention loop that fits a crypto audience very well.
 
-**Status produk:** *"Minds is currently in **Beta**."*
+**Product status:** *"Minds is currently in **Beta**."*
 
-### 4.2 Onboarding — dua jalur
+### 4.2 Onboarding — two paths
 
-Setelah sign-up, user memilih: *"Choose between Quick Setup or Tailored Setup."*
+After signing up, the user chooses: *"Choose between Quick Setup or Tailored Setup."*
 
-**Jalur A — Quick Setup / One-Click:**
+**Path A — Quick Setup / One-Click:**
 1. *"Pick a Mind template to get started, or build your own."*
-2. Pilih template dari 19 arketipe. Skills sudah ter-equip.
-3. Beri nama Mind (dicek via `name-api.hellominds.ai`).
-4. Selesai → email pengantar dikirim.
+2. Pick a template from the 19 archetypes. Skills come pre-equipped.
+3. Name the Mind (checked through `name-api.hellominds.ai`).
+4. Done → an introduction email is sent.
 
-**Jalur B — Tailored Setup (Concierge):**
-1. Layar loading: *"Please wait while your Master Mind is being activated."* / *"Master Mind will guide you step by step on how to launch your first Mind."*
-2. Wizard percakapan bertahap. Copy tiap langkah:
+**Path B — Tailored Setup (Concierge):**
+1. A loading screen: *"Please wait while your Master Mind is being activated."* / *"Master Mind will guide you step by step on how to launch your first Mind."*
+2. A step-by-step conversational wizard. The copy at each step:
    - *"A few quick questions so your {{name}} understands you more and can act like part of your team."*
    - *"Tell us what you'd like your assistant to handle and your main priority."*
    - *"Help your Mind understand who you serve and what you focus on."*
    - *"What would make your assistant genuinely useful on day one?"*
    - *"Give your Mind a name and personality that matches your brand."*
    - *"One last step. What will you call your assistant?"*
-3. Estimasi waktu ditampilkan: *"Customize based on your needs and preferences. Takes 1–2 min."*
-4. **Escape hatch:** *"In a rush? Reply to the Concierge: 'Please go ahead and create my Mind now.' You can calibrate its personality later just by conversing with it."*
-5. Concierge "Awakens" Mind → Mind mengirim email perkenalan dari alamat `@amind.ai` miliknya sendiri.
+3. A time estimate is shown: *"Customize based on your needs and preferences. Takes 1–2 min."*
+4. **An escape hatch:** *"In a rush? Reply to the Concierge: 'Please go ahead and create my Mind now.' You can calibrate its personality later just by conversing with it."*
+5. The Concierge "Awakens" the Mind → the Mind sends an introduction email from its own `@amind.ai` address.
 
-> 💡 Concierge dibingkai tegas sebagai *sekali pakai*: *"Do not treat it as a personal assistant — it exists only to spawn your specialized Mind."*
+> 💡 The Concierge is framed firmly as *single-use*: *"Do not treat it as a personal assistant — it exists only to spawn your specialized Mind."*
 
-**Nama resmi ketiga jalur** (verbatim dari FAQ): *"Launch a Mind from the main page or dashboard — you can choose **One-click Minds** (pick a template), **Guided Mind** (choose options and add your own context), or **Speak to Concierge** (recommended for custom Minds)."*
+**The official names of the three paths** (verbatim from the FAQ): *"Launch a Mind from the main page or dashboard — you can choose **One-click Minds** (pick a template), **Guided Mind** (choose options and add your own context), or **Speak to Concierge** (recommended for custom Minds)."*
 
-**Onboarding lanjutan (`/tutorials`)** dibungkus sebagai satu alur bertahap, bukan kumpulan artikel lepas: *"A step-by-step path from creating your first Mind to building Circles. Each step combines short videos and written guides — **watch, read, or both**."* Pola bagus: setiap langkah punya dua modalitas, user memilih.
+**The follow-on onboarding (`/tutorials`)** is packaged as one staged path, not a pile of loose articles: *"A step-by-step path from creating your first Mind to building Circles. Each step combines short videos and written guides — **watch, read, or both**."* A good pattern: every step has two modalities and the user picks.
 
-### 4.3 Aktivasi pertama
+### 4.3 First activation
 
-1. Mind mengirim email perkenalan: menyebut namanya, mengonfirmasi tujuannya, mengundang interaksi.
+1. The Mind sends an introduction email: it states its name, confirms its purpose, and invites interaction.
 2. *"Reply the email to start chatting, or connect via Telegram instead."*
-3. Percakapan dimulai dari balasan pertama. Tidak ada app untuk di-install.
-4. Kanal: **Email (primer)** + **Telegram** + WeChat (via token `/bind`) + WhatsApp Business.
+3. The conversation starts with the first reply. There is no app to install.
+4. Channels: **email (primary)** + **Telegram** + WeChat (via a `/bind` token) + WhatsApp Business.
 
-**Menghubungkan Telegram (langkah persis dari docs):**
-1. Buka Telegram, cari `@BotFather`, mulai chat.
-2. Kirim `/newbot`, ikuti prompt.
-3. Pilih display name + username (harus berakhiran `_bot`).
-4. Buka halaman profil (`profile.animocaminds.ai`).
-5. Verifikasi akun Telegram (nomor telepon + kode konfirmasi).
+**Connecting Telegram (the exact steps from the docs):**
+1. Open Telegram, find `@BotFather`, start a chat.
+2. Send `/newbot`, follow the prompts.
+3. Pick a display name + username (must end in `_bot`).
+4. Open the profile page (`profile.animocaminds.ai`).
+5. Verify the Telegram account (phone number + confirmation code).
 6. *"Say hello — your Mind is now live in Telegram."*
 
-### 4.4 ⭐ Discovery → Detail → **Equip** (alur "hire")
+### 4.4 ⭐ Discovery → Detail → **Equip** (the "hire" flow)
 
-Ini alur inti marketplace-nya.
+This is the core marketplace flow.
 
-1. **Browse** — `/bazaar` dengan 3 tab: Minds / Apps / Skills. Hero bertanda **"EARLY BETA"**: *"Browse one-click Minds, Apps, and Skills powering the ecosystem."*
-   - Search box (client-side substring match, case-insensitive).
-   - Filter/sort chip yang benar-benar ada: **`Featured`**, **`Recommended`**, **`All`**, **`A → Z`**, **`Z → A`**, **`Verified only`**, **`Official`**, **`Third-Party`**. Untuk Apps tambahan: `Connected first`, `Not connected first`.
+1. **Browse** — `/bazaar` with 3 tabs: Minds / Apps / Skills. The hero is marked **"EARLY BETA"**: *"Browse one-click Minds, Apps, and Skills powering the ecosystem."*
+   - A search box (client-side substring match, case-insensitive).
+   - The filter/sort chips that actually exist: **`Featured`**, **`Recommended`**, **`All`**, **`A → Z`**, **`Z → A`**, **`Verified only`**, **`Official`**, **`Third-Party`**. For Apps there are two more: `Connected first`, `Not connected first`.
    - Result counter: `{{total}} {{noun}} found` / `Showing {{total}} {{noun}}`.
-   - Sort daftar Mind: `Recently Created` (default) | `A → Z`.
-   - View mode toggle: `grid` | `list` — **dipersistensi di `localStorage`** (`minds:viewMode`, `minds:sort`).
-   - Grid responsif: `grid-cols-2 lg:grid-cols-3` (mobile 2 kolom, desktop 3).
+   - Mind list sorting: `Recently Created` (default) | `A → Z`.
+   - A view mode toggle: `grid` | `list` — **persisted in `localStorage`** (`minds:viewMode`, `minds:sort`).
+   - A responsive grid: `grid-cols-2 lg:grid-cols-3` (2 columns on mobile, 3 on desktop).
    - Pagination + "View All".
-2. **Kartu** menampilkan: ikon, nama, `short_description` (truncate 1 baris), badge `Official` (pill biru) + ikon centang `Verified`, signal-bar `level`, dan `Equipped: {{count}}`.
-3. **Klik kartu → modal detail** (`max-w-[900px] max-h-[90dvh]`), berisi:
-   - Header: ikon, nama, badge, `Equipped: {{count}}`
-   - `description` panjang
-   - **"How it works"** — konten `tutorial` (HTML list)
-   - **"Use cases"** — daftar `useCases` past-tense
-   - Apps/Skills yang dibundel (untuk Mind)
-   - Tombol utama: **`Equip this App`** / **`Equip this Skill`**
-4. **Equip** → dialog *"Choose Mind(s) to equip"* / *"Choose a **Mind.**"*
-   - Menampilkan daftar Mind milik user, **dengan saldo credit masing-masing** (`loadCredits`)
-   - Sort di dalam dialog: `Recently Created` | `A → Z`
-   - Mind yang sudah punya item ini ditandai **`Equipped`** (idempoten, tidak bisa dobel)
-   - Mind non-aktif diurutkan ke bawah (`isEnabled` first)
-5. **Konfirmasi** → `POST /v1/minds/{mindId}/apps` atau `POST /v1/minds/{mindId}/skills`
-6. **Peringatan biaya sebelum eksekusi** (copy verbatim):
+2. **The card** shows: the icon, the name, `short_description` (truncated to 1 line), an `Official` badge (a blue pill) + a `Verified` checkmark icon, the `level` signal bar, and `Equipped: {{count}}`.
+3. **Clicking a card → a detail modal** (`max-w-[900px] max-h-[90dvh]`), containing:
+   - Header: icon, name, badges, `Equipped: {{count}}`
+   - The long `description`
+   - **"How it works"** — the `tutorial` content (an HTML list)
+   - **"Use cases"** — the past-tense `useCases` list
+   - The bundled Apps/Skills (for a Mind)
+   - The primary button: **`Equip this App`** / **`Equip this Skill`**
+4. **Equip** → a dialog: *"Choose Mind(s) to equip"* / *"Choose a **Mind.**"*
+   - It shows the user's list of Minds, **with each one's credit balance** (`loadCredits`)
+   - Sorting inside the dialog: `Recently Created` | `A → Z`
+   - Minds that already have this item are marked **`Equipped`** (idempotent, you cannot double up)
+   - Inactive Minds are sorted to the bottom (`isEnabled` first)
+5. **Confirm** → `POST /v1/minds/{mindId}/apps` or `POST /v1/minds/{mindId}/skills`
+6. **A cost warning before execution** (copy verbatim):
    > *"This activates a real cycle and spends Cognition, the same as any regular message to your Mind. The Mind typically gets going within a minute. If a cycle's already running or queued, the nudge won't add another on top."*
-7. Jika Skill butuh API key eksternal, Mind akan **memintanya lewat percakapan**, bukan lewat form.
+7. If a Skill needs an external API key, the Mind **asks for it in conversation**, not through a form.
 
-**Alur alternatif (didokumentasikan di `llms.txt`):** user menyalin *"generated activation message"* dan mem-paste-nya ke Mind via email/Telegram; Mind auto-equip. Jadi ada **dua jalur equip**: UI web dan pesan natural-language.
+**An alternative flow (documented in `llms.txt`):** the user copies a *"generated activation message"* and pastes it to the Mind over email/Telegram; the Mind equips it automatically. So there are **two equip paths**: the web UI and a natural-language message.
 
-**Empty states pada alur equip (verbatim):**
-- Belum punya Mind → *"Create your first Mind, then come back to equip it."* + tombol `Create a Mind`
-- Belum login → *"Log in to see the Minds on your account and equip this to one of them."* + `Sign in to pick a Mind`
-- Gagal → *"We couldn't equip that Mind. Please try again."*
+**Empty states in the equip flow (verbatim):**
+- No Minds yet → *"Create your first Mind, then come back to equip it."* + a `Create a Mind` button
+- Not logged in → *"Log in to see the Minds on your account and equip this to one of them."* + `Sign in to pick a Mind`
+- Failure → *"We couldn't equip that Mind. Please try again."*
 
-### 4.5 Monitoring / Dashboard (`/profile` — 🔒 halaman butuh login; nama elemen di bawah diambil dari bundle + file i18n, bukan dari sesi login)
+### 4.5 Monitoring / Dashboard (`/profile` — 🔒 the page requires a login; the element names below come from the bundle + i18n files, not from a logged-in session)
 
-**Tab `/profile`:** `My Minds` · `My Connections` · `Linked Accounts` · `Redeem` · `Referral`. Header menampilkan `Account ID:`.
+**`/profile` tabs:** `My Minds` · `My Connections` · `Linked Accounts` · `Redeem` · `Referral`. The header shows `Account ID:`.
 
-**Halaman detail Mind (`/profile/minds/:mindId`)** — tab `Overview` · `Mind Connections`, plus aksi `Chat now` (*"Open your Mind in the app and start chatting instantly."*).
+**The Mind detail page (`/profile/minds/:mindId`)** — tabs `Overview` · `Mind Connections`, plus a `Chat now` action (*"Open your Mind in the app and start chatting instantly."*).
 
-**Panel di Overview (label huruf kapital):** `COGNITION` · `COGNITION USAGE` · `MIND CIRCLE` · `CIRCLE MEMBERS` · `WALLETS`, plus `App Connections`, `Skills`, `Tools`, `Status`, `ID:`.
+**Panels on Overview (labels in capitals):** `COGNITION` · `COGNITION USAGE` · `MIND CIRCLE` · `CIRCLE MEMBERS` · `WALLETS`, plus `App Connections`, `Skills`, `Tools`, `Status`, `ID:`.
 
-**Kontrol yang benar-benar ada:**
+**The controls that actually exist:**
 
-| Kontrol | Detail |
+| Control | Detail |
 |---|---|
-| **Toggle Online/Offline** | **Ini "kill switch"-nya yang sesungguhnya.** Helper copy: *"**Online Minds accept new tasks. Switch to Offline to pause without deleting.**"* aria-label: `Status: {{label}}. Click to toggle.` Toast: `Mind is now online` / `Mind is now offline`. |
-| **Nudge** | Membangunkan agent secara manual. `POST api.hellominds.ai/v1/messaging/{mindId}/beacon` dengan `triggerImmediateCognition`. Hasil: **"Nudge sent"** (*"will start a cognition cycle within a minute or so"*) atau **"Nudge noted"** (*"already has a cognition running or queued"*). Terblokir bila offline: *"{{mindName}} is offline — switch it online to nudge"*. |
+| **Online/Offline toggle** | **This is the real kill switch.** Helper copy: *"**Online Minds accept new tasks. Switch to Offline to pause without deleting.**"* aria-label: `Status: {{label}}. Click to toggle.` Toast: `Mind is now online` / `Mind is now offline`. |
+| **Nudge** | Wakes the agent manually. `POST api.hellominds.ai/v1/messaging/{mindId}/beacon` with `triggerImmediateCognition`. The result: **"Nudge sent"** (*"will start a cognition cycle within a minute or so"*) or **"Nudge noted"** (*"already has a cognition running or queued"*). Blocked when offline: *"{{mindName}} is offline — switch it online to nudge"*. |
 | **Top up** | `Top Up Now — US ${{amount}} one-time` / `Top Up Now — {{price}} {{cadence}}`, `{{count}} Cognitions`, `Worth of Cognition`, `Transaction Reference`. |
 | **Manage Circle** | `ADD TO CIRCLE`, `Already in circle`, *"That's the Steward — already in circle"*. |
 | **Wallet** | *"Each Mind has its own blockchain wallet for Web3 integrations."* States: *"Mind's wallet address is initializing…"*, *"Wallet initialization timed out"*. |
 
-**Yang TIDAK ada, meski diklaim di `llms-full.txt`:**
-- ❌ **Tidak ada "activity log"** di UI. Yang terdekat hanya panel `COGNITION USAGE`.
-- ❌ **Tidak ada soft kill "Quit emailing me"** di UI situs — hanya ada di `llms-full.txt`.
-- ❌ **Tidak ada konfirmasi "high-impact action"** — string `high-impact` dan `undo` **nol kemunculan** di bundle.
-- ❌ **Hapus Mind tidak self-serve.** FAQ: *"**Deletion isn't self-serve yet.** If you want a Mind permanently removed, get in touch with us and we'll handle it for you."*
+**What DOES NOT exist, despite being claimed in `llms-full.txt`:**
+- ❌ **There is no "activity log"** in the UI. The closest thing is the `COGNITION USAGE` panel.
+- ❌ **There is no soft kill "Quit emailing me"** in the site UI — it only appears in `llms-full.txt`.
+- ❌ **There is no "high-impact action" confirmation** — the strings `high-impact` and `undo` appear **zero times** in the bundle.
+- ❌ **Deleting a Mind is not self-serve.** From the FAQ: *"**Deletion isn't self-serve yet.** If you want a Mind permanently removed, get in touch with us and we'll handle it for you."*
 
-**Referral (angka revenue-share nyata satu-satunya di seluruh platform):**
+**Referrals (the only real revenue-share number on the entire platform):**
 > *"Share your unique link and earn **20% of every credit top-up your referrals make — no cap, paid monthly**."*
 
 **Billing (Stripe):** `Monthly` / `One Time`; *"Redirected to Stripe · Secure checkout · 256-bit SSL"*; *"✓ Cancel anytime · No lock-in · **Cognitions reset monthly**"*; *"✓ One-time charge · **Cognitions never expire**"*.
 
-**Linked Accounts:** Telegram, WeChat, iMessage. ⚠️ Peringatan irreversibilitas: **`Linked (This can't be unlinked)`** dan *"**This is a one-time action. Once linked, your Telegram account cannot be unlinked from this profile.**"*
+**Linked Accounts:** Telegram, WeChat, iMessage. ⚠️ An irreversibility warning: **`Linked (This can't be unlinked)`** and *"**This is a one-time action. Once linked, your Telegram account cannot be unlinked from this profile.**"*
 
-### 4.6 Koreksi & perbaikan
+### 4.6 Corrections and fixes
 
-Model mental yang mereka pakai: **perlakukan agent seperti karyawan**.
+The mental model they use: **treat the agent like an employee**.
 
 > *"Treat your Mind like an employee. Tell it exactly what it did wrong and how to fix it in the future. The Mind will record this feedback in its long-term memory and adjust its future behaviour."*
 
 ---
 
-## 5. Fitur Pembeda
+## 5. Differentiating Features
 
-### 5.1 Circles — kolaborasi Mind-ke-Mind dengan trust gate
+### 5.1 Circles — Mind-to-Mind collaboration with a trust gate
 
-Mekanisme paling orisinal mereka.
+Their most original mechanism.
 
-- Default: sebuah Mind **tidak bisa** bicara dengan Mind lain.
-- Cara memperkenalkan: (a) kirim email dan **CC alamat email Mind** target, atau (b) tambahkan ke **grup Telegram** bersama.
-- **Jaminan privasi:** *"Unknown agents or persons are fully blocked — your Mind does not even see the incoming message."* Pemblokiran terjadi **sebelum** konteks masuk ke model — mitigasi prompt-injection lintas agent.
-- **Peringatan izin yang sangat baik** (verbatim, layak ditiru mentah-mentah):
+- By default a Mind **cannot** talk to another Mind.
+- How to introduce them: (a) send an email and **CC the target Mind's email address**, or (b) add them to a shared **Telegram group**.
+- **A privacy guarantee:** *"Unknown agents or persons are fully blocked — your Mind does not even see the incoming message."* The block happens **before** the context reaches the model — a cross-agent prompt-injection mitigation.
+- **An excellent permission warning** (verbatim, worth copying as-is):
   > *"Only add those you know and trust. Circle members can interact with your Mind, put it to work and **consume Cognition without your prior approval**, access information it knows about you such as schedules, and **request Cognition transfers on your behalf**."*
-- Best practice yang mereka ajarkan: **swarm spesialis > satu super-agent**.
-- **Manusia luar tidak butuh akun:** *"Anyone can email your Mind directly with no account needed. Introducing someone is as simple as TO'ing or CC'ing them on a thread with your Mind... From there, several humans and Minds can sit in the same conversation, negotiate, agree changes, and execute. You only step in when you want to."* — friction akuisisi nol untuk kolaborator.
+- The best practice they teach: **a swarm of specialists beats one super-agent**.
+- **Outside humans need no account:** *"Anyone can email your Mind directly with no account needed. Introducing someone is as simple as TO'ing or CC'ing them on a thread with your Mind... From there, several humans and Minds can sit in the same conversation, negotiate, agree changes, and execute. You only step in when you want to."* — zero acquisition friction for collaborators.
 
-### 5.2 Agent builder
+### 5.2 The agent builder
 
-Tiga tingkat, sesuai kemampuan user:
-1. **One-Click** — pilih template, beri nama. 0 konfigurasi.
-2. **Build Your Own** — nama + personality + deskripsi outcome yang diinginkan.
-3. **Concierge** — wizard percakapan, dipandu AI.
-4. **(Builder)** — CLI + client library, publish ke Bazaar.
+Three levels, matched to the user's ability:
+1. **One-Click** — pick a template, name it. 0 configuration.
+2. **Build Your Own** — a name + personality + a description of the desired outcome.
+3. **Concierge** — a conversational wizard, AI-guided.
+4. **(Builder)** — the CLI + client library, publishing to the Bazaar.
 
-Selain itu: **Mind bisa membuat Tool dan Skill-nya sendiri** — *"Ask your Mind to search the public registry; another Mind may have already created what you need. Your Mind can also create its own tools and skills for your personal use."*
+On top of that: **a Mind can create its own Tools and Skills** — *"Ask your Mind to search the public registry; another Mind may have already created what you need. Your Mind can also create its own tools and skills for your personal use."*
 
-### 5.3 Format definisi Skill
+### 5.3 The Skill definition format
 
-Temuan teknis penting (verbatim dari FAQ):
+An important technical finding (verbatim from the FAQ):
 
 > *"Under the hood, a Skill is a **compact JSON playbook** that defines the exact sequence of operations, **hardwires which tool the Mind must call at each step**, and includes **fail-safes** if something goes wrong. Compared with simple prompt files, this design **lowers token cost, improves reliability and execution, and allows creators to monetise per use without exposing their underlying logic**."*
 
-Jadi: bukan prompt bebas, tapi **DAG langkah terstruktur** dengan tool binding eksplisit. Ini penting — desain ini yang memungkinkan (a) biaya lebih murah, (b) hasil deterministik, (c) monetisasi per-use tanpa membocorkan IP.
+So: not a free-form prompt but a **structured step DAG** with explicit tool binding. That matters — this design is what makes (a) lower cost, (b) deterministic results, and (c) per-use monetisation without leaking IP possible.
 
-**Empat artefak yang menyusun sebuah Skill** (dari Skill Building Guide — kosakata struktural resmi satu-satunya):
+**The four artefacts that make up a Skill** (from the Skill Building Guide — the only official structural vocabulary):
 
-| Nama bahasa-manusia | Istilah developer |
+| Human-language name | Developer term |
 |---|---|
-| *"How it's found"* — listing yang dilihat builder lain di Bazaar | **Registry Offering** |
-| *"How it connects"* — wiring antara Skill dan app-nya | **App Manifest** |
-| *"What it can do"* — aksi konkret yang diizinkan | **Tool Schemas** |
-| *"How it behaves"* — rutinitas yang diikuti | **Skill Playbook** |
+| *"How it's found"* — the listing other builders see in the Bazaar | **Registry Offering** |
+| *"How it connects"* — the wiring between the Skill and its app | **App Manifest** |
+| *"What it can do"* — the concrete actions it is allowed to take | **Tool Schemas** |
+| *"How it behaves"* — the routine it follows | **Skill Playbook** |
 
 > *"You do not need to write any of these directly. You describe the outcome, and your Mind builds and maintains all four."*
 >
-> ⚠️ **Tidak ada file format, JSON/YAML schema, atau daftar field yang dipublikasikan di mana pun.** Keempat artefak ini hanya *dinamai*, tidak pernah *dispesifikasikan*. Authoring 100% percakapan.
+> ⚠️ **No file format, JSON/YAML schema, or field list is published anywhere.** These four artefacts are only *named*, never *specified*. Authoring is 100% conversational.
 
-### 5.3b Alur publish ke Bazaar — 6 langkah persis
+### 5.3b The Bazaar publish flow — the exact 6 steps
 
-Contoh resmi: digest standup harian dari board Linear.
+The official example: a daily standup digest from a Linear board.
 
-| # | Langkah | Aksi |
+| # | Step | Action |
 |---|---|---|
-| **01** | **Describe** | Chat ke Mind: *"Build me a Skill that reads my team's Linear board and sends me a morning standup digest: what shipped yesterday, what's in progress, and what's blocked. Keep it short."* |
-| **02** | **Refine** | Mind membacakan ulang proposalnya dalam bahasa biasa. User: *"Group it by assignee, and flag anything blocked for more than two days."* → *"That's it. Build it."* |
-| **03** | **Connect** | **Langkah UI, bukan kode:** Profile → **My Connections** → cari app → masukkan API key → **Save Key**. *"**The platform stores and uses the key. Your Mind never holds the key directly.**"* Sekali set, dipakai ulang oleh semua Skill berikutnya. |
-| **04** | **Run** | *"Give me today's standup."* → koreksi: *"Too long. One line per person."* |
-| **05** | **Inspect** | ⭐ **Review cakupan akses sebelum publish:** *"Show me what this Skill can do, what it reads, and what it can change. Flag anything it should not touch."* → *"Tighten anything that looks too broad before anyone runs it."* |
+| **01** | **Describe** | Chat to the Mind: *"Build me a Skill that reads my team's Linear board and sends me a morning standup digest: what shipped yesterday, what's in progress, and what's blocked. Keep it short."* |
+| **02** | **Refine** | The Mind reads its proposal back in plain language. The user: *"Group it by assignee, and flag anything blocked for more than two days."* → *"That's it. Build it."* |
+| **03** | **Connect** | **A UI step, not code:** Profile → **My Connections** → find the app → enter the API key → **Save Key**. *"**The platform stores and uses the key. Your Mind never holds the key directly.**"* Set once, reused by every subsequent Skill. |
+| **04** | **Run** | *"Give me today's standup."* → a correction: *"Too long. One line per person."* |
+| **05** | **Inspect** | ⭐ **Review the scope of access before publishing:** *"Show me what this Skill can do, what it reads, and what it can change. Flag anything it should not touch."* → *"Tighten anything that looks too broad before anyone runs it."* |
 | **06** | **Publish** | *"Publish this Skill to the Bazaar as 'Sprint Standup' so my team can equip it."* |
 
-> 🎯 **Langkah 05 adalah pola terbaik yang mereka punya untuk keamanan marketplace** — audit izin yang dapat dibaca manusia, dilakukan **sebelum** dipublikasikan, dinyatakan dalam bahasa biasa. Fugugent harus punya padanannya (dan bisa melampauinya dengan menampilkannya ke *pembeli*, bukan hanya ke publisher).
+> 🎯 **Step 05 is the best marketplace-security pattern they have** — a human-readable permission audit, done **before** publishing, expressed in plain language. Fugugent needs an equivalent (and can go further by showing it to the *buyer*, not just the publisher).
 
-**Update Skill:** lewat operasi percakapan `REGISTRY_Update` dan `SKILL_Update`. *"Updates take effect immediately for new sessions — users in an active session continue with the version they started… Your Bazaar listing updates automatically… no separate publishing step needed."*
-⚠️ **Tidak ada API untuk publish.** Route Bazaar di API publik bersifat **read-only (ID discovery)**.
+**Updating a Skill:** through the conversational operations `REGISTRY_Update` and `SKILL_Update`. *"Updates take effect immediately for new sessions — users in an active session continue with the version they started… Your Bazaar listing updates automatically… no separate publishing step needed."*
+⚠️ **There is no publish API.** The Bazaar routes in the public API are **read-only (ID discovery)**.
 
-### 5.3c Constitution: Tenets, Invariants, Guardrails, Priors
+### 5.3c The Constitution: Tenets, Invariants, Guardrails, Priors
 
-Model tata-kelola perilaku mereka — konsep paling matang yang mereka punya, dan sangat relevan untuk agent yang memegang uang.
+Their behaviour governance model — the most mature concept they have, and highly relevant to an agent that holds money.
 
-- **Tenet** — *"a stored rule, belief, or learned fact that lives permanently in a Mind's Soul."* Dua jenis:
-  - **Invariant** — tidak pernah bisa dilanggar, bahkan jika user secara eksplisit menyuruhnya. Inilah **Guardrail**.
-  - **Prior** — preferensi fleksibel yang dipelajari.
+- **Tenet** — *"a stored rule, belief, or learned fact that lives permanently in a Mind's Soul."* Two kinds:
+  - **Invariant** — can never be broken, even if the user explicitly tells it to. This is a **Guardrail**.
+  - **Prior** — a flexible learned preference.
 - *"**All Guardrails are Tenets — but not all Tenets are Guardrails.**"*
 - *"**You define the Guardrails. Your Mind builds up its Priors.**"*
-- Ketika situasi bertentangan dengan Soul, *"the Mind experiences cognitive dissonance and will not comply"*. Disebut **Constitution** — *"both a technical floor (what the Mind can do) and a moral floor (what it won't do)."*
-- User bisa membaca/mengubahnya: *"Show me your current Tenets."*
+- When a situation conflicts with the Soul, *"the Mind experiences cognitive dissonance and will not comply"*. They call this the **Constitution** — *"both a technical floor (what the Mind can do) and a moral floor (what it won't do)."*
+- The user can read and change it: *"Show me your current Tenets."*
 
-**Tiga pola Guardrail yang mereka contohkan** — perhatikan yang kedua:
+**The three Guardrail patterns they give as examples** — note the second one:
 1. **Privacy** — *"Never share the Steward's personal email"*
 2. 💰 **Budget** — *"**Never spend more than 500 Credits in a single session**"*
 3. **Style** — *"Always respond in French"*
 
-> 🎯 **Guardrail budget adalah primitif yang wajib dimiliki Fugugent**, dan di on-chain kita bisa membuatnya jauh lebih kuat: bukan sekadar instruksi yang dipatuhi model, tapi **batas belanja yang ditegakkan smart contract**. HelloMinds hanya bisa menjanjikan kepatuhan; kita bisa menjaminnya.
+> 🎯 **A budget guardrail is a primitive Fugugent must have**, and on-chain we can make it far stronger: not merely an instruction the model complies with, but a **spend cap enforced by a smart contract**. HelloMinds can only promise compliance; we can guarantee it.
 
-### 5.3d Brain Pulse — penanganan kegagalan
+### 5.3d Brain Pulse — failure handling
 
 > *"When a Skill fails — due to an API timeout, a missing input, or an unexpected response — the Mind is notified through **Brain Pulse** rather than crashing silently. It can retry the Skill with adjusted parameters, pivot to an alternative approach, or explain the failure."*
 
-Lapisan self-monitoring/recovery bawaan. Polanya bagus: **agent yang sadar akan kegagalannya sendiri dan menjelaskannya**, bukan gagal senyap.
+A built-in self-monitoring/recovery layer. Good pattern: **an agent that is aware of its own failures and explains them**, instead of failing silently.
 
-### 5.3e Skill bawaan platform
+### 5.3e Platform built-in Skills
 
-- **Mind Architect** — mendefinisikan Soul & tujuan Mind baru
-- **Skill Architect** — mendesain/mendokumentasikan Skill
-- **Standard Hygiene** — manajemen konteks: meringkas percakapan panjang, memprioritaskan memori aktif, pruning
+- **Mind Architect** — defines a new Mind's Soul and purpose
+- **Skill Architect** — designs/documents a Skill
+- **Standard Hygiene** — context management: summarising long conversations, prioritising active memory, pruning
 - **Passive Autonomous Mode** — *"lets a Mind take actions without waiting for user prompts: checking in at intervals, sending scheduled updates, or running triggered workflows"*
 
-Memori berjenjang: **RAM** (konteks aktif) → **Episodes** (memori sesi lampau) → **Tenets** (permanen).
+Tiered memory: **RAM** (active context) → **Episodes** (memories of past sessions) → **Tenets** (permanent).
 
-### 5.4 Revenue share untuk creator — ⚠️ **BELUM ADA**
+### 5.4 Creator revenue share — ⚠️ **DOES NOT EXIST YET**
 
-Ini gap besar. Bukti:
+This is a big gap. The evidence:
 
 - FAQ: *"Developers who want to extend the platform can build skills and submit them to the Bazaar, with **monetisation for skill creators coming soon**."*
-- `llms.txt` mengklaim builder bisa *"Earn from users adopting their published items"* — tapi **tidak ada mekanisme, angka, rate, atau dokumentasi payout di mana pun** di seluruh docs.
-- Tidak ada field `creator`/`author` pada satu pun dari 148 item Bazaar. Semua bertag `Official`/`Featured`.
-- Programme FAQ, jawaban resmi terbaru (verbatim): *"**Can builders earn from the Skills and Tools they publish?** Yes. Builders who publish Skills and Tools to the Minds Bazaar can benefit from the platform's reward model. **We're still finalising the specifics and will share them in-platform when ready.**"*
-- Halaman `/about` sudah memasarkannya seolah live: *"**Monetize on every skill install. Build once, earn every time it runs.**"* — janji tanpa mekanisme.
-- **Dashboard analitik builder juga belum ada:** *"A builder analytics dashboard is **in development**. It will give you visibility into session volume, Cognition Credit spending by creation, and Skill call frequency. **Coming soon.**"*
+- `llms.txt` claims builders can *"Earn from users adopting their published items"* — but there is **no mechanism, number, rate, or payout documentation anywhere** in the whole docs set.
+- There is no `creator`/`author` field on any of the 148 Bazaar items. Everything is tagged `Official`/`Featured`.
+- The Programme FAQ, their most recent official answer (verbatim): *"**Can builders earn from the Skills and Tools they publish?** Yes. Builders who publish Skills and Tools to the Minds Bazaar can benefit from the platform's reward model. **We're still finalising the specifics and will share them in-platform when ready.**"*
+- The `/about` page already markets it as if it were live: *"**Monetize on every skill install. Build once, earn every time it runs.**"* — a promise with no mechanism.
+- **The builder analytics dashboard does not exist either:** *"A builder analytics dashboard is **in development**. It will give you visibility into session volume, Cognition Credit spending by creation, and Skill call frequency. **Coming soon.**"*
 
-**Satu-satunya angka bagi-hasil yang benar-benar dipublikasikan di seluruh platform adalah untuk referral, bukan creator:**
+**The only revenue-share number actually published anywhere on the platform is for referrals, not creators:**
 > *"Share your unique link and earn **20% of every credit top-up your referrals make — no cap, paid monthly**."*
 
-Selain itu ada **Minds Investment Programme** (hingga US$10M, ekuitas, rolling) dan bonus referral $5 Cognition.
+Beyond that there is the **Minds Investment Programme** (up to US$10M, equity, rolling) and a $5 Cognition referral bonus.
 
-**Ketentuan Investment Programme yang perlu dicatat** (dari `/en/program` + `/en/program/faq`):
-- *"Selected teams receive a bundle of **cash investment and Cognition Credits**"* — kredit mengalir kembali ke platform mereka sendiri.
+**Investment Programme terms worth noting** (from `/en/program` + `/en/program/faq`):
+- *"Selected teams receive a bundle of **cash investment and Cognition Credits**"* — the credits flow right back into their own platform.
 - *"**Every accepted team receives platform support, Cognition Credits, and DevRel support regardless of investment.** Investment decisions, if any, are **performance-based**, made on the basis of demonstrated progress, **not at acceptance**."*
 - *"**Not all accepted teams receive investment**… Participants that do not receive investment will not be required to give up equity."*
-- Butuh **pitch deck (PDF/PPTX)** + **video pitch 3 menit** + **tiga klaim yang bisa diverifikasi pihak ketiga** dengan link.
-- Deck dibaca oleh **"Minds Review"** — sebuah AI reviewer. Saran mereka: *"Use **real text, not scanned images** of slides"*, *"**YouTube unlisted gives the best AI evaluation**"*.
-- Sinyal terkuat menurut mereka sendiri: *"link to any Skills or Tools you've published on the Bazaar — **showing you've already started is the strongest signal we see**"*.
-- Shortlist dalam **2–4 minggu**, lalu call **30 menit**. *"No mass rejections."*
-- Eksplisit **tidak crypto-gated**: *"You do not need to build anything related to crypto or Web3."*
+- Requires a **pitch deck (PDF/PPTX)** + a **3-minute video pitch** + **three third-party-verifiable claims** with links.
+- The deck is read by **"Minds Review"** — an AI reviewer. Their advice: *"Use **real text, not scanned images** of slides"*, *"**YouTube unlisted gives the best AI evaluation**"*.
+- The strongest signal by their own account: *"link to any Skills or Tools you've published on the Bazaar — **showing you've already started is the strongest signal we see**"*.
+- Shortlisting within **2–4 weeks**, then a **30-minute** call. *"No mass rejections."*
+- Explicitly **not crypto-gated**: *"You do not need to build anything related to crypto or Web3."*
 
-> 🎯 **Peluang Fugugent:** revenue-share on-chain yang benar-benar berfungsi, transparan, dan bisa diverifikasi adalah pembeda paling tajam vs. HelloMinds — dan sangat natural untuk BNB Chain.
+> 🎯 **The Fugugent opportunity:** an on-chain revenue share that actually works, is transparent, and is verifiable is the sharpest differentiator versus HelloMinds — and it is very natural on BNB Chain.
 
-### 5.5 Review / reputation — ⚠️ **BELUM ADA**
+### 5.5 Reviews / reputation — ⚠️ **DOES NOT EXIST YET**
 
-Tidak ada rating, review, atau reputasi. Yang ada:
-- **Trust label biner:** `Official` (di-review tim) vs `Wild` (community, tidak di-review). Namun **100% katalog saat ini adalah Official/Featured** — label `Wild` didokumentasikan tapi belum terpakai.
-- **`equippedCount`** sebagai satu-satunya proxy popularitas.
-- **Leaderboard** disebut di `llms.txt` (*"A Leaderboard surfaces the most-equipped items"*) — tapi tidak ada route `/leaderboard` di sitemap.
+There is no rating, review, or reputation. What exists:
+- **A binary trust label:** `Official` (team-reviewed) versus `Wild` (community, not reviewed). But **100% of the current catalogue is Official/Featured** — the `Wild` label is documented but unused.
+- **`equippedCount`** as the only popularity proxy.
+- A **leaderboard** is mentioned in `llms.txt` (*"A Leaderboard surfaces the most-equipped items"*) — but there is no `/leaderboard` route in the sitemap.
 
-### 5.6 Sandbox / testing — ⚠️ **TIDAK ADA di level platform**
+### 5.6 Sandbox / testing — ⚠️ **DOES NOT EXIST at the platform level**
 
-Tidak ada dry-run, preview, atau sandbox sebagai fitur platform. Setiap equip/eksekusi adalah live dan membakar credit sungguhan; satu-satunya mitigasi adalah peringatan teks sebelum aksi.
+There is no dry-run, preview, or sandbox as a platform feature. Every equip/execution is live and burns real credits; the only mitigation is a text warning before the action.
 
-**Pengecualian penting:** satu agent — **Superior Trader** — membawa sandbox-nya sendiri di level domain: *"**backtests them before a dollar is at risk**, deploys them live **or on paper** across crypto and on-chain spot markets."* Jadi polanya ada, tapi **dibangun ke dalam satu agent, bukan disediakan platform**. Untuk Fugugent, menjadikan dry-run sebagai **primitif platform** (tersedia untuk semua agent) adalah peningkatan yang jelas.
+**An important exception:** one agent — **Superior Trader** — brings its own sandbox at the domain level: *"**backtests them before a dollar is at risk**, deploys them live **or on paper** across crypto and on-chain spot markets."* So the pattern exists, but it is **built into one agent rather than provided by the platform**. For Fugugent, making dry-run a **platform primitive** (available to every agent) is an obvious improvement.
 
-### 5.6b Permukaan crypto / DeFi (relevan langsung untuk Fugugent)
+### 5.6b The crypto / DeFi surface (directly relevant to Fugugent)
 
-Dari 119 Apps, hanya **5 yang menyentuh Web3** — permukaan crypto mereka sangat dangkal:
+Out of 119 Apps, only **5 touch Web3** — their crypto surface is very shallow:
 
-| App | Fungsi |
+| App | Function |
 |---|---|
-| Superior Trade | Monitor posisi, analisis market, kelola trade |
-| Polymarket | Cari market, pull data prediction market |
-| Pieverse | Query & interaksi aset on-chain |
-| Laguna Network | Query & eksekusi operasi on-chain |
-| (Nansen / Dune / CoinGlass) | Ikon ada di bundle, data on-chain |
+| Superior Trade | Monitor positions, analyse markets, manage trades |
+| Polymarket | Search markets, pull prediction market data |
+| Pieverse | Query and interact with on-chain assets |
+| Laguna Network | Query and execute on-chain operations |
+| (Nansen / Dune / CoinGlass) | Icons present in the bundle, on-chain data |
 
-**Superior Trader Mind** (satu-satunya agent trading, `archetype: superiortrader`):
-- Chain yang didukung: **Hyperliquid** dan **Aerodrome** — yaitu **bukan BNB Chain**.
-- `useCases`-nya adalah contoh terbaik dari pola past-tense-berangka untuk konteks DeFi:
+**The Superior Trader Mind** (the only trading agent, `archetype: superiortrader`):
+- Supported chains: **Hyperliquid** and **Aerodrome** — i.e. **not BNB Chain**.
+- Its `useCases` are the best example of the numbered past-tense pattern applied to a DeFi context:
   > "Backtested strategy across 3 months of market data"
   > "Deployed trading bot to paper trading environment"
   > "Detected risk conditions and halted execution"
   > "Improved strategy Sharpe ratio through optimization"
 
-> 🎯 **Peluang:** HelloMinds memiliki wallet per-agent dan retorika "agentic economy" yang kuat, tetapi kemampuan on-chain nyatanya minim (5 dari 119 App) dan tidak menyentuh BNB Chain sama sekali. Fugugent bisa menjadi **jauh lebih dalam di on-chain** sambil meminjam bahasa produk mereka yang sudah matang.
+> 🎯 **The opportunity:** HelloMinds has a per-agent wallet and strong "agentic economy" rhetoric, but its actual on-chain capability is minimal (5 of 119 Apps) and does not touch BNB Chain at all. Fugugent can be **far deeper on-chain** while borrowing their already-mature product language.
 
-### 5.7 Skill "Passive Autonomous Soul" — pola guardrail menarik
+### 5.7 The "Passive Autonomous Soul" Skill — an interesting guardrail pattern
 
-Salah satu dari 29 Skills adalah **"Passive Autonomous Soul" — *"Complete tasks within scope and never act beyond it."*** Yaitu: guardrail perilaku yang dikemas **sebagai item marketplace** yang bisa di-equip. Pola menarik — batas keamanan sebagai produk yang bisa dipilih user.
+One of the 29 Skills is **"Passive Autonomous Soul" — *"Complete tasks within scope and never act beyond it."*** That is: a behavioural guardrail packaged **as an equippable marketplace item**. An interesting pattern — a safety boundary as a product the user can choose.
 
 ---
 
-## 6. Arsitektur Teknis
+## 6. Technical Architecture
 
-### 6.1 Stack yang terdeteksi
+### 6.1 The stack we detected
 
-| Lapisan | Teknologi | Bukti |
+| Layer | Technology | Evidence |
 |---|---|---|
-| Frontend produk | **Vite + React + i18next + Radix UI + Tailwind** | `assets/index-*.js`, `Uv()` cva, `__scopeToggleGroup` |
-| Builder Hub | **Next.js (App Router)** | `_next/static/chunks/`, RSC payload |
+| Product frontend | **Vite + React + i18next + Radix UI + Tailwind** | `assets/index-*.js`, `Uv()` cva, `__scopeToggleGroup` |
+| Builder Hub | **Next.js (App Router)** | `_next/static/chunks/`, an RSC payload |
 | Auth / DB | **Supabase** (+ **WebAuthn/passkeys**) | `RealtimeClient`, `supabase.auth.getUser()`, `pubKeyCredParams` |
-| Integrasi tool | **Composio** | `logos.composio.dev`, `composio_managed_auth_schemes`, `api.hellominds.ai/v1/composio`, `/composio/callback` |
-| Pembayaran | **Stripe** | Checkout + link top-up |
+| Tool integration | **Composio** | `logos.composio.dev`, `composio_managed_auth_schemes`, `api.hellominds.ai/v1/composio`, `/composio/callback` |
+| Payments | **Stripe** | Checkout + top-up links |
 | Analytics | GTM (server-side via **Stape**), GA4 | `GTM-WRMHX4XC`, `proxy.feed.hellominds.ai` |
-| Browser automation | **Browserbase** | Skill LinkedIn Recruiter |
-| Search | **Tavily**, SerpAPI, Perplexity | App list |
-| Data on-chain | Nansen, Dune, CoinGlass, Polymarket | App list |
+| Browser automation | **Browserbase** | The LinkedIn Recruiter Skill |
+| Search | **Tavily**, SerpAPI, Perplexity | The App list |
+| On-chain data | Nansen, Dune, CoinGlass, Polymarket | The App list |
 
-> 🔑 **Temuan arsitektur paling penting:** lapisan integrasi 119-App mereka **bukan buatan sendiri** — itu **Composio**. Auth scheme di `toolkits.json` (`OAUTH2` ×102, `API_KEY` ×29, `S2S_OAUTH2` ×8, `GOOGLE_SERVICE_ACCOUNT`, `BASIC`, `OAUTH1`) persis adalah taksonomi Composio. **Fugugent bisa melakukan hal sama** dan mendapat ratusan integrasi tanpa membangunnya satu per satu.
+> 🔑 **The most important architectural finding:** their 119-App integration layer is **not their own** — it is **Composio**. The auth schemes in `toolkits.json` (`OAUTH2` ×102, `API_KEY` ×29, `S2S_OAUTH2` ×8, `GOOGLE_SERVICE_ACCOUNT`, `BASIC`, `OAUTH1`) are exactly the Composio taxonomy. **Fugugent can do the same** and get hundreds of integrations without building them one at a time.
 
-### 6.2 Builder API — spesifikasi lengkap
+### 6.2 The Builder API — full specification
 
 **OpenAPI 3.0.3 · "Minds Builder API" v1.0.3 · Server: `https://api.build.hellominds.ai`**
-(Web app konsumen memakai base terpisah: `https://api.hellominds.ai`.)
+(The consumer web app uses a separate base: `https://api.hellominds.ai`.)
 
 **Auth:**
 ```jsonc
 "BuilderApiKey": { "type": "apiKey", "in": "header", "name": "X-Api-Key" }
-// X-Access-Key DEPRECATED. Env var: MINDS_BUILDER_API_KEY
+// X-Access-Key is DEPRECATED. Env var: MINDS_BUILDER_API_KEY
 ```
 
-**21 path / 27 operasi.** Tag: Account, Cognition, Credits, Minds, Circles, Bazaar, Messaging, Events.
-Route Bazaar dan `GET /v1/minds/check/name` bersifat **publik** (tanpa key); sisanya butuh `X-Api-Key`.
+**21 paths / 27 operations.** Tags: Account, Cognition, Credits, Minds, Circles, Bazaar, Messaging, Events.
+The Bazaar routes and `GET /v1/minds/check/name` are **public** (no key); everything else needs `X-Api-Key`.
 
-| Method | Endpoint | Catatan |
+| Method | Endpoint | Notes |
 |---|---|---|
-| GET | `/v1/humans/{humanId}/minds` | Daftar Mind; `humanId` harus cocok dengan JWT di API key |
-| GET | `/v1/minds/check/name` | **Publik.** → `{ "isAvailable": true }` |
-| POST | `/v1/minds/awaken` | `{ id, mindName }`. `id` = enum **20 arketipe** |
+| GET | `/v1/humans/{humanId}/minds` | Lists Minds; `humanId` has to match the JWT in the API key |
+| GET | `/v1/minds/check/name` | **Public.** → `{ "isAvailable": true }` |
+| POST | `/v1/minds/awaken` | `{ id, mindName }`. `id` = an enum of **20 archetypes** |
 | GET | `/v1/minds/{mindId}` | Detail: email, wallet, chain, species, `isEnabled`, `model`, `hasTelegram` |
-| PATCH | `/v1/minds/{mindId}` | Hanya `{ isEnabled: boolean }` di v1 |
+| PATCH | `/v1/minds/{mindId}` | Only `{ isEnabled: boolean }` in v1 |
 | GET/PUT/DELETE | `/v1/minds/{mindId}/skills` | List / equip / unequip. Body `{ ids: [...] }` |
-| GET/PUT/DELETE | `/v1/minds/{mindId}/apps` | Idem |
+| GET/PUT/DELETE | `/v1/minds/{mindId}/apps` | Same |
 | GET | `/v1/minds/{mindId}/cognition/usage` | `interval`: `1m\|5m\|15m\|1h\|1d\|1w\|1M` |
-| GET | `/v1/minds/{mindId}/cognition/usage-by-tool` | `interval`: `hour\|day\|week\|month` (**beda enum!**) |
+| GET | `/v1/minds/{mindId}/cognition/usage-by-tool` | `interval`: `hour\|day\|week\|month` (**a different enum!**) |
 | GET | `/v1/minds/{mindId}/credits` | → `{ mindId, swarm: 219.65 }` |
-| GET/POST/DELETE | `/v1/circles/{mindId}` | GET → `CircleMember[]` langsung |
-| GET | `/v1/bazaar/skills`, `/skills/{id}` | **Publik**, `search`/`page`/`pageSize` |
-| GET | `/v1/bazaar/apps`, `/apps/{id}` | **Publik**, + `tier=wild\|verified` |
+| GET/POST/DELETE | `/v1/circles/{mindId}` | GET → a `CircleMember[]` directly |
+| GET | `/v1/bazaar/skills`, `/skills/{id}` | **Public**, `search`/`page`/`pageSize` |
+| GET | `/v1/bazaar/apps`, `/apps/{id}` | **Public**, + `tier=wild\|verified` |
 | POST | `/v1/messaging/conversation` | `alias` pattern `^[a-z0-9_-]+$`, max 64 |
 | GET | `/v1/messaging/conversations`, `/{alias}` | |
-| GET | `/v1/messaging/histories/{alias}` | **Kanonik.** `limit` 1–200 (def 50), `before` cursor **eksklusif**, **newest-first** |
-| GET | `/v1/messaging/history/{alias}` | **DEPRECATED** — oldest-first, `after` inklusif |
-| POST | `/v1/messaging/message` | `{ alias, messageText, attachments? }`. **Jangan kirim `conversationId`** |
-| GET | `/v1/messaging/events?alias=` | **SSE stream** — lihat §6.5 |
+| GET | `/v1/messaging/histories/{alias}` | **The canonical one.** `limit` 1–200 (default 50), the `before` cursor is **exclusive**, **newest-first** |
+| GET | `/v1/messaging/history/{alias}` | **DEPRECATED** — oldest-first, `after` is inclusive |
+| POST | `/v1/messaging/message` | `{ alias, messageText, attachments? }`. **Do not send `conversationId`** |
+| GET | `/v1/messaging/events?alias=` | **An SSE stream** — see §6.5 |
 
-**Konvensi data penting:**
-- `senderType` / `partyType`: **`0` = Mind, `1` = manusia**
-- Email Mind selalu berakhiran **`@hellominds.ai`**
-- Saldo di kabel bernama **`swarm`**, tapi CLI/SDK menampilkannya sebagai `cognition`
-- Cursor pagination = `fingerprint` dari baris terakhir
-- Apps memakai `appId` + **`appName`** (bukan `name`); Skills memakai `skillId` + `name`
+**Important data conventions:**
+- `senderType` / `partyType`: **`0` = Mind, `1` = human**
+- A Mind's email always ends in **`@hellominds.ai`**
+- The balance is called **`swarm`** on the wire, but the CLI/SDK displays it as `cognition`
+- The pagination cursor is the `fingerprint` of the last row
+- Apps use `appId` + **`appName`** (not `name`); Skills use `skillId` + `name`
 
-**Envelope error:**
+**The error envelope:**
 ```json
 { "error": { "type": "ValidationError", "subType": "InvalidAlias",
              "message": "alias must match ^[a-z0-9_-]+$" } }
 ```
-Tipe: `ValidationError`, `Unauthorized`, `Forbidden`, `NotFound`, `BadGateway`.
+Types: `ValidationError`, `Unauthorized`, `Forbidden`, `NotFound`, `BadGateway`.
 
-**Enum 20 arketipe Mind** (`POST /v1/minds/awaken`): `mastermind`, `generalassistant`, `sales`, `bizz`, `superiortrader`, `gamedesigner`, `emailmanager`, `scrummaster`, `fitnesscoach`, `personalchef`, `recruiter`, `football`, `decision`, `content`, `research`, `productbuilder`, `learningcoach`, `followup`, `gtm`, `chiefofstaff`.
-(Catat: `mastermind` ada di API tapi **tidak** di katalog publik `minds.json` yang berisi 19 — itulah Concierge/Master Mind.)
+**The enum of 20 Mind archetypes** (`POST /v1/minds/awaken`): `mastermind`, `generalassistant`, `sales`, `bizz`, `superiortrader`, `gamedesigner`, `emailmanager`, `scrummaster`, `fitnesscoach`, `personalchef`, `recruiter`, `football`, `decision`, `content`, `research`, `productbuilder`, `learningcoach`, `followup`, `gtm`, `chiefofstaff`.
+(Note: `mastermind` exists in the API but **not** in the public `minds.json` catalogue of 19 — that is the Concierge/Master Mind.)
 
 ### 6.3 Developer tooling
 
-| Artefak | Paket | Versi |
+| Artefact | Package | Version |
 |---|---|---|
 | CLI | `@animocabrands/minds-cli` | 0.1.4 |
 | Client library | `@animocabrands/minds-client-lib` | 0.1.4 (Node, typed) |
 
-**Perintah CLI yang terdokumentasi:** `minds mind awaken`, `minds mind check-name`, `circle add`, history dengan `--cursor`.
+**Documented CLI commands:** `minds mind awaken`, `minds mind check-name`, `circle add`, and history with `--cursor`.
 
-**Fungsi client library:** `checkMindName()`, `awakenMind()`, `getHistory()` (newest-first).
+**Client library functions:** `checkMindName()`, `awakenMind()`, `getHistory()` (newest-first).
 
-**Auth:** Builder API key dibuat di console (dengan **nama + tanggal kedaluwarsa**), disimpan sebagai env var **`MINDS_BUILDER_API_KEY`**. **Ditampilkan hanya sekali.**
+**Auth:** the Builder API key is created in the console (with a **name and an expiry date**) and stored as the env var **`MINDS_BUILDER_API_KEY`**. **Shown only once.**
 
-**Prasyarat setup:** minimal 1 Mind + 1 Builder API key sebelum bisa memakai Builder Tools.
+**Setup prerequisites:** at least 1 Mind + 1 Builder API key before you can use the Builder Tools.
 
-**Positioning CLI yang cerdas:** *"drive it from Cursor, Claude Code, or any coding agent, JSON stdout and examples in `--help` so your agent can list Minds, check cognition, and manage your account without you memorizing commands."* — CLI dirancang agar **coding agent** yang memakainya, bukan manusia. Pola bagus untuk 2026.
+**A clever bit of CLI positioning:** *"drive it from Cursor, Claude Code, or any coding agent, JSON stdout and examples in `--help` so your agent can list Minds, check cognition, and manage your account without you memorizing commands."* — the CLI is designed for a **coding agent** to use, not a human. A good pattern for 2026.
 
-### 6.4 MCP — ada, tapi tidak terdokumentasi
+### 6.4 MCP — it exists, but it is undocumented
 
-Status yang akurat: **MCP ada sebagai fitur platform, tetapi tidak ada satu pun dokumentasi builder untuknya.** Bukti:
+The accurate status: **MCP exists as a platform feature, but there is not a single piece of builder documentation for it.** The evidence:
 
-1. Form aplikasi Investment Programme punya checkbox: **"Connected an MCP server to a Mind"** — jadi user *bisa* menyambungkan MCP server ke sebuah Mind.
-2. Halaman marketing Builder Hub memanggil **`navigator.modelContext.provideContext()`** dan mendaftarkan browser tool: `openHome`, `openDocs`, `openInspirations`, `openProgram`, `openProgramApply`, `openFaq`, `openGuide`, `openInspiration`. Ini MCP sisi-browser agar agent bisa menavigasi situs mereka.
-3. **Tidak ada** endpoint MCP, konfigurasi server, atau panduan di seluruh docs/API reference.
+1. The Investment Programme application form has a checkbox: **"Connected an MCP server to a Mind"** — so a user *can* connect an MCP server to a Mind.
+2. The Builder Hub marketing page calls **`navigator.modelContext.provideContext()`** and registers browser tools: `openHome`, `openDocs`, `openInspirations`, `openProgram`, `openProgramApply`, `openFaq`, `openGuide`, `openInspiration`. This is browser-side MCP so an agent can navigate their site.
+3. There is **no** MCP endpoint, server configuration, or guide anywhere in the docs/API reference.
 
-Integrasi tool produksi berjalan lewat **Composio** dan **`HTTP_Execute`** (lihat §6.5b), bukan MCP.
+Production tool integration runs through **Composio** and **`HTTP_Execute`** (see §6.5b), not MCP.
 
-### 6.5 Event: **SSE, bukan webhook**
+### 6.5 Events: **SSE, not webhooks**
 
-Tidak ada webhook sama sekali. Satu-satunya mekanisme push adalah **Server-Sent Events**:
+There are no webhooks at all. The only push mechanism is **Server-Sent Events**:
 
 ```
 GET /v1/messaging/events?alias=<alias>
@@ -807,37 +807,37 @@ Cache-Control: no-cache
 X-Accel-Buffering: no
 ```
 
-Dari spec (verbatim): *"Each authenticated connection subscribes to a **Redis channel scoped to the user**. A heartbeat comment (`: ping`) is sent every 30 seconds to keep the connection alive."*
+From the spec (verbatim): *"Each authenticated connection subscribes to a **Redis channel scoped to the user**. A heartbeat comment (`: ping`) is sent every 30 seconds to keep the connection alive."*
 
-- Konfirmasi awal: `: connected`
-- Event: `data: <JSON>\n\n`
-- Heartbeat: `: ping` tiap 30 detik
-- `?alias` memfilter ke satu percakapan; tanpa alias = semua event user
-- Payload event: `fingerprint, conversationId, messageId, messageText, partyType, senderName, mindId, mindName, attachments[]`
+- Initial confirmation: `: connected`
+- Events: `data: <JSON>\n\n`
+- Heartbeat: `: ping` every 30 seconds
+- `?alias` filters to one conversation; with no alias you get all of the user's events
+- Event payload: `fingerprint, conversationId, messageId, messageText, partyType, senderName, mindId, mindName, attachments[]`
 
-SDK menyediakan dua bentuk konsumsi: `client.subscribeEvents({ onEvent, onError })` (callback) dan `for await (const e of client.eventsIterator({ alias }))` (async iterator), keduanya menerima `AbortSignal`.
+The SDK offers two ways to consume it: `client.subscribeEvents({ onEvent, onError })` (callbacks) and `for await (const e of client.eventsIterator({ alias }))` (an async iterator), both accepting an `AbortSignal`.
 
-> Field `webhookId` muncul di objek `custom` pada sebagian baris history Mind, tapi **tidak terdokumentasi**.
+> A `webhookId` field appears in the `custom` object on some Mind history rows, but it is **undocumented**.
 
-### 6.5b `HTTP_Execute` — connector universal
+### 6.5b `HTTP_Execute` — the universal connector
 
-Temuan penting untuk strategi integrasi. Dari FAQ builder:
+An important finding for integration strategy. From the builder FAQ:
 
 > *"**`HTTP_Execute`** — which lets your Mind call **any public REST endpoint without a pre-built connector**. If a service has a public URL and a standard API, your Mind can reach it today."*
 
-Jadi strategi integrasi mereka berlapis tiga: **(1)** Apps ter-kurasi (Composio, 119), **(2)** `HTTP_Execute` sebagai escape hatch universal, **(3)** MCP (tidak terdokumentasi). Integrasi live yang disebut eksplisit: Telegram, Gmail, Google Calendar, Discord, Slack, GitHub, **Nansen**, **Dune**, Perplexity, Spotify, Strava.
+So their integration strategy has three layers: **(1)** curated Apps (Composio, 119), **(2)** `HTTP_Execute` as a universal escape hatch, **(3)** MCP (undocumented). The live integrations named explicitly: Telegram, Gmail, Google Calendar, Discord, Slack, GitHub, **Nansen**, **Dune**, Perplexity, Spotify, Strava.
 
-### 6.5c LLM & infrastruktur yang dipakai
+### 6.5c The LLMs and infrastructure they use
 
-- **Brain providers:** OpenAI, Google (Gemini), xAI (Grok) — dan **Qwen** disebut di bagian data handling.
-- **Framework:** **LangChain** disebut sebagai infrastructure service.
-- Routing otomatis per jenis pekerjaan: *"reasoning, coding, image analysis, fast response."*
+- **Brain providers:** OpenAI, Google (Gemini), xAI (Grok) — and **Qwen** is mentioned in the data handling section.
+- **Framework:** **LangChain** is listed as an infrastructure service.
+- Automatic routing per kind of work: *"reasoning, coding, image analysis, fast response."*
 
-### 6.6 Isi docs Builder Hub (deskripsi resmi dari `build.hellominds.ai/llms.txt`)
+### 6.6 The contents of the Builder Hub docs (official descriptions from `build.hellominds.ai/llms.txt`)
 
-Seluruh dokumentasi builder hanya terdiri dari 5 halaman. Deskripsi resminya:
+The entire builder documentation is only 5 pages. Their official descriptions:
 
-| Halaman | Isi (verbatim dari llms.txt) |
+| Page | Content (verbatim from llms.txt) |
 |---|---|
 | **Account setup** | *"Create a Mind and issue a Builder API key before using Builder Tools."* |
 | **Minds CLI** | *"Install the Minds CLI and drive it from Cursor, Claude Code, or any coding agent, JSON stdout and examples in `--help` so your agent can list Minds, check cognition, and manage your account without you memorizing commands."* |
@@ -845,268 +845,268 @@ Seluruh dokumentasi builder hanya terdiri dari 5 halaman. Deskripsi resminya:
 | **Skill Building Guide** | *"**Six steps** from describing a Skill in one message to publishing it on the Bazaar, connected to the apps your team already uses. **Linear is the example**, the same flow works for any app."* |
 | **Navigate Circles** | *"**Three ways** to introduce a Mind — the Manage Circle dialog, an email CC, or a Telegram group. Plus how the trust gate works and why unknown senders are silently blocked."* |
 
-> 📌 **Alur publish ke Bazaar adalah 6 langkah, dimulai dari "mendeskripsikan Skill dalam satu pesan"** — yaitu authoring lewat bahasa natural, bukan menulis file JSON dengan tangan. Ini penting: skema Skill berupa JSON playbook (§5.3), tapi **jalur authoring-nya percakapan**. Pola yang sangat baik untuk ditiru — builder mendeskripsikan, sistem yang meng-compile.
+> 📌 **The Bazaar publish flow is 6 steps, starting from "describing a Skill in one message"** — that is, authoring in natural language rather than hand-writing a JSON file. This matters: the Skill schema is a JSON playbook (§5.3), but **the authoring path is conversational**. An excellent pattern to copy — the builder describes, the system compiles.
 >
-> ⚠️ Ada juga penemuan UI baru di sini: **"Manage Circle dialog"** — jadi Circle bisa dikelola lewat UI, bukan hanya via email CC/Telegram seperti yang disebut di dokumen konsumen.
+> ⚠️ There is also a new UI discovery here: the **"Manage Circle dialog"** — so Circles can be managed through the UI, not only via email CC/Telegram as the consumer-facing documents say.
 
-**Changelog terakhir (2026-08-25)** menunjukkan arah pengembangan:
+**The latest changelog (2026-08-25)** shows the direction of development:
 - `minds mind check-name` / `awaken`
-- History `--cursor` **newest-first** (pagination before-cursor)
-- **`circle add` kini menerima email manusia, bukan hanya Mind** — Circle berkembang dari mesin-ke-mesin menjadi campuran manusia+agent.
+- History `--cursor` **newest-first** (before-cursor pagination)
+- **`circle add` now accepts a human's email, not just a Mind** — Circles are growing from machine-to-machine into a human+agent mix.
 
-### 6.7 Model keamanan
+### 6.7 The security model
 
-- **Private key:** terenkripsi di DB. AI tidak pernah melihatnya. Untuk menandatangani transaksi, AI **mengirim execution request**; backend yang mendekripsi dan menandatangani. (Pola yang baik — signing dipisah dari reasoning.)
-- **Data training:** *"No user data is sent to or retained by these models for training purposes."*
-- **Isolasi antar-agent:** Circle gate memblokir pesan **sebelum** masuk ke konteks model.
-- **Kill switch:** soft (natural language) + hard (dashboard).
-- **Konfirmasi:** aksi high-impact butuh konfirmasi eksplisit.
-- `/.well-known/security.txt` tersedia.
-
----
-
-## 7. Pola UI/UX — Yang Ditiru vs Yang Dihindari
-
-### 7.1 ✅ Layak ditiru
-
-| # | Pola | Detail |
-|---|---|---|
-| 1 | **`useCases` past-tense berangka** | "Searched 38 roles", bukan "Can search roles". Bukti hasil, bukan janji fitur. |
-| 2 | **Signal-bar untuk `level`** | Kesulitan sebagai 1–2–3 batang visual, bukan teks. Terbaca dalam 200 ms. |
-| 3 | **`iconInitials` + `iconTint`** | Fallback avatar berwarna kalau tak ada gambar — tidak pernah ada kartu kosong. |
-| 4 | **View mode + sort dipersistensi** | `localStorage` menyimpan preferensi grid/list & sort. |
-| 5 | **Empty state yang preskriptif** | *"Try a different search term or clear the filters."* / *"Try clearing a filter or switching the format."* — selalu menyebut **aksi**, bukan hanya "no results". |
-| 6 | **Empty state yang mendorong konversi** | *"Create your first Mind, then come back to equip it."* + tombol langsung. Bukan dead end. |
-| 7 | **Peringatan biaya sebelum eksekusi** | *"This activates a real cycle and spends Cognition..."* + estimasi waktu ("within a minute") + jaminan anti-duplikat. |
-| 8 | **Saldo credit ditampilkan di dialog pilih agent** | User melihat saldo tiap agent **tepat saat** memilih ke mana meng-equip. |
-| 9 | **Escape hatch di onboarding** | *"In a rush? …You can calibrate its personality later."* |
-| 10 | **Estimasi durasi di wizard** | *"Takes 1–2 min."* |
-| 11 | **Pola "You should see:" di docs** | Tiap langkah docs menyebut hasil yang diharapkan → user bisa self-verify. |
-| 12 | **Peringatan izin yang eksplisit & jujur** | Copy Circle menyebut terus-terang bahwa anggota bisa "consume Cognition without your prior approval". |
-| 13 | **Agent memberi tahu saldonya sendiri** | Notifikasi credit datang dari agent via kanal yang sudah dipakai, dengan link bayar. Bukan banner di dashboard. |
-| 14 | **Pause-and-resume, bukan fail** | Habis credit → pause + notifikasi + lanjut dari titik terakhir. |
-| 15 | **Kuis kepribadian sebagai discovery** | Mindprint (16 tipe) mengubah "saya tidak tahu mau agent apa" jadi rekomendasi personal. |
-| 16 | **State agent yang antropomorfik** | "stress, focus, trust" — real-time. Sangat cocok untuk maskot fugu (fugu mengembang saat stres!). |
-| 17 | **Grid 2-kolom di mobile** | `grid-cols-2 lg:grid-cols-3` — bukan 1 kolom; density lebih baik untuk browsing. |
-| 18 | **CLI dirancang untuk coding agent** | JSON stdout + contoh di `--help`. |
-| 19 | ⭐ **"Markdown twins" untuk setiap halaman docs** | Setiap halaman Builder Hub tersedia juga di `<path>.md` (mis. `/en/docs/get-started/cli.md`). Plus tombol per-halaman: **Copy MD · View Markdown · Ask on Telegram · Builder console**. Ini membuat docs bisa dibaca agent/LLM secara sempurna. Sangat murah, sangat modern. |
-| 20 | **Meter "Setup Effort", bukan "difficulty"** | Framing berorientasi-user: yang ditanyakan user bukan "seberapa sulit ini" tapi "berapa banyak kerja yang harus saya lakukan". |
-| 21 | **"Example Actions" sebagai label** | Lebih baik daripada "Features" atau "Capabilities". |
-| 22 | **Banner risiko kontekstual** | `disclaimer: "Crypto Trading"` memicu banner oranye. Peringatan muncul **hanya di item yang membutuhkannya**, tepat di titik keputusan. |
-| 23 | ⭐ **Langkah "Inspect" sebelum publish** | *"Show me what this Skill can do, what it reads, and what it can change. Flag anything it should not touch."* — audit izin dalam bahasa biasa. |
-| 24 | ⭐ **Guardrail budget sebagai primitif** | *"Never spend more than 500 Credits in a single session."* |
-| 25 | **Brain Pulse: agent menjelaskan kegagalannya sendiri** | Retry dengan parameter berbeda, pivot, atau jelaskan — bukan crash senyap. |
-| 26 | **Kanvas Circle dengan legenda visual** | 🧠 biru = Mind online, 🧠 abu = offline, 🛡 oranye = Steward (pemilik), 👤 = manusia, garis putus-putus = koneksi. Kanvas **read-only**; semua perubahan lewat dialog. Memisahkan "melihat" dari "mengubah" dengan bersih. |
-| 27 | **Toggle status yang jujur** | *"Online Minds accept new tasks. Switch to Offline to pause without deleting."* — menjelaskan konsekuensi, bukan cuma label. |
-| 28 | **"Nudge" dengan proteksi duplikat** | Membangunkan agent manual, dan memberi tahu bila siklus sudah antre: *"Nudge noted — already has a cognition running or queued."* |
-| 29 | **Onboarding video+teks berdampingan** | *"watch, read, or both"* — tiap langkah punya video YouTube tersemat DAN instruksi tertulis. |
-| 30 | **Angka konkret di studi kasus** | Inspirations memuat metrik nyata: "3.300 views → 106 klik → 46 kunjungan, $0,08/kunjungan". Jauh lebih meyakinkan daripada testimoni. |
-| 31 | **Label kejujuran pada konten ilustratif** | Studi kasus genealogi ditandai eksplisit: *"**Illustrative story** — written to describe the thought process behind the pattern, not a single named builder."* Integritas yang murah dan menaikkan kepercayaan. |
-| 32 | **Disclaimer risiko pada demo trading** | *"Agentic trading is experimental… Past performance does not guarantee future results… should not be replicated without independent assessment."* Wajib untuk Fugugent di DeFi. |
-
-### 7.2 ❌ Sebaiknya JANGAN ditiru
-
-| # | Anti-pola | Kenapa |
-|---|---|---|
-| 1 | **Kartu tanpa metrik keputusan** | Tanpa rating, run count, success rate, latency, atau biaya — user tidak punya dasar memilih antar 119 item. |
-| 2 | **Filter hanya `All \| Official`** | 48 kategori ada di data tapi **tidak dipakai sebagai filter**. Menjelajahi 119 Apps praktis mustahil. |
-| 3 | **Tidak ada estimasi biaya per aksi** | *"complexity drives consumption"* + tanpa angka = kecemasan biaya. User tidak bisa memperkirakan. |
-| 4 | **Anonimitas creator total** | Tidak ada field creator → tidak ada reputasi, tidak ada insentif membangun brand, tidak ada akuntabilitas. |
-| 5 | **`Wild` label yang tidak terpakai** | Sistem trust dua-tingkat didokumentasikan tapi 100% katalog `Official`. Janji yang belum ditepati. |
-| 6 | **Revenue share "coming soon"** | Diiklankan sebagai keunggulan builder tapi tidak ada mekanisme. Merusak kepercayaan builder. |
-| 7 | **Leaderboard yang tidak ada** | Disebut di `llms.txt`, tidak ada di sitemap/route. |
-| 8 | **Kedalaman kategori sangat timpang** | 11 dari 19 Mind hanya 1 App + 0 Skills. Lebar tanpa dalam. |
-| 9 | **Alur equip via copy-paste pesan** | *"copy a generated activation message and paste it to your Mind"* — rapuh, tidak bisa dilacak, gagal diam-diam. |
-| 10 | **Tidak ada sandbox / dry-run** | Setiap tes membakar uang sungguhan. |
-| 11 | **Email sebagai kanal utama** | Latency tinggi, tidak ada UI kaya, sulit menampilkan data real-time. Buruk untuk use-case DeFi/trading. |
-| 12 | **Landing di-render 100% client-side** | Tidak ada konten di HTML awal → buruk untuk SEO dan first paint. Mereka menambalnya dengan `llms.txt`. |
-| 13 | **Docs builder cuma 5 halaman** | Sangat tipis untuk platform yang mengklaim program investasi US$10M. |
-| 14 | **Tidak ada versioning/last-updated** | Tidak ada cara tahu apakah sebuah Skill masih dirawat. |
-| 15 | **Konsep bertumpuk terlalu banyak** | Mind/Soul/Brain/DNA/State/Skill/Tool/App/Artifact/Circle/Cognition/Concierge/Swarm/Steward/Tenet/Prior/Invariant/Guardrail/Episode/Swarm — **20 istilah baru** sebelum user melakukan apa pun. |
-| 16 | 🚨 **Penautan akun yang tidak bisa dibatalkan** | *"Once linked, your Telegram account cannot be unlinked from this profile."* Aksi permanen tanpa jalan keluar adalah kegagalan UX serius. |
-| 17 | 🚨 **Hapus agent tidak self-serve** | *"Deletion isn't self-serve yet… get in touch with us."* User tidak bisa menghapus asetnya sendiri. Fatal untuk produk yang menjual "sovereign asset". |
-| 18 | **Filter tutorial dikompilasi habis** | Filter bar di `/tutorials` di-render kosong (`N2 = false`), tapi param URL `?category=`/`?format=` masih dihormati. Kontrol setengah jadi yang dikirim ke produksi. |
-| 19 | **Konten tersembunyi** | `tutorials-manifest.json` memuat 25 slug; halaman hanya menampilkan **6** dari allowlist hardcoded. 19 tutorial tak bisa ditemukan lewat navigasi. |
-| 20 | **Tabel kosong di FAQ** | Komponen `faq-launch-options` (tabel "Option \| Best for \| What happens") dipanggil **tanpa data** — tabel kosong/rusak di halaman live. |
-| 21 | **Docs basi berbeda dari produk** | `/docs` masih menyebut domain `animocaminds.ai`, dan `/docs/troubleshooting` sama sekali tidak memuat failure mode — hanya 5 FAQ marketing. |
-| 22 | **Halaman "Troubleshooting" tanpa troubleshooting** | Judulnya menjanjikan pemecahan masalah; isinya lima pertanyaan pemasaran. Menyesatkan. |
+- **Private key:** encrypted in the DB. The AI never sees it. To sign a transaction the AI **sends an execution request**; the backend decrypts and signs. (A good pattern — signing is separated from reasoning.)
+- **Training data:** *"No user data is sent to or retained by these models for training purposes."*
+- **Isolation between agents:** the Circle gate blocks a message **before** it enters the model's context.
+- **Kill switch:** soft (natural language) + hard (the dashboard).
+- **Confirmations:** high-impact actions require explicit confirmation.
+- `/.well-known/security.txt` is available.
 
 ---
 
-### 7.3 ⭐⭐ Jurang antara yang DIPASARKAN dan yang DIKIRIM
+## 7. UI/UX Patterns — What to Copy versus What to Avoid
 
-Ini temuan paling berharga dari seluruh riset, dan pelajaran paling keras untuk kita. `llms.txt` / `llms-full.txt` / `agents.json` mereka jauh lebih ambisius daripada produk yang benar-benar berjalan. Diverifikasi dengan mencari string di bundle produksi:
+### 7.1 ✅ Worth copying
 
-| Diklaim di `llms-full.txt` / marketing | Kenyataan di produk yang dikirim |
+| # | Pattern | Detail |
+|---|---|---|
+| 1 | **Numbered past-tense `useCases`** | "Searched 38 roles", not "Can search roles". Evidence of outcomes, not feature promises. |
+| 2 | **A signal bar for `level`** | Difficulty as 1–2–3 visual bars, not text. Readable in 200 ms. |
+| 3 | **`iconInitials` + `iconTint`** | A coloured avatar fallback when there is no image — no card is ever blank. |
+| 4 | **Persisted view mode + sort** | `localStorage` stores the grid/list and sort preference. |
+| 5 | **Prescriptive empty states** | *"Try a different search term or clear the filters."* / *"Try clearing a filter or switching the format."* — always naming an **action**, not just "no results". |
+| 6 | **Empty states that drive conversion** | *"Create your first Mind, then come back to equip it."* + a direct button. Not a dead end. |
+| 7 | **A cost warning before execution** | *"This activates a real cycle and spends Cognition..."* + a time estimate ("within a minute") + an anti-duplicate guarantee. |
+| 8 | **The credit balance shown in the agent-picker dialog** | The user sees each agent's balance **exactly when** choosing which one to equip. |
+| 9 | **An escape hatch in onboarding** | *"In a rush? …You can calibrate its personality later."* |
+| 10 | **A duration estimate in the wizard** | *"Takes 1–2 min."* |
+| 11 | **The "You should see:" pattern in the docs** | Every docs step states the expected result → the user can self-verify. |
+| 12 | **Explicit, honest permission warnings** | The Circle copy states outright that members can "consume Cognition without your prior approval". |
+| 13 | **The agent reports its own balance** | Credit notifications come from the agent through a channel already in use, with a payment link. Not a dashboard banner. |
+| 14 | **Pause-and-resume, not failure** | Out of credits → pause + notify + continue from where it stopped. |
+| 15 | **A personality quiz as discovery** | Mindprint (16 types) turns "I don't know which agent I want" into a personal recommendation. |
+| 16 | **Anthropomorphic agent state** | "stress, focus, trust" — in real time. A perfect fit for a fugu mascot (a fugu puffs up when stressed!). |
+| 17 | **A 2-column grid on mobile** | `grid-cols-2 lg:grid-cols-3` — not 1 column; better density for browsing. |
+| 18 | **A CLI designed for a coding agent** | JSON stdout + examples in `--help`. |
+| 19 | ⭐ **"Markdown twins" for every docs page** | Every Builder Hub page is also available at `<path>.md` (e.g. `/en/docs/get-started/cli.md`). Plus per-page buttons: **Copy MD · View Markdown · Ask on Telegram · Builder console**. This makes the docs perfectly readable by an agent/LLM. Very cheap, very modern. |
+| 20 | **A "Setup Effort" meter, not "difficulty"** | User-oriented framing: the user is not asking "how hard is this" but "how much work do I have to do". |
+| 21 | **"Example Actions" as the label** | Better than "Features" or "Capabilities". |
+| 22 | **Contextual risk banners** | `disclaimer: "Crypto Trading"` triggers an orange banner. The warning appears **only on the items that need it**, right at the decision point. |
+| 23 | ⭐ **An "Inspect" step before publishing** | *"Show me what this Skill can do, what it reads, and what it can change. Flag anything it should not touch."* — a permission audit in plain language. |
+| 24 | ⭐ **A budget guardrail as a primitive** | *"Never spend more than 500 Credits in a single session."* |
+| 25 | **Brain Pulse: the agent explains its own failures** | Retry with different parameters, pivot, or explain — instead of crashing silently. |
+| 26 | **A Circle canvas with a visual legend** | 🧠 blue = Mind online, 🧠 grey = offline, 🛡 orange = Steward (the owner), 👤 = human, dashed line = a connection. The canvas is **read-only**; all changes go through a dialog. It separates "looking" from "changing" cleanly. |
+| 27 | **An honest status toggle** | *"Online Minds accept new tasks. Switch to Offline to pause without deleting."* — it explains the consequence, not just the label. |
+| 28 | **"Nudge" with duplicate protection** | Wakes the agent manually, and tells you when a cycle is already queued: *"Nudge noted — already has a cognition running or queued."* |
+| 29 | **Onboarding with video and text side by side** | *"watch, read, or both"* — every step has an embedded YouTube video AND written instructions. |
+| 30 | **Concrete numbers in the case studies** | The Inspirations pages carry real metrics: "3,300 views → 106 clicks → 46 visits, $0.08/visit". Far more convincing than a testimonial. |
+| 31 | **An honesty label on illustrative content** | The genealogy case study is explicitly marked: *"**Illustrative story** — written to describe the thought process behind the pattern, not a single named builder."* Cheap integrity that raises trust. |
+| 32 | **A risk disclaimer on the trading demo** | *"Agentic trading is experimental… Past performance does not guarantee future results… should not be replicated without independent assessment."* Mandatory for Fugugent in DeFi. |
+
+### 7.2 ❌ What NOT to copy
+
+| # | Anti-pattern | Why |
+|---|---|---|
+| 1 | **Cards with no decision metrics** | With no rating, run count, success rate, latency, or cost — the user has no basis for choosing among 119 items. |
+| 2 | **Filters limited to `All \| Official`** | 48 categories exist in the data but **are not used as filters**. Browsing 119 Apps is practically impossible. |
+| 3 | **No per-action cost estimate** | *"complexity drives consumption"* + no numbers = cost anxiety. The user cannot estimate anything. |
+| 4 | **Total creator anonymity** | No creator field → no reputation, no incentive to build a brand, no accountability. |
+| 5 | **An unused `Wild` label** | A two-tier trust system is documented but 100% of the catalogue is `Official`. An unkept promise. |
+| 6 | **Revenue share "coming soon"** | Advertised as a builder advantage with no mechanism behind it. It damages builder trust. |
+| 7 | **A leaderboard that does not exist** | Mentioned in `llms.txt`, absent from the sitemap/routes. |
+| 8 | **Wildly uneven category depth** | 11 of 19 Minds have just 1 App + 0 Skills. Breadth without depth. |
+| 9 | **An equip flow via copy-pasted messages** | *"copy a generated activation message and paste it to your Mind"* — fragile, untraceable, fails silently. |
+| 10 | **No sandbox / dry-run** | Every test burns real money. |
+| 11 | **Email as the primary channel** | High latency, no rich UI, hard to display real-time data. Bad for a DeFi/trading use case. |
+| 12 | **A landing page rendered 100% client-side** | No content in the initial HTML → bad for SEO and first paint. They patch over it with `llms.txt`. |
+| 13 | **Only 5 pages of builder docs** | Very thin for a platform claiming a US$10M investment programme. |
+| 14 | **No versioning/last-updated** | There is no way to know whether a Skill is still maintained. |
+| 15 | **Far too many stacked concepts** | Mind/Soul/Brain/DNA/State/Skill/Tool/App/Artifact/Circle/Cognition/Concierge/Swarm/Steward/Tenet/Prior/Invariant/Guardrail/Episode/Swarm — **20 new terms** before the user does anything at all. |
+| 16 | 🚨 **Account linking that cannot be undone** | *"Once linked, your Telegram account cannot be unlinked from this profile."* A permanent action with no way out is a serious UX failure. |
+| 17 | 🚨 **Agent deletion is not self-serve** | *"Deletion isn't self-serve yet… get in touch with us."* The user cannot delete their own asset. Fatal for a product that sells a "sovereign asset". |
+| 18 | **Tutorial filters compiled away** | The filter bar on `/tutorials` renders empty (`N2 = false`), yet the `?category=`/`?format=` URL params are still honoured. A half-finished control shipped to production. |
+| 19 | **Hidden content** | `tutorials-manifest.json` contains 25 slugs; the page only shows **6** from a hardcoded allowlist. 19 tutorials cannot be found through navigation. |
+| 20 | **An empty table in the FAQ** | The `faq-launch-options` component (the "Option \| Best for \| What happens" table) is called **with no data** — an empty/broken table on the live page. |
+| 21 | **Stale docs that differ from the product** | `/docs` still refers to the `animocaminds.ai` domain, and `/docs/troubleshooting` contains no failure modes at all — just 5 marketing FAQs. |
+| 22 | **A "Troubleshooting" page with no troubleshooting** | The title promises problem-solving; the content is five marketing questions. Misleading. |
+
+---
+
+### 7.3 ⭐⭐ The gap between what is MARKETED and what is SHIPPED
+
+This is the most valuable finding of the whole research, and the harshest lesson for us. Their `llms.txt` / `llms-full.txt` / `agents.json` are far more ambitious than the product that actually runs. Verified by searching for the strings in the production bundle:
+
+| Claimed in `llms-full.txt` / marketing | The reality in the shipped product |
 |---|---|
-| Trust label **"Wild"** (community, unreviewed) | ❌ **Nol kemunculan** di bundle. Badge nyata: Official / Featured / Verified / Composio / Third-Party |
-| *"A **Leaderboard** surfaces the most-equipped items"* | ❌ **Nol kemunculan.** Tidak ada route, tidak ada UI |
-| Equip = **salin "activation message"** lalu paste ke Mind | ⚠️ String-nya ada di `locales/en/common.json` (`"Copy equip message"`, `Equip yourself with the skill "{{name}}" (ID: {{id}})`) tapi **tidak ada di bundle produksi**. Ini kunci i18n basi; UI live memakai tombol Equip langsung |
-| *"Your Mind asks for confirmation on **high-impact actions**… **undo actions**… review its **activity log**"* | ❌ String `high-impact`, `undo`, dan activity log **nol kemunculan**. Tidak ada satu pun dari ketiganya |
-| Soft kill *"Quit emailing me"* + *"**hard kill switch** in the dashboard"* | ⚠️ Tidak ada di UI. Yang ada: toggle **Online/Offline** (*"pause without deleting"*) |
-| *"**No user data is sent to or retained** by these models for training"* | ⚠️ `/docs/security` justru bilang provider *"may retain data in accordance with their own privacy policies"* |
-| *"over **1,000 skills** live and growing"* (halaman `/about`) | ⚠️ Katalog publik `bazaar.json` berisi **29 Skills** dan 119 Apps |
-| Bazaar sebagai marketplace komunitas | ⚠️ Badge bertanda **"EARLY BETA"**; 100% katalog Official/Featured |
-| **State** = *"focus, trust, attention"* | ⚠️ `/docs/core-concepts` bilang *"**stress**, focus, trust"* |
-| Domain | ⚠️ `/docs` masih menyebut **animocaminds.ai** dan **profile.animocaminds.ai**; sisa situs memakai **hellominds.ai** — docs sudah basi |
-| Email Mind | ⚠️ Docs bilang **`@amind.ai`**; API spec bilang **`@hellominds.ai`** |
-| CLI *"targeting a **June 2026** release"* (programme FAQ) | ⚠️ Changelog menunjukkan CLI sudah rilis **2026-06-09** dan sudah di 0.1.4 pada Agustus. FAQ basi |
-| Provider LLM | ⚠️ Tiga daftar berbeda di tiga halaman: docs (OpenAI/Google/xAI), FAQ (+ **Qwen**), llms.txt (generik) |
+| A **"Wild"** trust label (community, unreviewed) | ❌ **Zero occurrences** in the bundle. The real badges: Official / Featured / Verified / Composio / Third-Party |
+| *"A **Leaderboard** surfaces the most-equipped items"* | ❌ **Zero occurrences.** No route, no UI |
+| Equip = **copy an "activation message"** and paste it to the Mind | ⚠️ The strings exist in `locales/en/common.json` (`"Copy equip message"`, `Equip yourself with the skill "{{name}}" (ID: {{id}})`) but **are absent from the production bundle**. These are stale i18n keys; the live UI uses a direct Equip button |
+| *"Your Mind asks for confirmation on **high-impact actions**… **undo actions**… review its **activity log**"* | ❌ The strings `high-impact`, `undo`, and activity log have **zero occurrences**. Not one of the three exists |
+| A soft kill *"Quit emailing me"* + a *"**hard kill switch** in the dashboard"* | ⚠️ Neither is in the UI. What exists: an **Online/Offline** toggle (*"pause without deleting"*) |
+| *"**No user data is sent to or retained** by these models for training"* | ⚠️ `/docs/security` actually says providers *"may retain data in accordance with their own privacy policies"* |
+| *"over **1,000 skills** live and growing"* (the `/about` page) | ⚠️ The public `bazaar.json` catalogue contains **29 Skills** and 119 Apps |
+| The Bazaar as a community marketplace | ⚠️ Badged **"EARLY BETA"**; 100% of the catalogue is Official/Featured |
+| **State** = *"focus, trust, attention"* | ⚠️ `/docs/core-concepts` says *"**stress**, focus, trust"* |
+| Domain | ⚠️ `/docs` still refers to **animocaminds.ai** and **profile.animocaminds.ai**; the rest of the site uses **hellominds.ai** — the docs are stale |
+| A Mind's email | ⚠️ The docs say **`@amind.ai`**; the API spec says **`@hellominds.ai`** |
+| The CLI *"targeting a **June 2026** release"* (programme FAQ) | ⚠️ The changelog shows the CLI shipped on **2026-06-09** and was already at 0.1.4 by August. The FAQ is stale |
+| LLM providers | ⚠️ Three different lists on three pages: the docs (OpenAI/Google/xAI), the FAQ (+ **Qwen**), `llms.txt` (generic) |
 
-**Pelajaran untuk Fugugent (dan ini menyangkut langsung penilaian juri):**
+**Lessons for Fugugent (and these bear directly on the judging):**
 
-1. **Jangan pernah mendokumentasikan fitur yang belum dikirim.** Juri hackathon akan mengklik. Sebuah leaderboard yang dijanjikan tapi tidak ada adalah dead end — persis yang dinilai kriteria Functionality.
-2. **Satu sumber kebenaran.** Mereka punya empat surface (docs, FAQ, llms.txt, app) yang saling bertentangan tentang fakta-fakta dasar. Untuk demo, pastikan landing, docs, dan app menyatakan angka yang **sama**.
-3. **Jangan tampilkan angka yang tidak bisa dibuktikan.** *"Over 1,000 skills"* padahal katalog berisi 29 adalah risiko kredibilitas. Kita tampilkan hitungan nyata, diambil langsung dari data.
-4. **Hapus kunci i18n yang mati.** String equip basi mereka membocorkan alur produk lama.
+1. **Never document a feature you have not shipped.** Hackathon judges will click. A promised leaderboard that does not exist is a dead end — exactly what the Functionality criterion measures.
+2. **One source of truth.** They have four surfaces (docs, FAQ, llms.txt, the app) that contradict each other on basic facts. For the demo, make sure the landing page, docs, and app state the **same** numbers.
+3. **Do not display numbers you cannot prove.** *"Over 1,000 skills"* when the catalogue holds 29 is a credibility risk. We display real counts, read straight from the data.
+4. **Delete dead i18n keys.** Their stale equip strings leak an older product flow.
 
-## 8. Pelajaran untuk Fugugent
+## 8. Lessons for Fugugent
 
-Dipetakan ke tiga kriteria juri: **[F]** Functionality (journey land→find→understand→activate tanpa dead end), **[D]** Data Quality (data real-time akurat untuk memutuskan agent mana yang di-hire), **[A]** Agent Diversity (4 kategori sama dalamnya).
+Mapped onto the three judging criteria: **[F]** Functionality (the land→find→understand→activate journey with no dead ends), **[D]** Data Quality (accurate real-time data for deciding which agent to hire), **[A]** Agent Diversity (4 categories of equal depth).
 
-### Wajib adopsi (tiru langsung)
+### Must adopt (copy directly)
 
-1. **[F] Grid marketplace 2/3-kolom dengan search + sort + view-toggle yang dipersistensi.**
-   Tiru `grid-cols-2 lg:grid-cols-3` dan simpan `viewMode`/`sort` di `localStorage`. Murah, langsung terasa matang.
+1. **[F] A 2/3-column marketplace grid with search + sort + a persisted view toggle.**
+   Copy `grid-cols-2 lg:grid-cols-3` and store `viewMode`/`sort` in `localStorage`. Cheap, and it immediately feels mature.
 
-2. **[F][D] `useCases` past-tense berangka pada setiap kartu fugu.**
-   Bukan "Bisa memantau harga token" tapi **"Memantau 12 pair di PancakeSwap, memicu 3 alert minggu ini."** Ini satu perubahan copywriting dengan dampak demo terbesar.
+2. **[F][D] Numbered past-tense `useCases` on every fugu card.**
+   Not "Can monitor token prices" but **"Monitored 12 pairs on PancakeSwap, fired 3 alerts this week."** This is the single copywriting change with the biggest demo impact.
 
-3. **[F] Empty state yang selalu preskriptif dan tidak pernah dead end.**
-   Setiap state kosong harus menyebut aksi + menyediakan tombolnya: *"Belum punya agent — buat satu, lalu kembali untuk hire."* Juri secara eksplisit menguji "tanpa dead end".
+3. **[F] Empty states that are always prescriptive and never a dead end.**
+   Every empty state has to name an action and provide the button for it: *"No agents yet — create one, then come back to hire."* The judges explicitly test for "no dead ends".
 
-4. **[F] Peringatan biaya + estimasi waktu sebelum eksekusi.**
-   Tiru: *"Ini menjalankan siklus nyata dan menghabiskan X FUGU. Agent biasanya mulai dalam ~1 menit. Jika siklus sedang berjalan, permintaan ini tidak menambah antrean."*
+4. **[F] A cost warning + time estimate before execution.**
+   Copy this: *"This runs a real cycle and spends X FUGU. The agent usually starts within ~1 minute. If a cycle is already running, this request does not add another to the queue."*
 
-5. **[F] Saldo agent ditampilkan di dialog pemilihan agent.**
-   Saat user memilih agent mana yang akan meng-equip skill, tampilkan saldo tiap agent di baris yang sama.
+5. **[F] The agent's balance shown in the agent-picker dialog.**
+   When the user picks which agent will equip a skill, show each agent's balance on the same row.
 
-6. **[F] Escape hatch + estimasi durasi di onboarding.**
-   *"Buru-buru? Lewati — kamu bisa atur kepribadian nanti."* + *"Butuh 1–2 menit."*
+6. **[F] An escape hatch + a duration estimate in onboarding.**
+   *"In a rush? Skip it — you can set the personality later."* + *"Takes 1–2 minutes."*
 
-7. **[F] Idempotensi visual: tandai item yang sudah di-hire dengan badge `Hired`.**
-   Cegah user membayar dua kali untuk hal yang sama, dan tunjukkan status dengan jelas.
+7. **[F] Visual idempotency: mark already-hired items with a `Hired` badge.**
+   Stop the user paying twice for the same thing, and show the status clearly.
 
-8. **[F][D] Pause-and-resume saat saldo habis, bukan gagal senyap.**
-   Agent harus memberi tahu *dirinya sendiri* lewat kanal user, dengan link top-up, dan melanjutkan dari titik terakhir.
+8. **[F][D] Pause-and-resume when the balance runs out, not a silent failure.**
+   The agent has to notify *itself* through the user's channel, with a top-up link, and resume from where it stopped.
 
-9. **[A] `level` sebagai signal-bar visual (1–2–3 batang).**
-   Kesulitan/kompleksitas terbaca instan tanpa membaca teks.
+9. **[A] `level` as a visual signal bar (1–2–3 bars).**
+   Difficulty/complexity readable instantly without reading text.
 
-10. **[F] Avatar fallback berwarna (`iconInitials` + `iconTint`).**
-    Untuk Fugugent ini menjadi **varian fugu**: setiap agent mendapat fugu dengan warna/ekspresi berbeda, dihasilkan deterministik dari ID. Tidak pernah ada kartu kosong, dan identitas visual gratis.
+10. **[F] A coloured avatar fallback (`iconInitials` + `iconTint`).**
+    For Fugugent this becomes a **fugu variant**: every agent gets a fugu with a different colour/expression, generated deterministically from its ID. No card is ever blank, and the visual identity is free.
 
-### Wajib lampaui (di sinilah kita menang)
+### Must surpass (this is where we win)
 
-11. **[D] ⭐ Kartu agent harus punya metrik keputusan real-time yang HelloMinds tidak punya.**
-    Minimal per kartu: **success rate (7 hari)**, **jumlah run**, **median latency**, **biaya rata-rata per run**, **terakhir aktif**, **jumlah hirer aktif**. Semua on-chain-verifiable. Ini menyerang langsung celah terbesar mereka dan kriteria juri Data Quality.
+11. **[D] ⭐ Agent cards must carry the real-time decision metrics HelloMinds lacks.**
+    At minimum, per card: **success rate (7 days)**, **run count**, **median latency**, **average cost per run**, **last active**, **number of active hirers**. All on-chain-verifiable. This attacks their biggest gap and the Data Quality criterion head-on.
 
-12. **[D] ⭐ Estimasi biaya *sebelum* hire, bukan hanya peringatan.**
-    Tampilkan "≈0.4 BNB per 100 run, berdasarkan 1.284 run terakhir". HelloMinds hanya bilang *"complexity drives consumption"* — tidak bisa ditindaklanjuti.
+12. **[D] ⭐ A cost estimate *before* hiring, not just a warning.**
+    Show "≈0.4 BNB per 100 runs, based on the last 1,284 runs". HelloMinds only says *"complexity drives consumption"* — which cannot be acted on.
 
-13. **[D] ⭐ Reputasi creator yang nyata dengan identitas on-chain.**
-    Field `creator` dengan alamat wallet, jumlah agent yang dipublikasikan, total run yang dilayani, dan rating agregat. HelloMinds 100% anonim.
+13. **[D] ⭐ Real creator reputation with an on-chain identity.**
+    A `creator` field with a wallet address, the number of agents published, total runs served, and an aggregate rating. HelloMinds is 100% anonymous.
 
-14. **[D] Revenue share on-chain yang benar-benar berfungsi, bukan "coming soon".**
-    Split otomatis lewat smart contract di BNB Chain, payout terlihat di explorer. Ini adalah janji yang HelloMinds gagal tepati — dan alasan paling kuat untuk memakai blockchain.
+14. **[D] An on-chain revenue share that actually works, not "coming soon".**
+    An automatic split through a smart contract on BNB Chain, with payouts visible in the explorer. This is the promise HelloMinds failed to keep — and the strongest reason to use a blockchain.
 
-15. **[D] Rating + review terverifikasi, gated oleh bukti penggunaan.**
-    Hanya wallet yang benar-benar pernah men-hire agent (terbukti on-chain) yang bisa memberi review. Ini adalah rating anti-sybil yang hanya mungkin di Web3.
+15. **[D] Verified ratings + reviews, gated by proof of use.**
+    Only wallets that have actually hired the agent (provably, on-chain) can leave a review. This is anti-sybil rating, only possible in Web3.
 
-16. **[F][D] Sandbox / dry-run gratis sebelum hire.**
-    "Coba agent ini sekali, gratis" atau simulasi dengan data sampel. HelloMinds tidak punya sama sekali; setiap tes membakar uang.
+16. **[F][D] A free sandbox / dry-run before hiring.**
+    "Try this agent once, free" or a simulation against sample data. HelloMinds has none at all; every test burns money.
 
-17. **[A] ⭐ Filter kategori yang benar-benar berfungsi — kelemahan terbesar navigasi mereka.**
-    HelloMinds punya 48 kategori di data tapi hanya menampilkan filter `All | Official`. Kita harus punya filter kategori first-class + multi-select + chip "clear all".
+17. **[A] ⭐ Category filters that actually work — their biggest navigation weakness.**
+    HelloMinds has 48 categories in the data but only shows an `All | Official` filter. We need first-class category filters + multi-select + a "clear all" chip.
 
-18. **[A] ⭐ Empat kategori dengan kedalaman yang benar-benar SAMA.**
-    HelloMinds gagal di sini: 11 dari 19 template hanya punya 1 App dan 0 Skill. Aturan untuk kita: **setiap kategori minimal N agent, dan setiap agent minimal punya X tool + Y use-case terverifikasi.** Buat checklist paritas dan patuhi. Juri akan mengecek ini.
+18. **[A] ⭐ Four categories with genuinely EQUAL depth.**
+    HelloMinds fails here: 11 of 19 templates have only 1 App and 0 Skills. Our rule: **every category has at least N agents, and every agent has at least X tools + Y verified use cases.** Make a parity checklist and stick to it. The judges will check.
 
-19. **[D] Leaderboard yang benar-benar ada.**
-    Mereka menjanjikannya di `llms.txt` tapi tidak ada route-nya. Kita kirimkan: leaderboard by run, by revenue, by rating, dengan rentang waktu.
+19. **[D] A leaderboard that actually exists.**
+    They promise one in `llms.txt` but there is no route for it. We ship it: a leaderboard by runs, by revenue, by rating, with time ranges.
 
-20. **[F] Detail agent sebagai halaman ber-URL, bukan hanya modal.**
-    Modal HelloMinds tidak bisa di-share atau di-bookmark. Agent adalah aset — harus punya URL kanonik, OG image (fugu-nya!), dan bisa dibagikan.
+20. **[F] Agent details as a page with a URL, not just a modal.**
+    The HelloMinds modal cannot be shared or bookmarked. An agent is an asset — it needs a canonical URL, an OG image (its fugu!), and to be shareable.
 
-21. **[D] Versioning + "last updated" + changelog per agent.**
-    Tidak ada di HelloMinds. Ini sinyal kepercayaan yang murah dan kuat.
+21. **[D] Versioning + "last updated" + a per-agent changelog.**
+    Absent from HelloMinds. A cheap, strong trust signal.
 
-22. **[F] Aktivasi satu-transaksi, bukan copy-paste pesan.**
-    Alur "salin pesan aktivasi lalu paste ke agent" milik mereka rapuh. Kita: connect wallet → klik Hire → satu tanda tangan → agent aktif. Terlacak, atomik, tidak bisa gagal diam-diam.
+22. **[F] One-transaction activation, not a copy-pasted message.**
+    Their "copy the activation message and paste it to the agent" flow is fragile. Ours: connect wallet → click Hire → one signature → the agent is live. Traceable, atomic, and it cannot fail silently.
 
-23. **[F] Panel monitoring real-time dengan log eksekusi live.**
-    HelloMinds hanya punya "activity log" statis di balik login. Kita tampilkan run yang sedang berjalan, langkah demi langkah, plus tx hash. Ini secara langsung memberi bukti kriteria Data Quality kepada juri.
+23. **[F] A real-time monitoring panel with a live execution log.**
+    HelloMinds only has a static "activity log" behind a login. We show the currently running run, step by step, plus the tx hash. This hands the judges direct evidence for the Data Quality criterion.
 
-24. **[A] Guardrail sebagai item yang bisa dipilih (tiru "Passive Autonomous Soul").**
-    Tawarkan preset batas: hanya-baca, batas belanja, whitelist kontrak. Untuk marketplace DeFi ini kebutuhan, bukan tambahan.
+24. **[A] Guardrails as selectable items (copy "Passive Autonomous Soul").**
+    Offer limit presets: read-only, spend cap, contract allowlist. For a DeFi marketplace this is a requirement, not an extra.
 
-25. **[F] Pakai Composio (atau setara) untuk lapisan integrasi.**
-    Katalog 119-App HelloMinds bukan buatan sendiri. Kita bisa mendapat kedalaman kategori instan dengan cara yang sama, lalu fokuskan tenaga engineering pada lapisan on-chain yang menjadi pembeda kita.
+25. **[F] Use Composio (or an equivalent) for the integration layer.**
+    The HelloMinds 119-App catalogue is not their own work. We can get instant category depth the same way, then spend our engineering effort on the on-chain layer that actually differentiates us.
 
-26. **[F] Landing page ber-SSR dengan konten nyata.**
-    Marketplace mereka 100% client-rendered dan kartu tidak ada di HTML. Kita SSR halaman discovery — lebih cepat, bisa di-index, dan lebih baik saat didemokan lewat koneksi jelek.
+26. **[F] An SSR landing page with real content.**
+    Their marketplace is 100% client-rendered and the cards are absent from the HTML. We SSR the discovery pages — faster, indexable, and better when demoed over a bad connection.
 
-29. **[F] Satu kalimat positioning yang setajam milik mereka.**
-    Benchmark: *"You're not asking a Mind for an answer, you're giving it a job."* Fugugent butuh satu kalimat setara yang menjelaskan "kenapa marketplace agent" dalam sekali baca, dipasang di atas fold.
+29. **[F] One positioning sentence as sharp as theirs.**
+    The benchmark: *"You're not asking a Mind for an answer, you're giving it a job."* Fugugent needs one equivalent sentence that explains "why an agent marketplace" in a single read, placed above the fold.
 
-30. **[F] Loop retensi: daily quest + daily refill.**
-    HelloMinds memasangkan *"clear a daily quest"* dengan auto top-up harian untuk agent bersaldo < 100. Murah dibangun, sangat cocok untuk audiens crypto, dan memberi juri sesuatu yang hidup untuk dilihat saat demo.
+30. **[F] A retention loop: a daily quest + a daily refill.**
+    HelloMinds pairs *"clear a daily quest"* with a daily auto top-up for agents under 100 credits. Cheap to build, a great fit for a crypto audience, and it gives the judges something alive to look at during the demo.
 
-31. **[F] Samai *tingkat friksi* mereka, jangan salin anti-Web3-nya.**
-    Mereka menang dengan *"No wallets, no code, no barriers — you're live in seconds."* Kita di BNB Chain, jadi jawabannya adalah embedded/smart wallet + aksi pertama tanpa gas, sehingga user bisa mencapai "agent pertama aktif" tanpa pernah melihat seed phrase.
+31. **[F] Match their *level of friction*, do not copy their anti-Web3 stance.**
+    They win with *"No wallets, no code, no barriers — you're live in seconds."* We are on BNB Chain, so the answer is an embedded/smart wallet plus a gasless first action, so a user can reach "first agent live" without ever seeing a seed phrase.
 
-32. **[F] Sediakan "markdown twin" untuk setiap halaman docs + tombol Copy MD.**
-    Pola terbaik mereka yang paling murah ditiru. Juri (dan agent) bisa membaca docs kita sempurna.
+32. **[F] Provide a "markdown twin" for every docs page + a Copy MD button.**
+    Their best pattern, and the cheapest to copy. The judges (and agents) can read our docs perfectly.
 
-33. **[D] Guardrail budget yang ditegakkan smart contract, bukan sekadar instruksi.**
-    HelloMinds menjanjikan *"Never spend more than 500 Credits in a single session"* sebagai instruksi yang dipatuhi model. Di BNB Chain kita bisa **menjaminnya** dengan allowance on-chain. Ini adalah argumen "kenapa blockchain" yang paling meyakinkan untuk agent yang memegang uang.
+33. **[D] A budget guardrail enforced by a smart contract, not merely an instruction.**
+    HelloMinds promises *"Never spend more than 500 Credits in a single session"* as an instruction the model complies with. On BNB Chain we can **guarantee** it with an on-chain allowance. This is the most convincing "why blockchain" argument there is for an agent that holds money.
 
-34. **[F] Audit izin yang ditampilkan ke PEMBELI, bukan hanya publisher.**
-    Langkah "Inspect" mereka hanya dilihat pembuat Skill. Kita tampilkan "agent ini bisa membaca X, bisa mengubah Y, bisa membelanjakan maksimal Z" di **halaman detail agent**, sebelum di-hire.
+34. **[F] A permission audit shown to the BUYER, not just the publisher.**
+    Their "Inspect" step is only seen by the Skill's creator. We show "this agent can read X, can change Y, can spend at most Z" on the **agent detail page**, before hiring.
 
-35. **[F] Semua aksi harus reversibel.**
-    Penautan Telegram permanen dan penghapusan agent non-self-serve adalah dua kegagalan paling jelas di produk mereka. Setiap aksi di Fugugent harus bisa dibatalkan user sendiri.
+35. **[F] Every action must be reversible.**
+    Permanent Telegram linking and non-self-serve agent deletion are the two most obvious failures in their product. Every action in Fugugent must be undoable by the user themselves.
 
-36. **[F] Jangan pernah mengirim kontrol setengah jadi.**
-    Filter tutorial yang dikompilasi kosong, tabel FAQ tanpa data, leaderboard yang dijanjikan tanpa route. Lebih baik hilangkan elemennya daripada menampilkannya rusak — juri menguji dead end.
+36. **[F] Never ship a half-finished control.**
+    A tutorial filter compiled to nothing, an FAQ table with no data, a promised leaderboard with no route. Better to remove the element than to show it broken — the judges test for dead ends.
 
-37. **[D] Sertakan angka nyata pada setiap studi kasus/demo.**
-    "3.300 views → 106 klik → 46 kunjungan, $0,08 per kunjungan" jauh lebih meyakinkan daripada klaim kualitatif. Untuk kita: run nyata, tx hash nyata, biaya nyata.
+37. **[D] Put real numbers in every case study/demo.**
+    "3,300 views → 106 clicks → 46 visits, $0.08 per visit" is far more convincing than a qualitative claim. For us: real runs, real tx hashes, real costs.
 
-38. **[F] Label kejujuran + disclaimer risiko.**
-    Tandai konten ilustratif sebagai ilustratif, dan beri disclaimer eksplisit pada apa pun yang menyentuh trading. Ini membangun kepercayaan, bukan mengurangi.
+38. **[F] Honesty labels + risk disclaimers.**
+    Mark illustrative content as illustrative, and put an explicit disclaimer on anything that touches trading. This builds trust rather than reducing it.
 
-### Catatan identitas produk (fugu)
+### Product identity notes (the fugu)
 
-27. Konsep **State ("stress, focus, trust")** milik HelloMinds adalah hadiah untuk maskot fugu: **fugu mengembang saat stres.** Visualisasikan beban kerja/risiko agent sebagai tingkat mengembangnya fugu. Ini mengubah metrik abstrak menjadi umpan balik emosional yang instan — sesuatu yang HelloMinds, dengan bahasa visualnya yang datar dan korporat, tidak bisa lakukan.
+27. The HelloMinds **State ("stress, focus, trust")** concept is a gift to a fugu mascot: **a fugu puffs up when stressed.** Visualise the agent's workload/risk as how puffed up the fugu is. It turns an abstract metric into instant emotional feedback — something HelloMinds, with its flat corporate visual language, cannot do.
 
-28. Hindari menumpuk 13 istilah baru seperti mereka. Fugugent maksimal **4–5 istilah inti**. Sisanya pakai bahasa biasa.
+28. Avoid stacking up 13 new terms the way they do. Fugugent should have at most **4–5 core terms**. Everything else in plain language.
 
 ---
 
-## 9. Ringkasan Perbandingan
+## 9. Comparison Summary
 
-| Dimensi | HelloMinds | Target Fugugent |
+| Dimension | HelloMinds | The Fugugent target |
 |---|---|---|
-| Unit yang dijual | Cognition Credits (bahan bakar) | Hire per agent + revenue share |
-| Harga agent | Gratis di-equip | Transparan, on-chain, per-run |
-| Metrik kartu | `equippedCount`, `level`, `tag` | + success rate, latency, biaya, run, creator, rating |
-| Trust | Biner Official/Wild (Wild tak terpakai) | Reputasi on-chain + review tergated bukti |
-| Creator | Anonim | Identitas wallet + earnings publik |
-| Revenue share | ❌ "coming soon" | ✅ Smart contract, terverifikasi |
-| Filter | `All \| Official` | Kategori multi-select + rentang harga + performa |
-| Kanal | Email + Telegram | Web app real-time + wallet |
-| Sandbox | ❌ | ✅ Dry-run gratis |
-| Detail agent | Modal (tanpa URL) | Halaman kanonik + OG share |
-| Kedalaman kategori | Timpang (11/19 dangkal) | Paritas 4 kategori dipaksakan |
-| Integrasi | Composio (119 apps) | Composio + adaptor BNB Chain |
-| Docs builder | 5 halaman | Lebih dalam |
+| Unit sold | Cognition Credits (fuel) | Per-agent hire + revenue share |
+| Agent price | Free to equip | Transparent, on-chain, per run |
+| Card metrics | `equippedCount`, `level`, `tag` | + success rate, latency, cost, runs, creator, rating |
+| Trust | Binary Official/Wild (Wild unused) | On-chain reputation + reviews gated by proof |
+| Creator | Anonymous | A wallet identity + public earnings |
+| Revenue share | ❌ "coming soon" | ✅ A smart contract, verifiable |
+| Filters | `All \| Official` | Multi-select categories + price range + performance |
+| Channel | Email + Telegram | A real-time web app + a wallet |
+| Sandbox | ❌ | ✅ A free dry-run |
+| Agent detail | A modal (no URL) | A canonical page + OG sharing |
+| Category depth | Uneven (11/19 shallow) | Enforced parity across the 4 categories |
+| Integrations | Composio (119 apps) | Composio + BNB Chain adapters |
+| Builder docs | 5 pages | Deeper |
 
 ---
 
-## 10. Daftar URL Sumber
+## 10. Source URL List
 
-**Produk:**
+**Product:**
 - https://www.hellominds.ai/
 - https://www.hellominds.ai/sitemap.xml
 - https://www.hellominds.ai/robots.txt
@@ -1139,7 +1139,7 @@ Dipetakan ke tiga kriteria juri: **[F]** Functionality (journey land→find→un
 - https://build.hellominds.ai/en/program (+ /faq, /apply, /build-east)
 - https://build.hellominds.ai/en/inspirations (+ etsy-shop-strategist, superior-trade-intern, architect-of-ancestry)
 
-**Gagal / terbatas:**
+**Failed / restricted:**
 - `https://build.hellominds.ai/llms-full.txt` → **404**
-- `https://app.hellominds.ai/onboarding` → **butuh login**
-- `https://www.hellominds.ai/profile` → **butuh login** (di-disallow di robots.txt)
+- `https://app.hellominds.ai/onboarding` → **needs a login**
+- `https://www.hellominds.ai/profile` → **needs a login** (disallowed in robots.txt)

@@ -1,73 +1,73 @@
-# Fugugent — Keputusan Brainstorming (Locked)
+# Fugugent — Brainstorming Decisions (Locked)
 
-Tanggal: 2026-09-08
-Status: keputusan awal dari sesi brainstorming, sebelum design doc final.
+Date: 2026-09-08
+Status: initial decisions from the brainstorming session, before the final design doc.
 
-## Produk
-- **Nama**: Fugugent. Domain: `fugugent.xyz`
-- **Benchmark UX**: hellominds.ai
-- **Identitas visual**: tiap agent adalah karakter kartun ikan fugu, dengan beberapa
-  state ekspresi (idle, working, alert, profit). Aset digenerate.
+## Product
+- **Name**: Fugugent. Domain: `fugugent.xyz`
+- **UX benchmark**: hellominds.ai
+- **Visual identity**: every agent is a cartoon fugu fish character, with several
+  expression states (idle, working, alert, profit). Assets are generated.
 
-## Keputusan terkunci
-| # | Topik | Keputusan |
+## Locked decisions
+| # | Topic | Decision |
 |---|-------|-----------|
-| 1 | 4 agent prioritas | Persis 4 kategori wajib main track, di-skin sebagai karakter fugu: Rebalancing, Grid Trading, Yield Optimisation, Health Factor Monitoring |
-| 2 | Scope track | Kejar semua: Main + Altana + TermiX + PancakeSwap |
-| 3 | Isi marketplace | Hybrid — index agent live (8004scan / Agent Studio) + 4 agent Fugu first-party sebagai flagship yang benar-benar bisa dihire |
-| 4 | Custody / eksekusi | Altana session key, non-custodial. Wallet per agent, session ber-limit (call allowlist + spend cap + expiry), terdaftar di Keystore on-chain, revoke 1-klik dari UI |
-| 5 | Network | BSC **testnet** (chainId 97) untuk agent DeFi & smart contract |
-| 6 | Monetisasi | Dua jalur: subscription + escrow on-chain untuk 4 agent DeFi; x402/b402 pay-per-call untuk layanan data/riset agent-ke-agent |
-| 7 | Stack | TypeScript penuh — Hono/Fastify + Postgres + Redis + BullMQ; viem untuk chain |
-| 8 | Infra | VPS, Docker Compose + Caddy (TLS otomatis), domain sudah ada |
-| 9 | Smart contract | Upgradeable (proxy). Foundry + OpenZeppelin upgradeable (sudah ada di `contracts/lib`) |
-| 10 | LLM | **dGrid** — `https://api.dgrid.ai/v1`, OpenAI-compatible gateway ke 200+ model |
+| 1 | 4 priority agents | Exactly the 4 categories required by the main track, skinned as fugu characters: Rebalancing, Grid Trading, Yield Optimisation, Health Factor Monitoring |
+| 2 | Track scope | Go after all of them: Main + Altana + TermiX + PancakeSwap |
+| 3 | Marketplace content | Hybrid — index live agents (8004scan / Agent Studio) + 4 first-party Fugu agents as the flagship that can actually be hired |
+| 4 | Custody / execution | Altana session key, non-custodial. One wallet per agent, a limited session (call allowlist + spend cap + expiry), registered in the on-chain Keystore, 1-click revoke from the UI |
+| 5 | Network | BSC **testnet** (chainId 97) for the DeFi agents and smart contracts |
+| 6 | Monetisation | Two paths: subscription + on-chain escrow for the 4 DeFi agents; x402/b402 pay-per-call for agent-to-agent data/research services |
+| 7 | Stack | Full TypeScript — Hono/Fastify + Postgres + Redis + BullMQ; viem for chain access |
+| 8 | Infra | VPS, Docker Compose + Caddy (automatic TLS), domain already owned |
+| 9 | Smart contracts | Upgradeable (proxy). Foundry + OpenZeppelin upgradeable (already in `contracts/lib`) |
+| 10 | LLM | **dGrid** — `https://api.dgrid.ai/v1`, an OpenAI-compatible gateway to 200+ models |
 
-## Prioritas urutan kerja
-1. Smart contract (upgradeable, proxy)
+## Work order priority
+1. Smart contracts (upgradeable, proxy)
 2. AI / agent runtime
 3. Backend (indexer, API, scheduler)
 4. Frontend marketplace
 5. Landing page
 
-## Temuan awal dGrid (terverifikasi)
-- Gateway OpenAI-compatible, 200+ model, endpoint `POST /v1/chat/completions`
+## Initial dGrid findings (verified)
+- OpenAI-compatible gateway, 200+ models, endpoint `POST /v1/chat/completions`
   (docs: https://docs.dgrid.ai/)
-- Free router: model id `dgridai/free` — 10 req/menit, 100 req/hari (naik ke 20/menit,
-  1000/hari setelah top-up ≥ $5). Underlying model berubah-ubah per request, jangan
-  diandalkan untuk perilaku model spesifik.
+- Free router: model id `dgridai/free` — 10 req/min, 100 req/day (rises to 20/min,
+  1000/day after topping up ≥ $5). The underlying model changes from request to request,
+  so do not rely on it for specific model behaviour.
   (docs: https://docs.dgrid.ai/ai-gateway/free-models-router.md)
-- Mendukung tool calling, streaming, embeddings, image gen, TTS/transkripsi, moderation.
-- **x402 native di BSC**: network `eip155:56`, token pembayaran **USD1**
-  `0x8d0D000Ee44948FC98c9B98A4FA4921476f08B0d`. Flow: request tanpa header `x-payment`
-  → `402 Payment Required` + payment requirements → client tanda tangan → retry dengan
-  header `x-payment`. (docs: https://docs.dgrid.ai/x402/overview.md)
-  → Implikasi besar: **agent Fugu bisa membayar biaya inference-nya sendiri** dari wallet
-  Altana miliknya. Ini memenuhi bonus track Altana (x402) dan memperkuat narasi
-  "sovereign agent". Catatan: jalur x402 ini di **mainnet BSC**, sementara agent DeFi
-  kita di testnet — perlu diputuskan apakah jalur pembayaran inference dijalankan di
-  mainnet dengan nominal kecil.
+- Supports tool calling, streaming, embeddings, image gen, TTS/transcription, moderation.
+- **x402 native on BSC**: network `eip155:56`, payment token **USD1**
+  `0x8d0D000Ee44948FC98c9B98A4FA4921476f08B0d`. Flow: a request without the `x-payment`
+  header → `402 Payment Required` + payment requirements → the client signs → retry with
+  the `x-payment` header. (docs: https://docs.dgrid.ai/x402/overview.md)
+  → Big implication: **a Fugu agent can pay for its own inference costs** out of its own
+  Altana wallet. That satisfies the Altana bonus track (x402) and strengthens the
+  "sovereign agent" story. Note: this x402 path is on **BSC mainnet**, while our DeFi
+  agents are on testnet — we have to decide whether the inference payment path runs on
+  mainnet with small amounts.
 
-## Toolchain terverifikasi di mesin
+## Toolchain verified on the machine
 node v24.10.0 · bun 1.3.9 · forge/cast 1.7.1 · Python 3.14.4 · Docker 29.4.0 · darwin arm64
-Sudah ada: `contracts/lib/{forge-std, openzeppelin-contracts, openzeppelin-contracts-upgradeable}`,
+Already present: `contracts/lib/{forge-std, openzeppelin-contracts, openzeppelin-contracts-upgradeable}`,
 `frontend/` & `landingpage/` = Next.js 16.3.4 + React 19.2.8 + Tailwind v4 (bun).
-`backend/` dan `ai/` masih kosong.
+`backend/` and `ai/` are still empty.
 
-## Open questions (dijawab setelah riset selesai)
-- Apakah BNB Agent Studio punya API discovery publik untuk melist agent live di BSC?
-- Apakah agent Fugu harus dibangun DI ATAS Agent Studio CLI (syarat main track:
-  "agents surfaced on your marketplace must be live on BSC")?
-- Alamat kontrak Altana Keystore di BSC testnet.
-- Apakah x402 dGrid tersedia di BSC testnet atau hanya mainnet.
+## Open questions (to be answered once research is done)
+- Does BNB Agent Studio have a public discovery API for listing live agents on BSC?
+- Do the Fugu agents have to be built ON TOP OF the Agent Studio CLI (main track
+  requirement: "agents surfaced on your marketplace must be live on BSC")?
+- The Altana Keystore contract address on BSC testnet.
+- Whether dGrid's x402 is available on BSC testnet or only on mainnet.
 
-## Hasil uji dGrid (2026-09-08)
-Model dipilih: **`openai/gpt-5.6-luna`** (murah).
-- Tool calling: **didukung**, argumen dihasilkan benar.
-- Latency: **30–46 detik** untuk prompt pendek, konsisten lintas percobaan
-  (bukan cold start).
+## dGrid test results (2026-09-08)
+Model chosen: **`openai/gpt-5.6-luna`** (cheap).
+- Tool calling: **supported**, arguments generated correctly.
+- Latency: **30–46 seconds** for short prompts, consistent across attempts
+  (not a cold start).
 
-**Implikasi:** model ini TIDAK boleh berada di jalur kritis agent. Ini
-memvalidasi keputusan #13 (keputusan finansial deterministik, LLM hanya untuk
-penjelasan & riset): penjelasan dihasilkan asinkron setelah aksi dieksekusi,
-sehingga latency 45 detik tidak pernah menunda perlindungan posisi user.
+**Implication:** this model must NOT sit on an agent's critical path. This validates
+decision #13 (financial decisions are deterministic, the LLM is only for explanations
+and research): explanations are produced asynchronously after the action has been
+executed, so 45 seconds of latency never delays protecting a user's position.

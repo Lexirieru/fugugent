@@ -1,176 +1,176 @@
-# Altana Network — Riset Teknis Mendalam
+# Altana Network — In-Depth Technical Research
 
-> Untuk partner track **"Best Built with Altana"** di hackathon BNB Chain *Build the Era / The Smart Money Era*.
-> Riset per **8 September 2026**. Semua klaim di bawah punya URL sumber. Kalau sesuatu tidak ada di sumber, ditulis eksplisit **"tidak ditemukan"** — tidak ada yang dikarang.
+> For the **"Best Built with Altana"** partner track at the BNB Chain hackathon *Build the Era / The Smart Money Era*.
+> Research as of **8 September 2026**. Every claim below has a source URL. If something is not in a source, it is written out explicitly as **"not found"** — nothing here is invented.
 
 ---
 
-## 0. Ringkasan Eksekutif
+## 0. Executive Summary
 
-**Altana Network** (sebelumnya *Functor Network*, dioperasikan oleh Serendipity Global Inc., Delaware, dba Altana Network) adalah **noncustodial authorization infrastructure untuk agentic workflows** — "the stack for sovereign agentic finance". Sumber: <https://www.altana.network/llms.txt>, <https://docs.altana.network/llms.txt>
+**Altana Network** (formerly *Functor Network*, operated by Serendipity Global Inc., Delaware, dba Altana Network) is **noncustodial authorization infrastructure for agentic workflows** — "the stack for sovereign agentic finance". Sources: <https://www.altana.network/llms.txt>, <https://docs.altana.network/llms.txt>
 
-Inti produknya bukan wallet-as-a-service, tapi **inversi tempat penyimpanan state otorisasi**: alih-alih menyimpan "kunci mana yang boleh bertindak" di backend vendor, Altana menaruhnya di **Keystore — registry publik on-chain**. Konsekuensinya: siapa pun bisa memverifikasi otoritas sebuah agent dengan satu `eth_call` gratis, tanpa API key, tanpa integrasi dengan Altana. Sumber: <https://docs.altana.network/concepts/keystore>
+The core of the product is not wallet-as-a-service, but an **inversion of where authorization state is stored**: instead of keeping "which key is allowed to act" in a vendor's backend, Altana puts it in the **Keystore — a public on-chain registry**. The consequence: anyone can verify an agent's authority with one free `eth_call`, with no API key and no integration with Altana. Source: <https://docs.altana.network/concepts/keystore>
 
-### Empat layer (versi resmi Altana)
+### The four layers (Altana's official framing)
 
-| Layer | Isi |
+| Layer | Contents |
 |---|---|
-| **Account** | Smart Agentic Wallet — smart account self-custodial per agent, alamat sama di semua chain |
-| **Permissions** | Scoped session keys + **Keystore** (registry publik siapa yang live & sampai kapan) |
-| **Execution** | **Intent relay** — mengubah intent agent jadi transaksi tereksekusi, disimulasikan sebelum ditandatangani, gas ditangani |
-| **Commerce** | **x402 / B402** (bayar per-HTTP-request) dan **ERC-8183** (hire/dihire antar agent, escrow on-chain). Dua arah: agent bisa *earn*, bukan cuma *spend* |
+| **Account** | The Smart Agentic Wallet — a self-custodial smart account per agent, with the same address on every chain |
+| **Permissions** | Scoped session keys + the **Keystore** (a public registry of who is live and until when) |
+| **Execution** | The **intent relay** — turns an agent's intent into an executed transaction, simulated before it is signed, with gas handled |
+| **Commerce** | **x402 / B402** (pay per HTTP request) and **ERC-8183** (agents hiring and being hired, with on-chain escrow). Both directions: an agent can *earn*, not only *spend* |
 
-Sumber: <https://www.altana.network/llms.txt>
+Source: <https://www.altana.network/llms.txt>
 
-### Angka & fakta kunci
+### Key numbers and facts
 
-| Item | Nilai |
+| Item | Value |
 |---|---|
-| Paket SDK npm | `@altananetwork/sdk` **v0.9.0** (Apache-2.0, ESM, deps: `viem ^2.21.0`, `porto 0.2.37`, `ox ^0.14.0`) |
-| Paket MCP npm | `@altananetwork/mcp` **v0.9.0** (Apache-2.0, ship sebagai TypeScript — **wajib `bunx`, bukan `npx`**) |
-| Paket x402 seller | `@altananetwork/x402-server` **v0.2.0** (**GPL-3.0-or-later** ⚠️ lisensi beda) |
-| Chain live (mainnet) | BNB Chain (56), Ethereum (1), Base (8453, cache-only) |
-| Testnet full-stack | **BNB Smart Chain Testnet (97)** — keystore + account contracts + relay semuanya ada |
-| Audit | CertiK, selesai **15 Juli 2026**, scope `KeyStore.sol` + `KeyStoreCacheOPStack.sol` + 6 file lain |
-| Skills registry | **10 production skills**, semua fork-tested 2026-07-21 |
-| Basis kode | SDK di-fork/extend dari **Porto** (<https://porto.sh>, MIT) untuk kompatibilitas Keystore |
+| npm SDK package | `@altananetwork/sdk` **v0.9.0** (Apache-2.0, ESM, deps: `viem ^2.21.0`, `porto 0.2.37`, `ox ^0.14.0`) |
+| npm MCP package | `@altananetwork/mcp` **v0.9.0** (Apache-2.0, shipped as TypeScript — **`bunx` is mandatory, not `npx`**) |
+| x402 seller package | `@altananetwork/x402-server` **v0.2.0** (**GPL-3.0-or-later** ⚠️ a different licence) |
+| Live chains (mainnet) | BNB Chain (56), Ethereum (1), Base (8453, cache-only) |
+| Full-stack testnet | **BNB Smart Chain Testnet (97)** — keystore + account contracts + relay all present |
+| Audit | CertiK, completed **15 July 2026**, scope `KeyStore.sol` + `KeyStoreCacheOPStack.sol` + 6 other files |
+| Skills registry | **10 production skills**, all fork-tested 2026-07-21 |
+| Codebase | The SDK is forked/extended from **Porto** (<https://porto.sh>, MIT) for Keystore compatibility |
 
-Sumber npm: <https://registry.npmjs.org/@altananetwork/sdk> · <https://registry.npmjs.org/@altananetwork/mcp> · <https://registry.npmjs.org/@altananetwork/x402-server>
-Sumber audit: <https://docs.altana.network/security/audits> · <https://skynet.certik.com/projects/altana>
-Sumber acknowledgments: <https://docs.altana.network/acknowledgments>
+npm sources: <https://registry.npmjs.org/@altananetwork/sdk> · <https://registry.npmjs.org/@altananetwork/mcp> · <https://registry.npmjs.org/@altananetwork/x402-server>
+Audit source: <https://docs.altana.network/security/audits> · <https://skynet.certik.com/projects/altana>
+Acknowledgments source: <https://docs.altana.network/acknowledgments>
 
-### Peta URL
+### URL map
 
 | Surface | URL |
 |---|---|
 | Website | <https://altana.network> |
-| Arsitektur (teknis, keystore layer) | <https://altana.network/architecture> |
+| Architecture (technical, the keystore layer) | <https://altana.network/architecture> |
 | Docs | <https://docs.altana.network> |
-| **Docs mesin-readable (244 KB, semua halaman)** | <https://docs.altana.network/llms-full.txt> |
+| **Machine-readable docs (244 KB, every page)** | <https://docs.altana.network/llms-full.txt> |
 | Keystore Explorer (mainnet) | <https://explorer.altana.network> |
 | Keystore Explorer (testnet) | <https://testnet.altana.network> |
 | Skills Registry | <https://skills.altana.network> · index: <https://skills.altana.network/index.json> |
 | XP program | <https://xp.altana.network> |
 | GitHub org | <https://github.com/altananetwork> |
 | Desktop app | <https://altana.network/download> |
-| Kontak | founders@altana.network |
+| Contact | founders@altana.network |
 
-> ⚠️ **`https://docs.altana.network/sitemap.xml` → HTTP 404.** Yang ada adalah `https://altana.network/sitemap.xml` (5 URL saja: /, /download, /architecture, /privacy, /terms). Untuk crawling docs, pakai `llms.txt` / `llms-full.txt`.
+> ⚠️ **`https://docs.altana.network/sitemap.xml` → HTTP 404.** What does exist is `https://altana.network/sitemap.xml` (only 5 URLs: /, /download, /architecture, /privacy, /terms). To crawl the docs, use `llms.txt` / `llms-full.txt`.
 
-### Repo GitHub (org @altananetwork — hanya 4 repo publik)
+### GitHub repos (the @altananetwork org — only 4 public repos)
 
-| Repo | Bahasa | Deskripsi |
+| Repo | Language | Description |
 |---|---|---|
-| `altananetwork/altana-sdk` | TypeScript | Monorepo: `packages/wallet` (SDK), `packages/mcp`, `packages/x402-server`, `docs/` |
-| `altananetwork/skills` | TypeScript | Skills Registry — 10 `SKILL.md` + `index.json` + harness fork-test |
-| `altananetwork/altana-desktop-releases` | — | Artefak rilis desktop app |
-| `altananetwork/agentic-ecosystem-board` | TypeScript | Data terbuka agent ERC-8004, wallet & holdings per chain, refresh harian |
+| `altananetwork/altana-sdk` | TypeScript | A monorepo: `packages/wallet` (the SDK), `packages/mcp`, `packages/x402-server`, `docs/` |
+| `altananetwork/skills` | TypeScript | The Skills Registry — 10 `SKILL.md` files + `index.json` + a fork-test harness |
+| `altananetwork/altana-desktop-releases` | — | Desktop app release artefacts |
+| `altananetwork/agentic-ecosystem-board` | TypeScript | Open data on ERC-8004 agents, wallets and holdings per chain, refreshed daily |
 
-Sumber: <https://api.github.com/orgs/altananetwork/repos>
+Source: <https://api.github.com/orgs/altananetwork/repos>
 
 ---
 
-## 1. Arsitektur, Konsep Wallet Agent & Sovereign Agent
+## 1. Architecture, the Agent Wallet Concept & Sovereign Agents
 
-### 1.1 Apa itu "sovereign agent" menurut Altana
+### 1.1 What a "sovereign agent" means to Altana
 
 > "An agent is only sovereign when no third party can act for it or stop it, and that comes down to who holds the keys. Handing an agent the seed phrase lets it spend everything. MPC or co-signing puts a key share with a third party that can approve, delay, or refuse. A custodial platform holds the funds outright. **With Altana, the owner holds the admin key, the agent holds a scoped session key, and no one else holds anything.**"
 
-Sumber: <https://www.altana.network/llms.txt>
+Source: <https://www.altana.network/llms.txt>
 
-Pembagian peran (dua kunci yang tidak pernah dishare):
+The division of roles (two keys that are never shared):
 
-| Role | Key type | Dipegang oleh | Bisa dicabut? |
+| Role | Key type | Held by | Revocable? |
 |---|---|---|---|
-| Admin (kamu/user) | Passkey (P-256) **atau** private key (secp256k1) | Device / env / keychain kamu | Tidak — itu milikmu |
-| Agent | Session key (secp256k1) | Proses agent | **Ya — 1 transaksi** |
+| Admin (you/the user) | A passkey (P-256) **or** a private key (secp256k1) | Your device / env / keychain | No — it is yours |
+| Agent | A session key (secp256k1) | The agent process | **Yes — 1 transaction** |
 
-Sumber: <https://docs.altana.network/use-cases/1b-passkey-delegates-to-agent>
+Source: <https://docs.altana.network/use-cases/1b-passkey-delegates-to-agent>
 
-### 1.2 Smart Agentic Wallet
+### 1.2 The Smart Agentic Wallet
 
-- Smart account **counterfactual**: alamat deterministik, **belum ter-deploy on-chain sampai `execute` pertama**.
-- Alamat **sama di semua chain** yang dikonfigurasi.
-- Berbasis **EIP-7702**: wallet adalah EOA yang di-delegate ke account contract.
-- Admin key di-auto-register ke Keystore lewat `initialRegisterKey`, **di-batch ke dalam userOp pertama**.
-- ⚠️ Browser wallet (MetaMask, Trust Wallet, Rabby) **tidak bisa jadi signer** — extension wallet menahan EIP-7702 delegation authorization dan menolak menandatangani raw relay digest. `SignerType` resmi hanya `"privateKey" | "passkey"`.
+- A **counterfactual** smart account: a deterministic address, **not deployed on-chain until the first `execute`**.
+- **The same address on every** configured chain.
+- Based on **EIP-7702**: the wallet is an EOA delegated to an account contract.
+- The admin key is auto-registered to the Keystore through `initialRegisterKey`, **batched into the first userOp**.
+- ⚠️ Browser wallets (MetaMask, Trust Wallet, Rabby) **cannot be the signer** — extension wallets hold back the EIP-7702 delegation authorization and refuse to sign the raw relay digest. The only official `SignerType` values are `"privateKey" | "passkey"`.
 
-Sumber: <https://docs.altana.network/sdk/create-wallet> · <https://docs.altana.network/concepts/keystore> · <https://docs.altana.network/changelog>
+Sources: <https://docs.altana.network/sdk/create-wallet> · <https://docs.altana.network/concepts/keystore> · <https://docs.altana.network/changelog>
 
-### 1.3 Keystore — registry otorisasi on-chain
+### 1.3 The Keystore — an on-chain authorization registry
 
 > "**Keystore is a public onchain registry.** For every Altana wallet, it stores which keys are currently authorized to act on it."
 
-Model data (dari Explorer llms.txt): registry **signature-scheme-agnostic** yang memetakan
+The data model (from the Explorer's llms.txt): a **signature-scheme-agnostic** registry mapping
 ```
 (user, keyId) → publicKey + metadata + lifecycle state
 ```
-di mana `keyId` secara konvensi adalah `keccak256(publicKey)` (public key SEC1-encoded).
+where `keyId` is, by convention, `keccak256(publicKey)` (the SEC1-encoded public key).
 
-Sumber: <https://explorer.altana.network/llms.txt> · <https://docs.altana.network/concepts/keystore>
+Sources: <https://explorer.altana.network/llms.txt> · <https://docs.altana.network/concepts/keystore>
 
-**Writes vs Reads:**
+**Writes versus reads:**
 
-| Operasi | Jenis | Catatan |
+| Operation | Kind | Notes |
 |---|---|---|
-| Register key | Write (lewat **Controller**) | Admin: otomatis pada `execute` pertama. Session: pada `grantSession` (default `register: true`) |
-| Revoke key | Write (langsung ke **KeyStore**) | Di-gate `onlyKeyOwnerOrValidator` — hanya wallet sendiri atau validator. **Monotonic**: sekali dicabut tidak bisa dihidupkan lagi |
-| `isValidKey(user, keyId)` | Read — **gratis, unlimited** | `eth_call` dari RPC mana pun. Menggabungkan 3 pertanyaan: key ada, belum dicabut, belum expired |
-| `getKeys(user) → bytes32[]` | Read — gratis | ⚠️ **Revoke menghapus dari list; expiry TIDAK.** Key yang sudah lama expired tetap muncul di `getKeys` |
+| Register a key | Write (through the **Controller**) | Admin: automatic on the first `execute`. Session: on `grantSession` (default `register: true`) |
+| Revoke a key | Write (directly to the **KeyStore**) | Gated by `onlyKeyOwnerOrValidator` — only the wallet itself or a validator. **Monotonic**: once revoked it can never be brought back |
+| `isValidKey(user, keyId)` | Read — **free, unlimited** | An `eth_call` from any RPC. It answers 3 questions at once: the key exists, it is not revoked, and it has not expired |
+| `getKeys(user) → bytes32[]` | Read — free | ⚠️ **Revoking removes it from the list; expiry does NOT.** A key that expired long ago still shows up in `getKeys` |
 
-Sumber: <https://docs.altana.network/concepts/keystore>
+Source: <https://docs.altana.network/concepts/keystore>
 
-**Yang penting untuk privasi:** dari halaman utama Altana —
+**What matters for privacy:** from Altana's main page —
 > "only a hash of it is committed onchain, so the registry proves authority without publishing the details"
 
-Artinya `permissions` di-commit sebagai **permissions hash**, bukan plaintext. Ini yang membuat `Session` harus di-restore *byte-exact* (lihat §2.6). Sumber: <https://www.altana.network/llms.txt>
+That means `permissions` is committed as a **permissions hash**, not as plaintext. This is what forces a `Session` to be restored *byte-exact* (see §2.6). Source: <https://www.altana.network/llms.txt>
 
-**Event vocabulary (kontrak v1.1)** — yang di-index Explorer:
+**Event vocabulary (contracts v1.1)** — what the Explorer indexes:
 
-| Event | Contract | Arti |
+| Event | Contract | Meaning |
 |---|---|---|
-| `KeyRegistered` | KeyStore (L1) | Key baru ditambahkan ke akun (root atau session) |
-| `KeyRevoked` | KeyStore (L1) | Key dicabut. Monotonic |
-| `NonceUpdated` | KeyStore (L1) | Validator counter naik (mis. WebAuthn signCount) |
-| `FeeCollected` | Controller (L1) | Biaya registrasi dibayar; dikorelasikan ke `KeyRegistered` lewat tx hash |
-| `KeyPopulated` | Cache (L2) | Key L1 dibuktikan masuk cache L2 |
-| `KeyRevokedInCache` | Cache (L2) | Revokasi L1 dipropagasi ke cache |
+| `KeyRegistered` | KeyStore (L1) | A new key was added to the account (root or session) |
+| `KeyRevoked` | KeyStore (L1) | A key was revoked. Monotonic |
+| `NonceUpdated` | KeyStore (L1) | A validator counter went up (e.g. the WebAuthn signCount) |
+| `FeeCollected` | Controller (L1) | A registration fee was paid; correlated to `KeyRegistered` through the tx hash |
+| `KeyPopulated` | Cache (L2) | An L1 key was proven into the L2 cache |
+| `KeyRevokedInCache` | Cache (L2) | An L1 revocation was propagated into the cache |
 
-Sumber: <https://explorer.altana.network/llms.txt>
+Source: <https://explorer.altana.network/llms.txt>
 
-### 1.4 Intent relay
+### 1.4 The intent relay
 
-`execute` tidak mengirim transaksi langsung; ia mengirim **intent/bundle** ke relay Altana yang mengeksekusinya. Relay menjawab polling status dengan kode numerik ala EIP-5792. Ini penting untuk error handling (§9).
+`execute` does not send a transaction directly; it sends an **intent/bundle** to Altana's relay, which executes it. The relay answers status polls with EIP-5792-style numeric codes. This matters for error handling (§9).
 
-- Relay BNB mainnet: `https://relay.altana.network`
-- Relay BNB testnet: `https://testnet-relay.altana.network`
-- **Base tidak punya relay** → `BASE` tidak bisa dipassing ke `createClient`, murni target verifikasi.
+- BNB mainnet relay: `https://relay.altana.network`
+- BNB testnet relay: `https://testnet-relay.altana.network`
+- **Base has no relay** → `BASE` cannot be passed to `createClient`; it is purely a verification target.
 
-Sumber: <https://docs.altana.network/concepts/networks> · <https://docs.altana.network/concepts/networks/testnet>
+Sources: <https://docs.altana.network/concepts/networks> · <https://docs.altana.network/concepts/networks/testnet>
 
-### 1.5 Cross-chain: bagaimana otorisasi menyeberang tanpa bridge
+### 1.5 Cross-chain: how authorization crosses over without a bridge
 
-Sessions di-grant di L1 (Ethereum = source of truth). Cache L2 di Base memverifikasi session yang sama lewat **storage proof (Merkle Patricia) terhadap state L1**, dianchor ke L1 block hash yang di-expose predeploy `L1Block` milik L2 — **tanpa bridge message, tanpa oracle, tanpa committee**.
+Sessions are granted on L1 (Ethereum = the source of truth). The L2 cache on Base verifies the same session through a **storage proof (Merkle Patricia) against L1 state**, anchored to an L1 block hash exposed by the L2's `L1Block` predeploy — **with no bridge message, no oracle, and no committee**.
 
-`ensureKeyCached` menangani prosesnya dalam 4 tahap: `cache-hit` → `waiting-for-anchor` (1–3 menit) → `submitting-proof` → `done`.
+`ensureKeyCached` handles the process in 4 stages: `cache-hit` → `waiting-for-anchor` (1–3 minutes) → `submitting-proof` → `done`.
 
-Sumber: <https://docs.altana.network/use-cases/5-cross-chain-authorization> · <https://altana.network/architecture>
+Sources: <https://docs.altana.network/use-cases/5-cross-chain-authorization> · <https://altana.network/architecture>
 
-> ℹ️ Untuk hackathon BNB kita, **cross-chain tidak perlu**: BNB Chain punya Keystore standalone (bukan cache). Jalur `ensureKeyCached` hanya relevan Ethereum→Base.
+> ℹ️ For our BNB hackathon, **cross-chain is unnecessary**: BNB Chain has a standalone Keystore (not a cache). The `ensureKeyCached` path only matters for Ethereum→Base.
 
 ---
 
-## 2. Sessions — struktur, grant, batasan, revoke, baca dari Keystore
+## 2. Sessions — structure, granting, limits, revoking, reading from the Keystore
 
-Ini bagian paling penting untuk syarat menang track.
+This is the most important section for meeting the track's winning requirements.
 
-### 2.1 Definisi
+### 2.1 Definition
 
 > "A **session** is a scoped, time-bounded delegation from a wallet's admin key to another key. The session key can act on the wallet, but only within the granted permissions, and only until the expiry. **Permissions are enforced onchain.** A session that tries to call a contract outside its allowlist, or spend beyond its cap, reverts at validation time. There is no off-chain trust assumption."
 
-Sumber: <https://docs.altana.network/concepts/sessions>
+Source: <https://docs.altana.network/concepts/sessions>
 
-### 2.2 Struktur data (verbatim dari docs)
+### 2.2 The data structure (verbatim from the docs)
 
 ```ts
 type Session = {
@@ -187,9 +187,9 @@ type SessionPermissions = {
 };
 ```
 
-Sumber: <https://docs.altana.network/concepts/sessions>
+Source: <https://docs.altana.network/concepts/sessions>
 
-### 2.3 Bentuk permission — allowlist kontrak & selector
+### 2.3 The shape of a permission — contract & selector allowlists
 
 ```ts
 calls: [
@@ -199,13 +199,13 @@ calls: [
 ]
 ```
 
-**Tiga bentuk allowlist:** per-kontrak (`to`), per-selector (`signature`), atau keduanya dengan **semantik AND**.
+**Three allowlist forms:** per contract (`to`), per selector (`signature`), or both, with **AND semantics**.
 
-> ⚠️ **`permissions.calls` dihilangkan = UNRESTRICTED.** Kalau `calls` tidak dipassing, session bisa memanggil kontrak apa pun dalam batas spend cap. Docs bilang eksplisit: "Set both unless that's truly what you want."
+> ⚠️ **Omitting `permissions.calls` = UNRESTRICTED.** If `calls` is not passed, the session can call any contract at all, within the spend cap. The docs say it outright: "Set both unless that's truly what you want."
 
-Sumber: <https://docs.altana.network/concepts/sessions>
+Source: <https://docs.altana.network/concepts/sessions>
 
-### 2.4 Spend cap
+### 2.4 Spend caps
 
 ```ts
 spend: [
@@ -214,17 +214,17 @@ spend: [
 ]
 ```
 
-- `limit` dalam **smallest unit token**, `period` adalah **rolling period** (`"day"`, `"hour"` terlihat di contoh docs; daftar lengkap enum period **tidak ditemukan** di docs).
-- `token` dihilangkan → cap untuk **native token**.
+- `limit` is in the token's **smallest unit**, and `period` is a **rolling period** (`"day"` and `"hour"` appear in the docs examples; the full enum of periods was **not found** in the docs).
+- Omit `token` → the cap applies to the **native token**.
 
-**Dua jebakan yang didokumentasikan sebagai warning:**
+**Two traps documented as warnings:**
 
-1. **Desimal berbeda per chain.** USDT & USDC pakai **18 desimal di BNB Chain**, 6 di Ethereum. Menulis `100_000_000n` untuk "100 USDT" di BNB = cap 0.0000000001 USDT.
-2. **Native spend cap juga membayar relay fee.** Cap native menutupi fee, bukan cuma kiriman agent. Cap native mendekati nol (mis. 1 wei) = session yang tidak akan pernah bisa eksekusi satu transaksi pun — relay menolak setiap bundle sebelum inklusi (`FAILED`, `statusCode` **300**).
+1. **Decimals differ per chain.** USDT and USDC use **18 decimals on BNB Chain**, 6 on Ethereum. Writing `100_000_000n` for "100 USDT" on BNB gives you a cap of 0.0000000001 USDT.
+2. **The native spend cap also pays the relay fee.** A native cap covers the fee, not just what the agent sends. A native cap near zero (e.g. 1 wei) = a session that will never be able to execute a single transaction — the relay rejects every bundle before inclusion (`FAILED`, `statusCode` **300**).
 
-Sumber: <https://docs.altana.network/sdk/grant-session>
+Source: <https://docs.altana.network/sdk/grant-session>
 
-### 2.5 `grantSession` — signature lengkap
+### 2.5 `grantSession` — the full signature
 
 ```ts
 client.grantSession(opts: ClientGrantSessionOptions): Promise<GrantSessionResult>;
@@ -251,7 +251,7 @@ type GrantSessionResult = Session & {
 };
 ```
 
-**Contoh lengkap (verbatim docs):**
+**A complete example (verbatim from the docs):**
 
 ```ts
 import { createClient, BNB, signerFromPrivateKey } from "@altananetwork/sdk";
@@ -275,25 +275,25 @@ const session = await client.grantSession({
 });
 ```
 
-**Apa yang mendarat on-chain — dalam SATU userOp, atomik:**
-1. Public key session di-register di Keystore (lewat Controller) → **membuat otoritasnya provable ke siapa pun**.
-2. Session di-authorize di smart account wallet dengan **permissions hash**-nya.
+**What lands on-chain — in ONE userOp, atomically:**
+1. The session's public key is registered in the Keystore (through the Controller) → **making its authority provable to anyone**.
+2. The session is authorized on the wallet's smart account with its **permissions hash**.
 
 > "There is no intermediate state where one exists without the other."
 
-⚠️ **Ini call yang membebani user biaya.** Ada one-time Keystore registration fee; pada aksi admin pertama sebuah wallet, fee dibayar **dua kali** karena `initialRegisterKey` untuk admin di-prepend ke userOp yang sama. `register: false` melewati fee (tapi lalu `verify_authorization` / Keystore reader tidak melihat session tersebut → **jangan pakai `register: false` untuk hackathon ini**, syarat menang mensyaratkan session terdaftar di Keystore).
+⚠️ **This call costs the user money.** There is a one-time Keystore registration fee; on a wallet's first admin action the fee is paid **twice**, because `initialRegisterKey` for the admin is prepended to the same userOp. `register: false` skips the fee (but then `verify_authorization` / a Keystore reader will not see that session → **do not use `register: false` for this hackathon**; the winning requirements demand a session registered in the Keystore).
 
-Register belakangan: `await client.registerSessionKey({ wallet, signer: admin, session });`
+Registering later: `await client.registerSessionKey({ wallet, signer: admin, session });`
 
-⚠️ **Gotcha TypeScript:** anotasi eksplisit `const session: Session = await client.grantSession(...)` **menghapus** field `transactionHash`. Biarkan tipe di-infer, atau anotasi dengan `GrantSessionResult`.
+⚠️ **A TypeScript gotcha:** an explicit annotation `const session: Session = await client.grantSession(...)` **strips** the `transactionHash` field. Let the type be inferred, or annotate it as `GrantSessionResult`.
 
-Sumber: <https://docs.altana.network/sdk/grant-session>
+Source: <https://docs.altana.network/sdk/grant-session>
 
-### 2.6 Persist session — WAJIB pakai `serializeSession` / `deserializeSession`
+### 2.6 Persisting a session — you MUST use `serializeSession` / `deserializeSession`
 
 > "A `Session` embeds the session's private key and bigint spend limits, so **never `JSON.stringify` it**."
 
-Sejak SDK **0.9.0** (2026-09-02) field key internal dibuat **non-enumerable**, jadi `JSON.stringify`/`Object.keys` tidak pernah melihatnya. Siapa pun yang dulu mengandalkan kebocoran itu untuk persistence **harus migrasi**.
+Since SDK **0.9.0** (2026-09-02) the internal key fields are **non-enumerable**, so `JSON.stringify`/`Object.keys` never see them. Anyone who used to rely on that leak for persistence **has to migrate**.
 
 ```ts
 import { generatePrivateKey } from "viem/accounts";
@@ -317,15 +317,15 @@ const restored = deserializeSession(
 );
 ```
 
-- `serializeSession` menyimpan `walletAddress`, `publicKey`, `permissions` (spend limit sebagai **decimal string**), `expiry`.
-- `deserializeSession` merestore bigint dan **menolak key yang tidak cocok** dengan `publicKey` session yang terdaftar → gagal keras saat restore, bukan diam-diam saat execute.
-- ⚠️ Kalau `sessionSigner` dihilangkan, SDK generate key yang **hanya ada di memori proses** dan memberi warning di console. Kalau hilang (crash / script selesai), otorisasi on-chain yang di-back key itu **permanen tidak bisa dipakai** — satu-satunya jalan keluar adalah revoke-and-regrant.
+- `serializeSession` stores `walletAddress`, `publicKey`, `permissions` (with spend limits as **decimal strings**), and `expiry`.
+- `deserializeSession` restores the bigints and **rejects a key that does not match** the registered session's `publicKey` → it fails loudly at restore time rather than silently at execute time.
+- ⚠️ If `sessionSigner` is omitted, the SDK generates a key that **exists only in the process's memory** and prints a console warning. If it is lost (a crash, or the script finishing), the on-chain authorization backed by that key is **permanently unusable** — the only way out is revoke-and-regrant.
 
-**Untuk produk kita: SELALU passing `sessionSigner` sendiri.**
+**For our product: ALWAYS pass your own `sessionSigner`.**
 
-Sumber: <https://docs.altana.network/sdk/grant-session#persisting-a-session> · <https://docs.altana.network/changelog>
+Sources: <https://docs.altana.network/sdk/grant-session#persisting-a-session> · <https://docs.altana.network/changelog>
 
-### 2.7 `execute` — memakai session key
+### 2.7 `execute` — using the session key
 
 ```ts
 client.execute(opts: ClientExecuteOptions): Promise<ExecuteResult>;
@@ -356,17 +356,17 @@ const result = await client.execute({
 console.log(result.status, result.transactionHash);
 ```
 
-**Dampak Keystore:**
+**Keystore impact:**
 
-| Skenario | Menyentuh Keystore? |
+| Scenario | Touches the Keystore? |
 |---|---|
-| `execute` admin pertama di wallet baru | Ya (admin key di-register) |
-| `execute` admin berikutnya | Tidak |
-| **Semua session `execute`** | **Tidak** (session sudah di-register saat grant) |
+| The first admin `execute` on a new wallet | Yes (the admin key gets registered) |
+| Subsequent admin `execute`s | No |
+| **Every session `execute`** | **No** (the session was already registered at grant time) |
 
-⚠️ **`execute` yang gagal TIDAK melempar exception.** Ia mengembalikan `status: "FAILED"`. Kalau kamu cuma `try/catch`, kamu tidak akan menyadarinya.
+⚠️ **A failed `execute` DOES NOT throw.** It returns `status: "FAILED"`. If you only `try/catch`, you will never notice.
 
-Sumber: <https://docs.altana.network/sdk/execute> · <https://docs.altana.network/sdk/errors>
+Sources: <https://docs.altana.network/sdk/execute> · <https://docs.altana.network/sdk/errors>
 
 ### 2.8 `revokeSession`
 
@@ -383,21 +383,21 @@ type ClientRevokeSessionOptions = {
 ```
 
 ```ts
-// Bentuk paling ringkas
+// The shortest form
 await client.revokeSession({ wallet, signer: admin, session });
 
-// Hanya punya public key (kasus umum di UI: user klik "revoke" dari daftar di DB)
+// When you only have the public key (the common UI case: the user clicks "revoke" from a list in the DB)
 const sessionPublicKey = "0x04..." as `0x${string}`;
 await client.revokeSession({ wallet, signer: admin, session: sessionPublicKey });
 ```
 
-- Setelah konfirmasi, **`execute` berikutnya dari session itu revert di tahap validasi**.
-- Efek **langsung** di chain tempat key terdaftar; tidak perlu koordinasi off-chain.
-- **Monotonic** — sekali dicabut, tidak bisa diaktifkan lagi. Untuk memberi akses lagi: grant session baru dengan keypair baru.
-- Hanya **admin signer** wallet yang bisa mencabut (`onlyKeyOwnerOrValidator`).
-- Revoke yang gagal **mengembalikan** `status: 'FAILED'`, tidak melempar.
+- Once confirmed, **the next `execute` from that session reverts at the validation stage**.
+- The effect is **immediate** on the chain where the key is registered; no off-chain coordination is needed.
+- **Monotonic** — once revoked, it can never be reactivated. To grant access again: grant a new session with a new keypair.
+- Only the wallet's **admin signer** can revoke (`onlyKeyOwnerOrValidator`).
+- A failed revoke **returns** `status: 'FAILED'`; it does not throw.
 
-**Cross-chain revocation (hanya kalau pakai Ethereum→Base):**
+**Cross-chain revocation (only if you use Ethereum→Base):**
 
 ```ts
 import { syncKeyToL2, ETHEREUM, BASE } from "@altananetwork/sdk";
@@ -412,11 +412,11 @@ await syncKeyToL2({
 });
 ```
 
-Sumber: <https://docs.altana.network/sdk/revoke-session>
+Source: <https://docs.altana.network/sdk/revoke-session>
 
-### 2.9 Membaca session dari Keystore on-chain (verifikasi pihak ketiga)
+### 2.9 Reading a session from the on-chain Keystore (third-party verification)
 
-Ini yang akan dilakukan juri. **Gratis, tanpa API key, tanpa admin key, tanpa session, tanpa apa pun dari Altana.**
+This is what the judges will do. **Free, no API key, no admin key, no session, nothing from Altana at all.**
 
 ```ts
 import { createPublicClient, http, keccak256 } from "viem";
@@ -448,34 +448,34 @@ const authorized = await client.readContract({
 });
 ```
 
-- `isValidKey` return `true` **hanya kalau** key ada, belum dicabut, dan belum expired.
-- Untuk seluruh set key di wallet: `getKeys(walletAddress)` → `bytes32[]`, lalu cek satu-satu dengan `isValidKey`.
-- ⚠️ Ingat: revoke menghapus dari `getKeys` seketika, **expiry tidak**.
+- `isValidKey` returns `true` **only if** the key exists, has not been revoked, and has not expired.
+- For a wallet's whole key set: `getKeys(walletAddress)` → `bytes32[]`, then check each one with `isValidKey`.
+- ⚠️ Remember: revoking removes it from `getKeys` immediately, **expiry does not**.
 
-**Catatan sub-delegation (verbatim dari docs):**
+**A note on sub-delegation (verbatim from the docs):**
 > "Only the wallet admin grants sessions. Do not read this as one agent minting a sub-key for another. It is the admin authorizing both agents, and the agents verifying each other. If session-to-session sub-delegation lands later, the docs will be updated."
 
-Sumber: <https://docs.altana.network/use-cases/4-verify-agent-authority> · <https://docs.altana.network/concepts/keystore>
+Sources: <https://docs.altana.network/use-cases/4-verify-agent-authority> · <https://docs.altana.network/concepts/keystore>
 
-### 2.10 Lifecycle ringkas
+### 2.10 The lifecycle in brief
 
-| Stage | Fungsi | Dampak Keystore |
+| Stage | Function | Keystore impact |
 |---|---|---|
-| Grant | `grantSession` | **Write.** Session public key di-register by default |
-| Use | `execute({ session, calls })` | Tidak ada |
-| Verify | Siapa pun baca `isValidKey` | Tidak ada. Gratis, unlimited |
-| Revoke | `revokeSession` | **Write** (gated `onlyKeyOwnerOrValidator`). Monotonic |
-| Expire | Otomatis pada `expiry` | Tidak ada. **Tidak ada transaksi** |
+| Grant | `grantSession` | **A write.** The session public key is registered by default |
+| Use | `execute({ session, calls })` | None |
+| Verify | Anyone reads `isValidKey` | None. Free, unlimited |
+| Revoke | `revokeSession` | **A write** (gated by `onlyKeyOwnerOrValidator`). Monotonic |
+| Expire | Automatic at `expiry` | None. **No transaction** |
 
-Sumber: <https://docs.altana.network/concepts/sessions>
+Source: <https://docs.altana.network/concepts/sessions>
 
 ---
 
-## 3. Alamat Kontrak — BNB Mainnet & Testnet
+## 3. Contract Addresses — BNB Mainnet & Testnet
 
-### 3.1 BNB Smart Chain — export SDK `BNB`
+### 3.1 BNB Smart Chain — the SDK's `BNB` export
 
-| Item | Nilai |
+| Item | Value |
 |---|---|
 | Chain id | **56** |
 | Public RPC | `https://bsc-rpc.publicnode.com` |
@@ -484,11 +484,11 @@ Sumber: <https://docs.altana.network/concepts/sessions>
 | **KeyStore** | `0x6572427ED530BadcF7375Cf9A4709D8d2b0E7E0a` |
 | **KeyStoreController** | `0x0834Ee2C9BdC3E3efF0a2dC34393D4B0e546A555` |
 
-Verifikasi source code: <https://bscscan.com/address/0x6572427ED530BadcF7375Cf9A4709D8d2b0E7E0a#code> (source-verified, exact match)
+Source code verification: <https://bscscan.com/address/0x6572427ED530BadcF7375Cf9A4709D8d2b0E7E0a#code> (source-verified, exact match)
 
-### 3.2 BNB Smart Chain Testnet — export SDK `BNB_TESTNET`
+### 3.2 BNB Smart Chain Testnet — the SDK's `BNB_TESTNET` export
 
-| Item | Nilai |
+| Item | Value |
 |---|---|
 | Chain id | **97** |
 | Public RPC | `https://bsc-testnet-rpc.publicnode.com` |
@@ -498,7 +498,7 @@ Verifikasi source code: <https://bscscan.com/address/0x6572427ED530BadcF7375Cf9A
 | **KeyStore** | `0x6b8361C29d05D498b1a12B54A37310f94171E94A` |
 | **KeyStoreController** | `0xb530D1971f5453F3359518343F05D0AedFfF7e12` |
 
-**Account stack (dipakai relay) — testnet:**
+**The account stack (used by the relay) — testnet:**
 
 | Contract | Address |
 |---|---|
@@ -509,42 +509,42 @@ Verifikasi source code: <https://bscscan.com/address/0x6572427ED530BadcF7375Cf9A
 | Funder | `0xb248602EAadd9c3e2Db4575C4e4d58003b7a2740` |
 | Escrow | `0xCd075ceb5Cd463a9233a8085fc915767139F655c` |
 
-**Token testnet:**
+**Testnet tokens:**
 
-| Token | Address | Fungsi |
+| Token | Address | Function |
 |---|---|---|
-| EXP | `0xa8071DA5e994cB8e3eB56CaD0FBB6ca424dD8dc0` | fee token (bayar relay fee dengan test token, bukan tBNB) |
-| EXP2 | `0x61727778216127D0843A99A3e91e99C27e9f3BC7` | fee token |
-| **$U token** | `0xc70B8741B8B07A6d61E54fd4B20f22Fa648E5565` | token ekonomi agent, escrow ERC-8183 |
-| **$U faucet** | `0x86e9197CC0F76E4e4aaa7082180945196bBAb5D3` | `requestTokens()` → 10 $U per address / 30 menit |
+| EXP | `0xa8071DA5e994cB8e3eB56CaD0FBB6ca424dD8dc0` | A fee token (pay the relay fee with a test token instead of tBNB) |
+| EXP2 | `0x61727778216127D0843A99A3e91e99C27e9f3BC7` | A fee token |
+| **$U token** | `0xc70B8741B8B07A6d61E54fd4B20f22Fa648E5565` | The agent economy token, ERC-8183 escrow |
+| **$U faucet** | `0x86e9197CC0F76E4e4aaa7082180945196bBAb5D3` | `requestTokens()` → 10 $U per address every 30 minutes |
 
-> ⚠️ Alamat account-stack di atas **hanya ada untuk testnet** di halaman docs. Padanan untuk BNB mainnet **tidak ditemukan** di dokumentasi publik (halaman `/concepts/networks` untuk BNB hanya mencantumkan KeyStore + KeyStoreController).
+> ⚠️ The account-stack addresses above **only exist for testnet** on the docs page. Their BNB mainnet equivalents were **not found** in the public documentation (the `/concepts/networks` page for BNB lists only the KeyStore + KeyStoreController).
 
-### 3.3 Ethereum & Base (referensi, tidak dipakai untuk track ini)
+### 3.3 Ethereum & Base (for reference, not used for this track)
 
-| Network | Chain id | Kontrak |
+| Network | Chain id | Contracts |
 |---|---|---|
 | Ethereum (`ETHEREUM`) | 1 | KeyStore `0xb70fDa90C1d576Ba8399946a0c10ECD9d9Ea923b` · Controller `0x30a188Eecf14F4142B0d828ce838C9E1134e7FaA` · RPC `https://ethereum-rpc.publicnode.com` · Relay `https://relay.altana.network` |
-| Base (`BASE`) | 8453 | KeyStoreCache `0x6572427ED530BadcF7375Cf9A4709D8d2b0E7E0a` · RPC `https://base-rpc.publicnode.com` · **tanpa relay, read-only** |
+| Base (`BASE`) | 8453 | KeyStoreCache `0x6572427ED530BadcF7375Cf9A4709D8d2b0E7E0a` · RPC `https://base-rpc.publicnode.com` · **no relay, read-only** |
 
-### 3.4 ERC-8183 / ERC-8004 — registry alamat (dari source code SDK)
+### 3.4 ERC-8183 / ERC-8004 — the address registry (from the SDK source code)
 
-Diambil verbatim dari `packages/wallet/src/erc8183.ts`, export `ERC8183_ADDRESSES`:
+Taken verbatim from `packages/wallet/src/erc8183.ts`, the `ERC8183_ADDRESSES` export:
 
-| Kontrak | BSC Mainnet (56) | BSC Testnet (97) |
+| Contract | BSC Mainnet (56) | BSC Testnet (97) |
 |---|---|---|
-| `commerce` (AgenticCommerce kernel) | `0xEa4DAa3100A767e86FDed867729ae7446476EBA6` | `0xa206c0517B6371C6638CD9e4a42Cc9f02A33B0DE` |
+| `commerce` (the AgenticCommerce kernel) | `0xEa4DAa3100A767e86FDed867729ae7446476EBA6` | `0xa206c0517B6371C6638CD9e4a42Cc9f02A33B0DE` |
 | `router` (EvaluatorRouter) | `0x51895229E12F9876011789B04f8698af06cCD6DA` | `0xD7d36D66d2F1B608A0F943f722D27e3744f66F25` |
 | `policy` (OptimisticPolicy) | `0x9C01845705b3078Aa2e8cfF7520a6376FD766dE5` | `0xd6a4217588F6B1F5657a92A3e94E6422aD771cEA` |
 | `registry` (ERC-8004 identity, ERC-721) | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` | `0x8004A818BFB912233c491871b3d84c89A494BD9e` |
 | `paymentToken` (**$U** / United Stables) | `0xcE24439F2D9C6a2289F741120FE202248B666666` | `0xc70B8741B8B07A6d61E54fd4B20f22Fa648E5565` |
 
-Sumber: <https://github.com/altananetwork/altana-sdk/blob/main/packages/wallet/src/erc8183.ts>
-Source of truth untuk semua alamat network: <https://github.com/altananetwork/altana-sdk/blob/main/packages/wallet/src/config.ts>
+Source: <https://github.com/altananetwork/altana-sdk/blob/main/packages/wallet/src/erc8183.ts>
+The source of truth for all network addresses: <https://github.com/altananetwork/altana-sdk/blob/main/packages/wallet/src/config.ts>
 
-### 3.5 Alamat protokol BNB mainnet (dari Skills Registry — untuk membangun allowlist)
+### 3.5 BNB mainnet protocol addresses (from the Skills Registry — for building the allowlist)
 
-| Protokol | Kontrak | Address |
+| Protocol | Contract | Address |
 |---|---|---|
 | PancakeSwap | V2 Router | `0x10ED43C718714eb63d5aA57B78B54704E256024E` |
 | PancakeSwap | V2 Factory | `0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73` |
@@ -559,13 +559,13 @@ Source of truth untuk semua alamat network: <https://github.com/altananetwork/al
 | Lista | slisBNB | `0xB0b84D294e0C75A6abe60171b70edEb2EFd14A1B` |
 | Aave V3 | Pool | `0x6807dc923806fE8Fd134338EABCA509979a7e0cB` |
 | Aave V3 | aBnbUSDT (aToken) | `0xa9251ca9DE909CB71783723713B21E4233fbf1B1` |
-| Permit2 | canonical | `PERMIT2_ADDRESS` diekspor dari `@altananetwork/sdk` (docs menyebut prefix `0x0000…78BA3`) |
+| Permit2 | canonical | `PERMIT2_ADDRESS` is exported from `@altananetwork/sdk` (the docs mention the prefix `0x0000…78BA3`) |
 
-Sumber: <https://skills.altana.network/llms-full.txt> · <https://docs.altana.network/use-cases/6-agent-pays-api-x402> · <https://docs.altana.network/concepts/off-chain-signatures>
+Sources: <https://skills.altana.network/llms-full.txt> · <https://docs.altana.network/use-cases/6-agent-pays-api-x402> · <https://docs.altana.network/concepts/off-chain-signatures>
 
 ---
 
-## 4. SDK & MCP Server
+## 4. The SDK & MCP Server
 
 ### 4.1 `@altananetwork/sdk` — v0.9.0
 
@@ -573,33 +573,33 @@ Sumber: <https://skills.altana.network/llms-full.txt> · <https://docs.altana.ne
 npm install @altananetwork/sdk viem
 ```
 
-| Metadata | Nilai |
+| Metadata | Value |
 |---|---|
-| Versi latest | `0.9.0` (dirilis 2026-09-02) |
-| Riwayat versi | 0.3.2 → 0.3.3 → 0.4.0 → 0.5.0 → 0.5.1 → 0.6.0 → 0.7.0 → 0.7.1 → 0.8.0 → **0.9.0** |
-| Lisensi | Apache-2.0 |
+| Latest version | `0.9.0` (released 2026-09-02) |
+| Version history | 0.3.2 → 0.3.3 → 0.4.0 → 0.5.0 → 0.5.1 → 0.6.0 → 0.7.0 → 0.7.1 → 0.8.0 → **0.9.0** |
+| Licence | Apache-2.0 |
 | Module type | ESM (`"type": "module"`) |
 | Dependencies | `viem ^2.21.0`, `porto 0.2.37`, `ox ^0.14.0` |
 | Repo | `github.com/altananetwork/altana-sdk`, directory `packages/wallet` |
 | Unpacked size | ~440 KB |
 
-> ⚠️ **Pre-1.0. Minor version bisa berisi breaking changes.** (docs: "These packages are pre-1.0. Minor versions may contain breaking changes.") **Pin versi exact di `package.json`.**
+> ⚠️ **Pre-1.0. A minor version can contain breaking changes.** (From the docs: "These packages are pre-1.0. Minor versions may contain breaking changes.") **Pin the exact version in `package.json`.**
 
-Sumber: <https://registry.npmjs.org/@altananetwork/sdk> · <https://docs.altana.network/changelog>
+Sources: <https://registry.npmjs.org/@altananetwork/sdk> · <https://docs.altana.network/changelog>
 
-#### Permukaan API (dari docs + llms.txt)
+#### The API surface (from the docs + llms.txt)
 
 **Client & chains**
 - `createClient({ chains, defaultChainId? })`
-- Export chain config: `BNB`, `BNB_TESTNET`, `ETHEREUM`, `BASE`
-- Properti chain config yang dipakai di contoh docs: `.chain`, `.publicRpcUrl`, `.keyStore`, `.keyStoreCache`
+- Chain config exports: `BNB`, `BNB_TESTNET`, `ETHEREUM`, `BASE`
+- The chain config properties used in the docs examples: `.chain`, `.publicRpcUrl`, `.keyStore`, `.keyStoreCache`
 
 **Signers**
-- `signerFromPrivateKey(pk)` — dari private key hex
-- `createPrivateKeySigner()` — generate baru
-- `createPasskey()` — passkey (browser, WebAuthn)
-- `createHeadlessPasskey()` — passkey P-256 in-memory untuk Node/script test, tanpa prompt biometrik
-- `SignerType` = `"privateKey" | "passkey"` (sejak 0.9.0 `"injected"` dihapus dari union)
+- `signerFromPrivateKey(pk)` — from a hex private key
+- `createPrivateKeySigner()` — generate a new one
+- `createPasskey()` — a passkey (browser, WebAuthn)
+- `createHeadlessPasskey()` — an in-memory P-256 passkey for Node/test scripts, with no biometric prompt
+- `SignerType` = `"privateKey" | "passkey"` (since 0.9.0, `"injected"` has been removed from the union)
 
 **Wallets**
 - `client.createWallet({ signer? })` → `{ address, signer }`
@@ -615,14 +615,14 @@ Sumber: <https://registry.npmjs.org/@altananetwork/sdk> · <https://docs.altana.
 
 **Reads**
 - `client.balances({ wallet, tokens?, chainId? })` → `{ native: bigint, tokens?: TokenBalance[] }`
-  - Multicall ter-batch; per-token `{ ok, display, symbol, raw, scaled? }`
-  - Auto-handle **BEP-677** scaled UI amounts (ERC-165 id `0xa60bf13d`)
+  - Batched multicall; per token `{ ok, display, symbol, raw, scaled? }`
+  - Handles **BEP-677** scaled UI amounts automatically (ERC-165 id `0xa60bf13d`)
 
 **Cross-chain**
 - `ensureKeyCached(...)`, `syncKeyToL2({ l1Client, l2Client, l2WalletClient, l1KeyStore, l2Cache, user, publicKey })`
 
 **Off-chain signatures & payments**
-- `signOrder` / `signOrderTypedData` — ERC-1271 nested envelope
+- `signOrder` / `signOrderTypedData` — an ERC-1271 nested envelope
 - `client.fetchWithX402({ session, url, init?, chainId?, preferRail? })`
 - `client.approveTokenForPermit2({ wallet, signer, token })`
 - `client.approveSignatureChecker({ wallet, signer, session, checker })`
@@ -635,9 +635,9 @@ Sumber: <https://registry.npmjs.org/@altananetwork/sdk> · <https://docs.altana.
 **ERC-8004**
 - `registerErc8004Agent`, `setErc8004AgentUri`, `getErc8004Agent`, `encodeErc8004AgentUri`, `decodeErc8004AgentUri`, `withErc8004Registration`, `erc8004RegisterPermissions(chainId)`
 
-Sumber: <https://docs.altana.network/sdk> dan seluruh halaman `/sdk/*` via <https://docs.altana.network/llms-full.txt>
+Sources: <https://docs.altana.network/sdk> and all the `/sdk/*` pages via <https://docs.altana.network/llms-full.txt>
 
-### 4.2 Contoh kode lengkap — grant → execute → revoke (verbatim docs)
+### 4.2 A complete code example — grant → execute → revoke (verbatim from the docs)
 
 **Step 1: Create your wallet**
 ```ts
@@ -683,9 +683,9 @@ console.log(result.status, result.transactionHash);
 await client.revokeSession({ wallet, signer, session });
 ```
 
-Sumber: <https://docs.altana.network/use-cases/1-agent-wallet-policy>
+Source: <https://docs.altana.network/use-cases/1-agent-wallet-policy>
 
-### 4.3 Contoh: agent trading di DEX dengan cap (PancakeSwap)
+### 4.3 Example: an agent trading on a DEX with a cap (PancakeSwap)
 
 ```ts
 // wallet from the "Give an agent a wallet and a policy" guide
@@ -706,9 +706,9 @@ await client.execute({
 });
 ```
 
-Sumber: <https://docs.altana.network/use-cases/2-agent-trades-dex>
+Source: <https://docs.altana.network/use-cases/2-agent-trades-dex>
 
-### 4.4 Contoh: multi-agent di satu wallet (relevan untuk marketplace kita)
+### 4.4 Example: multiple agents on one wallet (relevant to our marketplace)
 
 ```ts
 // Agent A: swaps on PancakeSwap, cap X.
@@ -736,9 +736,9 @@ await client.revokeSession({ wallet, signer, session: sessionA });
 // Agent B keeps working.
 ```
 
-Sumber: <https://docs.altana.network/use-cases/3-portfolio-multiple-agents>
+Source: <https://docs.altana.network/use-cases/3-portfolio-multiple-agents>
 
-### 4.5 Passkey path (untuk UI konsumer — user = admin lewat Face ID / Touch ID)
+### 4.5 The passkey path (for a consumer UI — the user is the admin via Face ID / Touch ID)
 
 ```ts
 import { createClient, BNB } from "@altananetwork/sdk";
@@ -767,30 +767,30 @@ const recovered = await client.recoverFromPasskey({ rpId: "myapp.example" });
 await client.revokeSession({ wallet, signer: wallet.signer, session });
 ```
 
-Untuk testing di Node/script tanpa prompt biometrik:
+For testing in Node/scripts without a biometric prompt:
 ```ts
 import { createClient, BNB, createHeadlessPasskey } from "@altananetwork/sdk";
 const client = createClient({ chains: [BNB] });
 const wallet = await client.createWallet({ signer: createHeadlessPasskey() });
 ```
 
-Ada **demo live interaktif** flow ini di halaman docs (komponen `<PasskeyAgentDemo />`) — tombol yang langsung memanggil SDK terhadap BNB. Berguna untuk verifikasi cepat sebelum coding.
+There is an **interactive live demo** of this flow on the docs page (the `<PasskeyAgentDemo />` component) — buttons that call the SDK directly against BNB. Useful for a quick check before writing code.
 
-Sumber: <https://docs.altana.network/use-cases/1b-passkey-delegates-to-agent>
+Source: <https://docs.altana.network/use-cases/1b-passkey-delegates-to-agent>
 
-⚠️ `recoverFromPasskey` butuh minimal satu active key di Keystore → **wallet harus pernah execute minimal sekali**. Wallet yang dibuat tapi tidak pernah dipakai tidak punya apa-apa untuk di-recover.
+⚠️ `recoverFromPasskey` needs at least one active key in the Keystore → **the wallet must have executed at least once**. A wallet that was created but never used has nothing to recover.
 
 ### 4.6 `@altananetwork/mcp` — v0.9.0
 
-**WAJIB Bun ≥ 1.1.** Paket ini di-ship sebagai TypeScript dan berjalan di bawah Bun. **`npx` gagal dengan TypeScript syntax error**, bukan pesan yang berguna.
+**Bun ≥ 1.1 is MANDATORY.** This package is shipped as TypeScript and runs under Bun. **`npx` fails with a TypeScript syntax error**, not with a useful message.
 
 ```bash
 claude mcp add altana -- bunx @altananetwork/mcp
-# hapus:
+# to remove:
 claude mcp remove altana
 ```
 
-Pilih chain lewat env `ALTANA_CHAIN` (satu proses server = satu chain):
+Pick the chain through the `ALTANA_CHAIN` env var (one server process = one chain):
 
 | `ALTANA_CHAIN` | Chain |
 |---|---|
@@ -802,7 +802,7 @@ Pilih chain lewat env `ALTANA_CHAIN` (satu proses server = satu chain):
 claude mcp add altana -e ALTANA_CHAIN=bnb-testnet -- bunx @altananetwork/mcp
 ```
 
-Cursor / Continue / host lain:
+Cursor / Continue / other hosts:
 ```json
 {
   "mcpServers": {
@@ -814,36 +814,36 @@ Cursor / Continue / host lain:
 }
 ```
 
-> ℹ️ Catatan inkonsistensi sumber: `https://altana.network/llms.txt` menampilkan snippet MCP dengan `"command": "npx"`, sementara halaman docs `/mcp/install` eksplisit bilang **npx gagal** dan semua contohnya `bunx`. **Ikuti docs: pakai `bunx`.**
+> ℹ️ A note on source inconsistency: `https://altana.network/llms.txt` shows the MCP snippet with `"command": "npx"`, while the docs page `/mcp/install` says explicitly that **npx fails** and every example there uses `bunx`. **Follow the docs: use `bunx`.**
 
-**Penyimpanan key (namespace terpisah, tidak pernah bentrok):**
+**Key storage (separate namespaces, they never collide):**
 
-| Jenis | Urutan lookup |
+| Kind | Lookup order |
 |---|---|
-| Wallet admin key | 1. OS keychain service `altana-wallet` → 2. `~/.altana/keys.json` → `wallets[]` (mode 0600) → 3. env `ALTANA_WALLET_<NAME>_PRIVATE_KEY` (default: `ALTANA_WALLET_DEFAULT_PRIVATE_KEY`) |
-| Session key | 1. OS keychain service `altana-session` → 2. `~/.altana/keys.json` → `sessions[]` → 3. env `ALTANA_SESSION_<NAME>_PRIVATE_KEY` |
+| Wallet admin key | 1. The OS keychain service `altana-wallet` → 2. `~/.altana/keys.json` → `wallets[]` (mode 0600) → 3. the env var `ALTANA_WALLET_<NAME>_PRIVATE_KEY` (default: `ALTANA_WALLET_DEFAULT_PRIVATE_KEY`) |
+| Session key | 1. The OS keychain service `altana-session` → 2. `~/.altana/keys.json` → `sessions[]` → 3. the env var `ALTANA_SESSION_<NAME>_PRIVATE_KEY` |
 
 > "Altana never sees these keys. They stay on your machine."
 
-Sumber: <https://docs.altana.network/mcp/install> · <https://registry.npmjs.org/@altananetwork/mcp>
+Sources: <https://docs.altana.network/mcp/install> · <https://registry.npmjs.org/@altananetwork/mcp>
 
 ### 4.7 MCP tools — 20 tools
 
-> ⚠️ Inkonsistensi di dokumentasi sendiri: halaman `/mcp` bilang "**18 tools** … **12 prompts**", halaman `/mcp/tools` bilang "**20 tools** … **Eleven** of them also have a slash command" lalu mendaftar 12 slash command (11 tool + `demos` yang tidak memetakan ke tool). Daftar aktual di `/mcp/tools` berisi **20 tools**; itu yang dipakai di bawah.
+> ⚠️ An inconsistency inside their own documentation: the `/mcp` page says "**18 tools** … **12 prompts**", while `/mcp/tools` says "**20 tools** … **Eleven** of them also have a slash command" and then lists 12 slash commands (11 tools + `demos`, which does not map to a tool). The actual list on `/mcp/tools` contains **20 tools**; that is the one used below.
 
-| Kategori | Tools |
+| Category | Tools |
 |---|---|
 | Discovery | `about_altana` |
 | Wallet lifecycle | `create_wallet`, `list_wallets`, `wallet_balance`, `wallet_execute` |
-| **Verification** | `wallet_verification` (list semua active key di wallet dari Keystore), **`verify_authorization`** (apakah key/session ini authorized di wallet ini sekarang?) |
-| **Session lifecycle** | **`grant_session`** (generate key, register di Keystore, authorize dengan permissions; return session details, **keyId**, dan **tx hash grant**), `list_sessions`, **`session_execute`**, **`revoke_session`** |
+| **Verification** | `wallet_verification` (lists every active key on a wallet from the Keystore), **`verify_authorization`** (is this key/session authorized on this wallet right now?) |
+| **Session lifecycle** | **`grant_session`** (generates a key, registers it in the Keystore, authorizes it with permissions; returns the session details, the **keyId**, and the **grant tx hash**), `list_sessions`, **`session_execute`**, **`revoke_session`** |
 | Agent commerce | `x402_request`, `erc8183_create_job`, `erc8183_job_status`, `erc8183_settle`, `erc8183_submit` |
 | Agent identity | `erc8004_register`, `erc8004_set_agent_uri`, `erc8004_show` |
 | Skills | `search_skills`, `get_skill` |
 
-**Slash commands (11 tool + `demos`):**
+**Slash commands (11 tools + `demos`):**
 
-| Slash command | Memanggil |
+| Slash command | Calls |
 |---|---|
 | `/altana-agentic-wallet:about` | `about_altana` |
 | `/altana-agentic-wallet:create-wallet` | `create_wallet` |
@@ -856,13 +856,13 @@ Sumber: <https://docs.altana.network/mcp/install> · <https://registry.npmjs.org
 | `/altana-agentic-wallet:session-execute` | `session_execute` |
 | `/altana-agentic-wallet:revoke-session` | `revoke_session` |
 | `/altana-agentic-wallet:send-tx` | `wallet_execute` |
-| `/altana-agentic-wallet:demos` | (listing demo flows, bukan tool) |
+| `/altana-agentic-wallet:demos` | (lists the demo flows, not a tool) |
 
-**10 tools TANPA slash command** (host-callable saja, minta host memanggilnya by name): `x402_request`, `erc8183_create_job`, `erc8183_job_status`, `erc8183_settle`, `erc8183_submit`, `erc8004_register`, `erc8004_set_agent_uri`, `erc8004_show`, `search_skills`, `get_skill`. Mengetik `/altana-agentic-wallet:x402-request` **tidak akan resolve**.
+**The 10 tools with NO slash command** (host-callable only; ask the host to call them by name): `x402_request`, `erc8183_create_job`, `erc8183_job_status`, `erc8183_settle`, `erc8183_submit`, `erc8004_register`, `erc8004_set_agent_uri`, `erc8004_show`, `search_skills`, `get_skill`. Typing `/altana-agentic-wallet:x402-request` **will not resolve**.
 
-Sumber: <https://docs.altana.network/mcp/tools>
+Source: <https://docs.altana.network/mcp/tools>
 
-### 4.8 Claude Code Skill (untuk menulis kode SDK yang benar)
+### 4.8 The Claude Code Skill (for writing correct SDK code)
 
 ```bash
 mkdir -p .claude/skills/altana-agentic-wallet
@@ -870,34 +870,34 @@ curl -fsSL https://docs.altana.network/skill.md \
   -o .claude/skills/altana-agentic-wallet/SKILL.md
 ```
 
-Untuk Codex: `curl -fsSL https://docs.altana.network/skill.md >> AGENTS.md`
-Untuk Cursor: taruh di `.cursor/rules/` · Windsurf: `.windsurfrules` · Gemini CLI: `GEMINI.md`
+For Codex: `curl -fsSL https://docs.altana.network/skill.md >> AGENTS.md`
+For Cursor: put it in `.cursor/rules/` · Windsurf: `.windsurfrules` · Gemini CLI: `GEMINI.md`
 
-Sumber lengkap skill: <https://github.com/altananetwork/altana-sdk/blob/main/packages/wallet/SKILL.md>
+The full skill source: <https://github.com/altananetwork/altana-sdk/blob/main/packages/wallet/SKILL.md>
 
-> ℹ️ **Jangan campur aduk:** Claude Skill ini mengajari coding agent cara **menulis kode** dengan SDK. **Skills Registry** (§7) mengajari *running* agent cara **memakai protokol**. Beda audiens, beda file, format `SKILL.md` sama.
+> ℹ️ **Do not mix these up:** this Claude Skill teaches a coding agent how to **write code** with the SDK. The **Skills Registry** (§7) teaches a *running* agent how to **use the protocols**. Different audiences, different files, the same `SKILL.md` format.
 
-Sumber: <https://docs.altana.network/mcp/skill> · <https://docs.altana.network/getting-started/build-with-claude>
+Sources: <https://docs.altana.network/mcp/skill> · <https://docs.altana.network/getting-started/build-with-claude>
 
 ---
 
 ## 5. ERC-8183 — Hire & Get Hired
 
-### 5.1 Apa spesifikasinya
+### 5.1 What the spec is
 
-**ERC-8183 adalah job escrow** untuk agent commerce:
+**ERC-8183 is a job escrow** for agent commerce:
 
-1. **Buyer** mendanai sebuah **Job** dalam **$U** terhadap alamat **seller**.
-2. **Seller** submit **deliverable**.
-3. Escrow **release** setelah **optimistic dispute window**.
-4. Kalau seller tidak pernah deliver, buyer **reclaim** seluruh escrow setelah expiry.
+1. The **buyer** funds a **Job** in **$U** against a **seller** address.
+2. The **seller** submits a **deliverable**.
+3. The escrow **releases** after an **optimistic dispute window**.
+4. If the seller never delivers, the buyer **reclaims** the whole escrow after expiry.
 
-Status job (order-locked dengan AgenticCommerce kernel):
+Job statuses (order-locked with the AgenticCommerce kernel):
 ```ts
 export const JOB_STATUS = ["OPEN", "FUNDED", "SUBMITTED", "COMPLETED", "REJECTED", "EXPIRED"] as const;
 ```
 
-Struktur Job (dari source SDK):
+The Job structure (from the SDK source):
 ```ts
 export type Erc8183Job = {
   id: bigint;
@@ -916,9 +916,9 @@ export type Erc8183Job = {
 };
 ```
 
-Sumber: <https://docs.altana.network/sdk/erc8183> · <https://github.com/altananetwork/altana-sdk/blob/main/packages/wallet/src/erc8183.ts>
+Sources: <https://docs.altana.network/sdk/erc8183> · <https://github.com/altananetwork/altana-sdk/blob/main/packages/wallet/src/erc8183.ts>
 
-**Relasi dengan ERC-8004:** ERC-8004 = **identitas/discoverability** (token ERC-721 di identity registry, `tokenURI` = registration record: nama, deskripsi, endpoint). Buyer menemukan seller lewat ERC-8004, lalu **ERC-8183 job escrow adalah apa yang mereka lakukan berikutnya**. Sumber: <https://docs.altana.network/sdk/erc8004>
+**How it relates to ERC-8004:** ERC-8004 = **identity/discoverability** (an ERC-721 token in the identity registry, whose `tokenURI` is the registration record: name, description, endpoint). The buyer finds the seller through ERC-8004, and then **the ERC-8183 job escrow is what they do next**. Source: <https://docs.altana.network/sdk/erc8004>
 
 ### 5.2 Buyer side — `hireErc8183Agent`
 
@@ -934,14 +934,14 @@ const { jobId } = await hireErc8183Agent(wallet, signer, {
 
 > "One call runs the whole buyer flow — `createJob`, `registerJob` (binds the dispute policy), `setBudget`, `approve $U`, `fund` — as **one atomic relay intent**."
 
-**Jalur session key juga bekerja:** `hireErc8183Agent(session, params, opts)` — "so a scoped key with an on-chain spend limit caps what an autonomous agent can ever escrow." **Ini bagian bonus track yang paling kuat: agent otonom yang hire agent lain, dibatasi spend cap on-chain.**
+**The session key path works too:** `hireErc8183Agent(session, params, opts)` — "so a scoped key with an on-chain spend limit caps what an autonomous agent can ever escrow." **This is the strongest part of the bonus track: an autonomous agent hiring another agent, bounded by an on-chain spend cap.**
 
-Low-level builder: `buildHireCalls({ addresses, jobId, provider, description, budget, expiredAt })`.
-`jobId` diprediksi dari `jobCounter() + 1` (job id 1-indexed); kalau job lain dibuat di blok yang sama, batch revert tanpa efek samping (`registerJob` client-only) — baca ulang counter dan retry.
+The low-level builder: `buildHireCalls({ addresses, jobId, provider, description, budget, expiredAt })`.
+The `jobId` is predicted from `jobCounter() + 1` (job ids are 1-indexed); if another job is created in the same block, the batch reverts with no side effects (`registerJob` is client-only) — re-read the counter and retry.
 
-`description` ≤ 4096 bytes. `expiredAt` absolute unix seconds, **harus melebihi now + disputeWindow**.
+`description` must be ≤ 4096 bytes. `expiredAt` is absolute unix seconds and **must be later than now + disputeWindow**.
 
-### 5.3 Track job & ambil deliverable
+### 5.3 Tracking a job and fetching the deliverable
 
 ```ts
 import { getErc8183Job, getErc8183DeliverableUrl } from "@altananetwork/sdk";
@@ -953,7 +953,7 @@ if (job.submittedAt > 0n) {
 }
 ```
 
-**Verifikasi integritas (WAJIB):** `job.deliverable` on-chain adalah keccak256 dari canonical manifest.
+**Integrity verification (MANDATORY):** the on-chain `job.deliverable` is the keccak256 of the canonical manifest.
 
 ```ts
 import { verifyErc8183ManifestText } from "@altananetwork/sdk";
@@ -965,7 +965,7 @@ const manifest = JSON.parse(text); // manifest.response.content
 
 ### 5.4 Seller side — `submitErc8183Deliverable`
 
-Grant session seller dengan `erc8183SubmitPermissions(chainId)` — capability yang di-scope **persis ke `submit()` di commerce kernel**.
+Grant the seller's session with `erc8183SubmitPermissions(chainId)` — a capability scoped **exactly to `submit()` on the commerce kernel**.
 
 ```ts
 import { submitErc8183Deliverable, erc8183SubmitPermissions } from "@altananetwork/sdk";
@@ -990,12 +990,12 @@ const result = await submitErc8183Deliverable(
 // Serve result.manifestText VERBATIM at deliverableUrl — byte-for-byte.
 ```
 
-**Dua hal yang mudah salah kalau dikerjakan manual:**
+**Two things that are easy to get wrong if you do it by hand:**
 
-1. **Canonical hashing lintas bahasa.** Hash on-chain dihitung atas *canonical JSON*: keys tersortir, compact, dan **setiap karakter non-ASCII di-escape `\uXXXX`** — persis seperti referensi Python (`json.dumps(…, sort_keys=True, separators=(",", ":"))` dengan `ensure_ascii` default). `JSON.stringify` biasa menghasilkan byte berbeda untuk konten apa pun yang mengandung em-dash, aksen, atau emoji, dan hash-nya tidak akan verify lintas ekosistem. Pakai `encodeErc8183Manifest` / `erc8183ManifestHash`.
-2. **Sajikan byte hasil hash yang persis.** Buyer memverifikasi *raw* fetched text terhadap hash on-chain — re-serialize saat serve merusak verifikasi. `result.manifestText` adalah string yang harus disajikan.
+1. **Canonical hashing across languages.** The on-chain hash is computed over *canonical JSON*: sorted keys, compact, and **every non-ASCII character escaped as `\uXXXX`** — exactly like the Python reference (`json.dumps(…, sort_keys=True, separators=(",", ":"))` with the default `ensure_ascii`). A plain `JSON.stringify` produces different bytes for any content containing an em-dash, an accent, or an emoji, and its hash will not verify across ecosystems. Use `encodeErc8183Manifest` / `erc8183ManifestHash`.
+2. **Serve the exact bytes that were hashed.** The buyer verifies the *raw* fetched text against the on-chain hash — re-serializing when you serve it breaks verification. `result.manifestText` is the string you have to serve.
 
-Pre-flight checks melempar error yang actionable sebelum submit: wrong provider, job belum FUNDED (atau sudah SUBMITTED), atau lewat deadline.
+Pre-flight checks throw actionable errors before submitting: wrong provider, the job is not FUNDED yet (or is already SUBMITTED), or the deadline has passed.
 Low-level: `buildSubmitCall({ addresses, jobId, deliverable, optParams })`.
 
 ### 5.5 Settle / dispute / reclaim
@@ -1008,9 +1008,9 @@ await settleErc8183Job(wallet, signer, { jobId, action: "dispute" }, opts);   //
 await execute(wallet, signer, buildClaimRefundCall(56, jobId), opts);         // full refund after expiry
 ```
 
-### 5.6 Dapatkan $U testnet
+### 5.6 Getting testnet $U
 
-Faucet publik di BSC testnet (97): `requestTokens()` membayar **10 $U** ke caller, sekali per address per **30 menit**. Klaim langsung dari Altana wallet lewat relay — smart account adalah `msg.sender`, jadi payout mendarat di wallet:
+There is a public faucet on BSC testnet (97): `requestTokens()` pays **10 $U** to the caller, once per address every **30 minutes**. Claim it straight from an Altana wallet through the relay — the smart account is `msg.sender`, so the payout lands in the wallet:
 
 ```ts
 import { encodeFunctionData } from "viem";
@@ -1033,24 +1033,24 @@ await client.execute({
 });
 ```
 
-Atau dari EOA biasa dengan test BNB untuk gas:
+Or from an ordinary EOA with test BNB for gas:
 ```bash
 cast send 0x86e9197CC0F76E4e4aaa7082180945196bBAb5D3 "requestTokens()" \
   --rpc-url https://bsc-testnet-rpc.publicnode.com --private-key $AGENT_KEY
 ```
 
-Read-only `allowedToWithdraw(address)` melaporkan apakah klaim sedang diizinkan.
+The read-only `allowedToWithdraw(address)` reports whether a claim is currently allowed.
 
-### 5.7 ⚠️ Bug testnet yang SUDAH diperbaiki di 0.9.0
+### 5.7 ⚠️ A testnet bug that IS ALREADY FIXED in 0.9.0
 
-Dari changelog 0.9.0:
+From the 0.9.0 changelog:
 > "**BSC testnet (chain 97) hire flow no longer reverts.** The bundled `ERC8183_ADDRESSES[97].policy` pointed at an address that is not whitelisted on the testnet EvaluatorRouter, so every `hireErc8183Agent()` / `buildHireCalls()` run on BSC testnet reverted at `registerJob` with `PolicyNotWhitelisted()`."
 
-**Konsekuensi praktis: kalau kita pakai ERC-8183 di BSC testnet, WAJIB `@altananetwork/sdk` ≥ 0.9.0.** Versi 0.8.0 ke bawah akan revert.
+**The practical consequence: if we use ERC-8183 on BSC testnet, `@altananetwork/sdk` ≥ 0.9.0 is MANDATORY.** Version 0.8.0 and below will revert.
 
-Sumber: <https://docs.altana.network/changelog>
+Source: <https://docs.altana.network/changelog>
 
-### 5.8 ERC-8004 — grant capability yang aman
+### 5.8 ERC-8004 — granting the capability safely
 
 ```ts
 import { createClient, erc8004RegisterPermissions, BNB, signerFromPrivateKey } from "@altananetwork/sdk";
@@ -1067,7 +1067,7 @@ const session = await client.grantSession({
 });
 ```
 
-`erc8004RegisterPermissions(chainId)` mengembalikan dua rule `{ to, signature }` dengan **semantik AND**:
+`erc8004RegisterPermissions(chainId)` returns two `{ to, signature }` rules with **AND semantics**:
 ```ts
 [
   { to: "0x8004A169…", signature: "register(string,(string,bytes)[])" },
@@ -1075,11 +1075,11 @@ const session = await client.grantSession({
 ]
 ```
 
-> 🚨 **JANGAN PERNAH grant seluruh registry.** Docs memberi `:::danger`: session dieksekusi **sebagai wallet**, dan wallet adalah owner identity token. Grant `{ to: registry }` tanpa `signature` juga akan mengotorisasi `transferFrom`/`safeTransferFrom` (agent bisa memberikan identitasnya), `approve`/`setApprovalForAll` (**operator approval yang HIDUP LEBIH LAMA daripada revokasi session**), dan `setAgentWallet`/`setMetadata` (identity poisoning).
+> 🚨 **NEVER grant the whole registry.** The docs mark this `:::danger`: a session executes **as the wallet**, and the wallet is the owner of the identity token. Granting `{ to: registry }` with no `signature` also authorizes `transferFrom`/`safeTransferFrom` (the agent could give its identity away), `approve`/`setApprovalForAll` (**an operator approval that OUTLIVES the session revocation**), and `setAgentWallet`/`setMetadata` (identity poisoning).
 >
-> **Ini contoh sempurna untuk demo/pitch kita: kenapa selector-level allowlist penting, bukan sekadar contract-level.**
+> **This is a perfect example for our demo/pitch: why selector-level allowlists matter, not just contract-level ones.**
 
-Registrasi 2-fase (karena record menyematkan id yang di-assign oleh mint):
+Registration is 2-phase (because the record embeds the id assigned by the mint):
 
 ```ts
 import {
@@ -1109,36 +1109,36 @@ await setErc8004AgentUri(
 );
 ```
 
-⚠️ `registerErc8004Agent` **menolak `opts.noWait`** — `agentId` hanya ada di event `Registered` pada receipt yang confirmed. Kalau relay wait timeout, error membawa `callsId` — recover id dari receipt bundle itu, **jangan register ulang** (akan mint identitas KEDUA untuk agent yang sama).
+⚠️ `registerErc8004Agent` **rejects `opts.noWait`** — the `agentId` only exists in the `Registered` event on a confirmed receipt. If the relay wait times out, the error carries the `callsId` — recover the id from that bundle's receipt, **do not register again** (that would mint a SECOND identity for the same agent).
 
-`register` dan `setAgentURI` bersifat `nonpayable`: **tidak ada protocol fee, hanya gas.**
+`register` and `setAgentURI` are `nonpayable`: **there is no protocol fee, only gas.**
 
-`encodeErc8004AgentUri` menghasilkan `data:application/json;base64,<canonical JSON>` — byte-identical dengan yang dihasilkan SDK TypeScript & Python `@bnbagent` untuk record yang sama.
+`encodeErc8004AgentUri` produces `data:application/json;base64,<canonical JSON>` — byte-identical to what the TypeScript SDK and the Python `@bnbagent` SDK produce for the same record.
 
-Sumber: <https://docs.altana.network/sdk/erc8004>
+Source: <https://docs.altana.network/sdk/erc8004>
 
 ---
 
 ## 6. x402 / B402
 
-### 6.1 Perbedaan x402 vs B402 di BNB Chain
+### 6.1 The difference between x402 and B402 on BNB Chain
 
-| Aspek | x402 (standar) | B402 (Binance/BNB) |
+| Aspect | x402 (the standard) | B402 (Binance/BNB) |
 |---|---|---|
-| Wire | HTTP 402 + header `X-PAYMENT` (base64) | Sama, tapi beberapa merchant baca `PAYMENT-SIGNATURE` |
-| Rail utama | `exact` / **EIP-3009** `TransferWithAuthorization` | **permit2-exact** — `PermitWitnessTransferFrom` dengan recipient di-bind lewat Permit2 **witness** |
-| Checker (ERC-1271) | token contract | canonical **Permit2** |
-| Token cocok | hanya token yang EIP-3009-nya ERC-1271-aware (Circle FiatTokenV2_2 — USDC Base/Ethereum) | token apa pun yang di-approve ke Permit2 |
-| Envelope | `payload.permit` + sibling `payload.from` (dialek Altana) | `payload.permit2Authorization` dengan `from` nested (dialek b402) |
-| `resource` | boleh string URL | biasanya object `{ url, description?, mimeType? }` — merchant menolak envelope tanpa ini (CoinMarketCap menjawab `payment header resource is null`) |
+| Wire | HTTP 402 + an `X-PAYMENT` header (base64) | The same, but some merchants read `PAYMENT-SIGNATURE` |
+| Primary rail | `exact` / **EIP-3009** `TransferWithAuthorization` | **permit2-exact** — `PermitWitnessTransferFrom` with the recipient bound through a Permit2 **witness** |
+| Checker (ERC-1271) | the token contract | the canonical **Permit2** |
+| Compatible tokens | only tokens whose EIP-3009 is ERC-1271-aware (Circle FiatTokenV2_2 — USDC on Base/Ethereum) | any token approved to Permit2 |
+| Envelope | `payload.permit` + a sibling `payload.from` (the Altana dialect) | `payload.permit2Authorization` with a nested `from` (the b402 dialect) |
+| `resource` | may be a URL string | usually an object `{ url, description?, mimeType? }` — merchants reject an envelope without it (CoinMarketCap answers `payment header resource is null`) |
 
-**Kesimpulan praktis untuk BNB Chain: pakai rail `permit2-exact`.** Ini "the reliable rail" menurut docs. Rail EIP-3009 di BNB hanya relevan untuk **$U** (dipakai buyer BNB Agent Studio).
+**The practical conclusion for BNB Chain: use the `permit2-exact` rail.** It is "the reliable rail" according to the docs. The EIP-3009 rail on BNB only matters for **$U** (which BNB Agent Studio buyers use).
 
-Sumber: <https://docs.altana.network/sdk/x402> · <https://docs.altana.network/concepts/off-chain-signatures>
+Sources: <https://docs.altana.network/sdk/x402> · <https://docs.altana.network/concepts/off-chain-signatures>
 
 ### 6.2 Buyer side — `fetchWithX402`
 
-**Provisioning sekali (admin):**
+**One-time provisioning (admin):**
 ```ts
 import { createClient, BNB, PERMIT2_ADDRESS, signerFromPrivateKey } from "@altananetwork/sdk";
 
@@ -1160,7 +1160,7 @@ await client.approveTokenForPermit2({ wallet, signer: admin, token: USDC });
 await client.approveSignatureChecker({ wallet, signer: admin, session, checker: PERMIT2_ADDRESS });
 ```
 
-**Agent bayar & fetch:**
+**The agent pays and fetches:**
 ```ts
 const res = await client.fetchWithX402({
   session,
@@ -1170,7 +1170,7 @@ const res = await client.fetchWithX402({
 console.log(res.status, await res.text());
 ```
 
-Parameter:
+The parameters:
 ```ts
 type ClientFetchWithX402Options = {
   session: Session;
@@ -1183,15 +1183,15 @@ type ClientFetchWithX402Options = {
 };
 ```
 
-⚠️ **Jalankan `fetchWithX402` server-side.** Endpoint x402 pihak ketiga umum tidak memasukkan `X-PAYMENT` ke CORS `Access-Control-Allow-Headers`, jadi browser tidak bisa POST pembayaran.
+⚠️ **Run `fetchWithX402` server-side.** Third-party x402 endpoints commonly leave `X-PAYMENT` out of the CORS `Access-Control-Allow-Headers`, so a browser cannot POST the payment.
 
-⚠️ **Signature bukan EOA signature** — ini envelope ERC-1271 98-byte (`innerSig ‖ keyHash ‖ prehash`). Facilitator **harus** verify lewat `isValidSignature`, bukan `ecrecover`. Payment bisa valid & settleable on-chain tapi tetap ditolak facilitator yang mengasumsikan EOA.
+⚠️ **The signature is not an EOA signature** — it is a 98-byte ERC-1271 envelope (`innerSig ‖ keyHash ‖ prehash`). A facilitator **has to** verify it through `isValidSignature`, not `ecrecover`. A payment can be valid and settleable on-chain and still be rejected by a facilitator that assumes an EOA.
 
-Sumber: <https://docs.altana.network/use-cases/6-agent-pays-api-x402> · <https://docs.altana.network/sdk/x402>
+Sources: <https://docs.altana.network/use-cases/6-agent-pays-api-x402> · <https://docs.altana.network/sdk/x402>
 
-### 6.3 Kenapa `approveSignatureChecker` wajib
+### 6.3 Why `approveSignatureChecker` is mandatory
 
-Altana account tidak memverifikasi signature terhadap raw application digest. Ia membungkus ulang digest itu dalam **nested EIP-712 envelope** yang dikunci ke alamat account:
+An Altana account does not verify a signature against the raw application digest. It re-wraps that digest in a **nested EIP-712 envelope** locked to the account's address:
 
 ```
 nested = keccak256(0x1901 ‖ domainSeparator ‖ structHash)
@@ -1201,18 +1201,18 @@ nested = keccak256(0x1901 ‖ domainSeparator ‖ structHash)
                       keccak256("ERC1271Sign(bytes32 digest)"), appDigest))
 ```
 
-Domain EIP-712 account sengaja **dipangkas ke `verifyingContract` saja** (tanpa name/version/chainId).
+The account's EIP-712 domain is deliberately **trimmed down to `verifyingContract` alone** (no name/version/chainId).
 
-Dan: `isValidSignature` sebuah session key mengembalikan magic value **hanya kalau `msg.sender` adalah approved checker** untuk key tersebut (super-admin key melewati gate ini). Tanpa `approveSignatureChecker`, verifikasi mengembalikan `0xffffffff` bahkan untuk signature yang sempurna valid.
+And: a session key's `isValidSignature` returns the magic value **only if `msg.sender` is an approved checker** for that key (super-admin keys bypass this gate). Without `approveSignatureChecker`, verification returns `0xffffffff` even for a perfectly valid signature.
 
-| Rail | Checker yang harus di-approve |
+| Rail | The checker that must be approved |
 |---|---|
-| Permit2 / permit2-exact | canonical Permit2 (`0x0000…78BA3`) |
-| EIP-3009 | contract token-nya (mis. USDC) |
+| Permit2 / permit2-exact | the canonical Permit2 (`0x0000…78BA3`) |
+| EIP-3009 | the token contract itself (e.g. USDC) |
 
-Jalankan **sekali per session, per rail**.
+Run it **once per session, per rail**.
 
-Sumber: <https://docs.altana.network/concepts/off-chain-signatures> · <https://docs.altana.network/sdk/approve-signature-checker>
+Sources: <https://docs.altana.network/concepts/off-chain-signatures> · <https://docs.altana.network/sdk/approve-signature-checker>
 
 ### 6.4 Seller side — `@altananetwork/x402-server`
 
@@ -1222,12 +1222,12 @@ npm install @altananetwork/x402-server viem
 
 > "`@altananetwork/x402-server` is the seller side of x402/B402: put one guard in front of any HTTP route and it becomes a paid capability with instant on-chain settlement."
 
-**Payable out of the box oleh:**
-- **BNB Agent Studio agents** (`bag x402 trust <your-url>` → `bag x402 buy`) — mereka menandatangani EIP-3009 `TransferWithAuthorization` di **$U (United Stables)**
-- **Altana wallets** (`fetchWithX402` / MCP `x402_request`) — session key smart-account menandatangani rail B402 permit2-exact (ERC-1271)
-- Apa pun yang berbicara **B402 v2 wire** (CAIP-2 networks, `scheme:"exact"`, `extra.assetTransferMethod`)
+**Payable out of the box by:**
+- **BNB Agent Studio agents** (`bag x402 trust <your-url>` → `bag x402 buy`) — they sign an EIP-3009 `TransferWithAuthorization` in **$U (United Stables)**
+- **Altana wallets** (`fetchWithX402` / the MCP `x402_request`) — a smart-account session key signs the B402 permit2-exact rail (ERC-1271)
+- Anything that speaks the **B402 v2 wire** (CAIP-2 networks, `scheme:"exact"`, `extra.assetTransferMethod`)
 
-**Contoh lengkap (verbatim README repo):**
+**A complete example (verbatim from the repo README):**
 
 ```ts
 import { privateKeyToAccount } from "viem/accounts";
@@ -1260,190 +1260,190 @@ Bun.serve({
 });
 ```
 
-**Export yang ada:** `createX402Merchant`, `U_TOKEN` (map chainId → alamat $U), `USDT_BSC`.
+**The exports that exist:** `createX402Merchant`, `U_TOKEN` (a chainId → $U address map), `USDT_BSC`.
 
-**Flow pembayaran per-call:**
-1. Request tanpa payment → `merchant.guard(req)` mengembalikan `{ response }` berisi **402 challenge** dengan payment requirements (`accepts[]`: scheme, network, asset, amount, receiver).
-2. Buyer menandatangani authorization, base64-encode ke header `X-PAYMENT`, retry.
-3. `guard()` menjalankan off-chain checks dulu (token, amount dalam `[minPrice, maxPrice]`, recipient, expiry, signature).
-4. Settlement on-chain **seketika** lewat facilitator EOA (hanya broadcast + bayar gas).
-5. `guard()` mengembalikan `{ response: undefined, receipt }` → route kamu jalan, `receipt.txHash` tersedia.
+**The per-call payment flow:**
+1. A request with no payment → `merchant.guard(req)` returns `{ response }` containing a **402 challenge** with the payment requirements (`accepts[]`: scheme, network, asset, amount, receiver).
+2. The buyer signs the authorization, base64-encodes it into the `X-PAYMENT` header, and retries.
+3. `guard()` runs off-chain checks first (token, amount within `[minPrice, maxPrice]`, recipient, expiry, signature).
+4. On-chain settlement happens **immediately** through the facilitator EOA (which only broadcasts and pays gas).
+5. `guard()` returns `{ response: undefined, receipt }` → your route runs, with `receipt.txHash` available.
 
 | Rail | Buyer signs | Settled via | Verified by |
 |---|---|---|---|
-| `eip3009` | `TransferWithAuthorization` ($U) | `token.transferWithAuthorization(bytes)` | contract token |
+| `eip3009` | `TransferWithAuthorization` ($U) | `token.transferWithAuthorization(bytes)` | the token contract |
 | `permit2-exact` | `PermitWitnessTransferFrom` | `Permit2.permitWitnessTransferFrom` | Permit2 |
 
-**Properti keamanan:**
-- Dana bergerak **langsung dari payer ke `payTo`**. Recipient **di-bind ke dalam signature buyer** (EIP-3009 `to` / permit2 Witness) → **facilitator key yang kompromi tidak bisa mengalihkan earnings**.
-- **Replay mustahil**: EIP-3009 nonce dan Permit2 nonce bitmap terbakar on-chain.
-- Smart-account signature yang checker-restricted (session key Altana) diverifikasi oleh **contract settling itu sendiri**; payment invalid revert dan request ditolak.
+**Security properties:**
+- Funds move **directly from the payer to `payTo`**. The recipient is **bound into the buyer's signature** (the EIP-3009 `to` / the permit2 Witness) → **a compromised facilitator key cannot redirect the earnings**.
+- **Replay is impossible**: the EIP-3009 nonce and the Permit2 nonce bitmap are burned on-chain.
+- A checker-restricted smart-account signature (an Altana session key) is verified by **the settling contract itself**; an invalid payment reverts and the request is rejected.
 
-**Aturan kompatibilitas untuk buyer BNB Agent Studio:**
-- Tawarkan `maxTimeoutSeconds ≤ 480` (default 300). Signer Studio menolak authorization window > 600s dan **backdate `validAfter` 120 detik**.
-- Buyer Studio membayar **$U lewat eip3009 SAJA** — sertakan rail itu agar bisa dibayar mereka.
-- `bag x402 trust` **membutuhkan URL https di production**.
+**Compatibility rules for BNB Agent Studio buyers:**
+- Offer `maxTimeoutSeconds ≤ 480` (the default is 300). The Studio signer refuses an authorization window > 600s and **backdates `validAfter` by 120 seconds**.
+- Studio buyers pay in **$U over eip3009 ONLY** — include that rail if you want them to be able to pay you.
+- `bag x402 trust` **requires an https URL in production**.
 
-**Dialek envelope buyer** yang diterima decoder tanpa perlu tahu client mana yang membayar: `payload.permit` + `payload.from` (Altana) **atau** `payload.permit2Authorization` dengan `from` nested (b402); header dibaca dari `X-PAYMENT` dengan fallback `PAYMENT-SIGNATURE`; `resource` boleh string URL atau object, selalu di-emit sebagai object.
+**Buyer envelope dialects** the decoder accepts, so it need not know which client is paying: `payload.permit` + `payload.from` (Altana) **or** `payload.permit2Authorization` with a nested `from` (b402); the header is read from `X-PAYMENT` with a `PAYMENT-SIGNATURE` fallback; `resource` may be a URL string or an object, and is always emitted as an object.
 
-**Verified end-to-end:** `tests/e2e/fork-x402-server.ts` menjalankan kedua keluarga buyer terhadap fork BNB mainnet asli ($U, USDT, Permit2 bytecode asli): settlement eip3009 envelope Studio, settlement permit2-witness session-key Altana, dan penolakan replay. Jalankan `bun run fork:x402-server` dari `tests/e2e`.
+**Verified end-to-end:** `tests/e2e/fork-x402-server.ts` runs both buyer families against a real BNB mainnet fork (real $U, USDT, and Permit2 bytecode): settlement of a Studio eip3009 envelope, settlement of an Altana session-key permit2-witness, and replay rejection. Run `bun run fork:x402-server` from `tests/e2e`.
 
-> ⚠️ **Lisensi berbeda:** `@altananetwork/x402-server` adalah **GPL-3.0-or-later**, sementara `@altananetwork/sdk` dan `@altananetwork/mcp` Apache-2.0. Pertimbangkan implikasinya kalau kode server kita mau dijadikan closed-source. (Sumber: registry npm masing-masing paket.)
+> ⚠️ **A different licence:** `@altananetwork/x402-server` is **GPL-3.0-or-later**, while `@altananetwork/sdk` and `@altananetwork/mcp` are Apache-2.0. Consider the implications if we want our server code to be closed-source. (Source: each package's npm registry entry.)
 
-> ⚠️ **`repository.url` di manifest npm `x402-server` menunjuk `github.com/altananetwork/sdk`, yang tidak ada** (repo aslinya `altana-sdk`). Salah ketik di package.json mereka; README aktual ada di `altana-sdk/packages/x402-server/README.md`.
+> ⚠️ **The `repository.url` in the npm manifest for `x402-server` points at `github.com/altananetwork/sdk`, which does not exist** (the real repo is `altana-sdk`). A typo in their package.json; the actual README is at `altana-sdk/packages/x402-server/README.md`.
 
-Sumber: <https://docs.altana.network/sdk/x402-server> · <https://github.com/altananetwork/altana-sdk/blob/main/packages/x402-server/README.md> · <https://registry.npmjs.org/@altananetwork/x402-server>
+Sources: <https://docs.altana.network/sdk/x402-server> · <https://github.com/altananetwork/altana-sdk/blob/main/packages/x402-server/README.md> · <https://registry.npmjs.org/@altananetwork/x402-server>
 
 ---
 
-## 7. Skills Registry — 10 Production Skills
+## 7. The Skills Registry — 10 Production Skills
 
-<https://skills.altana.network> · index JSON: <https://skills.altana.network/index.json> · katalog penuh: <https://skills.altana.network/llms-full.txt> · raw canonical: <https://raw.githubusercontent.com/altananetwork/skills/main/index.json>
+<https://skills.altana.network> · index JSON: <https://skills.altana.network/index.json> · the full catalogue: <https://skills.altana.network/llms-full.txt> · raw canonical: <https://raw.githubusercontent.com/altananetwork/skills/main/index.json>
 
-### 7.1 Konsep
+### 7.1 The concept
 
 > "A session gives your agent authority. A skill gives it competence."
 
-Skill = **satu file `SKILL.md`** yang mengajari agent cara sebuah protokol benar-benar bekerja: kontrak yang tepat, quirk yang merusak integrasi naif, dan urutan call yang persis untuk setiap aksi umum. Altana menguji setiap skill dengan **agent nyata di private fork mainnet** sebelum live. **Gratis dipakai**, dan agent mencarinya sendiri.
+A skill is **a single `SKILL.md` file** that teaches an agent how a protocol actually works: the right contracts, the quirks that break a naive integration, and the exact call order for every common action. Altana tests each skill with a **real agent on a private mainnet fork** before it goes live. They are **free to use**, and agents find them on their own.
 
-**Pemisahan kritikal (ini yang membuat skill aman dishare):**
+**The critical separation (this is what makes a skill safe to share):**
 > "A skill is public, readable text. It cannot grant anything… An agent holding the PancakeSwap skill and no session can do exactly nothing."
 
-Kolom "may not" di setiap katalog **bukan janji dari penulis skill** — itu adalah apa yang **session-mu tegakkan on-chain**, dan yang siapa pun bisa verifikasi dari Keystore.
+The "may not" column in each catalogue entry is **not a promise from the skill's author** — it is what **your session enforces on-chain**, and what anyone can verify from the Keystore.
 
-**Aturan rumah yang tidak boleh dilanggar:** plays **tidak pernah menandatangani**. Setiap write on-chain lewat Altana session executor — `client.execute({ session, calls })` (SDK) atau tool MCP `session_execute`. Reads langsung ke RPC. "That one rule is what keeps a skill from being able to widen its own scope."
+**The house rule that must never be broken:** plays **never sign**. Every on-chain write goes through the Altana session executor — `client.execute({ session, calls })` (SDK) or the MCP `session_execute` tool. Reads go straight to the RPC. "That one rule is what keeps a skill from being able to widen its own scope."
 
-Sumber: <https://docs.altana.network/skills> · <https://skills.altana.network/llms.txt>
+Sources: <https://docs.altana.network/skills> · <https://skills.altana.network/llms.txt>
 
-### 7.2 Anatomi sebuah skill (4 bagian)
+### 7.2 The anatomy of a skill (4 parts)
 
-1. **Frontmatter** — `name` (= nama direktori, id skill), `description` (satu kalimat mulai dengan verb, menyebut protokol + chain). Ini teks yang di-match agent saat mencari registry.
-2. **Reference** — tabel alamat checksummed (hanya kontrak yang benar-benar disentuh plays) + **Quirks**: 3–6 fakta protokol yang merusak integrasi naif, satu baris masing-masing + signature fungsi.
-3. **Playbook** — 2–5 **play** per skill, masing-masing menyebut parameter dan **Typical time**, langkah bernomor agar agent bisa menjalankan seluruh play dalam satu skrip.
-4. **Guards (do not remove)** — keputusan keamanan: output floor, verifikasi balance on-chain setelah setiap state change, retry limit, dan apa yang dilakukan saat gagal ("stop and report, never improvise outside the session scope"). **Certification memverifikasi guards, jadi submission tidak bisa memangkasnya.**
+1. **Frontmatter** — `name` (= the directory name, the skill id), `description` (one sentence starting with a verb, naming the protocol + chain). This is the text an agent matches against when searching the registry.
+2. **Reference** — a table of checksummed addresses (only the contracts the plays actually touch) + **Quirks**: 3–6 protocol facts that break a naive integration, one line each plus the function signature.
+3. **Playbook** — 2–5 **plays** per skill, each naming its parameters and a **Typical time**, with numbered steps so an agent can run a whole play in one script.
+4. **Guards (do not remove)** — the safety decisions: output floors, on-chain balance verification after every state change, retry limits, and what to do on failure ("stop and report, never improvise outside the session scope"). **Certification verifies the guards, so a submission cannot trim them.**
 
-> **Tabel alamat punya fungsi ganda: suggested session scope diturunkan darinya.**
+> **The address table serves double duty: the suggested session scope is derived from it.**
 
-Sumber: <https://docs.altana.network/skills> · <https://docs.altana.network/skills/submit>
+Sources: <https://docs.altana.network/skills> · <https://docs.altana.network/skills/submit>
 
-### 7.3 Cara memanggil
+### 7.3 How to call them
 
-**Lewat MCP (jalur yang dimaksudkan):**
+**Through MCP (the intended path):**
 ```bash
 claude mcp add altana -- bunx @altananetwork/mcp
 ```
-- `search_skills({ query })` → skill yang cocok + scope + certification scorecard, di-rank berdasarkan berapa kata query yang match
-- `get_skill({ id })` → `SKILL.md` penuh. **Konten di-integrity-check terhadap `sha256` registry sebelum dikembalikan** — playbook yang di-tamper ditolak, bukan diikuti. Juga mengembalikan scope (allowed contracts, suggested spend cap) dan scorecard.
+- `search_skills({ query })` → the matching skills + their scope + a certification scorecard, ranked by how many query words match
+- `get_skill({ id })` → the full `SKILL.md`. **The content is integrity-checked against the registry `sha256` before it is returned** — a tampered playbook is rejected, not followed. It also returns the scope (allowed contracts, suggested spend cap) and the scorecard.
 
-Registry URL default ke main branch repo publik, **override dengan env `ALTANA_SKILLS_INDEX_URL`**.
+The registry URL defaults to the public repo's main branch; **override it with the `ALTANA_SKILLS_INDEX_URL` env var**.
 
-**Lewat HTTPS biasa (tanpa MCP):**
+**Over plain HTTPS (without MCP):**
 - `https://skills.altana.network/index.json`
-- `https://skills.altana.network/llms-full.txt` (semua 10 SKILL.md dalam satu fetch)
+- `https://skills.altana.network/llms-full.txt` (all 10 SKILL.md files in one fetch)
 - `https://skills.altana.network/skills/<id>/SKILL.md`
 
-Sumber: <https://skills.altana.network/llms.txt> · <https://docs.altana.network/mcp/tools>
+Sources: <https://skills.altana.network/llms.txt> · <https://docs.altana.network/mcp/tools>
 
-### 7.4 Katalog lengkap — 10 skills
+### 7.4 The full catalogue — 10 skills
 
-Semua `verified: fork-tested by Altana` pada **2026-07-21**. Semua `publisher: Altana`.
-`askAt` menandakan kapan input diminta: **`grant`** = saat membuat session (masuk ke policy), **`run`** = saat menjalankan play.
+All are `verified: fork-tested by Altana` on **2026-07-21**. All have `publisher: Altana`.
+`askAt` says when the input is requested: **`grant`** = when the session is created (it goes into the policy), **`run`** = when the play is run.
 
 ---
 
 #### 1. PancakeSwap Trading — `pancakeswap-trading` v1.0.0
-- **Chain:** bnb · **Kategori:** Trading · **Suggested cap:** 50 USDT
+- **Chain:** bnb · **Category:** Trading · **Suggested cap:** 50 USDT
 - **sha256:** `8721c5294ac8e3475ab7b14c41f397061e9c4de550f86c5ec17a51da8db1f4d5`
-- **Deskripsi:** Buy and sell tokens on PancakeSwap on BNB Chain through an Altana session. In and out of positions fast, with quotes, slippage protection, and full-balance exits.
+- **Description:** Buy and sell tokens on PancakeSwap on BNB Chain through an Altana session. In and out of positions fast, with quotes, slippage protection, and full-balance exits.
 - **Scope contracts:** PancakeSwap V2 Router `0x10ED43C718714eb63d5aA57B78B54704E256024E` · WBNB `0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c` · USDT `0x55d398326f99059fF775485246999027B3197955`
 - **Inputs:** `token` (address, run) · `amountUsdt` (usd, run) · `slippagePct` (percent, run, default 1) · `takeProfitPct` (percent, run) · `stopLossPct` (percent, run)
 - **Plays:** `enter-position`, `exit-position`, `round-trip`, `tp-sl-watch`
 - **May:** Trade on PancakeSwap; Spend up to the cap you set
 - **May not:** Send funds anywhere else; Touch any other app or token
 - **Example ask:** *"ape $20 into $TOKEN, sell at 30% profit"*
-- **Quirks penting:** USDT di BNB **18 desimal**, bukan 6 → $20 = `20n * 10n**18n`. Route selection: quote pair langsung **DAN** hop WBNB dengan `getAmountsOut`, pakai yang lebih baik. Approve sebelum setiap arah swap. Fee-on-transfer token butuh `swapExactTokensForTokensSupportingFeeOnTransferTokens`.
+- **Important quirks:** USDT on BNB has **18 decimals**, not 6 → $20 = `20n * 10n**18n`. Route selection: quote the direct pair **AND** the WBNB hop with `getAmountsOut`, and use whichever is better. Approve before each swap direction. Fee-on-transfer tokens need `swapExactTokensForTokensSupportingFeeOnTransferTokens`.
 
 #### 2. Four.meme Trading — `four-meme` v1.0.0
-- **Chain:** bnb · **Kategori:** Trading · **Suggested cap:** 0.1 BNB
+- **Chain:** bnb · **Category:** Trading · **Suggested cap:** 0.1 BNB
 - **sha256:** `c39a51afa14cee0ff6dac9803547641f07f3c58efc8bae9dc6ad5c3353e0070b`
-- **Deskripsi:** Snipe and trade memecoin launchpad curves on Four.meme, and hand off to PancakeSwap after graduation.
+- **Description:** Snipe and trade memecoin launchpad curves on Four.meme, and hand off to PancakeSwap after graduation.
 - **Scope contracts:** TokenManager2 `0x5c952063c7fc8610FFDB798152D69F0B9550762b` · TokenManagerHelper3 (reads) `0xF251F83e40a78868FcfA3FA4599Dad6494E46034` · PancakeSwap V2 Router (post-graduation) · WBNB
-- **Inputs:** `token` (address, run) · `amountBnb` (bnb, run) · `amountToken` (amount, run — juga menerima `"all"`) · `slippagePct` (percent, run, default 3)
+- **Inputs:** `token` (address, run) · `amountBnb` (bnb, run) · `amountToken` (amount, run — also accepts `"all"`) · `slippagePct` (percent, run, default 3)
 - **Plays:** `buy-on-curve`, `sell-on-curve`, `check-curve-status`, `round-trip`, `graduation-handoff`
 - **May:** Buy and sell on Four.meme curves; Spend BNB up to the cap you set
 - **May not:** Send funds anywhere else; Touch any other app or token
 - **Example ask:** *"snipe 0.05 BNB into this four.meme launch, sell at 2x"*
 
 #### 3. PancakeSwap Liquidity — `pancakeswap-liquidity` v1.0.0
-- **Chain:** bnb · **Kategori:** Liquidity · **Suggested cap:** 50 USDT
+- **Chain:** bnb · **Category:** Liquidity · **Suggested cap:** 50 USDT
 - **sha256:** `80d8bb4435689a2a696b22ebbf295c7f805c43f6287d1cd0c6e97951c3548b0f`
-- **Deskripsi:** Provide and withdraw PancakeSwap V2 liquidity to earn trading fees on your token pairs.
-- **Scope contracts:** V2 Router · V2 Factory `0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73` · WBNB · USDT · USDT/WBNB pair (LP) `0x16b9a82891338f9bA80E2D6970FddA79D1eb0daE` — *pair tokens approve ke router saja*
-- **Inputs:** `tokenA`, `tokenB` (address, run) · `amount` (amount, run — sisi lain diturunkan dari rasio pool) · `lpAmount` (amount, run — juga `"all"`) · `slippagePct` (default 1)
+- **Description:** Provide and withdraw PancakeSwap V2 liquidity to earn trading fees on your token pairs.
+- **Scope contracts:** V2 Router · V2 Factory `0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73` · WBNB · USDT · the USDT/WBNB pair (LP) `0x16b9a82891338f9bA80E2D6970FddA79D1eb0daE` — *pair tokens are approved to the router only*
+- **Inputs:** `tokenA`, `tokenB` (address, run) · `amount` (amount, run — the other side is derived from the pool ratio) · `lpAmount` (amount, run — also `"all"`) · `slippagePct` (default 1)
 - **Plays:** `add-liquidity`, `remove-liquidity`, `position-check`
 - **May:** Add and remove PancakeSwap liquidity; Spend up to the cap you set
 - **Example ask:** *"put $50 into the USDT/WBNB pool and show my share"*
 
-#### 4. Copy Trade — `copy-trade` **v1.1.0** (satu-satunya yang bukan 1.0.0)
-- **Chain:** bnb · **Kategori:** Trading · **Suggested cap:** 50 USDT
+#### 4. Copy Trade — `copy-trade` **v1.1.0** (the only one that is not 1.0.0)
+- **Chain:** bnb · **Category:** Trading · **Suggested cap:** 50 USDT
 - **sha256:** `d5458abd494a096f4ba208e7e534259fffdd1b5351a37130ec634514e18d1e37`
-- **Deskripsi:** Mirror a wallet you name on PancakeSwap under hard per-trade and total caps.
-- **Scope contracts:** PancakeSwap V2 Router · V2 Factory · WBNB · USDT — *traded tokens approve ke router saja*
-- **Inputs (semua `askAt: grant` — masuk ke policy!):** `leaderWallet` (address) · `perTradeMaxUsd` (usd, default 10) · `totalBudgetUsd` (usd, default 50) · `screenTokens` (boolean, default true)
+- **Description:** Mirror a wallet you name on PancakeSwap under hard per-trade and total caps.
+- **Scope contracts:** PancakeSwap V2 Router · V2 Factory · WBNB · USDT — *traded tokens are approved to the router only*
+- **Inputs (all `askAt: grant` — they go into the policy!):** `leaderWallet` (address) · `perTradeMaxUsd` (usd, default 10) · `totalBudgetUsd` (usd, default 50) · `screenTokens` (boolean, default true)
 - **Plays:** `follow`, `mirror-exit`, `stop`
 - **May:** Mirror the PancakeSwap trades of the wallet you name; Spend up to the caps you set
 - **May not:** Follow any wallet you did not give it; Exceed per-trade or total caps; Send funds anywhere else; Touch any other app
 - **Example ask:** *"copy 0xab...'s trades, $10 max each, stop at $50"*
-- 💡 **Skill paling menarik untuk demo UI kita** — semua input diminta pada tahap *grant*, jadi UI "atur izin agent" punya form yang kaya dan langsung memetakan ke session policy.
+- 💡 **The most interesting skill for our UI demo** — every input is asked for at the *grant* stage, so the "set the agent's permissions" UI has a rich form that maps directly onto the session policy.
 
 #### 5. Venus Lending — `venus-lending` v1.0.0
-- **Chain:** bnb · **Kategori:** Lending · **Suggested cap:** 100 USDT
+- **Chain:** bnb · **Category:** Lending · **Suggested cap:** 100 USDT
 - **sha256:** `69bcf2a17ffe4624dcb9d98321299f166e045787a6ffad1219f0f5d331f77bf7`
-- **Deskripsi:** Lend stablecoins on Venus Protocol on BNB Chain through an Altana session.
+- **Description:** Lend stablecoins on Venus Protocol on BNB Chain through an Altana session.
 - **Scope contracts:** vUSDT (core pool) `0xfD5840Cd36d94D7229439859C0112a4185BC0255` · USDT
-- **Inputs:** `amountUsdt` (usd, run — withdraw juga menerima `"all"`)
+- **Inputs:** `amountUsdt` (usd, run — withdraw also accepts `"all"`)
 - **Plays:** `supply`, `withdraw`, `position-check`, `pay-once`, `auto-refill`
 - **May:** Supply and withdraw stablecoins on Venus; Spend up to the cap you set
 - **Example ask:** *"lend $100 USDT on venus"*
-- 🚨 **PERINGATAN KRITIS (dari halaman Errors docs):** Venus core-pool **vBNB `redeem` REVERT** dari Altana wallet. Alasan: Altana wallet adalah EOA yang di-delegate (EIP-7702); membayar wallet native coin lewat `.transfer()`/`.send()` hanya meneruskan 2300-gas stipend, tidak cukup menjalankan delegated account code. **Payout ERC-20 tidak terpengaruh.** Workaround: pakai jalur wrapped-token (WBNB), gateway yang membayar dengan `call{value:}` full-gas (Venus NativeTokenGateway di mana ter-deploy), atau terima ke plain EOA. **Tidak ada perbaikan sisi SDK** — root cause di contract pembayar. → **Untuk demo, pakai vUSDT (ERC-20), JANGAN vBNB.**
+- 🚨 **A CRITICAL WARNING (from the docs Errors page):** the Venus core-pool **vBNB `redeem` REVERTS** from an Altana wallet. The reason: an Altana wallet is a delegated EOA (EIP-7702); paying a wallet native coin through `.transfer()`/`.send()` only forwards the 2300-gas stipend, which is not enough to run the delegated account code. **ERC-20 payouts are unaffected.** Workarounds: use the wrapped-token path (WBNB), a gateway that pays with a full-gas `call{value:}` (the Venus NativeTokenGateway where it is deployed), or receive into a plain EOA. **There is no SDK-side fix** — the root cause is in the paying contract. → **For the demo, use vUSDT (ERC-20), NOT vBNB.**
 
 #### 6. x402 API Payments — `x402-payments` v1.0.0
-- **Chain:** **multi** · **Kategori:** Payments · **Suggested cap:** 25 USDT
+- **Chain:** **multi** · **Category:** Payments · **Suggested cap:** 25 USDT
 - **sha256:** `8250aae2d2ba2ce1320e5fc1b48e6389e5751b197e787c3e65199143b9fb75b7`
-- **Deskripsi:** Pay for APIs and services over HTTP with the x402 protocol from an Altana session. Per-use payments in stablecoins, no accounts or cards, spend-capped and revocable.
+- **Description:** Pay for APIs and services over HTTP with the x402 protocol from an Altana session. Per-use payments in stablecoins, no accounts or cards, spend-capped and revocable.
 - **Scope contracts:** Permit2 · USDT (BSC-USD)
 - **Inputs:** `maxPricePerPaymentUsd` (usd, **grant**, default 1) · `totalBudgetUsd` (usd, **grant**, default 25) · `resourceUrl` (url, run)
-- **Plays:** `pay-once` (~10s), `auto-refill` (loop sampai budget habis)
+- **Plays:** `pay-once` (~10s), `auto-refill` (loops until the budget runs out)
 - **May:** Pay x402 invoices per request; Spend up to the cap you set
-- **Guards:** Selalu tegakkan max price; jangan pernah tanda tangani authorization di atasnya. Track cumulative spend dan berhenti di budget. **Hanya bayar endpoint yang user sebut — jangan ikuti 402 dari redirect ke host berbeda tanpa melapor dulu.**
-- **Quirks:** Amount dalam smallest unit (USDT BNB = 18 desimal). **Session menandatangani via ERC-1271 melalui smart account: wallet yang membayar adalah alamat smart account, BUKAN alamat session key.** Rail BNB pakai Permit2 dengan USDT; approval USDT→Permit2 sekali, ditangani SDK pada pembayaran pertama. Pembayaran dihitung terhadap spend cap session seperti outflow lainnya.
+- **Guards:** Always enforce the max price; never sign an authorization above it. Track cumulative spend and stop at the budget. **Only pay the endpoint the user named — do not follow a 402 from a redirect to a different host without reporting first.**
+- **Quirks:** Amounts are in the smallest unit (USDT on BNB = 18 decimals). **The session signs via ERC-1271 through the smart account: the wallet that pays is the smart account address, NOT the session key address.** The BNB rail uses Permit2 with USDT; the USDT→Permit2 approval happens once and is handled by the SDK on the first payment. Payments count against the session's spend cap like any other outflow.
 
 #### 7. Lista Liquid Staking — `lista-staking` v1.0.0
-- **Chain:** bnb · **Kategori:** Staking · **Suggested cap:** 0.5 BNB
+- **Chain:** bnb · **Category:** Staking · **Suggested cap:** 0.5 BNB
 - **sha256:** `67f15a40d3b2cf09a7317ca0a9e3a07dab083001cc17a999c46764cf1406e5ac`
-- **Deskripsi:** Stake BNB for slisBNB on Lista and earn staking yield while staying liquid.
-- **Scope contracts:** ListaStakeManager `0x1adB950d8bB3dA4bE104211D5AB038628e477fE6` · slisBNB `0xB0b84D294e0C75A6abe60171b70edEb2EFd14A1B` (approve ke manager saja)
+- **Description:** Stake BNB for slisBNB on Lista and earn staking yield while staying liquid.
+- **Scope contracts:** ListaStakeManager `0x1adB950d8bB3dA4bE104211D5AB038628e477fE6` · slisBNB `0xB0b84D294e0C75A6abe60171b70edEb2EFd14A1B` (approved to the manager only)
 - **Inputs:** `amountBnb` (bnb, run) · `amountSlisBnb` (amount, run) · `requestIndex` (integer, run, default 0)
-- **Plays:** `stake`, `unstake-request`, `claim` (setelah unbonding period), `position-check`
+- **Plays:** `stake`, `unstake-request`, `claim` (after the unbonding period), `position-check`
 - **May:** Stake BNB on Lista; Request withdrawals back to BNB; Spend BNB up to the cap you set
 - **Example ask:** *"stake 0.2 BNB on lista and show me the yield"*
 
 #### 8. Aave V3 Lending — `aave-v3-lending` v1.0.0
-- **Chain:** bnb · **Kategori:** Lending · **Suggested cap:** 50 USDT
+- **Chain:** bnb · **Category:** Lending · **Suggested cap:** 50 USDT
 - **sha256:** `20416c8f288207d32abc6217b5cf7ef239d4fa80e1cbbe8184e5d4c892a82f81`
-- **Deskripsi:** Supply USDT to Aave V3 on BNB Chain to earn yield, and withdraw on command.
-- **Scope contracts:** Aave V3 Pool `0x6807dc923806fE8Fd134338EABCA509979a7e0cB` · aBnbUSDT `0xa9251ca9DE909CB71783723713B21E4233fbf1B1` · USDT (approve ke Pool saja)
+- **Description:** Supply USDT to Aave V3 on BNB Chain to earn yield, and withdraw on command.
+- **Scope contracts:** Aave V3 Pool `0x6807dc923806fE8Fd134338EABCA509979a7e0cB` · aBnbUSDT `0xa9251ca9DE909CB71783723713B21E4233fbf1B1` · USDT (approved to the Pool only)
 - **Inputs:** `amountUsdt` (usd, run)
 - **Plays:** `supply`, `withdraw`, `position-check`
 - **May:** Supply USDT to Aave V3; Withdraw your position; Spend up to the cap you set
-- **May not:** **Borrow** ← eksplisit out-of-scope on purpose; Send funds anywhere else; Touch any other app or token
+- **May not:** **Borrow** ← explicitly out of scope on purpose; Send funds anywhere else; Touch any other app or token
 - **Example ask:** *"park 30 USDT in aave and tell me the APY"*
 
 #### 9. Token Radar — `dexscreener-token-radar` v1.0.0
-- **Chain:** bnb · **Kategori:** **Research** · **Suggested cap:** **none, research only**
+- **Chain:** bnb · **Category:** **Research** · **Suggested cap:** **none, research only**
 - **sha256:** `dc541956a847e00c2793da679b8a4121a5b9f46f08f07d852b88f86681c39a0b`
-- **Deskripsi:** Find trending BNB Chain tokens and screen them for liquidity and risk before trading.
-- **Scope contracts:** `[]` (kosong)
+- **Description:** Find trending BNB Chain tokens and screen them for liquidity and risk before trading.
+- **Scope contracts:** `[]` (empty)
 - **Inputs:** `token` (address, run) · `condition` (text, run) · `count` (integer, run, default 10) · `intervalSeconds` (integer, run, default 30)
 - **Plays:** `trending-scan`, `token-screen`, `watch`
 - **May:** Read public market data; Screen tokens and report risks
@@ -1451,27 +1451,27 @@ Semua `verified: fork-tested by Altana` pada **2026-07-21**. Semua `publisher: A
 - **Example ask:** *"what's pumping on BNB right now? screen the top one"*
 
 #### 10. Wallet Tracker — `wallet-tracker` v1.0.0
-- **Chain:** bnb · **Kategori:** **Research** · **Suggested cap:** **none, research only**
+- **Chain:** bnb · **Category:** **Research** · **Suggested cap:** **none, research only**
 - **sha256:** `271ce8f1bae98c3c943a2d48c454d762ac85000f9067bcaa25d11c9aed7525f9`
-- **Deskripsi:** Watch any BNB Chain wallet's trades live, profile its recent activity, and find a token's early buyers.
-- **Scope contracts:** `[]` (kosong)
+- **Description:** Watch any BNB Chain wallet's trades live, profile its recent activity, and find a token's early buyers.
+- **Scope contracts:** `[]` (empty)
 - **Inputs:** `wallet` (address, run) · `token` (address, run) · `intervalSeconds` (default 30) · `windowBlocks` (default 20000) · `count` (default 10)
 - **Plays:** `watch-wallet`, `profile-wallet`, `find-early-buyers`
-- **May:** Read public onchain activity; Watch and profile wallets
+- **May:** Read public on-chain activity; Watch and profile wallets
 - **May not:** Submit any transaction; Touch any contract or token
 - **Example ask:** *"watch what 0xab... is buying and tell me when they move"*
 
-> 💡 **Poin desain yang layak dipakai di pitch:** dua skill Research punya scope contracts kosong. Docs bilang: *"a read-only skill paired with a zero-scope session is a genuinely safe way to let an agent look around before you give it anything to spend."* Ini alur onboarding yang bagus di marketplace kita: **agent lihat-lihat dulu dengan zero-scope session, baru user naikkan izinnya.**
+> 💡 **A design point worth using in the pitch:** the two Research skills have an empty scope contracts list. The docs say: *"a read-only skill paired with a zero-scope session is a genuinely safe way to let an agent look around before you give it anything to spend."* That is a good onboarding flow for our marketplace: **the agent looks around first with a zero-scope session, and only then does the user raise its permissions.**
 
-### 7.5 Komposabilitas
+### 7.5 Composability
 
-**Ya, skills bisa dikomposisi.** Bukti langsung dari registry:
+**Yes, skills compose.** Direct evidence from the registry:
 
-1. **`four-meme` punya play `graduation-handoff`** yang secara eksplisit menyerahkan ke **PancakeSwap** setelah token lulus dari bonding curve → dua protokol, satu alur.
-2. **`copy-trade` punya input `screenTokens`** (default `true`) yang "skip anything that fails the liquidity and honeypot check" → mengonsumsi kapabilitas ala **Token Radar** di dalam alur trading.
-3. **`venus-lending` punya plays `pay-once` dan `auto-refill`** — nama yang identik dengan plays di skill **x402 API Payments** → pola play yang dishare lintas skill.
+1. **`four-meme` has a `graduation-handoff` play** that explicitly hands off to **PancakeSwap** once a token graduates from the bonding curve → two protocols, one flow.
+2. **`copy-trade` has a `screenTokens` input** (default `true`) that "skip anything that fails the liquidity and honeypot check" → it consumes a **Token Radar**-style capability inside a trading flow.
+3. **`venus-lending` has `pay-once` and `auto-refill` plays** — names identical to the plays in the **x402 API Payments** skill → shared play patterns across skills.
 
-**Mekanisme komposisi:** karena skill hanyalah teks dan semua write mengalir lewat `client.execute({ session, calls })`, mengomposisi dua skill = memberi agent kedua file `SKILL.md` **dan satu session yang `calls` allowlist-nya adalah union dari kedua tabel alamat**, dengan spend cap yang mencakup keduanya. `execute` menerima **array of calls** dalam satu userOp atomik, jadi satu play bisa `approve` + `swap` dalam satu transaksi:
+**The composition mechanism:** because a skill is just text and all writes flow through `client.execute({ session, calls })`, composing two skills = giving the agent both `SKILL.md` files **and one session whose `calls` allowlist is the union of both address tables**, with a spend cap covering both. `execute` accepts an **array of calls** in one atomic userOp, so a single play can `approve` + `swap` in one transaction:
 
 ```ts
 await client.execute({
@@ -1483,7 +1483,7 @@ await client.execute({
 });
 ```
 
-**Contoh scope komposit (verbatim dari docs Skills):**
+**A composite scope example (verbatim from the Skills docs):**
 ```ts
 // Scope taken straight from the PancakeSwap Trading skill's address table.
 const PANCAKE_ROUTER = "0x10ED43C718714eb63d5aA57B78B54704E256024E";
@@ -1506,78 +1506,78 @@ const session = await client.grantSession({
 
 > "Anything outside `calls` or over the spend cap reverts onchain, **whatever the skill says**."
 
-Sumber: <https://docs.altana.network/skills> · <https://skills.altana.network/llms-full.txt>
+Sources: <https://docs.altana.network/skills> · <https://skills.altana.network/llms-full.txt>
 
-### 7.6 Submit skill sendiri (opsi diferensiasi hackathon)
+### 7.6 Submitting your own skill (a hackathon differentiation option)
 
-PR ke <https://github.com/altananetwork/skills>. Tiga langkah: **(1)** tulis satu `SKILL.md` di `skills/<your-skill-id>/` · **(2)** Altana test dengan agent nyata di private copy chain · **(3)** live untuk semua agent.
+A PR to <https://github.com/altananetwork/skills>. Three steps: **(1)** write one `SKILL.md` in `skills/<your-skill-id>/` · **(2)** Altana tests it with a real agent on a private copy of the chain · **(3)** it goes live for every agent.
 
-Prompt resmi yang bisa di-paste ke Claude Code / Cursor (verbatim dari docs):
+The official prompt you can paste into Claude Code / Cursor (verbatim from the docs):
 > "Read the Altana skill template at https://github.com/altananetwork/skills/blob/main/skills/_template/SKILL.md and the example at https://github.com/altananetwork/skills/blob/main/skills/pancakeswap-trading/SKILL.md. Write a SKILL.md for \<protocol\> following the template exactly: one capability, checksummed addresses in a table, plays with parameters and Typical time lines, and explicit guards. Then write the test scenario described in tools/skill-test/scenarios and self-test with the harness."
 
-Harness self-test ada di `tools/skill-test/` (`skill-test.ts`, `harness/altana.ts`, `harness/fork.ts`, `scenarios/*.ts`).
+The self-test harness lives in `tools/skill-test/` (`skill-test.ts`, `harness/altana.ts`, `harness/fork.ts`, `scenarios/*.ts`).
 
-Sumber: <https://docs.altana.network/skills/submit> · <https://github.com/altananetwork/skills>
+Sources: <https://docs.altana.network/skills/submit> · <https://github.com/altananetwork/skills>
 
 ---
 
-## 8. Altana Explorer — Bagaimana Juri Memverifikasi Kita
+## 8. The Altana Explorer — How the Judges Will Verify Us
 
 | Network | URL |
 |---|---|
 | **Mainnet** | <https://explorer.altana.network> |
 | **Testnet** | <https://testnet.altana.network> |
 
-Keduanya punya link ke satu sama lain di header. **Tidak perlu akun, API key, atau koneksi wallet.**
+Both link to each other in the header. **No account, API key, or wallet connection is needed.**
 
-### 8.1 Halaman & rute
+### 8.1 Pages & routes
 
-| Rute | Isi |
+| Route | Contents |
 |---|---|
-| `/` | Homepage: global activity feed, totals, chain status |
-| `/account/<address>` | Semua yang registry tahu tentang satu wallet: **jumlah active key, total keys, chain yang disentuh**, dan tabel key dengan **type, state, chain, nonce, last update**. Di bawahnya: event history wallet |
-| `/key/<keyId>` | Satu key dalam bahasa manusia: **active / revoked / expired**, admin atau session key, akun pemilik, chain, **expiry**, dan kapan di-register |
+| `/` | Homepage: a global activity feed, totals, chain status |
+| `/account/<address>` | Everything the registry knows about one wallet: **the number of active keys, total keys, chains touched**, and a key table with **type, state, chain, nonce, last update**. Below it: the wallet's event history |
+| `/key/<keyId>` | One key in plain language: **active / revoked / expired**, admin or session key, the owning account, the chain, the **expiry**, and when it was registered |
 
-Search box menerima **wallet address, key id, atau public key hash** — public key hash auto-derive ke key id, jadi kamu bisa paste apa yang ada di kode tanpa hashing manual.
+The search box accepts a **wallet address, a key id, or a public key hash** — a public key hash is auto-derived into a key id, so you can paste whatever is in your code without hashing it by hand.
 
-Homepage `WebSite` JSON-LD mendeklarasikan `/account/{search_term}` sebagai canonical `SearchAction`.
+The homepage's `WebSite` JSON-LD declares `/account/{search_term}` as the canonical `SearchAction`.
 
-**Networks panel:** Mainnet meng-index BNB Smart Chain dan Ethereum sebagai source, dengan Base sebagai L2 cache. **Testnet meng-index BNB Smart Chain Testnet dan Ethereum Sepolia, dengan Base Sepolia sebagai cache.**
+**The Networks panel:** mainnet indexes BNB Smart Chain and Ethereum as sources, with Base as an L2 cache. **Testnet indexes BNB Smart Chain Testnet and Ethereum Sepolia, with Base Sepolia as the cache.**
 
-### 8.2 Cara pakai untuk verifikasi juri — dari docs sendiri
+### 8.2 How to use it for judge verification — in their own words
 
 > **"Share a link as evidence.** Account and key pages are plain URLs, so `explorer.altana.network/account/<your wallet>` is a self-contained, third-party-verifiable record of what your agent was authorized to do and when. **That link is the right thing to hand a counterparty, a reviewer, or a hackathon judge who asks to see your onchain activity.** It reads from the same public registry they could read themselves, so nothing about it depends on trusting you or Altana."
 
-**Ini instruksi eksplisit dari Altana untuk skenario juri hackathon.** Sumber: <https://docs.altana.network/explorer>
+**That is an explicit instruction from Altana for the hackathon judging scenario.** Source: <https://docs.altana.network/explorer>
 
-**Checklist verifikasi yang bisa dilakukan juri:**
-1. **Konfirmasi grant mendarat** → buka account page wallet kita. Session key baru harus muncul di tabel keys **dengan expiry**. Kalau tidak ada, grant tidak sampai ke chain yang mereka lihat.
-2. **Konfirmasi revoke berlaku** → key page flip ke **revoked**. Monotonic, jadi tidak pernah kembali. "This is the fastest way to prove to yourself, or to someone else, that authority is actually gone."
-3. **Bedakan revoked vs expired** → keduanya gagal sama di kode tapi artinya sangat berbeda. Expired = habis waktu, bisa di-grant lagi. Revoked = ditarik sengaja. Key page menyebut yang mana.
-4. **Live activity feed** → filter ke registrations / revocations / L2 cache syncs, dengan transaction fee dan chain per event.
+**A verification checklist a judge can run:**
+1. **Confirm the grant landed** → open our wallet's account page. The new session key must appear in the keys table **with its expiry**. If it is not there, the grant never reached the chain they are looking at.
+2. **Confirm the revoke took effect** → the key page flips to **revoked**. It is monotonic, so it never comes back. "This is the fastest way to prove to yourself, or to someone else, that authority is actually gone."
+3. **Tell revoked apart from expired** → both fail the same way in code but mean very different things. Expired = it ran out of time and can be granted again. Revoked = it was deliberately withdrawn. The key page says which.
+4. **The live activity feed** → filter to registrations / revocations / L2 cache syncs, with the transaction fee and chain per event.
 
-### 8.3 Batasan Explorer (penting untuk kode kita)
+### 8.3 Explorer limitations (important for our code)
 
 > "The explorer is an indexed view built for humans. **It is not the authority, and it is not an API.**"
 
-Untuk apa pun yang kodemu bergantung padanya, **baca contract Keystore langsung**: satu `isValidKey` gratis menjawab apakah key authorized sekarang, dari RPC mana pun, **tanpa indexing lag**. Kalau live node read tidak tersedia, key page akan bilang begitu dan fallback ke indexed history — perlakukan state itu sebagai informational dan konfirmasi dengan contract read.
+For anything your code depends on, **read the Keystore contract directly**: one free `isValidKey` answers whether a key is authorized right now, from any RPC, **with no indexing lag**. If a live node read is unavailable, the key page will say so and fall back to indexed history — treat that state as informational and confirm it with a contract read.
 
-**Implikasi arsitektur produk kita:** UI "lihat & revoke izin agent" **harus** membaca `isValidKey` / `getKeys` langsung on-chain (bukan scraping Explorer), lalu **tautkan** ke Explorer sebagai bukti pihak ketiga.
+**The implication for our product's architecture:** the "view & revoke agent permissions" UI **must** read `isValidKey` / `getKeys` directly on-chain (not scrape the Explorer), and then **link out** to the Explorer as third-party proof.
 
-Sumber: <https://docs.altana.network/explorer> · <https://explorer.altana.network/llms.txt>
+Sources: <https://docs.altana.network/explorer> · <https://explorer.altana.network/llms.txt>
 
 ---
 
-## 9. Error Handling — Wajib Baca Sebelum Coding
+## 9. Error Handling — Read This Before Writing Code
 
-### 9.1 Dua kelas kegagalan
+### 9.1 Two classes of failure
 
-| Kelas | Perilaku |
+| Class | Behaviour |
 |---|---|
-| **Sebelum submission** | **Melempar** JavaScript `Error` dengan message string. Bad config, unsupported signer, chain tanpa relay. Tangkap dengan `try/catch`. |
-| **Pada / setelah submission** | **TIDAK melempar.** `execute` dan `revokeSession` mengembalikan `ExecuteResult` dengan `status: "FAILED"`. **Kalau kamu cuma `try/catch`, kamu tidak akan menyadarinya.** |
+| **Before submission** | **Throws** a JavaScript `Error` with a message string. Bad config, an unsupported signer, a chain with no relay. Catch it with `try/catch`. |
+| **At or after submission** | **DOES NOT throw.** `execute` and `revokeSession` return an `ExecuteResult` with `status: "FAILED"`. **If you only `try/catch`, you will never notice.** |
 
-Pengecualian: **`grantSession` MELEMPAR** `Session grant did not confirm: status=<status>` (dengan relay code ditambahkan bila teramati, mis. `status=FAILED (relay code 300)`) — karena tidak ada objek `Session` berguna untuk dikembalikan.
+The exception: **`grantSession` DOES THROW** `Session grant did not confirm: status=<status>` (with the relay code appended when observed, e.g. `status=FAILED (relay code 300)`) — because there is no useful `Session` object to return.
 
 ```ts
 const result = await client.execute({ wallet, signer, calls });
@@ -1586,90 +1586,90 @@ if (result.status !== "CONFIRMED") {
 }
 ```
 
-### 9.2 Relay status codes (band EIP-5792)
+### 9.2 Relay status codes (EIP-5792 bands)
 
-| `statusCode` | Band | Arti |
+| `statusCode` | Band | Meaning |
 |---|---|---|
-| `100`–`199` | still in flight | SDK terus polling |
-| `200`–`299` | success | Muncul sebagai `CONFIRMED` |
-| **`300`–`499`** | **rejected before inclusion** | Terminal, `FAILED` seketika. **Tidak ada yang sampai ke chain.** Penyebab `300` paling umum: **spend cap session tidak bisa menutupi relay fee** (cap juga membayar fee), atau relay policy menolak bundle |
-| `500`–`699` | failed on-chain | Terminal, `FAILED`. `500` = revert; `600` = partial failure |
-| lainnya | unknown | SDK terus polling daripada menebak. Timeout → `PENDING` dengan kode aneh di `statusCode` |
+| `100`–`199` | still in flight | The SDK keeps polling |
+| `200`–`299` | success | Surfaces as `CONFIRMED` |
+| **`300`–`499`** | **rejected before inclusion** | Terminal, `FAILED` immediately. **Nothing reached the chain.** The most common cause of `300`: **the session's spend cap cannot cover the relay fee** (the cap pays the fee too), or the relay policy rejected the bundle |
+| `500`–`699` | failed on-chain | Terminal, `FAILED`. `500` = a revert; `600` = a partial failure |
+| anything else | unknown | The SDK keeps polling rather than guessing. On timeout → `PENDING` with the odd code in `statusCode` |
 
-`PENDING` tanpa `noWait` berarti 240 detik polling (tiap 2 detik) berakhir tanpa jawaban terminal. `PENDING` + `statusCode: 100` = relay reachable, bundle benar-benar masih in flight. `PENDING` tanpa `statusCode` = relay tidak pernah menjawab. **Perlakukan `PENDING` nyata sebagai UNKNOWN, bukan gagal** — bundle mungkin masih mendarat. Poll `callsId` sebelum retry, atau kamu berisiko submit intent yang sama dua kali.
+A `PENDING` without `noWait` means 240 seconds of polling (every 2 seconds) ended with no terminal answer. `PENDING` + `statusCode: 100` = the relay is reachable and the bundle really is still in flight. `PENDING` with no `statusCode` = the relay never answered. **Treat a genuine `PENDING` as UNKNOWN, not as a failure** — the bundle may still land. Poll the `callsId` before retrying, or you risk submitting the same intent twice.
 
-### 9.3 Kelas kegagalan & cara mengenalinya
+### 9.3 Failure classes and how to recognise them
 
-| Yang salah | Cara mengenali | Perbaikan |
+| What went wrong | How to recognise it | The fix |
 |---|---|---|
-| **Policy revert** — session melebihi spend cap, memanggil kontrak di luar `permissions.calls`, atau lewat `expiry` | Session tadinya jalan lalu berhenti, atau gagal hanya untuk call/amount tertentu. Baca key on-chain dengan `isValidKey`; cek `spend` limits terhadap desimal token | **Grant session baru dengan scope yang benar. Permissions fixed saat grant dan TIDAK BISA diperlebar** |
-| **Desimal salah di spend cap** | Pembayaran kecil revert terhadap limit yang terlihat besar. **Sangat umum di BNB Chain** (stablecoin 18 desimal, bukan 6) | Lihat warning desimal di `grantSession` |
-| **Counterfactual wallet belum didanai** | Terjadi di `execute` pertama untuk wallet baru. `createWallet` tidak menyentuh chain | Kirim native token ke `wallet.address` dulu |
-| **Session tidak cocok dengan grant** | **Setiap** `execute` gagal, termasuk yang tadinya jalan. Biasanya setelah lossy JSON round-trip | Persist dengan `serializeSession`, restore dengan `deserializeSession` |
-| **Relay rejection** | `FAILED` dalam hitungan detik dengan `statusCode` 300–499 | Naikkan cap (atau perbaiki input) dan resubmit; tidak ada yang sampai ke chain |
-| **Contract membayar wallet native coin via `.transfer()`/`.send()`** | Call jalan dari plain EOA tapi revert dari wallet; trace menunjukkan out-of-gas atau empty revert di dalam native-coin send ke alamat wallet | **Tidak ada fix sisi wallet.** Pakai jalur wrapped-token, gateway full-gas `call{value:}`, atau terima ke plain EOA. Kasus yang diketahui: **Venus core-pool vBNB `redeem`** |
+| **A policy revert** — the session exceeded its spend cap, called a contract outside `permissions.calls`, or passed its `expiry` | The session used to work and then stopped, or it fails only for a particular call/amount. Read the key on-chain with `isValidKey`; check the `spend` limits against the token's decimals | **Grant a new session with the right scope. Permissions are fixed at grant time and CANNOT be widened** |
+| **Wrong decimals in the spend cap** | Small payments revert against a limit that looks large. **Very common on BNB Chain** (stablecoins have 18 decimals, not 6) | See the decimals warning under `grantSession` |
+| **The counterfactual wallet is unfunded** | It happens on the first `execute` for a new wallet. `createWallet` never touches the chain | Send native tokens to `wallet.address` first |
+| **The session does not match the grant** | **Every** `execute` fails, including ones that used to work. Usually after a lossy JSON round-trip | Persist with `serializeSession`, restore with `deserializeSession` |
+| **A relay rejection** | `FAILED` within seconds, with `statusCode` 300–499 | Raise the cap (or fix the input) and resubmit; nothing reached the chain |
+| **A contract paying the wallet native coin via `.transfer()`/`.send()`** | The call works from a plain EOA but reverts from the wallet; the trace shows out-of-gas or an empty revert inside the native-coin send to the wallet address | **There is no wallet-side fix.** Use the wrapped-token path, a full-gas `call{value:}` gateway, or receive into a plain EOA. The known case: **the Venus core-pool vBNB `redeem`** |
 
-`FAILED` **tidak membawa revert string atau receipt**. Untuk alasan on-chain: cari alamat wallet di BscScan, inspect transaksi terakhir ke account, revert reason ada di trace. Kamu punya `callsId`, alamat wallet, dan chain.
+A `FAILED` **carries no revert string and no receipt**. For the on-chain reason: look up the wallet address on BscScan, inspect the last transaction to the account, and the revert reason is in the trace. You have the `callsId`, the wallet address, and the chain.
 
-Sumber: <https://docs.altana.network/sdk/errors>
+Source: <https://docs.altana.network/sdk/errors>
 
 ---
 
 ## 10. Quickstart: "Build an Agent Marketplace on BNB with Altana"
 
-### 10.1 Konteks hackathon
+### 10.1 Hackathon context
 
 **Build the Era / The Smart Money Era** — <https://www.bnbchain.org/en/hackathons/smart-money-era>
 
-| Item | Nilai |
+| Item | Value |
 |---|---|
-| Build period | 5 Agustus – 9 September 2026 |
+| Build period | 5 August – 9 September 2026 |
 | Judging | 9 – 23 September 2026 |
 | Winner announcement | 5 November 2026 |
-| Total prize pool | > $40.000 |
-| Breakdown | BNB Chain $30.000 USDT · TermiX $10.000 USDT · PancakeSwap 1.000 CAKE · AltLayer 8004scan Pro + AltLLM credits · **Altana 50.000 XP** |
-| Main challenge | "the best AI agent marketplace on BNB Smart Chain: one venue to browse agents, see what they do and how they've performed, and put them to work." Pemenang **diadopsi sebagai marketplace resmi BNB Agent Studio sebagai produk standalone** |
-| Kategori agent referensi | Monitoring · Grid trading · Health factor · Yield |
+| Total prize pool | > $40,000 |
+| Breakdown | BNB Chain $30,000 USDT · TermiX $10,000 USDT · PancakeSwap 1,000 CAKE · AltLayer 8004scan Pro + AltLLM credits · **Altana 50,000 XP** |
+| Main challenge | "the best AI agent marketplace on BNB Smart Chain: one venue to browse agents, see what they do and how they've performed, and put them to work." The winner is **adopted as the official BNB Agent Studio marketplace as a standalone product** |
+| Reference agent categories | Monitoring · Grid trading · Health factor · Yield |
 
-Sumber: <https://www.bnbchain.org/en/blog/build-the-era-build-the-official-bnb-agent-studio-marketplace> · <https://www.bnbchain.org/en/hackathons/smart-money-era?tab=prizes>
+Sources: <https://www.bnbchain.org/en/blog/build-the-era-build-the-official-bnb-agent-studio-marketplace> · <https://www.bnbchain.org/en/hackathons/smart-money-era?tab=prizes>
 
-### 10.2 Track "Best Built with Altana" — teks resmi
+### 10.2 The "Best Built with Altana" track — the official text
 
-**Tantangan:** *"create an agent marketplace on BNB Chain where the agents transact for themselves, inside limits their users set."*
+**The challenge:** *"create an agent marketplace on BNB Chain where the agents transact for themselves, inside limits their users set."*
 
-**Winning criteria (4, semua wajib):**
+**Winning criteria (4, all mandatory):**
 1. **Agents on independent Altana wallets** with **real onchain transactions**
 2. **Session keys with genuine constraints**: call allowlists, spend caps, and expiry dates
 3. **Sessions registered in Keystore** for verifiable onchain integration
 4. **User-facing controls** allowing users to **view and revoke** agent permissions
 
 **Bonus:**
-- **ERC-8183 agent hiring** lewat Altana SDK
-- **x402/B402 micropayment** lewat x402 server SDK
+- **ERC-8183 agent hiring** through the Altana SDK
+- **x402/B402 micropayments** through the x402 server SDK
 
-**Build ideas yang disarankan:** agent-to-agent commerce · autonomous DeFi operations with spending limits · micropayment streaming · treasury management yang mendistribusikan izin berbeda ke beberapa agent.
+**Suggested build ideas:** agent-to-agent commerce · autonomous DeFi operations with spending limits · micropayment streaming · treasury management that distributes different permissions to several agents.
 
-**Resources resmi track:**
+**Official track resources:**
 | Resource | URL |
 |---|---|
 | Docs | <https://docs.altana.network/> |
-| SDK dan MCP | <https://github.com/altananetwork/altana-sdk> |
+| The SDK and MCP | <https://github.com/altananetwork/altana-sdk> |
 | ERC-8183 SDK | <https://docs.altana.network/sdk/erc8183> |
 | x402 Server SDK | <https://docs.altana.network/sdk/x402-server> |
 | Sessions guide | <https://docs.altana.network/concepts/sessions> |
 | Testnet faucet | <https://testnet.bnbchain.org/faucet-smart> |
 
-**Support:** live workshop dan office hours sepanjang build period.
+**Support:** a live workshop and office hours throughout the build period.
 
-Sumber: <https://www.bnbchain.org/en/hackathons/smart-money-era?tab=prizes>
+Source: <https://www.bnbchain.org/en/hackathons/smart-money-era?tab=prizes>
 
-### 10.3 Langkah quickstart — rekonstruksi lengkap
+### 10.3 Quickstart steps — a full reconstruction
 
-> ⚠️ **Catatan kejujuran:** Sebuah dokumen quickstart terpisah berjudul persis *"build an agent marketplace on BNB with Altana"* **tidak ditemukan sebagai halaman standalone** di `docs.altana.network` (tidak ada di `llms.txt`, `llms-full.txt`, atau sitemap). Yang ada adalah **deskripsi track di halaman prizes hackathon BNB Chain** (dikutip lengkap di §10.2). Langkah di bawah adalah **rekonstruksi berbasis sumber** dari: kriteria track + guide `/use-cases/1-agent-wallet-policy` + `/sdk/bnb-testnet` + `/sdk/erc8183` + `/sdk/x402-server`. Setiap langkah punya sumber.
+> ⚠️ **An honesty note:** a separate quickstart document titled exactly *"build an agent marketplace on BNB with Altana"* was **not found as a standalone page** on `docs.altana.network` (it is not in `llms.txt`, `llms-full.txt`, or the sitemap). What does exist is the **track description on the BNB Chain hackathon prizes page** (quoted in full in §10.2). The steps below are a **source-based reconstruction** from: the track criteria + the `/use-cases/1-agent-wallet-policy` guide + `/sdk/bnb-testnet` + `/sdk/erc8183` + `/sdk/x402-server`. Every step has a source.
 
-**Step 0 — Setup toolchain** (§11)
+**Step 0 — Set up the toolchain** (§11)
 
-**Step 1 — Client & admin signer (per-agent wallet)**
+**Step 1 — Client & admin signer (a wallet per agent)**
 ```ts
 import { createClient, BNB_TESTNET, signerFromPrivateKey } from "@altananetwork/sdk";
 
@@ -1678,12 +1678,12 @@ const admin = signerFromPrivateKey(process.env.PRIVATE_KEY as `0x${string}`);
 const wallet = await client.createWallet({ signer: admin });
 console.log(wallet.address);
 ```
-→ Memenuhi kriteria #1 (bagian "own Altana wallet"). Sumber: <https://docs.altana.network/sdk/bnb-testnet>
+→ Satisfies criterion #1 (the "own Altana wallet" part). Source: <https://docs.altana.network/sdk/bnb-testnet>
 
-**Step 2 — Danai wallet**
-Kirim test BNB dari <https://testnet.bnbchain.org/faucet-smart> ke `wallet.address`. **Wajib sebelum `execute` pertama** — wallet counterfactual, belum ada on-chain.
+**Step 2 — Fund the wallet**
+Send test BNB from <https://testnet.bnbchain.org/faucet-smart> to `wallet.address`. **Mandatory before the first `execute`** — the wallet is counterfactual and does not exist on-chain yet.
 
-**Step 3 — Grant session dengan limit NYATA** (kriteria #2 + #3)
+**Step 3 — Grant a session with REAL limits** (criteria #2 + #3)
 ```ts
 import { signerFromPrivateKey, serializeSession } from "@altananetwork/sdk";
 import { generatePrivateKey } from "viem/accounts";
@@ -1696,111 +1696,111 @@ const session = await client.grantSession({
   signer: admin,
   sessionSigner: signerFromPrivateKey(sessionKey),
   permissions: {
-    calls: [                                  // ← ALLOWLIST NYATA
+    calls: [                                  // ← A REAL ALLOWLIST
       { to: PANCAKE_ROUTER },
       { to: USDT, signature: "approve(address,uint256)" },  // selector-scoped
     ],
-    spend: [                                  // ← SPEND CAP NYATA
+    spend: [                                  // ← A REAL SPEND CAP
       { limit: 50n * 10n ** 18n, period: "day", token: USDT },
-      { limit: 20_000_000_000_000_000n, period: "day" },     // native, HARUS cukup untuk relay fee
+      { limit: 20_000_000_000_000_000n, period: "day" },     // native, MUST be enough for the relay fee
     ],
   },
-  expiry: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60,  // ← EXPIRY NYATA
-  register: true,                             // ← default; JANGAN false, ini yang bikin terdaftar di Keystore
+  expiry: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60,  // ← A REAL EXPIRY
+  register: true,                             // ← the default; DO NOT set false, this is what puts it in the Keystore
 });
 
 await db.save(`agent-${id}.session`, serializeSession(session));
-console.log("grant tx:", session.transactionHash);   // ← simpan untuk bukti juri
+console.log("grant tx:", session.transactionHash);   // ← keep this as evidence for the judges
 ```
 
-**Step 4 — Agent eksekusi transaksi on-chain nyata** (kriteria #1)
+**Step 4 — The agent executes a real on-chain transaction** (criterion #1)
 ```ts
 const result = await client.execute({
   session,
   calls: [{ to: PANCAKE_ROUTER, data: swapCalldata, value: 0n }],
 });
 if (result.status !== "CONFIRMED") { /* handle — no throw! */ }
-console.log(result.transactionHash);          // ← simpan untuk bukti juri
+console.log(result.transactionHash);          // ← keep this as evidence for the judges
 ```
 
-**Step 5 — UI: user lihat & revoke** (kriteria #4)
-Baca on-chain (bukan dari DB!) untuk menampilkan status sebenarnya:
+**Step 5 — UI: the user views and revokes** (criterion #4)
+Read on-chain (not from the DB!) to show the real state:
 ```ts
 const keyIds = await pub.readContract({ address: BNB_TESTNET.keyStore, abi: KEYSTORE_ABI, functionName: "getKeys", args: [wallet.address] });
 const live   = await Promise.all(keyIds.map(id =>
   pub.readContract({ address: BNB_TESTNET.keyStore, abi: KEYSTORE_ABI, functionName: "isValidKey", args: [wallet.address, id] })));
 ```
-Tombol revoke:
+The revoke button:
 ```ts
 await client.revokeSession({ wallet, signer: admin, session: sessionPublicKey });
 ```
-Tampilkan juga deep-link bukti: `https://testnet.altana.network/account/${wallet.address}`
+Also show an evidence deep-link: `https://testnet.altana.network/account/${wallet.address}`
 
-**Step 6 (bonus) — ERC-8183 hiring** (§5): buyer `hireErc8183Agent(session, …)` + seller `submitErc8183Deliverable(session, …)`. **Butuh SDK ≥ 0.9.0 untuk testnet.** Danai budget dari $U faucet.
+**Step 6 (bonus) — ERC-8183 hiring** (§5): buyer `hireErc8183Agent(session, …)` + seller `submitErc8183Deliverable(session, …)`. **Requires SDK ≥ 0.9.0 for testnet.** Fund the budget from the $U faucet.
 
-**Step 7 (bonus) — x402/B402 selling** (§6.4): `createX402Merchant` + `merchant.guard(req)` di depan route API agent kita.
+**Step 7 (bonus) — x402/B402 selling** (§6.4): `createX402Merchant` + `merchant.guard(req)` in front of our agent's API route.
 
 ---
 
-## 11. Instalasi & Setup untuk macOS arm64
+## 11. Installation & Setup for macOS arm64
 
-**Verifikasi pada mesin ini (2026-09-08):** `uname -m` → `arm64` · `node -v` → **v24.10.0** · `npm -v` → **11.6.1** · `bun --version` → **1.3.9** ✅ Semua prasyarat sudah terpasang.
+**Verified on this machine (2026-09-08):** `uname -m` → `arm64` · `node -v` → **v24.10.0** · `npm -v` → **11.6.1** · `bun --version` → **1.3.9** ✅ All prerequisites are already installed.
 
-> ℹ️ `@altananetwork/sdk@0.9.0` **tidak mendeklarasikan field `engines`** di package.json — tidak ada minimum Node version resmi yang dipublikasikan. Yang dideklarasikan eksplisit hanyalah **Bun ≥ 1.1 untuk `@altananetwork/mcp`**.
+> ℹ️ `@altananetwork/sdk@0.9.0` **declares no `engines` field** in its package.json — there is no officially published minimum Node version. The only explicitly declared requirement is **Bun ≥ 1.1 for `@altananetwork/mcp`**.
 
-### 11.1 Prasyarat
+### 11.1 Prerequisites
 
 ```bash
-# Node (via Homebrew arm64, atau nvm/fnm)
+# Node (via Homebrew arm64, or nvm/fnm)
 brew install node          # → node + npm
 node -v && npm -v
 
-# Bun — WAJIB untuk MCP server (npx GAGAL: paket di-ship sebagai TypeScript)
+# Bun — MANDATORY for the MCP server (npx FAILS: the package ships as TypeScript)
 curl -fsSL https://bun.sh/install | bash
-bun --version              # butuh >= 1.1
+bun --version              # needs >= 1.1
 
-# Foundry — opsional, untuk `cast send` ke $U faucet
+# Foundry — optional, for `cast send` to the $U faucet
 curl -L https://foundry.paradigm.xyz | bash && foundryup
 ```
-Sumber Bun: <https://bun.sh> (dirujuk dari <https://docs.altana.network/mcp/install>)
+Bun source: <https://bun.sh> (referenced from <https://docs.altana.network/mcp/install>)
 
-### 11.2 Install SDK
+### 11.2 Installing the SDK
 
 ```bash
 mkdir -p altana-agent && cd altana-agent
 npm init -y
-npm pkg set type=module          # SDK adalah ESM-only
+npm pkg set type=module          # the SDK is ESM-only
 npm install @altananetwork/sdk@0.9.0 viem
 npm install -D typescript tsx @types/node
 ```
-> **Pin versi exact** — paket pre-1.0, minor version bisa breaking.
+> **Pin the exact version** — the packages are pre-1.0 and a minor version can be breaking.
 
-Untuk seller x402:
+For the x402 seller:
 ```bash
 npm install @altananetwork/x402-server@0.2.0 viem   # ⚠️ GPL-3.0-or-later
 ```
 
-Sumber: <https://docs.altana.network/sdk/bnb-testnet> · <https://docs.altana.network/sdk/x402-server>
+Sources: <https://docs.altana.network/sdk/bnb-testnet> · <https://docs.altana.network/sdk/x402-server>
 
-### 11.3 MCP server di Claude Code
+### 11.3 The MCP server in Claude Code
 
 ```bash
-# BNB testnet (untuk hackathon)
+# BNB testnet (for the hackathon)
 claude mcp add altana -e ALTANA_CHAIN=bnb-testnet -- bunx @altananetwork/mcp
 
-# atau BNB mainnet (default)
+# or BNB mainnet (the default)
 claude mcp add altana -- bunx @altananetwork/mcp
 
-# hapus
+# remove
 claude mcp remove altana
 ```
-Restart Claude Code → tools + slash command tersedia. **Satu proses server = satu chain**; restart dengan `ALTANA_CHAIN` berbeda untuk pindah.
+Restart Claude Code → the tools and slash commands become available. **One server process = one chain**; restart with a different `ALTANA_CHAIN` to switch.
 
-Key disimpan di **macOS Keychain** (service `altana-wallet` / `altana-session`), fallback `~/.altana/keys.json` (mode 0600), fallback env.
+Keys are stored in the **macOS Keychain** (service `altana-wallet` / `altana-session`), falling back to `~/.altana/keys.json` (mode 0600), then to env vars.
 
-Sumber: <https://docs.altana.network/mcp/install>
+Source: <https://docs.altana.network/mcp/install>
 
-### 11.4 Claude Code Skill (menulis kode SDK yang benar)
+### 11.4 The Claude Code Skill (for writing correct SDK code)
 
 ```bash
 mkdir -p .claude/skills/altana-agentic-wallet
@@ -1831,41 +1831,41 @@ console.log("tBNB:", native);
 ```bash
 npx tsx --env-file=.env smoke.ts
 ```
-Lalu danai `wallet.address` dari <https://testnet.bnbchain.org/faucet-smart> dan cek di <https://testnet.altana.network/account/<address>>.
+Then fund `wallet.address` from <https://testnet.bnbchain.org/faucet-smart> and check it at <https://testnet.altana.network/account/<address>>.
 
-### 11.6 Desktop app (opsional, untuk demo)
+### 11.6 The desktop app (optional, for the demo)
 
 ```
 https://altana.network/api/download/mac-arm64
 ```
-Redirect 302 ke asset rilis GitHub terbaru. Build macOS **ditandatangani dengan Developer ID Altana dan dinotarisasi Apple**. App auto-update (download di background, install saat restart).
+A 302 redirect to the latest GitHub release asset. The macOS builds are **signed with Altana's Developer ID and notarised by Apple**. The app auto-updates (downloading in the background, installing on restart).
 
-Sumber: <https://www.altana.network/llms.txt>
-
----
-
-## 12. Checklist: Syarat Menang Track Altana → Cara Kami Memenuhinya
-
-### Syarat WAJIB
-
-#### ☐ 1. Agent punya wallet Altana sendiri, dengan transaksi on-chain nyata
-
-**Implementasi teknis:**
-- Satu `client.createWallet({ signer: adminSignerPerAgent })` per agent yang di-list di marketplace. Alamat deterministik & counterfactual sampai `execute` pertama.
-- Danai tiap wallet dengan tBNB dari faucet **sebelum** `execute` pertama (kalau tidak: "Unfunded counterfactual wallet" failure).
-- Setiap agent menjalankan minimal satu transaksi nyata lewat session key (mis. approve + swap PancakeSwap, atau supply Aave V3).
-
-**Bukti untuk juri:** `result.transactionHash` di BscScan testnet + halaman `testnet.altana.network/account/<wallet>` yang menunjukkan admin key + session key.
-
-**Jebakan:** jangan pakai satu wallet bersama untuk semua agent — kriterianya "agents on **independent** Altana wallets". Kalau mau demo shared-wallet, gunakan pola `/use-cases/3-portfolio-multiple-agents` sebagai fitur **tambahan** (treasury management), bukan pengganti.
-
-**Bukti kesiapan mainnet (nilai lebih):** ulangi flow di `BNB` (56) dengan nominal kecil. Semua kontrak live & CertiK-audited di mainnet.
+Source: <https://www.altana.network/llms.txt>
 
 ---
 
-#### ☐ 2. Session dengan limit nyata: call allowlist + spend cap + expiry
+## 12. Checklist: The Altana Track's Winning Requirements → How We Meet Them
 
-**Implementasi teknis:**
+### MANDATORY requirements
+
+#### ☐ 1. Each agent has its own Altana wallet, with real on-chain transactions
+
+**Technical implementation:**
+- One `client.createWallet({ signer: adminSignerPerAgent })` per agent listed in the marketplace. The address is deterministic and counterfactual until the first `execute`.
+- Fund each wallet with tBNB from the faucet **before** its first `execute` (otherwise: the "Unfunded counterfactual wallet" failure).
+- Every agent runs at least one real transaction through its session key (e.g. a PancakeSwap approve + swap, or an Aave V3 supply).
+
+**Evidence for the judges:** `result.transactionHash` on BscScan testnet + the `testnet.altana.network/account/<wallet>` page showing the admin key + the session key.
+
+**The trap:** do not use one shared wallet for all the agents — the criterion says "agents on **independent** Altana wallets". If you want a shared-wallet demo, use the `/use-cases/3-portfolio-multiple-agents` pattern as an **additional** feature (treasury management), not as a substitute.
+
+**Evidence of mainnet readiness (extra credit):** repeat the flow on `BNB` (56) with small amounts. All the contracts are live and CertiK-audited on mainnet.
+
+---
+
+#### ☐ 2. A session with real limits: call allowlist + spend cap + expiry
+
+**Technical implementation:**
 ```ts
 permissions: {
   calls: [
@@ -1873,54 +1873,54 @@ permissions: {
     { to: USDT, signature: "approve(address,uint256)" },     // selector-level (AND semantics)
   ],
   spend: [
-    { limit: 50n * 10n ** 18n, period: "day", token: USDT }, // ⚠️ 18 desimal di BNB
-    { limit: 20_000_000_000_000_000n, period: "day" },       // native — HARUS cukup untuk relay fee
+    { limit: 50n * 10n ** 18n, period: "day", token: USDT }, // ⚠️ 18 decimals on BNB
+    { limit: 20_000_000_000_000_000n, period: "day" },       // native — MUST cover the relay fee
   ],
 },
 expiry: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60,
 ```
 
-**Tiga jebakan yang HARUS dihindari:**
-1. **JANGAN hilangkan `calls`** — itu = unrestricted, dan juri akan melihatnya. Selalu set `calls` DAN `spend`.
-2. **Desimal:** USDT/USDC = **18 desimal di BNB Chain**. `100_000_000n` bukan 100 USDT, itu 0.0000000001 USDT.
-3. **Native cap membayar relay fee.** Cap native terlalu kecil = session yang tidak akan pernah bisa eksekusi, `FAILED` dengan `statusCode` 300.
+**Three traps you MUST avoid:**
+1. **DO NOT omit `calls`** — that means unrestricted, and the judges will see it. Always set `calls` AND `spend`.
+2. **Decimals:** USDT/USDC have **18 decimals on BNB Chain**. `100_000_000n` is not 100 USDT, it is 0.0000000001 USDT.
+3. **The native cap pays the relay fee.** A native cap that is too small = a session that will never be able to execute, `FAILED` with `statusCode` 300.
 
-**Nilai lebih:** pakai **selector-scoped** permission (`{ to, signature }`), bukan cuma `{ to }`. Docs Altana sendiri memberi contoh danger untuk ERC-8004 (§5.8): grant contract-level ke registry juga mengotorisasi `setApprovalForAll` yang **hidup lebih lama daripada revokasi session**. Menunjukkan pemahaman ini di demo = poin kuat.
+**Extra credit:** use **selector-scoped** permissions (`{ to, signature }`), not just `{ to }`. Altana's own docs give a danger example for ERC-8004 (§5.8): a contract-level grant on the registry also authorizes `setApprovalForAll`, which **outlives the session revocation**. Showing you understand this in the demo is a strong point.
 
-**Demo yang menjual:** tunjukkan transaksi yang **revert** karena di luar policy (kontrak tidak di-allowlist, atau amount melebihi cap) — "reverts at the onchain validator, not at Altana's backend, at the contract itself."
-
----
-
-#### ☐ 3. Session terdaftar di Keystore on-chain
-
-**Implementasi teknis:**
-- **`register: true` (default) — JANGAN set ke `false`.** Ini yang menulis public key session ke Keystore lewat Controller, di-batch atomik dengan otorisasi di smart account.
-- Simpan `session.transactionHash` dari `GrantSessionResult` sebagai bukti.
-- ⚠️ **Jangan anotasi `const session: Session = ...`** — itu menghapus field `transactionHash`. Biarkan di-infer atau anotasi `GrantSessionResult`.
-- Biaya: one-time Keystore registration fee; pada aksi admin pertama dibayar **dua kali** (`initialRegisterKey` admin di-prepend).
-
-**Bukti untuk juri:**
-- Explorer: `https://testnet.altana.network/account/<wallet>` → session key muncul di tabel keys **dengan expiry**.
-- Programmatic: `isValidKey(walletAddress, keccak256(sessionPublicKey))` di `0x6b8361C29d05D498b1a12B54A37310f94171E94A` (testnet KeyStore) → `true`.
+**A demo that sells:** show a transaction that **reverts** because it falls outside the policy (a contract that is not allowlisted, or an amount above the cap) — "reverts at the onchain validator, not at Altana's backend, at the contract itself."
 
 ---
 
-#### ☐ 4. Transaksi on-chain nyata lewat session key (testnet cukup, mainnet lebih kuat)
+#### ☐ 3. The session is registered in the on-chain Keystore
 
-**Implementasi teknis:**
-- `client.execute({ session, calls })` — **bukan** admin path. Session path tidak menyentuh Keystore lagi (sudah ter-register saat grant).
-- Cek `result.status !== "CONFIRMED"` secara eksplisit. **`execute` yang gagal TIDAK melempar.**
-- Persist session dengan `serializeSession` + key terpisah, restore dengan `deserializeSession` — kalau tidak, setiap execute gagal dengan "session doesn't match the grant".
+**Technical implementation:**
+- **`register: true` (the default) — DO NOT set it to `false`.** That is what writes the session public key into the Keystore through the Controller, batched atomically with the authorization on the smart account.
+- Keep `session.transactionHash` from the `GrantSessionResult` as evidence.
+- ⚠️ **Do not annotate `const session: Session = ...`** — that strips the `transactionHash` field. Let it be inferred, or annotate `GrantSessionResult`.
+- Cost: a one-time Keystore registration fee; on the first admin action it is paid **twice** (the admin's `initialRegisterKey` is prepended).
 
-**Strategi mainnet:** jalankan minimal satu flow lengkap (grant → execute → revoke) di **BNB mainnet (56)** dengan nominal kecil (mis. 1 USDT swap), lalu tautkan `explorer.altana.network/account/<wallet>` di submission. Track menulis "testnet cukup, mainnet lebih kuat" — satu tx mainnet nyata adalah diferensiasi murah dan besar.
+**Evidence for the judges:**
+- The Explorer: `https://testnet.altana.network/account/<wallet>` → the session key appears in the keys table **with its expiry**.
+- Programmatically: `isValidKey(walletAddress, keccak256(sessionPublicKey))` on `0x6b8361C29d05D498b1a12B54A37310f94171E94A` (the testnet KeyStore) → `true`.
 
 ---
 
-#### ☐ 5. User bisa lihat & revoke izin agent DI DALAM produk
+#### ☐ 4. Real on-chain transactions through the session key (testnet is enough, mainnet is stronger)
 
-**Implementasi teknis — panel "Agent Permissions":**
+**Technical implementation:**
+- `client.execute({ session, calls })` — **not** the admin path. The session path never touches the Keystore again (it was registered at grant time).
+- Check `result.status !== "CONFIRMED"` explicitly. **A failed `execute` DOES NOT throw.**
+- Persist the session with `serializeSession` plus a separately stored key, and restore it with `deserializeSession` — otherwise every execute fails with "session doesn't match the grant".
 
-*Read (harus on-chain langsung, BUKAN dari DB, BUKAN scraping Explorer):*
+**Mainnet strategy:** run at least one complete flow (grant → execute → revoke) on **BNB mainnet (56)** with small amounts (e.g. a 1 USDT swap), then link `explorer.altana.network/account/<wallet>` in the submission. The track says "testnet is enough, mainnet is stronger" — one real mainnet tx is a cheap, large differentiator.
+
+---
+
+#### ☐ 5. The user can view and revoke the agent's permissions INSIDE the product
+
+**Technical implementation — the "Agent Permissions" panel:**
+
+*Reads (must be directly on-chain, NOT from the DB, NOT by scraping the Explorer):*
 ```ts
 const keyIds = await pub.readContract({ address: NET.keyStore, abi: KEYSTORE_ABI,
   functionName: "getKeys", args: [walletAddress] });          // bytes32[]
@@ -1928,35 +1928,35 @@ const live = await Promise.all(keyIds.map(id =>
   pub.readContract({ address: NET.keyStore, abi: KEYSTORE_ABI,
     functionName: "isValidKey", args: [walletAddress, id] }))); // bool
 ```
-⚠️ **Wajib pakai `isValidKey`, bukan hanya `getKeys`.** Revoke menghapus dari `getKeys` seketika, **expiry tidak** — key yang sudah lama expired tetap muncul di `getKeys`. UI yang hanya membaca `getKeys` akan menampilkan izin yang sudah mati sebagai aktif.
+⚠️ **You must use `isValidKey`, not just `getKeys`.** Revoking removes a key from `getKeys` immediately, **expiry does not** — a key that expired long ago still shows up in `getKeys`. A UI that only reads `getKeys` will display dead permissions as active.
 
-*Tampilkan per session:* agent name, allowlist kontrak (human-readable: "PancakeSwap Router"), spend cap + period, expiry (countdown), status (**Active / Expired / Revoked** — bedakan!), grant tx hash, dan link `explorer.altana.network/account/<wallet>` sebagai bukti pihak ketiga.
+*Show per session:* the agent name, the contract allowlist (human-readable: "PancakeSwap Router"), the spend cap + period, the expiry (as a countdown), the status (**Active / Expired / Revoked** — tell them apart!), the grant tx hash, and a link to `explorer.altana.network/account/<wallet>` as third-party evidence.
 
-*Revoke (satu tombol):*
+*Revoke (one button):*
 ```ts
 await client.revokeSession({ wallet, signer: admin, session: sessionPublicKey });
 ```
-Terima `Session | Hex` — jadi UI cukup menyimpan public key, tidak perlu objek session lengkap.
-⚠️ Revoke yang gagal **mengembalikan** `FAILED`, tidak melempar. Cek statusnya.
-⚠️ **Monotonic** — beri konfirmasi di UI: "Once revoked, this key can never be reactivated. Granting access again requires a new session key."
+It accepts `Session | Hex` — so the UI only needs to store the public key, not the full session object.
+⚠️ A failed revoke **returns** `FAILED`; it does not throw. Check the status.
+⚠️ **It is monotonic** — put a confirmation in the UI: "Once revoked, this key can never be reactivated. Granting access again requires a new session key."
 
-**Demo killer:** tampilkan agent sedang jalan → user klik Revoke → refresh panel (dibaca on-chain) menunjukkan **Revoked** → jalankan lagi aksi agent → gagal revert di validasi. Semuanya bisa diverifikasi juri di Explorer.
+**The killer demo:** show the agent running → the user clicks Revoke → refreshing the panel (read on-chain) shows **Revoked** → run the agent action again → it fails, reverting at validation. All of it verifiable by the judges in the Explorer.
 
 ---
 
-### Syarat BONUS
+### BONUS requirements
 
-#### ☐ 6. Hire agent BNB Agent Studio via ERC-8183 (buyer + seller side)
+#### ☐ 6. Hiring a BNB Agent Studio agent through ERC-8183 (buyer + seller side)
 
 **Buyer side:**
 ```ts
-const { jobId } = await hireErc8183Agent(session, {   // ← session path: spend cap membatasi escrow!
+const { jobId } = await hireErc8183Agent(session, {   // ← the session path: the spend cap bounds the escrow!
   provider: sellerAgentAddress,
   task: "…",
   budget: 100_000_000_000_000_000n,                   // 0.1 $U (18 dec)
 }, { network: BNB_TESTNET });
 ```
-Satu call = `createJob` + `registerJob` + `setBudget` + `approve $U` + `fund` sebagai **satu atomic relay intent**.
+One call = `createJob` + `registerJob` + `setBudget` + `approve $U` + `fund` as **one atomic relay intent**.
 
 **Seller side:**
 ```ts
@@ -1968,100 +1968,100 @@ const result = await submitErc8183Deliverable(session, { jobId, manifest, delive
 // serve result.manifestText VERBATIM at deliverableUrl
 ```
 
-**Verifikasi & settle:** `getErc8183Job` → `getErc8183DeliverableUrl` → `verifyErc8183ManifestText(text, job.deliverable)` → `settleErc8183Job`.
+**Verify & settle:** `getErc8183Job` → `getErc8183DeliverableUrl` → `verifyErc8183ManifestText(text, job.deliverable)` → `settleErc8183Job`.
 
-**🚨 Blocker yang harus dicek:** SDK **≥ 0.9.0 WAJIB** untuk testnet. Di ≤0.8.0, `ERC8183_ADDRESSES[97].policy` menunjuk alamat yang tidak di-whitelist di testnet EvaluatorRouter → setiap `hireErc8183Agent()` revert dengan `PolicyNotWhitelisted()`.
+**🚨 A blocker to check:** SDK **≥ 0.9.0 is MANDATORY** for testnet. On ≤0.8.0, `ERC8183_ADDRESSES[97].policy` points at an address that is not whitelisted on the testnet EvaluatorRouter → every `hireErc8183Agent()` reverts with `PolicyNotWhitelisted()`.
 
-**Dana:** klaim $U dari faucet `0x86e9197CC0F76E4e4aaa7082180945196bBAb5D3` (`requestTokens()`, 10 $U / 30 menit / address).
+**Funding:** claim $U from the faucet `0x86e9197CC0F76E4e4aaa7082180945196bBAb5D3` (`requestTokens()`, 10 $U per 30 minutes per address).
 
-**Nilai lebih maksimal:** demo **kedua sisi** — agent A di marketplace kita hire agent B, B submit deliverable, buyer verify hash, escrow release. Jalur session key di **kedua** sisi membuktikan "agent otonom yang dibatasi on-chain", tepat tesis track ini.
+**Maximum extra credit:** demo **both sides** — agent A in our marketplace hires agent B, B submits a deliverable, the buyer verifies the hash, the escrow releases. Using the session key path on **both** sides proves "an autonomous agent bounded on-chain", which is exactly this track's thesis.
 
-**Plus:** register agent kita dengan **ERC-8004** (`erc8004RegisterPermissions(chainId)`) agar discoverable oleh buyer di ekonomi agent BNB. Registry: `0x8004A818BFB912233c491871b3d84c89A494BD9e` (testnet 97).
+**Plus:** register our agents with **ERC-8004** (`erc8004RegisterPermissions(chainId)`) so they are discoverable by buyers in the BNB agent economy. Registry: `0x8004A818BFB912233c491871b3d84c89A494BD9e` (testnet 97).
 
 ---
 
-#### ☐ 7. Jualan lewat x402/B402 pakai x402 server SDK
+#### ☐ 7. Selling through x402/B402 with the x402 server SDK
 
-**Implementasi:**
+**Implementation:**
 ```ts
 const merchant = createX402Merchant({
-  chainId: 97,                                 // atau 56
-  payTo: agentSmartAccountAddress,             // earnings mendarat di Altana wallet agent
+  chainId: 97,                                 // or 56
+  payTo: agentSmartAccountAddress,             // earnings land in the agent's Altana wallet
   price: 200_000_000_000_000_000n,
   minPrice, maxPrice,
   rails: [
-    { rail: "eip3009", token: U_TOKEN[chainId] },                        // ← WAJIB untuk buyer Studio
-    { rail: "permit2-exact", token: USDT_BSC, spender: facilitator.address }, // ← untuk buyer Altana/B402
+    { rail: "eip3009", token: U_TOKEN[chainId] },                        // ← MANDATORY for Studio buyers
+    { rail: "permit2-exact", token: USDT_BSC, spender: facilitator.address }, // ← for Altana/B402 buyers
   ],
   resource: "https://our-marketplace.example/api/agent/<id>/run",
   facilitator: privateKeyToAccount(process.env.FACILITATOR_KEY),
   rpcUrl, chain,
 });
-// di route handler:
+// in the route handler:
 const { response, receipt } = await merchant.guard(req);
 if (response) return response;
 return Response.json({ data: await runAgentTask(), tx: receipt.txHash });
 ```
 
-**Checklist kompatibilitas buyer BNB Agent Studio:**
-- ☐ Sertakan rail **`eip3009` dengan $U** — buyer Studio **hanya** membayar $U lewat eip3009
-- ☐ `maxTimeoutSeconds ≤ 480` (default 300) — signer Studio menolak window > 600s dan backdate `validAfter` 120s
-- ☐ URL **https** di production — `bag x402 trust` mensyaratkannya
+**Compatibility checklist for BNB Agent Studio buyers:**
+- ☐ Include the **`eip3009` rail with $U** — Studio buyers pay **only** in $U over eip3009
+- ☐ `maxTimeoutSeconds ≤ 480` (default 300) — the Studio signer refuses a window > 600s and backdates `validAfter` by 120s
+- ☐ An **https** URL in production — `bag x402 trust` requires it
 
-**Sisi buyer (agent kita membayar API lain):** `approveTokenForPermit2` + `approveSignatureChecker({ checker: PERMIT2_ADDRESS })` sekali, lalu `client.fetchWithX402({ session, url })`. **Jalankan server-side** (CORS memblokir `X-PAYMENT` di browser).
+**The buyer side (our agent paying another API):** `approveTokenForPermit2` + `approveSignatureChecker({ checker: PERMIT2_ADDRESS })` once, then `client.fetchWithX402({ session, url })`. **Run it server-side** (CORS blocks `X-PAYMENT` in the browser).
 
-**Narasi dua arah yang kuat:** marketplace kita adalah **seller** (agent kita menjual kapabilitas per-call, earnings ke smart account mereka sendiri) **dan buyer** (agent kita membayar data feed per-call, dibatasi spend cap). Ini persis "Both directions, so an agent can earn as well as spend" dari layer Commerce Altana.
+**A strong two-way story:** our marketplace is both a **seller** (our agents sell capabilities per call, with earnings going to their own smart accounts) **and** a **buyer** (our agents pay for data feeds per call, bounded by a spend cap). That is exactly the "Both directions, so an agent can earn as well as spend" of Altana's Commerce layer.
 
 ---
 
-### Tambahan yang tidak diminta tapi menaikkan nilai
+### Extras nobody asked for that raise the score
 
-| Ide | Kenapa |
+| Idea | Why |
 |---|---|
-| **Integrasi Skills Registry** (`search_skills` + `get_skill`, atau fetch `index.json` langsung) | Katalog agent kita jadi ter-populate 10 protokol production dengan scope + suggested cap yang sudah divalidasi. `get_skill` melakukan integrity check sha256. Instant depth tanpa menulis integrasi protokol sendiri. |
-| **Turunkan session policy dari tabel alamat skill secara otomatis** | Docs bilang eksplisit "the suggested session scope is derived from it". UI: user pilih skill → allowlist + suggested cap terisi otomatis → user tinggal atur angka. Sangat demo-able. |
-| **Onboarding zero-scope** | Skill Research (Token Radar, Wallet Tracker) punya `scope.contracts: []`. Beri agent baru session zero-scope dulu agar user melihat perilakunya sebelum memberi izin belanja. |
-| **Submit skill baru ke registry** | PR ke `altananetwork/skills`. Kontribusi nyata ke ekosistem partner. |
-| **Tampilkan CertiK audit badge** | Kontrak Keystore diaudit CertiK 15 Juli 2026, source-verified exact match di BscScan. Sinyal trust untuk juri. |
-| **Halaman "Verify this agent"** publik | Reads gratis & unlimited. Halaman yang siapa pun (tanpa akun) bisa buka untuk `isValidKey` sebuah agent = mewujudkan tesis Altana secara harfiah. |
+| **Skills Registry integration** (`search_skills` + `get_skill`, or fetching `index.json` directly) | Our agent catalogue gets populated with 10 production protocols, each with an already-validated scope and suggested cap. `get_skill` does a sha256 integrity check. Instant depth without writing our own protocol integrations. |
+| **Derive the session policy automatically from a skill's address table** | The docs say explicitly that "the suggested session scope is derived from it". The UI: the user picks a skill → the allowlist + suggested cap fill in automatically → the user only adjusts the numbers. Very demo-able. |
+| **Zero-scope onboarding** | The Research skills (Token Radar, Wallet Tracker) have `scope.contracts: []`. Give a new agent a zero-scope session first so the user can watch its behaviour before granting spending permissions. |
+| **Submit a new skill to the registry** | A PR to `altananetwork/skills`. A real contribution to a partner's ecosystem. |
+| **Show the CertiK audit badge** | The Keystore contracts were audited by CertiK on 15 July 2026, source-verified as an exact match on BscScan. A trust signal for the judges. |
+| **A public "Verify this agent" page** | Reads are free and unlimited. A page anyone (with no account) can open to `isValidKey` an agent = Altana's thesis made literal. |
 
 ---
 
-## 13. Ringkasan Risiko & Gotcha (untuk implementasi)
+## 13. Risk & Gotcha Summary (for implementation)
 
-| # | Risiko | Mitigasi |
+| # | Risk | Mitigation |
 |---|---|---|
-| 1 | **`permissions.calls` kosong = unrestricted** | Selalu set `calls` DAN `spend`. Lint check di code review. |
-| 2 | **Desimal 18 vs 6 di BNB** | Helper `toBnbUnits(amount)` terpusat. Assert di test. |
-| 3 | **Native cap membayar relay fee** | Beri headroom di cap native, jangan pas-pasan. `FAILED` 300 = gejala ini. |
-| 4 | **`execute`/`revokeSession` gagal TANPA throw** | Wrapper `assertConfirmed(result)` di semua call site. |
-| 5 | **`JSON.stringify(session)` rusak** | Hanya `serializeSession`/`deserializeSession`. Key di secret store terpisah. |
-| 6 | **`sessionSigner` dihilangkan = key in-memory hilang selamanya** | Selalu passing `sessionSigner` sendiri. |
-| 7 | **Anotasi `: Session` menghilangkan `transactionHash`** | Infer, atau anotasi `GrantSessionResult`. |
-| 8 | **`getKeys` tidak menghapus key expired** | Selalu cross-check dengan `isValidKey`. |
-| 9 | **ERC-8183 revert di testnet pada SDK ≤0.8.0** | Pin `@altananetwork/sdk@0.9.0`. |
-| 10 | **Venus vBNB `redeem` revert (EIP-7702 / 2300 gas stipend)** | Pakai vUSDT (ERC-20). Hindari native payout `.transfer()`. |
-| 11 | **`npx @altananetwork/mcp` gagal** | Wajib `bunx`, Bun ≥ 1.1. |
-| 12 | **`fetchWithX402` diblokir CORS di browser** | Jalankan server-side. |
-| 13 | **Facilitator berbasis `ecrecover` menolak pembayaran kita** | Signature adalah ERC-1271 98-byte, bukan EOA. Facilitator harus `isValidSignature`. Pakai `@altananetwork/x402-server` sendiri untuk menghindari masalah. |
-| 14 | **`approveSignatureChecker` terlupa → `0xffffffff`** | Sekali per session, per rail. Masukkan ke provisioning script. |
-| 15 | **Grant ERC-8004 contract-level → `setApprovalForAll` bocor melewati revoke** | Selalu `erc8004RegisterPermissions(chainId)`, jangan `{ to: registry }`. |
-| 16 | **SDK pre-1.0, minor bisa breaking** | Pin exact version. Baca changelog sebelum bump. |
-| 17 | **`x402-server` GPL-3.0** | Cek implikasi lisensi bila kode server mau closed-source. |
-| 18 | **Browser wallet tidak bisa jadi signer** | Pola onboarding: connect MetaMask seperti biasa → buat account dengan `createPasskeyWallet` → fund satu klik lewat provider wallet yang terhubung. Lihat `/use-cases/7-onboard-from-browser-wallets`. |
-| 19 | **Revoke monotonic** | Konfirmasi di UI sebelum revoke. |
-| 20 | **Alamat account-stack BNB mainnet tidak terdokumentasi publik** | Kalau butuh, tanya di office hours atau baca `packages/wallet/src/config.ts`. |
+| 1 | **An empty `permissions.calls` = unrestricted** | Always set `calls` AND `spend`. A lint check in code review. |
+| 2 | **18 versus 6 decimals on BNB** | A centralised `toBnbUnits(amount)` helper. Assert it in tests. |
+| 3 | **The native cap pays the relay fee** | Leave headroom in the native cap, do not cut it fine. A `FAILED` 300 is the symptom. |
+| 4 | **`execute`/`revokeSession` fail WITHOUT throwing** | An `assertConfirmed(result)` wrapper at every call site. |
+| 5 | **`JSON.stringify(session)` breaks it** | Only `serializeSession`/`deserializeSession`. The key lives in a separate secret store. |
+| 6 | **Omitting `sessionSigner` = an in-memory key lost forever** | Always pass your own `sessionSigner`. |
+| 7 | **A `: Session` annotation strips `transactionHash`** | Infer it, or annotate `GrantSessionResult`. |
+| 8 | **`getKeys` does not remove expired keys** | Always cross-check with `isValidKey`. |
+| 9 | **ERC-8183 reverts on testnet with SDK ≤0.8.0** | Pin `@altananetwork/sdk@0.9.0`. |
+| 10 | **Venus vBNB `redeem` reverts (EIP-7702 / the 2300 gas stipend)** | Use vUSDT (ERC-20). Avoid native payouts via `.transfer()`. |
+| 11 | **`npx @altananetwork/mcp` fails** | `bunx` is mandatory, Bun ≥ 1.1. |
+| 12 | **`fetchWithX402` is blocked by CORS in the browser** | Run it server-side. |
+| 13 | **An `ecrecover`-based facilitator rejects our payment** | The signature is a 98-byte ERC-1271 one, not an EOA signature. The facilitator has to use `isValidSignature`. Use our own `@altananetwork/x402-server` to avoid the problem. |
+| 14 | **Forgetting `approveSignatureChecker` → `0xffffffff`** | Once per session, per rail. Put it in the provisioning script. |
+| 15 | **A contract-level ERC-8004 grant → `setApprovalForAll` leaks past the revoke** | Always `erc8004RegisterPermissions(chainId)`, never `{ to: registry }`. |
+| 16 | **The SDK is pre-1.0; a minor can be breaking** | Pin the exact version. Read the changelog before bumping. |
+| 17 | **`x402-server` is GPL-3.0** | Check the licence implications if the server code is meant to be closed-source. |
+| 18 | **A browser wallet cannot be the signer** | The onboarding pattern: connect MetaMask as usual → create the account with `createPasskeyWallet` → fund it in one click through the connected provider wallet. See `/use-cases/7-onboard-from-browser-wallets`. |
+| 19 | **Revoking is monotonic** | Confirm in the UI before revoking. |
+| 20 | **The BNB mainnet account-stack addresses are not publicly documented** | If you need them, ask at office hours or read `packages/wallet/src/config.ts`. |
 
 ---
 
-## 14. Daftar Sumber
+## 14. Source List
 
-**Dokumentasi Altana**
-1. <https://docs.altana.network> — root docs
-2. <https://docs.altana.network/llms.txt> — indeks mesin-readable
-3. <https://docs.altana.network/llms-full.txt> — **seluruh docs, 244 KB** (sumber utama riset ini)
-4. <https://docs.altana.network/changelog> — riwayat rilis 0.7.0 → 0.9.0
-5. <https://docs.altana.network/acknowledgments> — basis Porto (MIT)
+**Altana documentation**
+1. <https://docs.altana.network> — the docs root
+2. <https://docs.altana.network/llms.txt> — the machine-readable index
+3. <https://docs.altana.network/llms-full.txt> — **the entire docs, 244 KB** (the main source for this research)
+4. <https://docs.altana.network/changelog> — the release history 0.7.0 → 0.9.0
+5. <https://docs.altana.network/acknowledgments> — the Porto basis (MIT)
 6. <https://docs.altana.network/why-altana>
 7. <https://docs.altana.network/concepts/keystore>
 8. <https://docs.altana.network/concepts/sessions>
@@ -2069,7 +2069,7 @@ return Response.json({ data: await runAgentTask(), tx: receipt.txHash });
 10. <https://docs.altana.network/concepts/networks/testnet>
 11. <https://docs.altana.network/concepts/comparison>
 12. <https://docs.altana.network/concepts/off-chain-signatures>
-13. <https://docs.altana.network/sdk> — SDK reference overview
+13. <https://docs.altana.network/sdk> — the SDK reference overview
 14. <https://docs.altana.network/sdk/bnb>
 15. <https://docs.altana.network/sdk/bnb-testnet>
 16. <https://docs.altana.network/sdk/create-wallet>
@@ -2108,7 +2108,7 @@ return Response.json({ data: await runAgentTask(), tx: receipt.txHash });
 49. <https://docs.altana.network/getting-started/build-with-claude>
 50. <https://docs.altana.network/getting-started/create-agentic-wallet>
 
-**Website & surface Altana**
+**Altana website & surfaces**
 51. <https://altana.network> · <https://www.altana.network/llms.txt>
 52. <https://altana.network/architecture>
 53. <https://altana.network/sitemap.xml>
@@ -2133,33 +2133,33 @@ return Response.json({ data: await runAgentTask(), tx: receipt.txHash });
 68. <https://registry.npmjs.org/@altananetwork/mcp>
 69. <https://registry.npmjs.org/@altananetwork/x402-server>
 
-**Hackathon & ekosistem**
-70. <https://www.bnbchain.org/en/hackathons/smart-money-era?tab=prizes> — **teks track "Best Built with Altana"**
+**Hackathon & ecosystem**
+70. <https://www.bnbchain.org/en/hackathons/smart-money-era?tab=prizes> — **the "Best Built with Altana" track text**
 71. <https://www.bnbchain.org/en/blog/build-the-era-build-the-official-bnb-agent-studio-marketplace>
 72. <https://www.bnbchain.org/en/bnb-agent-studio>
 73. <https://chainwire.org/2026/08/18/bnb-chain-launches-bnb-agent-studio-v2-giving-ai-agents-the-ability-to-earn/>
 74. <https://cryptobriefing.com/bnb-agent-studio-altana-network-wallet/>
-75. <https://skynet.certik.com/projects/altana> — laporan audit CertiK
+75. <https://skynet.certik.com/projects/altana> — the CertiK audit report
 
-**Verifikasi kontrak on-chain**
-76. <https://bscscan.com/address/0x6572427ED530BadcF7375Cf9A4709D8d2b0E7E0a#code> — KeyStore BNB
-77. <https://etherscan.io/address/0xb70fDa90C1d576Ba8399946a0c10ECD9d9Ea923b#code> — KeyStore Ethereum
-78. <https://basescan.org/address/0x6572427ED530BadcF7375Cf9A4709D8d2b0E7E0a#code> — KeyStoreCacheOPStack Base
+**On-chain contract verification**
+76. <https://bscscan.com/address/0x6572427ED530BadcF7375Cf9A4709D8d2b0E7E0a#code> — the BNB KeyStore
+77. <https://etherscan.io/address/0xb70fDa90C1d576Ba8399946a0c10ECD9d9Ea923b#code> — the Ethereum KeyStore
+78. <https://basescan.org/address/0x6572427ED530BadcF7375Cf9A4709D8d2b0E7E0a#code> — the Base KeyStoreCacheOPStack
 
 ---
 
-## 15. Yang TIDAK Ditemukan
+## 15. What Was NOT Found
 
-Dicatat agar tidak ada yang mengarang di kemudian hari:
+Recorded so nobody invents it later:
 
 | Item | Status |
 |---|---|
-| Dokumen quickstart standalone berjudul **"build an agent marketplace on BNB with Altana"** | **Tidak ditemukan** sebagai halaman terpisah di docs.altana.network (bukan di llms.txt, llms-full.txt, atau sitemap). Yang ada: deskripsi track di halaman prizes hackathon BNB Chain (§10.2), dan use-case guides yang menyusunnya (§10.3) |
+| A standalone quickstart document titled **"build an agent marketplace on BNB with Altana"** | **Not found** as a separate page on docs.altana.network (not in llms.txt, llms-full.txt, or the sitemap). What exists: the track description on the BNB Chain hackathon prizes page (§10.2), and the use-case guides that make it up (§10.3) |
 | `https://docs.altana.network/sitemap.xml` | **HTTP 404** |
-| Daftar enum lengkap `period` untuk spend permission | **Tidak ditemukan.** Docs hanya menunjukkan `"day"` dan `"hour"` di contoh |
-| Alamat account-stack (Orchestrator/Delegation proxy/Account implementation/Simulator/Funder/Escrow) untuk **BNB mainnet (56)** | **Tidak ditemukan** di docs publik. Hanya versi testnet (97) yang dipublikasikan. Halaman `/concepts/networks` untuk BNB hanya mencantumkan KeyStore + KeyStoreController |
-| Alamat Permit2 canonical lengkap | Docs hanya menyebut prefix `0x0000…78BA3`; alamat penuh diakses lewat export `PERMIT2_ADDRESS` dari SDK |
-| Spesifikasi EIP resmi untuk **ERC-8183** di eips.ethereum.org | **Tidak diverifikasi dalam riset ini.** Semua detail ERC-8183 di dokumen ini berasal dari docs Altana + source code SDK. ERC-8004 punya URL EIP resmi yang dirujuk docs: <https://eips.ethereum.org/EIPS/eip-8004> |
-| Field `engines` (minimum Node version) di `@altananetwork/sdk` | **Tidak dideklarasikan** di package.json |
-| `github.com/altananetwork/sdk` (dirujuk `repository.url` npm x402-server) | **Repo tidak ada** — typo di package.json. Repo asli: `altananetwork/altana-sdk` |
-| Detail program XP (bagaimana 50.000 XP dihitung/didistribusikan) | **Tidak diriset** — `xp.altana.network` adalah SPA Next.js tanpa llms.txt |
+| The complete enum of `period` values for a spend permission | **Not found.** The docs only show `"day"` and `"hour"` in examples |
+| The account-stack addresses (Orchestrator/Delegation proxy/Account implementation/Simulator/Funder/Escrow) for **BNB mainnet (56)** | **Not found** in the public docs. Only the testnet (97) versions are published. The `/concepts/networks` page for BNB lists only the KeyStore + KeyStoreController |
+| The full canonical Permit2 address | The docs only mention the prefix `0x0000…78BA3`; the full address is accessed through the SDK's `PERMIT2_ADDRESS` export |
+| The official EIP specification for **ERC-8183** on eips.ethereum.org | **Not verified in this research.** Every ERC-8183 detail in this document comes from the Altana docs + the SDK source code. ERC-8004 does have an official EIP URL that the docs reference: <https://eips.ethereum.org/EIPS/eip-8004> |
+| The `engines` field (minimum Node version) in `@altananetwork/sdk` | **Not declared** in package.json |
+| `github.com/altananetwork/sdk` (referenced by the x402-server npm `repository.url`) | **The repo does not exist** — a typo in package.json. The real repo: `altananetwork/altana-sdk` |
+| Details of the XP program (how the 50,000 XP is computed/distributed) | **Not researched** — `xp.altana.network` is a Next.js SPA with no llms.txt |

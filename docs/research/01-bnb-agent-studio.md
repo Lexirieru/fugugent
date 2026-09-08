@@ -1,69 +1,69 @@
-# BNB Agent Studio — Riset Teknis Mendalam
+# BNB Agent Studio — In-Depth Technical Research
 
-> **Tanggal riset:** 8 September 2026
-> **Konteks:** Hackathon BNB Chain "The Smart Money Era: Build the Era" — membangun agent marketplace di BSC dengan 4 kategori (Rebalancing, Grid Trading, Yield Optimisation, Health Factor Monitoring).
-> **Penulis:** riset agent (Claude Code)
+> **Research date:** 8 September 2026
+> **Context:** BNB Chain hackathon "The Smart Money Era: Build the Era" — building an agent marketplace on BSC with 4 categories (Rebalancing, Grid Trading, Yield Optimisation, Health Factor Monitoring).
+> **Author:** research agent (Claude Code)
 
-## Legenda Status
+## Status Legend
 
-| Tanda | Arti |
+| Mark | Meaning |
 |---|---|
-| ✅ **FAKTA TERVERIFIKASI** | Ada URL sumber, atau saya sendiri yang mengeksekusi (curl/RPC/tarball) dan melihat hasilnya |
-| 🟡 **DUGAAN / BELUM DIVERIFIKASI** | Berasal dari ringkasan sekunder, blog pihak ketiga, atau inferensi saya |
-| ❌ **TIDAK DITEMUKAN** | Sudah dicari, tidak ketemu — beserta apa yang sudah dicoba |
+| ✅ **VERIFIED FACT** | There is a source URL, or I executed it myself (curl/RPC/tarball) and saw the result |
+| 🟡 **ASSUMPTION / NOT VERIFIED** | Comes from a secondary summary, a third-party blog, or my own inference |
+| ❌ **NOT FOUND** | Searched for, not found — along with what was tried |
 
 ---
 
-## 1. Ringkasan Eksekutif
+## 1. Executive Summary
 
-**BNB Agent Studio** adalah toolkit BNB Chain untuk membangun, men-deploy, dan memonetisasi **"seller agent"** di BNB Smart Chain. Ia bukan framework strategi DeFi — ia adalah lapisan **identitas + komersial + deployment** untuk AI agent.
+**BNB Agent Studio** is BNB Chain's toolkit for building, deploying, and monetising **"seller agents"** on BNB Smart Chain. It is not a DeFi strategy framework — it is the **identity + commerce + deployment** layer for AI agents.
 
-Tiga temuan terpenting untuk keputusan arsitektur kita:
+The three most important findings for our architecture decisions:
 
-1. **CLI-nya adalah paket npm, bukan Python.** `npm install --global @bnbagent/studio-cli` → binary bernama **`bag`**. Butuh **Node.js ≥ 22**. (Ada juga paket Python `bnbagent-studio` di PyPI tapi versinya jauh tertinggal — v0.0.5 vs v0.0.13 di npm. Gunakan npm.)
+1. **The CLI is an npm package, not Python.** `npm install --global @bnbagent/studio-cli` → a binary called **`bag`**. Requires **Node.js ≥ 22**. (There is also a `bnbagent-studio` Python package on PyPI, but its version lags far behind — v0.0.5 versus v0.0.13 on npm. Use npm.)
 
-2. **Ada API discovery agent yang nyata dan publik — dua lapis:**
-   - **On-chain (paling otoritatif):** kontrak ERC-8004 `AgentIdentity` di BSC mainnet `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` dan testnet `0x8004A818BFB912233c491871b3d84c89A494BD9e`. Saya sudah verifikasi keduanya live via RPC. Mainnet punya **340.785 agent** terdaftar per hari ini.
-   - **API terindeks (paling praktis untuk UI):** **8004scan** di `https://api.8004scan.io/api/v1` — REST publik, punya OpenAPI spec, filter `chain_id=56`, semantic search, leaderboard, reputasi. Ini yang **secara eksplisit disebut sebagai required tech oleh panitia hackathon**, dengan free Pro tier untuk peserta.
+2. **There is a real, public agent discovery API — in two layers:**
+   - **On-chain (most authoritative):** the ERC-8004 `AgentIdentity` contract on BSC mainnet `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` and testnet `0x8004A818BFB912233c491871b3d84c89A494BD9e`. I verified both live via RPC. Mainnet has **340,785 agents** registered as of today.
+   - **Indexed API (most practical for the UI):** **8004scan** at `https://api.8004scan.io/api/v1` — a public REST API, with an OpenAPI spec, a `chain_id=56` filter, semantic search, a leaderboard, and reputation. This is what the hackathon organisers **explicitly list as required tech**, with a free Pro tier for participants.
 
-3. **Agent dieksekusi sebagai container/zip di cloud (AWS Bedrock AgentCore, Azure AI Foundry, atau trial 48 jam milik BNB), dan agent memegang private key-nya sendiri.** Signing **tidak pernah** diekspos sebagai LLM tool — ia adalah kode tetap di `app/agent/src/signing.ts`. LLM hanya dapat read-only chain tools.
+3. **Agents are executed as a container/zip in the cloud (AWS Bedrock AgentCore, Azure AI Foundry, or BNB's own 48-hour trial), and the agent holds its own private key.** Signing is **never** exposed as an LLM tool — it is fixed code in `app/agent/src/signing.ts`. The LLM only gets read-only chain tools.
 
-> ⚠️ **PERINGATAN JADWAL:** Halaman resmi hackathon menyebut periode build **5 Agustus – 9 September 2026**. Hari ini **8 September 2026**. Kalau tanggal itu akurat, kita punya waktu sangat sedikit. **Verifikasi ulang** di [halaman hackathon](https://www.bnbchain.org/en/hackathons/smart-money-era) sebelum merencanakan scope.
+> ⚠️ **SCHEDULE WARNING:** The official hackathon page lists the build period as **5 August – 9 September 2026**. Today is **8 September 2026**. If that date is accurate, we have very little time left. **Re-verify** on the [hackathon page](https://www.bnbchain.org/en/hackathons/smart-money-era) before planning scope.
 
 ---
 
-## 2. Apa Itu BNB Agent Studio — Arsitektur & Komponen
+## 2. What BNB Agent Studio Is — Architecture & Components
 
-### 2.1 Posisi produk ✅
+### 2.1 Product positioning ✅
 
-Dari [blog peluncuran resmi](https://www.bnbchain.org/en/blog/bnb-agent-studio-is-live-on-bnb-chain-ai-agents-from-one-prompt) dan deskripsi paket npm:
+From the [official launch blog](https://www.bnbchain.org/en/blog/bnb-agent-studio-is-live-on-bnb-chain-ai-agents-from-one-prompt) and the npm package description:
 
 > "Skills-first toolkit and bag CLI for BNB Chain seller agents: ERC-8004 identity, ERC-8183 escrowed commerce, and x402 payments."
-> — `package.json` dari `@bnbagent/studio-cli@0.0.13`
+> — `package.json` of `@bnbagent/studio-cli@0.0.13`
 
-Studio menyelesaikan tiga masalah: **deployment**, **discoverability**, dan **continuity** agent.
+Studio solves three problems for an agent: **deployment**, **discoverability**, and **continuity**.
 
-### 2.2 Komponen ✅
+### 2.2 Components ✅
 
-Terverifikasi dari `package.json` dan README paket npm yang saya unduh & ekstrak:
+Verified from the `package.json` and README of the npm packages I downloaded and extracted:
 
-| Paket | Peran | Versi (8 Sep 2026) |
+| Package | Role | Version (8 Sep 2026) |
 |---|---|---|
-| `@bnbagent/studio-cli` | CLI `bag` + IDE skills + recipes (scaffolding, wallet, diagnostics, deploy) | **0.0.13** (alpha: 0.0.14-alpha.1) |
-| `@bnbagent/studio-runtime` | Library yang di-*import* oleh agent hasil generate | 0.0.13 |
-| `@bnbagent/sdk` | Lapisan protokol BNB Chain (ERC-8004 / ERC-8183 / wallet / x402) | **0.5.5** |
-| `@bnbagent/deploy-cli` | Lifecycle cloud deploy (di-pin oleh studio-cli) | 0.5.15 |
-| `bnbagent` (PyPI) | SDK Python setara `@bnbagent/sdk` | 0.4.6 |
-| `bnbagent-studio` (PyPI) | CLI `bag` versi Python — **tertinggal jauh** | 0.0.5 |
+| `@bnbagent/studio-cli` | The `bag` CLI + IDE skills + recipes (scaffolding, wallet, diagnostics, deploy) | **0.0.13** (alpha: 0.0.14-alpha.1) |
+| `@bnbagent/studio-runtime` | The library *imported* by the generated agent | 0.0.13 |
+| `@bnbagent/sdk` | The BNB Chain protocol layer (ERC-8004 / ERC-8183 / wallet / x402) | **0.5.5** |
+| `@bnbagent/deploy-cli` | The cloud deploy lifecycle (pinned by studio-cli) | 0.5.15 |
+| `bnbagent` (PyPI) | The Python SDK equivalent of `@bnbagent/sdk` | 0.4.6 |
+| `bnbagent-studio` (PyPI) | The Python version of the `bag` CLI — **far behind** | 0.0.5 |
 
-Sumber: `https://registry.npmjs.org/@bnbagent/studio-cli`, `https://registry.npmjs.org/@bnbagent/sdk`, `https://pypi.org/pypi/bnbagent/json`, `https://pypi.org/pypi/bnbagent-studio/json` — semua saya query langsung.
+Sources: `https://registry.npmjs.org/@bnbagent/studio-cli`, `https://registry.npmjs.org/@bnbagent/sdk`, `https://pypi.org/pypi/bnbagent/json`, `https://pypi.org/pypi/bnbagent-studio/json` — all queried directly by me.
 
-### 2.3 Lapisan arsitektur ✅
+### 2.3 Architecture layers ✅
 
 ```
 ┌─ Development layer ──────────────────────────────────────┐
 │ bag CLI  +  IDE skill /bnbagent-studio (Claude Code/Cursor)│
-│ recipes/ → generate TypeScript project yang kita miliki   │
+│ recipes/ → generates a TypeScript project that we own     │
 └───────────────────────────────────────────────────────────┘
 ┌─ Runtime layer ──────────────────────────────────────────┐
 │ @bnbagent/studio-runtime: config, wallet providers,       │
@@ -79,73 +79,73 @@ Sumber: `https://registry.npmjs.org/@bnbagent/studio-cli`, `https://registry.npm
 └───────────────────────────────────────────────────────────┘
 ```
 
-**Keterlibatan AWS** ✅: Blog resmi menyebut Studio "co-engineered with the AWS Generative AI Innovation Center". Runtime produksi default adalah **AWS Bedrock AgentCore**. `bag deploy prepare` bahkan melakukan read-only AgentCore quota check lewat AWS CLI (opsional, fail-open).
+**AWS involvement** ✅: the official blog describes Studio as "co-engineered with the AWS Generative AI Innovation Center". The default production runtime is **AWS Bedrock AgentCore**. `bag deploy prepare` even runs a read-only AgentCore quota check through the AWS CLI (optional, fail-open).
 
-### 2.4 Standar yang dipakai ✅
+### 2.4 Standards used ✅
 
-- **ERC-8004** — identitas agent on-chain (ERC-721; token = agent).
-- **ERC-8183** — "agentic commerce": job escrow bernegosiasi (kernel `AgenticCommerce` + `EvaluatorRouter` + `OptimisticPolicy`).
-- **x402 / B402 / MPP** — pembayaran per-HTTP-request. B402 adalah rail settlement Binance; x402 dan MPP adalah dua adapter alternatif (tidak bisa dipilih bersamaan).
-- **EIP-3009** (`TransferWithAuthorization`) — transfer gasless untuk pembayaran x402.
-- **A2A** (agent-to-agent) & **MCP** — "public faces" agent.
+- **ERC-8004** — on-chain agent identity (ERC-721; the token is the agent).
+- **ERC-8183** — "agentic commerce": negotiated job escrow (the `AgenticCommerce` kernel + `EvaluatorRouter` + `OptimisticPolicy`).
+- **x402 / B402 / MPP** — per-HTTP-request payments. B402 is Binance's settlement rail; x402 and MPP are two alternative adapters (you cannot pick both).
+- **EIP-3009** (`TransferWithAuthorization`) — gasless transfers for x402 payments.
+- **A2A** (agent-to-agent) & **MCP** — the agent's "public faces".
 
 ---
 
-## 3. Dokumentasi Resmi & Repositori
+## 3. Official Documentation & Repositories
 
-| Sumber | URL | Status |
+| Source | URL | Status |
 |---|---|---|
-| Landing page produk | https://www.bnbchain.org/en/bnb-agent-studio | ✅ |
-| Blog peluncuran | https://www.bnbchain.org/en/blog/bnb-agent-studio-is-live-on-bnb-chain-ai-agents-from-one-prompt | ✅ |
-| Docs Studio | https://docs.bnbchain.org/developer-kit/bnbchain-studio/ | ✅ |
-| Docs CLI reference | https://docs.bnbchain.org/developer-kit/bnbchain-studio/cli-reference/ | ✅ (⚠️ agak stale, lihat §4.3) |
-| Docs SDK | https://docs.bnbchain.org/developer-kit/bnbagent-sdk/ | ✅ (sidebar terlihat) |
-| GitHub SDK | https://github.com/bnb-chain/bnbagent-sdk | ✅ publik |
-| GitHub Studio | https://github.com/bnb-chain/bnbagent-studio | ⚠️ **404 / private.** Dirujuk oleh `package.json` & README paket npm, tapi tidak dapat diakses publik saat riset ini (dicoba via API GitHub dan fetch langsung). Semua isi Studio yang saya dokumentasikan di bawah berasal dari **tarball npm**, bukan dari repo. |
-| Contoh kode BNB Chain | https://github.com/bnb-chain/example-hub | ✅ publik |
+| Product landing page | https://www.bnbchain.org/en/bnb-agent-studio | ✅ |
+| Launch blog | https://www.bnbchain.org/en/blog/bnb-agent-studio-is-live-on-bnb-chain-ai-agents-from-one-prompt | ✅ |
+| Studio docs | https://docs.bnbchain.org/developer-kit/bnbchain-studio/ | ✅ |
+| CLI reference docs | https://docs.bnbchain.org/developer-kit/bnbchain-studio/cli-reference/ | ✅ (⚠️ somewhat stale, see §4.3) |
+| SDK docs | https://docs.bnbchain.org/developer-kit/bnbagent-sdk/ | ✅ (sidebar visible) |
+| SDK GitHub | https://github.com/bnb-chain/bnbagent-sdk | ✅ public |
+| Studio GitHub | https://github.com/bnb-chain/bnbagent-studio | ⚠️ **404 / private.** Referenced by the npm package's `package.json` and README, but not publicly accessible at the time of this research (tried through the GitHub API and a direct fetch). Everything about Studio documented below comes from the **npm tarball**, not from the repo. |
+| BNB Chain code examples | https://github.com/bnb-chain/example-hub | ✅ public |
 
-**Struktur sidebar docs** ✅ (dari fetch `docs.bnbchain.org/developer-kit/bnbchain-studio/`):
+**Docs sidebar structure** ✅ (from fetching `docs.bnbchain.org/developer-kit/bnbchain-studio/`):
 `BNB Agent Studio` → Quickstart, Demo, Architecture, Configuration, CLI Reference, Deployment, Security, Troubleshooting.
 `BNB Agent SDK` → Quickstart (TS), Quickstart (Python), Configuration, Architecture, **Networks & Contracts**, Examples, Security, Troubleshooting.
 
-> ❌ URL persis halaman "Networks & Contracts" tidak berhasil saya tebak (`/developer-kit/bnbagent-sdk/networks-and-contracts/` → 404). Namun isinya sudah saya dapatkan langsung dari kode SDK — lihat §7.2, yang lebih otoritatif karena itulah yang benar-benar dipakai runtime.
+> ❌ I could not guess the exact URL of the "Networks & Contracts" page (`/developer-kit/bnbagent-sdk/networks-and-contracts/` → 404). But I got its content straight from the SDK code — see §7.2, which is more authoritative anyway because that is what the runtime actually uses.
 
 ---
 
-## 4. CLI — Nama, Instalasi, Perintah
+## 4. CLI — Name, Installation, Commands
 
-### 4.1 Nama paket & instalasi ✅
+### 4.1 Package name & installation ✅
 
-**Ini yang benar** (dari README `@bnbagent/studio-cli@0.0.13`):
+**This is the correct one** (from the `@bnbagent/studio-cli@0.0.13` README):
 
 ```bash
 npm install --global @bnbagent/studio-cli
 bag skills install
 ```
 
-- Nama paket npm: **`@bnbagent/studio-cli`**
-- Nama binary: **`bag`** (dari `"bin": { "bag": "./dist/bag.js" }`)
-- Lisensi: Apache-2.0
+- npm package name: **`@bnbagent/studio-cli`**
+- Binary name: **`bag`** (from `"bin": { "bag": "./dist/bag.js" }`)
+- Licence: Apache-2.0
 - `"engines": { "node": ">=22" }`
-- Maintainer npm: `robotbnb <yolin@bnbchain.org>`, `jardenx <devin@bnbchain.org>`, `aiden-cao <aiden.c@nodereal.io>` — konsisten dengan kepemilikan BNB Chain ✅
+- npm maintainers: `robotbnb <yolin@bnbchain.org>`, `jardenx <devin@bnbchain.org>`, `aiden-cao <aiden.c@nodereal.io>` — consistent with BNB Chain ownership ✅
 
-> ⚠️ **Koreksi terhadap sumber sekunder.** Beberapa blog/ringkasan menyebut `pip install bnbagent-studio`. Paket PyPI itu **memang ada** (v0.0.5, deskripsi: "The `bag` CLI to scaffold and deploy a bnbagent-sdk seller agent on BNB Chain") tapi tertinggal 8 rilis dari npm. Blog resmi BNB Chain sendiri menyebut versi pip. **Rekomendasi: pakai npm.**
+> ⚠️ **Correction to secondary sources.** Several blogs/summaries say `pip install bnbagent-studio`. That PyPI package **does exist** (v0.0.5, description: "The `bag` CLI to scaffold and deploy a bnbagent-sdk seller agent on BNB Chain") but it is 8 releases behind npm. BNB Chain's own official blog quotes the pip version. **Recommendation: use npm.**
 
-`bag skills install` mendeteksi Claude Code & Cursor dan memasang skill `/bnbagent-studio` + 14 reference playbook. Versi terskrip:
+`bag skills install` detects Claude Code and Cursor and installs the `/bnbagent-studio` skill plus 14 reference playbooks. The scripted version:
 
 ```bash
 bag skills install --target both --scope user
 ```
 
-### 4.2 Bahasa ✅
+### 4.2 Language ✅
 
-Proyek yang di-generate adalah **TypeScript murni**. README: *"Studio generates ordinary TypeScript under `app/agent/`"*. Python tersedia sebagai SDK protokol paralel (`pip install bnbagent`), bukan sebagai target scaffolding utama.
+The generated project is **pure TypeScript**. From the README: *"Studio generates ordinary TypeScript under `app/agent/`"*. Python is available as a parallel protocol SDK (`pip install bnbagent`), not as the primary scaffolding target.
 
-### 4.3 Grup perintah `bag` ✅
+### 4.3 `bag` command groups ✅
 
-Dari README paket npm (sumber paling mutakhir):
+From the npm package README (the most up-to-date source):
 
-| Area | Perintah |
+| Area | Commands |
 |---|---|
 | Skills | `skills install`, `skills list`, `skills uninstall` |
 | Project | `init`, `scan`, `recipe`, `dev`, `doctor`, `bundle` |
@@ -159,9 +159,9 @@ Dari README paket npm (sumber paling mutakhir):
 | Deployment | `deploy`, `deploy prepare`, `verify`, `status`, `info`, `logs`, `destroy` |
 | Managed trial | `platform login`, `whoami`, `credit`, `agents`, `invoke-client`, `kill` |
 
-⚠️ **Docs vs paket tidak sinkron.** Halaman CLI reference di docs.bnbchain.org masih mencantumkan `bag mcp serve`, `bag deploy agent`, `bag erc8183 publish` — sementara README paket 0.0.13 menyebut `deploy agent` sebagai *"deprecated compatibility alias"* dan menambahkan grup `mpp` + `platform` yang tidak ada di docs. **Source of truth = `bag --help` setelah install.**
+⚠️ **The docs and the package are out of sync.** The CLI reference page on docs.bnbchain.org still lists `bag mcp serve`, `bag deploy agent`, and `bag erc8183 publish` — while the 0.0.13 package README calls `deploy agent` a *"deprecated compatibility alias"* and adds the `mpp` and `platform` groups that are missing from the docs. **The source of truth is `bag --help` after installing.**
 
-### 4.4 Perintah scaffold ✅
+### 4.4 The scaffold command ✅
 
 ```bash
 bag init <name> \
@@ -178,61 +178,61 @@ bag init <name> \
   --no-onboard
 ```
 
-**Aturan penamaan** ✅: harus diawali huruf, hanya ASCII huruf+angka, maksimal **23 karakter**. `-`, `_`, `.` **ditolak** (bukan di-rename). Ini aturan AgentCore.
+**Naming rules** ✅: must start with a letter, ASCII letters and digits only, maximum **23 characters**. `-`, `_`, and `.` are **rejected** (not renamed). These are AgentCore's rules.
 
-**Default penting** ✅:
+**Important defaults** ✅:
 - network: `bsc-testnet`
 - wallet: `evm-local`
 - LLM: `pieverse-llm`, model `auto/free` ($0/token)
 - protocols: `A2A,X402`
-- rails: keduanya (8183 + B402)
-- harga ERC-8183: `100000000000000000` (0.1 U)
-- harga B402: `0.01` USD
-- `--destination`: `platform` selama kampanye trial berjalan
+- rails: both (8183 + B402)
+- ERC-8183 price: `100000000000000000` (0.1 U)
+- B402 price: `0.01` USD
+- `--destination`: `platform` while the trial campaign is running
 
-### 4.5 Struktur proyek hasil generate ✅
+### 4.5 Generated project structure ✅
 
 ```
 <name>/
 ├── package.json                 workspace marker
 ├── pnpm-workspace.yaml          packages: ["app/agent"]
-├── AGENTS.md                    safety rules untuk coding agent
+├── AGENTS.md                    safety rules for the coding agent
 ├── agentcore/
 │   ├── agentcore.json           deployment descriptor
 │   └── aws-targets.json         AWS account + region
 ├── .studio/
 │   ├── .env.local               secrets, gitignored, mode 0600
-│   └── wallets/                 keystore terenkripsi (DI LUAR kode deployable)
+│   └── wallets/                 encrypted keystore (OUTSIDE the deployable code)
 └── app/agent/
-    ├── studio.toml              ← file config utama
+    ├── studio.toml              ← the main config file
     ├── package.json             @bnbagent/studio-runtime + @bnbagent/sdk + ai
     ├── tsconfig.json
-    ├── Dockerfile               hanya untuk container path (twak)
+    ├── Dockerfile               only for the container path (twak)
     └── src/
-        ├── sellerCore.ts        ← LOGIKA BISNIS KITA (hook runWork)
-        ├── signing.ts           quote/verify/submit — kode tetap, LLM tak pernah sentuh
-        ├── tools.ts             read-only chain tools untuk LLM
-        ├── model.ts             factory LanguageModel (AI SDK) + auto-topup
+        ├── sellerCore.ts        ← OUR BUSINESS LOGIC (the runWork hook)
+        ├── signing.ts           quote/verify/submit — fixed code, the LLM never touches it
+        ├── tools.ts             read-only chain tools for the LLM
+        ├── model.ts             LanguageModel factory (AI SDK) + auto-topup
         ├── agentCard.ts         A2A agent card (/.well-known/agent-card.json)
         ├── executor.ts
-        ├── unifiedMain.ts       entrypoint A2A + X402  (port 9000)
-        ├── mcpMain.ts           entrypoint MCP-only    (port 8000/mcp)
-        └── dualMain.ts          A2A + MCP gabungan
+        ├── unifiedMain.ts       A2A + X402 entrypoint  (port 9000)
+        ├── mcpMain.ts           MCP-only entrypoint    (port 8000/mcp)
+        └── dualMain.ts          combined A2A + MCP
 ```
 
-### 4.6 Format config: `app/agent/studio.toml` ✅
+### 4.6 Config format: `app/agent/studio.toml` ✅
 
-Section yang terverifikasi ada (di-grep dari bundle `dist/` CLI):
+The sections verified to exist (grepped from the CLI's `dist/` bundle):
 
 ```
 [network]                    default = "bsc-testnet" | "bsc-mainnet"
 [wallet]                     kind = "evm-local" | "twak" | "altana"
-[wallet.signing]             allowlist EIP-712 domain
+[wallet.signing]             EIP-712 domain allowlist
 [llm]                        provider, model
 [llm.pieverse]
 [llm.auto_renew]             enabled = true|false
 [budget]                     max_per_day_usd
-[payments.erc8183]           price (string desimal; "0" = FREE eksplisit)
+[payments.erc8183]           price (decimal string; "0" = explicitly FREE)
 [payments.x402]              max_per_request_usd
 [payments.x402.merchants.<name>]   domain, pay_to, per_call_cap_usd, verified
 [payments.b402_seller]       price_usd
@@ -245,7 +245,7 @@ Section yang terverifikasi ada (di-grep dari bundle `dist/` CLI):
 [agent]  [agentcore]  [project]
 ```
 
-Contoh merchant x402 (dari skill doc, format persis):
+An x402 merchant example (from the skill doc, exact format):
 ```toml
 [payments.x402.merchants.cmc]
 domain = "pro-api.coinmarketcap.com"
@@ -256,102 +256,102 @@ verified = true
 
 ---
 
-## 5. Model Agent — Definisi, Eksekusi, Signing
+## 5. The Agent Model — Definition, Execution, Signing
 
-### 5.1 Bagaimana agent didefinisikan ✅
+### 5.1 How an agent is defined ✅
 
-Agent **bukan** file deklaratif YAML. Ia adalah **proyek TypeScript** dengan struktur tetap:
+An agent is **not** a declarative YAML file. It is a **TypeScript project** with a fixed structure:
 
-- **Kemampuan / skill** → diekspos lewat **A2A AgentCard** di `/.well-known/agent-card.json`. Scaffold default hanya punya **dua skill**: `negotiate` dan `notify_funded`. File `agentCard.ts` adalah milik kita — deskripsi skill di situlah tempat menaruh identitas kategori agent.
-- **Tools LLM** → `app/agent/src/tools.ts`, dibungkus sebagai AI SDK `tool()`. Studio menyediakan **15 fungsi read-only** di `@bnbagent/studio-runtime/tools`:
+- **Capabilities / skills** → exposed through the **A2A AgentCard** at `/.well-known/agent-card.json`. The default scaffold has only **two skills**: `negotiate` and `notify_funded`. The `agentCard.ts` file is ours — the skill descriptions there are where the agent's category identity goes.
+- **LLM tools** → `app/agent/src/tools.ts`, wrapped as AI SDK `tool()`s. Studio provides **15 read-only functions** in `@bnbagent/studio-runtime/tools`:
   - Wallet/chain: `walletInfo`, `walletAddress`, `walletList`, `balanceNative`, `balanceU`, `networkInfo`, `txStatus`
   - LLM: `pieverseUsage`
   - ERC-8004: `agentInfo(agentId)`, `agentByAddress(address)`
   - ERC-8183: `jobStatus`, `jobList`, `jobCount`
-  - Advanced (ditandai "footgun"): `blockInfo`, `contractCallView` (arbitrary `eth_call` — rawan prompt injection)
-- **Pekerjaan yang dijual** → hook `runWork` di `app/agent/src/sellerCore.ts`.
-- **Trigger / schedule** → ⚠️ **TIDAK ADA scheduler bawaan.** README eksplisit: *"There is **no** background poller."* Agent bersifat **reaktif**: dipicu oleh pesan A2A `notify_funded`, request HTTP `/x402` atau `/mpp`, atau tool call MCP. Ada "best-effort in-process sweep" job FUNDED lain saat `notify_funded` masuk, itu saja. **Implikasi besar untuk kita:** agent monitoring (health factor, grid) yang butuh polling periodik harus punya scheduler sendiri (EventBridge/cron), tidak disediakan Studio.
+  - Advanced (marked "footgun"): `blockInfo`, `contractCallView` (arbitrary `eth_call` — prone to prompt injection)
+- **The work being sold** → the `runWork` hook in `app/agent/src/sellerCore.ts`.
+- **Triggers / schedules** → ⚠️ **THERE IS NO BUILT-IN SCHEDULER.** The README is explicit: *"There is **no** background poller."* The agent is **reactive**: it is triggered by an A2A `notify_funded` message, an HTTP request to `/x402` or `/mpp`, or an MCP tool call. There is a "best-effort in-process sweep" of other FUNDED jobs when a `notify_funded` arrives, and that is all. **A big implication for us:** monitoring agents (health factor, grid) that need periodic polling have to bring their own scheduler (EventBridge/cron); Studio does not provide one.
 
-### 5.2 Bagaimana agent dieksekusi ✅
+### 5.2 How an agent is executed ✅
 
-Satu runtime, satu signer, beberapa "public faces":
+One runtime, one signer, several "public faces":
 
-| Face | Surface lokal | Perilaku |
+| Face | Local surface | Behaviour |
 |---|---|---|
-| A2A | agent card + JSON-RPC di port `9000` | `negotiate` + `notify_funded` (delivery di background) |
-| MCP | Streamable HTTP `http://localhost:8000/mcp` | operasi seller yang sama, delivery sinkron |
-| A2A + MCP | A2A-native `:9000`, `/mcp` di-tunnel | shared seller core/wallet |
-| X402 | `/x402` | 1 request berbayar atau FREE |
-| MPP | `/mpp` | alternatif X402 |
+| A2A | agent card + JSON-RPC on port `9000` | `negotiate` + `notify_funded` (delivery in the background) |
+| MCP | Streamable HTTP `http://localhost:8000/mcp` | the same seller operations, delivered synchronously |
+| A2A + MCP | A2A-native on `:9000`, `/mcp` tunnelled | shared seller core/wallet |
+| X402 | `/x402` | 1 paid request, or FREE |
+| MPP | `/mpp` | an alternative to X402 |
 
-**Target deployment** ✅ (tiga, dan setiap `bag deploy` **wajib** memilih eksplisit — tidak ada default diam-diam):
+**Deployment targets** ✅ (three of them, and every `bag deploy` **must** pick one explicitly — there is no silent default):
 
-1. **BNB managed trial** — `bag platform login && bag platform credit && bag deploy --provider bnb`. Sandbox **BSC testnet 48 jam** di cloud operator. Jam mulai dari deploy sukses pertama; redeploy tidak mereset. Resource direklamasi otomatis saat expired.
-2. **AWS Bedrock AgentCore (akun sendiri)** — `bag deploy --provider aws`. Memvalidasi identitas AWS, build, provisioning runtime secrets + inbound Cognito OAuth, mencatat endpoint live.
-3. **Azure AI Foundry** — `bag deploy --provider azure`. ⚠️ Azure **menolak MCP**.
+1. **BNB managed trial** — `bag platform login && bag platform credit && bag deploy --provider bnb`. A **48-hour BSC testnet** sandbox in the operator's cloud. The clock starts at the first successful deploy; redeploying does not reset it. Resources are reclaimed automatically at expiry.
+2. **AWS Bedrock AgentCore (your own account)** — `bag deploy --provider aws`. Validates the AWS identity, builds, provisions runtime secrets plus inbound Cognito OAuth, and records the live endpoint.
+3. **Azure AI Foundry** — `bag deploy --provider azure`. ⚠️ Azure **rejects MCP**.
 
-Deploy default `evm-local` adalah **code-zip** (tidak butuh Docker). Path container (mis. `twak`) butuh Docker. Semua mutasi cloud didelegasikan ke `@bnbagent/deploy-cli` yang dijalankan via `bunx --bun` → **butuh Bun 1.3+**.
+The default `evm-local` deploy is a **code zip** (no Docker needed). The container path (e.g. `twak`) needs Docker. All cloud mutations are delegated to `@bnbagent/deploy-cli`, which is run through `bunx --bun` → **requires Bun 1.3+**.
 
 Lifecycle: `bag deploy status | logs --provider X | verify --provider X | destroy --provider X [--execute]`.
 
-### 5.3 Bagaimana agent memegang dana & menandatangani ✅ (KRITIS)
+### 5.3 How an agent holds funds and signs ✅ (CRITICAL)
 
-**Prinsip inti (dari "5 core commitments" skill doc):**
+**The core principle (from the "5 core commitments" skill doc):**
 
 > *"Signing is fixed handler code, never an LLM-callable tool."*
 > *"ALL signing is fixed entrypoint code in `app/agent/src/signing.ts` or the runtime's bounded x402 payment handler, never an LLM-callable tool."*
 
-Tiga pilihan custody:
+Three custody options:
 
-| Wallet | Model custody | Packaging | Catatan |
+| Wallet | Custody model | Packaging | Notes |
 |---|---|---|---|
-| **`evm-local`** (default) | Keystore V3 terenkripsi di `.studio/wallets/` (workspace root, **di luar** codeLocation deploy) | code zip | Password lewat `WALLET_PASSWORD` di `.studio/.env.local`. Saat deploy, material key di-inject via secret channel provider (AWS Secrets Manager). |
-| **`twak`** | Trust Wallet Agent Kit, self-custody, home terdedikasi `.studio/twak` | container | Butuh TWAK CLI ≥0.20.0 + Docker |
-| **`altana`** | **Session key EIP-7702** — admin keystore tetap lokal, runtime hanya menerima `ALTANA_SESSION` yang dibatasi budget & waktu | zip | Tidak kompatibel dengan `pieverse-llm` atau paid B402 rail. Payout B402 mendarat di alamat admin. Bisa di-revoke/renew eksplisit. |
+| **`evm-local`** (default) | An encrypted V3 keystore in `.studio/wallets/` (workspace root, **outside** the deploy codeLocation) | code zip | The password comes from `WALLET_PASSWORD` in `.studio/.env.local`. At deploy time the key material is injected through the provider's secret channel (AWS Secrets Manager). |
+| **`twak`** | Trust Wallet Agent Kit, self-custody, dedicated home at `.studio/twak` | container | Requires TWAK CLI ≥0.20.0 + Docker |
+| **`altana`** | **An EIP-7702 session key** — the admin keystore stays local, and the runtime only receives an `ALTANA_SESSION` bounded by budget and time | zip | Not compatible with `pieverse-llm` or the paid B402 rail. B402 payouts land at the admin address. Can be explicitly revoked/renewed. |
 
-Provider wallet di level SDK ✅ (dari README `bnbagent-sdk`): `EVMWalletProvider` (keystore lokal), `TWAKProvider`, `AltanaWalletProvider` (EIP-7702 session keys, TS-only), `TurnkeyWalletProvider` (AWS Nitro enclaves), `MPCWalletProvider` (stub).
+Wallet providers at the SDK level ✅ (from the `bnbagent-sdk` README): `EVMWalletProvider` (local keystore), `TWAKProvider`, `AltanaWalletProvider` (EIP-7702 session keys, TS-only), `TurnkeyWalletProvider` (AWS Nitro enclaves), `MPCWalletProvider` (a stub).
 
-**⚠️ Peringatan keamanan penting** ✅: untuk **BNB managed trial**, material signing `evm-local`/`twak` **dikirim ke managed secret store operator**. Dokumen resmi: *"Use a fresh testnet-only wallet and never reuse it on mainnet."* Untuk track Altana hackathon, hanya bounded session yang dikirim — ini alasan teknis kenapa panitia mensyaratkan session keys.
+**⚠️ An important security warning** ✅: for the **BNB managed trial**, `evm-local`/`twak` signing material is **sent to the operator's managed secret store**. The official document says: *"Use a fresh testnet-only wallet and never reuse it on mainnet."* For the Altana hackathon track, only a bounded session is sent — that is the technical reason the organisers require session keys.
 
-**Batas pengeluaran berlapis** ✅: `per_call_cap_usd` (per merchant) → `[payments.x402].max_per_request_usd` → `[budget].max_per_day_usd` (ledger bersama di `.studio/spend-ledger.json`). LLM **tidak bisa** melebarkan cap maupun mengubah `pay_to`.
+**Layered spend limits** ✅: `per_call_cap_usd` (per merchant) → `[payments.x402].max_per_request_usd` → `[budget].max_per_day_usd` (a shared ledger in `.studio/spend-ledger.json`). The LLM **cannot** widen a cap or change `pay_to`.
 
-### 5.4 Model monetisasi ✅
+### 5.4 Monetisation model ✅
 
-- **ERC-8183 (job escrow):** buyer `negotiate` → dapat quote ber-tanda-tangan EIP-191 (harga di-clamp kode, **tanpa LLM**) → `createJob` → `registerJob` → `setBudget` → `fund` → buyer kirim `notify_funded` → seller verifikasi on-chain → kerjakan → `submit` deliverable → buyer `settle`. **Dispute window 24 jam** on-chain; `approve` sebelum itu revert dengan `0x17be5b7b`.
-- **x402/MPP (bayar per request):** harga positif → payment challenge → settle via B402 sebelum kerja. `price_usd = "0"` → FREE passthrough anonim.
+- **ERC-8183 (job escrow):** the buyer calls `negotiate` → gets an EIP-191-signed quote (the price is clamped in code, **with no LLM involved**) → `createJob` → `registerJob` → `setBudget` → `fund` → the buyer sends `notify_funded` → the seller verifies on-chain → does the work → `submit`s the deliverable → the buyer `settle`s. There is a **24-hour dispute window** on-chain; calling `approve` before it elapses reverts with `0x17be5b7b`.
+- **x402/MPP (pay per request):** a positive price → a payment challenge → settle through B402 before doing the work. `price_usd = "0"` → an anonymous FREE passthrough.
 
 ---
 
-## 6. Discovery / Registry — Cara Marketplace Kita Mendapat Data Agent
+## 6. Discovery / Registry — How Our Marketplace Gets Agent Data
 
-**Ini bagian paling penting untuk kita.** Ada **dua jalur**, dan saya sarankan pakai keduanya.
+**This is the most important part for us.** There are **two paths**, and I recommend using both.
 
-### 6.1 Jalur A — 8004scan REST API (rekomendasi utama untuk UI) ✅
+### 6.1 Path A — the 8004scan REST API (the main recommendation for the UI) ✅
 
 **Base URL:** `https://api.8004scan.io/api/v1`
-**OpenAPI spec:** `https://api.8004scan.io/openapi.json` — ✅ saya unduh, HTTP 200, 426 KB, `"title": "8004scan Backend API", "version": "0.4.367"`.
-**Dokumentasi:** https://8004scan.io/developers · https://docs.altlayer.io/altlayer-documentation/8004-scan/overview
-**Dibuat oleh:** AltLayer (https://altlayer.io/8004scan)
+**OpenAPI spec:** `https://api.8004scan.io/openapi.json` — ✅ I downloaded it, HTTP 200, 426 KB, `"title": "8004scan Backend API", "version": "0.4.367"`.
+**Documentation:** https://8004scan.io/developers · https://docs.altlayer.io/altlayer-documentation/8004-scan/overview
+**Built by:** AltLayer (https://altlayer.io/8004scan)
 
-**Auth:** header `X-API-Key: YOUR_API_KEY`. Tanpa key tetap bisa dipakai (anonymous tier).
+**Auth:** the `X-API-Key: YOUR_API_KEY` header. It still works without a key (anonymous tier).
 
-**Rate limit** ✅ (dari halaman developers):
+**Rate limits** ✅ (from the developers page):
 
-| Tier | Req/menit | Req/hari |
+| Tier | Req/min | Req/day |
 |---|---|---|
-| Anonymous | 30 | 1.000 |
-| Free API | 600 | 100.000 |
-| **Pro (gratis untuk peserta hackathon)** | 500/min, 100.000/hari | via [form ini](https://forms.gle/jQevEPCAacBXaKG79) |
+| Anonymous | 30 | 1,000 |
+| Free API | 600 | 100,000 |
+| **Pro (free for hackathon participants)** | 500/min, 100,000/day | via [this form](https://forms.gle/jQevEPCAacBXaKG79) |
 
-Header respons: `X-RateLimit-Tier`, `X-RateLimit-Limit-Minute`, `X-RateLimit-Remaining-Minute`, `X-RateLimit-Limit-Day`, `X-RateLimit-Remaining-Day`.
+Response headers: `X-RateLimit-Tier`, `X-RateLimit-Limit-Minute`, `X-RateLimit-Remaining-Minute`, `X-RateLimit-Limit-Day`, `X-RateLimit-Remaining-Day`.
 
-**Endpoint yang relevan untuk marketplace** ✅ (diambil dari OpenAPI spec yang saya parse):
+**Endpoints relevant to the marketplace** ✅ (taken from the OpenAPI spec I parsed):
 
 ```
-GET /api/v1/agents                                  ← endpoint utama listing
-GET /api/v1/agents/{chain_id}/{token_id}            ← detail 1 agent
+GET /api/v1/agents                                  ← the main listing endpoint
+GET /api/v1/agents/{chain_id}/{token_id}            ← detail for 1 agent
 GET /api/v1/agents/{chain_id}/{registry_address}/{token_id}
-GET /api/v1/agents/search/semantic                  ← pencarian bahasa natural
+GET /api/v1/agents/search/semantic                  ← natural-language search
 GET /api/v1/agents/featured
 GET /api/v1/agents/trending          ?period=24h|7d|30d
 GET /api/v1/agents/leaderboard       ?sort_by=total_score
@@ -363,18 +363,18 @@ GET /api/v1/agents/scores/v5/{chain_id}/{token_id}
 GET /api/v1/agents/score-history/{chain_id}/{token_id}
 GET /api/v1/stats/agents/{chain_id}/{token_id}/analytics
 GET /api/v1/stats/global
-GET /api/v1/stats/oasf/skills                       ← taksonomi skill!
-GET /api/v1/stats/oasf/domains                      ← taksonomi domain!
-GET /api/v1/feedbacks                               ← reputasi
+GET /api/v1/stats/oasf/skills                       ← the skill taxonomy!
+GET /api/v1/stats/oasf/domains                      ← the domain taxonomy!
+GET /api/v1/feedbacks                               ← reputation
 GET /api/v1/wallets/{address}/agents
 GET /api/v1/chains
 POST /api/v1/agents/{chain_id}/{token_id}/health-check
 POST /api/v1/agents/verify-endpoint/{chain_id}/{token_id}
-POST /api/v1/webhooks/register                      ← webhook untuk update realtime
-GET /api/v1/mcp/tools/search_agents                 ← ada MCP surface juga
+POST /api/v1/webhooks/register                      ← webhooks for real-time updates
+GET /api/v1/mcp/tools/search_agents                 ← there is an MCP surface too
 ```
 
-**Parameter `GET /api/v1/agents`** ✅ (persis dari OpenAPI spec — inilah yang bikin 4 kategori kita bisa difilter):
+**`GET /api/v1/agents` parameters** ✅ (verbatim from the OpenAPI spec — this is what makes our 4 categories filterable):
 
 ```
 limit (default 20), offset (default 0)
@@ -384,66 +384,66 @@ owner_address
 owner_publisher_tier    → OFFICIAL | VERIFIED | COMMUNITY
 supported_protocol      → MCP, A2A, ...
 x402_supported          → bool
-is_active               → default "true" (field `active` dari ERC-8004)
-is_endpoint_verified    → bool   ← PENTING: saring agent yang endpoint-nya benar hidup
+is_active               → default "true" (the `active` field from ERC-8004)
+is_endpoint_verified    → bool   ← IMPORTANT: filters for agents whose endpoint is actually alive
 supported_trust         → reputation | crypto-economic | tee-attestation
 has_mcp / has_a2a / has_oasf   → bool
 is_registered           → default "true"
-oasf_skill[]            → filter skill OASF (OR logic)
-oasf_domain[]           → filter domain OASF (OR logic)
+oasf_skill[]            → OASF skill filter (OR logic)
+oasf_domain[]           → OASF domain filter (OR logic)
 search, search_type (auto), search_fields
 min_feedbacks, min_validations, min_score (0-100)
 created_after, created_before (ISO 8601)
 tags                    → comma-separated (OR)
-categories              → comma-separated (OR)      ← relevan untuk 4 kategori kita
+categories              → comma-separated (OR)      ← relevant to our 4 categories
 sort_by                 → created_at | stars | name | token_id | (score dimensions)
 sort_order              → asc | desc
 ```
 
 **`GET /api/v1/agents/search/semantic`**: `q`, `limit`, `offset`, `chain_id`, `is_active`, `semantic_weight` (0=pure text … 1=pure semantic, default 0.5), `similarity_threshold` (default 0.5).
 
-**Bentuk respons** ✅ (saya lihat langsung): `{"items": [ {...agent...} ], "total": N, ...}`. Field agent mencakup antara lain `id`, `owner_id`, `token_id`, `chain_id`, `name`, `description`, `is_active`, `total_score`.
+**Response shape** ✅ (seen directly): `{"items": [ {...agent...} ], "total": N, ...}`. Agent fields include, among others, `id`, `owner_id`, `token_id`, `chain_id`, `name`, `description`, `is_active`, `total_score`.
 
-**Uji hidup yang saya lakukan** ✅:
-- `GET /api/v1/chains` → HTTP 200. BSC ada: `{"chain_key":"bsc_mainnet","chain_id":56,"name":"BSC","is_testnet":false,"enabled":true}` dan `{"chain_key":"bsc_testnet","chain_id":97,"name":"BSC Testnet","is_testnet":true,"enabled":true}`.
+**Live tests I ran** ✅:
+- `GET /api/v1/chains` → HTTP 200. BSC is there: `{"chain_key":"bsc_mainnet","chain_id":56,"name":"BSC","is_testnet":false,"enabled":true}` and `{"chain_key":"bsc_testnet","chain_id":97,"name":"BSC Testnet","is_testnet":true,"enabled":true}`.
 - `GET /api/v1/stats/global` → HTTP 200: **`total_agents: 820100`**, `total_users: 458338`, `total_feedbacks: 3654749`, `daily_new_agents: 3589`, `average_feedback_score: 82.6`.
-- `GET /api/v1/agents/search/semantic?q=grid trading&chain_id=56&limit=3` → HTTP 200, mengembalikan `{"items":[...]}` berisi agent nyata.
+- `GET /api/v1/agents/search/semantic?q=grid trading&chain_id=56&limit=3` → HTTP 200, returning `{"items":[...]}` with real agents.
 
-**⚠️ MASALAH RELIABILITAS — WAJIB DIPERHITUNGKAN DALAM ARSITEKTUR** ✅:
-API ini **sering mengembalikan** `{"success":false,"error":{"code":"DATABASE_ERROR","message":"Database error occurred"}}` dengan HTTP 500 secara **intermiten**. Dalam pengujian saya, 4 dari 5 percobaan berturut-turut gagal sebelum satu berhasil. Setelah ±50 request saya juga kena **HTTP 403** (rate limit anonymous tier).
+**⚠️ RELIABILITY PROBLEM — THE ARCHITECTURE MUST ACCOUNT FOR THIS** ✅:
+This API **frequently returns** `{"success":false,"error":{"code":"DATABASE_ERROR","message":"Database error occurred"}}` with HTTP 500, **intermittently**. In my testing, 4 out of 5 consecutive attempts failed before one succeeded. After roughly 50 requests I also hit **HTTP 403** (the anonymous tier rate limit).
 
-**Rekomendasi arsitektur:**
-1. Ambil API key Pro gratis via form hackathon **sekarang**.
-2. **Jangan panggil 8004scan langsung dari browser.** Dokumentasi mereka sendiri menyarankan "server-first authentication". Buat proxy/BFF di backend kita.
-3. **Cache agresif + retry with backoff.** Kriteria juri "Data Quality" 35% — marketplace yang blank karena upstream 500 akan hancur nilainya.
-4. Siapkan **fallback ke pembacaan on-chain langsung** (Jalur B) supaya demo tidak pernah kosong.
+**Architecture recommendations:**
+1. Get the free Pro API key through the hackathon form **now**.
+2. **Do not call 8004scan directly from the browser.** Their own documentation recommends "server-first authentication". Build a proxy/BFF in our backend.
+3. **Cache aggressively + retry with backoff.** The "Data Quality" judging criterion is 35% — a marketplace that goes blank because upstream returned a 500 will be destroyed on score.
+4. Prepare a **fallback to reading on-chain directly** (Path B) so the demo is never empty.
 
-### 6.2 Jalur B — Baca langsung ERC-8004 on-chain (fallback & source of truth) ✅
+### 6.2 Path B — reading ERC-8004 directly on-chain (fallback & source of truth) ✅
 
-**Alamat kontrak — SAYA VERIFIKASI SENDIRI VIA RPC:**
+**Contract addresses — I VERIFIED THESE MYSELF VIA RPC:**
 
-| Network | Chain ID | Alamat `AgentIdentity` registry | Bukti |
+| Network | Chain ID | `AgentIdentity` registry address | Evidence |
 |---|---|---|---|
-| **BSC Mainnet** | 56 | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` | `eth_getCode` non-kosong; `name()` → `"AgentIdentity"`; `symbol()` → `"AGENT"` |
-| **BSC Testnet** | 97 | `0x8004A818BFB912233c491871b3d84c89A494BD9e` | idem, `eth_chainId` → `0x61` (97) |
+| **BSC Mainnet** | 56 | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` | non-empty `eth_getCode`; `name()` → `"AgentIdentity"`; `symbol()` → `"AGENT"` |
+| **BSC Testnet** | 97 | `0x8004A818BFB912233c491871b3d84c89A494BD9e` | same, `eth_chainId` → `0x61` (97) |
 
-Sumber alamat: konstanta `NETWORKS` di dalam bundle `@bnbagent/sdk@0.5.5` (`dist/chunk-DSR5PNLX.js`), lalu saya konfirmasi live lewat `eth_call` ke RPC publik BSC.
+Address source: the `NETWORKS` constant inside the `@bnbagent/sdk@0.5.5` bundle (`dist/chunk-DSR5PNLX.js`), then confirmed live through `eth_call` against a public BSC RPC.
 
-**Registry ini adalah ERC-721.** Setiap agent = 1 token. `name()` = `AgentIdentity`, `symbol()` = `AGENT`.
+**This registry is an ERC-721.** Each agent = 1 token. `name()` = `AgentIdentity`, `symbol()` = `AGENT`.
 
-**ABI penting** ✅ (diekstrak dari bundle SDK, 65 entri):
+**The important ABI** ✅ (extracted from the SDK bundle, 65 entries):
 
 ```solidity
-// EVENTS — inilah yang kita index
+// EVENTS — these are what we index
 event Registered(uint256 indexed agentId, string agentURI, address indexed owner);
 event URIUpdated(uint256 indexed agentId, string newURI, address indexed updatedBy);
 event MetadataSet(uint256 indexed agentId, string indexed indexedMetadataKey,
                   string metadataKey, bytes metadataValue);
-event Transfer(address indexed from, address indexed to, uint256 indexed tokenId); // ganti kepemilikan
+event Transfer(address indexed from, address indexed to, uint256 indexed tokenId); // ownership change
 event MetadataUpdate(uint256 _tokenId);
 event BatchMetadataUpdate(uint256 _fromTokenId, uint256 _toTokenId);
 
-// READS — inilah yang kita panggil untuk render kartu agent
+// READS — these are what we call to render an agent card
 function tokenURI(uint256 tokenId)  view returns (string);
 function ownerOf(uint256 tokenId)   view returns (address);
 function balanceOf(address owner)   view returns (uint256);
@@ -463,38 +463,38 @@ function setAgentWallet(uint256 agentId, address newWallet, uint256 deadline, by
 function unsetAgentWallet(uint256 agentId);
 ```
 
-**Topic hash event (siap dipakai untuk `eth_getLogs`)** ✅ — saya hitung dengan `cast keccak`:
+**Event topic hashes (ready to use with `eth_getLogs`)** ✅ — computed by me with `cast keccak`:
 
 ```
 Registered(uint256,string,address)              → 0xca52e62c367d81bb2e328eb795f7c7ba24afb478408a26c0e201d155c449bc4a
 URIUpdated(uint256,string,address)              → 0x3a2c7fffc2cba7582c690e3b82c453ea02a308326a98a3ad7576c606336409fb
 MetadataSet(uint256,string,string,bytes)        → 0x2c149ed548c6d2993cd73efe187df6eccabe4538091b33adbd25fafdb8a1468b
-keccak256("built_with")  (untuk topic2 MetadataSet) → 0xba3c72985a276b7df84ee744b387a3ebb5bc20fc15befa203130d9432939c115
+keccak256("built_with")  (for MetadataSet topic2) → 0xba3c72985a276b7df84ee744b387a3ebb5bc20fc15befa203130d9432939c115
 ```
 
-`getMetadata(uint256,string)` selector = `0xcb4799f2`.
+The `getMetadata(uint256,string)` selector = `0xcb4799f2`.
 
-**Skala nyata** ✅ — saya lakukan binary search `ownerOf()` di mainnet:
-> **agentId tertinggi yang ada di BSC mainnet = 340.785**
+**Real scale** ✅ — I did a binary search on `ownerOf()` on mainnet:
+> **the highest existing agentId on BSC mainnet = 340,785**
 
-Token ID bersifat **sekuensial** mulai dari 1, jadi enumerasi mudah.
+Token IDs are **sequential** starting at 1, so enumeration is easy.
 
-**Format metadata: `tokenURI` bervariasi — ini jebakan besar** ✅. Saya sampling langsung dan menemukan **lima bentuk berbeda**:
+**Metadata format: `tokenURI` varies — this is a big trap** ✅. I sampled it directly and found **five different shapes**:
 
-| agentId | Bentuk `tokenURI` |
+| agentId | `tokenURI` shape |
 |---|---|
-| 340785 | `data:application/json;base64,...` ← format kanonik |
+| 340785 | `data:application/json;base64,...` ← the canonical format |
 | 10 | `data:application/json;enc=gzip;level=6;base64,H4sI...` ← **gzip** |
 | 50 | `ipfs://QmW79S38Xd3oda1qQ1DG8wYY1h3ue7hfsf6gryguh51q25` |
 | 50000 | `https://build4.io/api/standards/erc8004/agent-card/7caf3b02-...` |
 | 150000–340700 | `https://metadata.evoevo.ai/agents/4778808` |
-| 2 | `0x6446ad9821021eeb9f85b8a18b0153d58166d161` ← bukan URI sama sekali |
-| 5000 | `{"name":"babycaisubagent-99","description":"..."}` ← JSON telanjang, bukan data URI |
-| 1000, 10000 | string kosong / spasi |
+| 2 | `0x6446ad9821021eeb9f85b8a18b0153d58166d161` ← not a URI at all |
+| 5000 | `{"name":"babycaisubagent-99","description":"..."}` ← bare JSON, not a data URI |
+| 1000, 10000 | empty string / whitespace |
 
-**Implikasi:** parser kita harus menangani `data:` (base64 + gzip), `ipfs://`, `https://`, JSON telanjang, dan string sampah — dengan graceful degradation. **Jangan asumsikan satu format.**
+**Implication:** our parser has to handle `data:` (base64 + gzip), `ipfs://`, `https://`, bare JSON, and garbage strings — with graceful degradation. **Do not assume one format.**
 
-**Contoh registration file yang valid** ✅ (agentId 1, mainnet, hasil decode base64 oleh saya):
+**An example of a valid registration file** ✅ (agentId 1, mainnet, base64-decoded by me):
 
 ```json
 {
@@ -519,83 +519,83 @@ Token ID bersifat **sekuensial** mulai dari 1, jadi enumerasi mudah.
 }
 ```
 
-**Ini skema data marketplace kita.** Perhatikan:
-- `services[].name == "OASF"` membawa **`skills[]` dan `domains[]` terstruktur** → **inilah kunci untuk mengklasifikasikan 4 kategori kita** (dan juga kenapa 8004scan punya filter `oasf_skill` / `oasf_domain`).
-- `services[].name == "agentWallet"` memberi alamat wallet agent dalam format CAIP-10 → bisa dipakai untuk menampilkan aktivitas on-chain / P&L nyata.
-- `active` dan `x402Support` adalah flag yang dideklarasikan pemilik.
-- Endpoint A2A ditemukan di `services[].name == "A2A"`, dan kartu lengkapnya di `{endpoint}/.well-known/agent-card.json`.
+**This is our marketplace data schema.** Note:
+- `services[].name == "OASF"` carries **structured `skills[]` and `domains[]`** → **this is the key to classifying our 4 categories** (and also why 8004scan has `oasf_skill` / `oasf_domain` filters).
+- `services[].name == "agentWallet"` gives the agent's wallet address in CAIP-10 format → usable for showing real on-chain activity / P&L.
+- `active` and `x402Support` are flags declared by the owner.
+- The A2A endpoint is found at `services[].name == "A2A"`, and its full card at `{endpoint}/.well-known/agent-card.json`.
 
-**⚠️ Realita kualitas data** ✅: dari sampling saya, **mayoritas dari 340k agent adalah spam / bulk registration** (satu farm `metadata.evoevo.ai` mendominasi rentang 150.000–340.700; banyak entri lain kosong). Marketplace kita **harus** memfilter. Filter yang tersedia:
-- `is_endpoint_verified=true` di 8004scan
+**⚠️ The reality of data quality** ✅: from my sampling, **the majority of the 340k agents are spam / bulk registrations** (one `metadata.evoevo.ai` farm dominates the 150,000–340,700 range; many other entries are empty). Our marketplace **must** filter. The available filters:
+- `is_endpoint_verified=true` on 8004scan
 - `owner_publisher_tier=OFFICIAL|VERIFIED`
 - `min_score` / `min_feedbacks`
-- `has_a2a=true` (agent yang benar-benar bisa "dipekerjakan")
-- metadata `built_with` (lihat di bawah)
+- `has_a2a=true` (agents that can actually be "hired")
+- the `built_with` metadata (see below)
 
-**Menandai agent buatan BNB Agent Studio** 🟡: SDK **otomatis meng-inject** metadata entry dengan key **`built_with`** bernilai `https://github.com/bnb-chain/bnbagent-sdk#v<version>` pada setiap registrasi (terverifikasi dari `ContractInterface.injectBuiltWith` + konstanta `BUILT_WITH_KEY = "built_with"` di `@bnbagent/sdk`). Artinya **`getMetadata(agentId, "built_with")` adalah cara membedakan agent Studio dari 340k agent lain** — dan `MetadataSet` dengan `topic2 = 0xba3c7298...` bisa di-`eth_getLogs` untuk menemukan semuanya.
-Saya sempat memanggil `getMetadata` pada agent #1, #100000, #340785 → semuanya `0x` (kosong), artinya agent-agent itu bukan buatan Studio. Saya **belum sempat menyelesaikan** `eth_getLogs` bertopik `built_with` (query range besar di RPC publik terlalu lambat, job timeout 120s). **Ini item aksi prioritas tinggi** — lihat §11.
+**Identifying agents built with BNB Agent Studio** 🟡: the SDK **automatically injects** a metadata entry with the key **`built_with`**, valued `https://github.com/bnb-chain/bnbagent-sdk#v<version>`, on every registration (verified from `ContractInterface.injectBuiltWith` plus the constant `BUILT_WITH_KEY = "built_with"` in `@bnbagent/sdk`). That means **`getMetadata(agentId, "built_with")` is how you distinguish a Studio agent from the other 340k** — and `MetadataSet` with `topic2 = 0xba3c7298...` can be `eth_getLogs`-ed to find all of them.
+I did call `getMetadata` on agents #1, #100000, and #340785 → all returned `0x` (empty), meaning those agents were not built with Studio. I **did not manage to finish** the `eth_getLogs` query on the `built_with` topic (a large block range on a public RPC is too slow; the job timed out at 120s). **This is a high-priority action item** — see §11.
 
-### 6.3 Jalur C — Katalog Binance Bazaar (B402) 🟡
+### 6.3 Path C — the Binance Bazaar catalogue (B402) 🟡
 
-Dari skill doc `bnbagent-studio-buying-from-bazaar.md` (isi paket npm, jadi teks-nya ✅ terverifikasi):
+From the `bnbagent-studio-buying-from-bazaar.md` skill doc (part of the npm package, so its text is ✅ verified):
 
 > "**Bazaar** (`https://www.binance.com/bapi/ramp/v1/public/ramp/b402/bazaar/…`) — a public, auth-free **catalog** of x402 merchants."
 
-Endpoint yang didokumentasikan:
+The documented endpoints:
 ```
 GET .../bazaar/search?query=<keyword>&limit=10
 GET .../bazaar/resources
 GET .../bazaar/merchant?payTo=0x…
 ```
-Tiap resource membawa `accepts[]` (siapa dibayar, aset apa, chain mana) dan sinyal kualitas 30 hari: `l30DaysTotalCalls`, `l30DaysUniquePayers`.
+Each resource carries `accepts[]` (who gets paid, in what asset, on which chain) plus 30-day quality signals: `l30DaysTotalCalls`, `l30DaysUniquePayers`.
 
-❌ **Saya TIDAK BISA memverifikasi endpoint ini.** `curl` ke `www.binance.com` gagal connect dari lingkungan riset ini — DNS resolve ke `202.169.44.80` lalu "Connection refused" (kemungkinan besar pemblokiran tingkat ISP di Indonesia). **Tim harus menguji sendiri dari jaringan lain / VPN sebelum bergantung padanya.** Perhatikan juga: ini katalog **merchant x402**, bukan katalog agent ERC-8004 — cakupannya berbeda dari kebutuhan utama kita.
+❌ **I COULD NOT verify these endpoints.** `curl` to `www.binance.com` fails to connect from this research environment — DNS resolves to `202.169.44.80` and then "Connection refused" (most likely ISP-level blocking in Indonesia). **The team has to test this from another network / a VPN before relying on it.** Also note: this is a catalogue of **x402 merchants**, not of ERC-8004 agents — its scope differs from our main need.
 
-### 6.4 Endpoint yang saya coba dan GAGAL ❌
+### 6.4 Endpoints I tried that FAILED ❌
 
-Supaya tidak diulang:
+So nobody repeats them:
 
-| URL | Hasil |
+| URL | Result |
 |---|---|
-| `https://8004scan.io/api/agents?chain=56` | HTTP 404 (HTML Next.js) |
+| `https://8004scan.io/api/agents?chain=56` | HTTP 404 (Next.js HTML) |
 | `https://api.8004scan.io/agents?chain=56` | HTTP 404 `{"detail":"Not Found"}` |
 | `https://api.8004scan.io/v1/agents` | HTTP 404 |
-| `https://api.8004scan.io/api/v1/openapi.json` | HTTP 404 (spec ada di root: `/openapi.json`) |
+| `https://api.8004scan.io/api/v1/openapi.json` | HTTP 404 (the spec is at the root: `/openapi.json`) |
 | `https://api.8004scan.io/docs` | HTTP 404 |
-| `https://8004scan.io/api/v1/agents?chain=56` | HTTP 500 DATABASE_ERROR (path frontend proxy, bukan yang benar) |
-| `https://docs.bnbchain.org/developer-kit/bnbagent-sdk/networks-and-contracts/` | HTTP 404 (nama slug tidak tertebak) |
+| `https://8004scan.io/api/v1/agents?chain=56` | HTTP 500 DATABASE_ERROR (a frontend proxy path, not the right one) |
+| `https://docs.bnbchain.org/developer-kit/bnbagent-sdk/networks-and-contracts/` | HTTP 404 (could not guess the slug) |
 | `https://github.com/bnb-chain/bnbagent-studio` | 404 / private |
-| `https://www.binance.com/bapi/...` | Connection refused (network riset) |
+| `https://www.binance.com/bapi/...` | Connection refused (research network) |
 
-❌ **Tidak ditemukan:** API discovery **resmi milik BNB Agent Studio sendiri** (mis. `studio.bnbchain.org/api/agents`) yang melist agent live. `https://bnbagent-api.bnbchain.world` muncul di bundle CLI, tapi itu adalah **API platform trial** (auth-gated, untuk hosting deliverable & lifecycle agent milik sendiri), **bukan** direktori publik. Jangan andalkan itu untuk marketplace.
+❌ **Not found:** an **official BNB Agent Studio discovery API of its own** (e.g. `studio.bnbchain.org/api/agents`) that lists live agents. `https://bnbagent-api.bnbchain.world` appears in the CLI bundle, but it is the **trial platform API** (auth-gated, for hosting your own agent's deliverables and lifecycle), **not** a public directory. Do not rely on it for the marketplace.
 
-**Kesimpulan §6:** Discovery agent = **8004scan API (primer) + ERC-8004 on-chain (fallback/verifikasi)**. Tidak ada API marketplace resmi selain itu.
+**§6 conclusion:** agent discovery = **the 8004scan API (primary) + ERC-8004 on-chain (fallback/verification)**. There is no official marketplace API beyond that.
 
 ---
 
-## 7. Konfigurasi Jaringan & Kontrak
+## 7. Network & Contract Configuration
 
-### 7.1 Network BSC ✅
+### 7.1 BSC networks ✅
 
 | | Mainnet | Testnet |
 |---|---|---|
 | Chain ID | **56** (`0x38`) | **97** (`0x61`) |
-| RPC default SDK | `https://bsc-dataseed.binance.org` | `https://data-seed-prebsc-2-s2.binance.org:8545` |
+| SDK default RPC | `https://bsc-dataseed.binance.org` | `https://data-seed-prebsc-2-s2.binance.org:8545` |
 | Paymaster (MegaFuel) | `https://bsc-megafuel.nodereal.io/` | `https://bsc-megafuel-testnet.nodereal.io` |
-| Gas sponsorship | ❌ tidak pernah | ✅ default aktif untuk kontrak kanonik |
+| Gas sponsorship | ❌ never | ✅ on by default for the canonical contracts |
 | Explorer | bscscan.com | testnet.bscscan.com |
 
-⚠️ **RPC default SDK memakai domain `binance.org` yang tidak bisa saya jangkau** (diblokir jaringan). RPC publik yang **saya uji dan berhasil** (`eth_chainId` → `0x38`):
+⚠️ **The SDK's default RPC uses the `binance.org` domain, which I cannot reach** (network-blocked). The public RPCs I **tested and got working** (`eth_chainId` → `0x38`):
 - ✅ `https://bsc-dataseed.bnbchain.org`
 - ✅ `https://bsc-rpc.publicnode.com`
 - ✅ `https://1rpc.io/bnb`
-- ❌ `https://binance.llamarpc.com` (kosong)
+- ❌ `https://binance.llamarpc.com` (empty)
 
-Testnet yang berhasil: ✅ `https://data-seed-prebsc-1-s1.bnbchain.org:8545` (`eth_chainId` → `0x61`).
+The testnet one that worked: ✅ `https://data-seed-prebsc-1-s1.bnbchain.org:8545` (`eth_chainId` → `0x61`).
 
-**Set `RPC_URL` di env** — recipe CLI sendiri memperingatkan: *"Set it to avoid the rate-limited public BSC RPC default."*
+**Set `RPC_URL` in the env** — the CLI recipe itself warns: *"Set it to avoid the rate-limited public BSC RPC default."*
 
-### 7.2 Alamat kontrak ✅ (dari konstanta `NETWORKS` & `BNB_CHAIN_ADDRESSES` di `@bnbagent/sdk@0.5.5`)
+### 7.2 Contract addresses ✅ (from the `NETWORKS` and `BNB_CHAIN_ADDRESSES` constants in `@bnbagent/sdk@0.5.5`)
 
 **BSC Mainnet (56):**
 ```
@@ -613,137 +613,137 @@ registryContract (ERC-8004)   0x8004A818BFB912233c491871b3d84c89A494BD9e   ✅ v
 commerceContract (ERC-8183)   0xa206c0517b6371c6638cd9e4a42cc9f02a33b0de
 routerContract                0xd7d36d66d2f1b608a0f943f722d27e3744f66f25
 policyContract                0xd6a4217588f6b1f5657a92a3e94e6422ad771cea
-$U token (ERC-8183 testnet)   0xc70B8741B8B07A6d61E54fd4B20f22Fa648E5565   (18 desimal)
+$U token (ERC-8183 testnet)   0xc70B8741B8B07A6d61E54fd4B20f22Fa648E5565   (18 decimals)
 ```
-> README CLI mengonfirmasi alamat U testnet: *"The ERC-8183 testnet U contract is `0xc70B8741B8B07A6d61E54fd4B20f22Fa648E5565`. Do not substitute the 6-decimal B402/x402 test token; it belongs to a different rail."*
+> The CLI README confirms the testnet U address: *"The ERC-8183 testnet U contract is `0xc70B8741B8B07A6d61E54fd4B20f22Fa648E5565`. Do not substitute the 6-decimal B402/x402 test token; it belongs to a different rail."*
 
-EIP-712 domain token pembayaran: `name = "United Stables"`, `version = "1"` (diverifikasi tim SDK terhadap `DOMAIN_SEPARATOR()` on-chain).
+The payment token's EIP-712 domain: `name = "United Stables"`, `version = "1"` (verified by the SDK team against the on-chain `DOMAIN_SEPARATOR()`).
 
-Alamat lain yang terlihat: `0x3C5f3a6cE224BB89D72f5EB4232ecC27F67B3eeA` = `pay_to` merchant CoinMarketCap x402.
+Another address seen: `0x3C5f3a6cE224BB89D72f5EB4232ecC27F67B3eeA` = the `pay_to` for the CoinMarketCap x402 merchant.
 
-### 7.3 Faucet ✅
+### 7.3 Faucets ✅
 
-- **tBNB & U via Telegram bot resmi:** https://t.me/bnbchain_official_bot
-  - `I would like to get tBNB to my wallet <address>` (maks 0,3 tBNB/hari)
+- **tBNB & U through the official Telegram bot:** https://t.me/bnbchain_official_bot
+  - `I would like to get tBNB to my wallet <address>` (max 0.3 tBNB/day)
   - `I would like to get U to my wallet <address>`
-- Faucet web: https://testnet.bnbchain.org/faucet-smart
-- Faucet U alternatif: https://united-coin-u.github.io/u-faucet/
-- Docs faucet: https://docs.bnbchain.org/bnb-smart-chain/developers/faucet/
+- Web faucet: https://testnet.bnbchain.org/faucet-smart
+- Alternative U faucet: https://united-coin-u.github.io/u-faucet/
+- Faucet docs: https://docs.bnbchain.org/bnb-smart-chain/developers/faucet/
 
 ---
 
-## 8. Template Agent untuk 4 Kategori Kita
+## 8. Agent Templates for Our 4 Categories
 
-### 8.1 Temuan negatif penting ✅
+### 8.1 An important negative finding ✅
 
-**Tidak ada template siap pakai untuk keempat kategori.** Saya mengunduh dan mengekstrak seluruh tarball `@bnbagent/studio-cli@0.0.13` (60 file). Isi lengkap `recipes/` dan `skills/`:
+**There is no ready-made template for any of the four categories.** I downloaded and extracted the entire `@bnbagent/studio-cli@0.0.13` tarball (60 files). The complete contents of `recipes/` and `skills/`:
 
-**Recipes (template kode):**
+**Recipes (code templates):**
 ```
 recipes/agent/              signing.ts (quote/verify/submit)
 recipes/wallet/
-recipes/tools-chain/        chainTools.ts (15 fungsi read-only)
+recipes/tools-chain/        chainTools.ts (15 read-only functions)
 recipes/x402-buyer/         x402Buyer.ts
 recipes/mpp-buyer/          mppBuyer.ts
 recipes/providers/pieverse-llm/
 recipes/runtimes/agentcore/       executor, model, Dockerfile, sellerCore,
                                   tools, agentCard, unifiedMain, mcpMain, dualMain
-recipes/runtimes/azure-foundry/   (idem)
+recipes/runtimes/azure-foundry/   (same)
 ```
 
-**Skills (14 playbook):** scaffolding-agent, adding-to-project, operating, selling-via-8183, selling-via-b402, buying-via-8183, buying-from-bazaar, buying-via-mpp, extending-signing, use-bnb-trial, use-aws-agentcore, use-azure-foundry, using-twak-wallet, using-altana-wallet, wiring-llm-tools.
+**Skills (14 playbooks):** scaffolding-agent, adding-to-project, operating, selling-via-8183, selling-via-b402, buying-via-8183, buying-from-bazaar, buying-via-mpp, extending-signing, use-bnb-trial, use-aws-agentcore, use-azure-foundry, using-twak-wallet, using-altana-wallet, wiring-llm-tools.
 
-**Semuanya tentang plumbing komersial agent** (identitas, pembayaran, deployment). **Nol** yang menyentuh rebalancing, grid trading, yield optimization, atau health factor. Hal yang sama berlaku untuk `bnb-chain/bnbagent-sdk` (isinya `abis/`: AgenticCommerce.json, ERC20.json, EvaluatorRouter.json, IdentityRegistry.json, OptimisticPolicy.json) dan `bnb-chain/example-hub`.
+**All of it is about an agent's commercial plumbing** (identity, payments, deployment). **Zero** of it touches rebalancing, grid trading, yield optimization, or health factor. The same is true of `bnb-chain/bnbagent-sdk` (which contains `abis/`: AgenticCommerce.json, ERC20.json, EvaluatorRouter.json, IdentityRegistry.json, OptimisticPolicy.json) and of `bnb-chain/example-hub`.
 
-🟡 Beberapa sumber pers menyebut BNB Chain akan "share reference agents and skills spanning four categories: monitoring, grid trading, health factor, yield". ❌ Saya **tidak menemukan** halaman docs yang memuatnya. Perlu dicek ulang: jalankan `bag skills install` versi terbaru (ada `0.0.14-alpha.1` yang belum saya periksa) dan lihat halaman hackathon untuk "reference agents".
+🟡 Some press sources say BNB Chain will "share reference agents and skills spanning four categories: monitoring, grid trading, health factor, yield". ❌ I **did not find** a docs page containing them. Worth re-checking: run the latest `bag skills install` (there is a `0.0.14-alpha.1` I have not inspected) and check the hackathon page for "reference agents".
 
-**Implikasi arsitektur:** logika strategi keempat kategori **harus kita bangun sendiri**, lalu di-wire lewat `sellerCore.ts` (`runWork`) dan `tools.ts`. Studio memberi kita identitas + monetisasi + hosting, bukan alpha.
+**Architectural implication:** the strategy logic for all four categories **is ours to build**, then wired in through `sellerCore.ts` (`runWork`) and `tools.ts`. Studio gives us identity + monetisation + hosting, not alpha.
 
-### 8.2 Protokol DeFi di BSC yang relevan
+### 8.2 Relevant DeFi protocols on BSC
 
-Diverifikasi oleh sub-agent riset; tingkat keyakinan bervariasi — **cek ulang sebelum hardcode**.
+Verified by a research sub-agent; confidence varies — **re-check before hardcoding**.
 
 **PancakeSwap v3** ✅
 - `NonfungiblePositionManager` (BSC 56): `0x46A15B0b27311cedF172ab29E4f4766fbE7F4364`
-- Panduan resmi khusus agent: https://docs.pancakeswap.finance/trading-tools/building-trading-agents-on-pancakeswap-v3
+- Official agent-specific guide: https://docs.pancakeswap.finance/trading-tools/building-trading-agents-on-pancakeswap-v3
 - Developer portal: https://developer.pancakeswap.finance/
-- 🟡 Endpoint subgraph: **konflik antar sumber** (dua ID subgraph berbeda ditemukan). Untuk hackathon lebih aman baca posisi LP langsung on-chain via `positions(tokenId)`.
-- Relevan untuk: **Rebalancing (LP range)**, **Grid Trading**.
+- 🟡 Subgraph endpoint: **sources conflict** (two different subgraph IDs found). For the hackathon it is safer to read LP positions directly on-chain via `positions(tokenId)`.
+- Relevant to: **Rebalancing (LP range)**, **Grid Trading**.
 
-**Venus Protocol** ✅ (sumber: `https://raw.githubusercontent.com/VenusProtocol/venus-protocol/master/deployments/bscmainnet_addresses.json`)
+**Venus Protocol** ✅ (source: `https://raw.githubusercontent.com/VenusProtocol/venus-protocol/master/deployments/bscmainnet_addresses.json`)
 - Comptroller (Unitroller): `0xfD36E2c2a6789Db23113685031d7F16329158384`
 - vBNB `0xA07c5b74C9B40447a954e1466938b865b6BBea36`, vUSDC `0xecA88125a5ADbe82614ffC12D0DB554E2e2867C8`, vUSDT `0xfD5840Cd36d94D7229439859C0112a4185BC0255`
 - Health read: `getAccountLiquidity(address) → (error, liquidity, shortfall)`; `shortfall > 0` = liquidatable.
 - API: `https://api.venus.io` / `https://testnetapi.venus.io`
-- ⚠️ **Docs Venus eksplisit melarang** memakai API-nya untuk balance/harga/keamanan likuidasi (data terindeks, bisa lag). **Untuk agent Health Factor, baca `getAccountLiquidity` live via RPC.**
-- Relevan untuk: **Health Factor Monitoring**, **Yield Optimisation**.
+- ⚠️ **The Venus docs explicitly forbid** using their API for balances, prices, or liquidation safety (the data is indexed and can lag). **For the Health Factor agent, read `getAccountLiquidity` live via RPC.**
+- Relevant to: **Health Factor Monitoring**, **Yield Optimisation**.
 
-**Aave v3 di BNB Chain** ✅ (sumber: `https://raw.githubusercontent.com/bgd-labs/aave-address-book/main/src/AaveV3BNB.sol`)
+**Aave v3 on BNB Chain** ✅ (source: `https://raw.githubusercontent.com/bgd-labs/aave-address-book/main/src/AaveV3BNB.sol`)
 - PoolAddressesProvider `0xff75B6da14FfbbfD355Daf7a2731456b3562Ba6D`
 - **Pool** `0x6807dc923806fE8Fd134338EABCA509979a7e0cB`
 - AaveOracle `0x39bc1bfDa2130d6Bb6DBEfd366939b4c7aa7C697`
 - AaveProtocolDataProvider `0xc90Df74A7c16245c5F5C5870327Ceb38Fe5d5328`
 - Health read: `Pool.getUserAccountData(address) → (..., healthFactor)`
-- Relevan untuk: **Health Factor Monitoring**.
+- Relevant to: **Health Factor Monitoring**.
 
-**Lista DAO** 🟡 — semua alamat di bawah **BELUM terverifikasi dari sumber primer**, hanya dari ringkasan halaman docs:
+**Lista DAO** 🟡 — every address below is **NOT verified against a primary source**, only from a docs page summary:
 - Interaction (CDP) `0xB68443Ee3e828baD1526b3e0Bdf2Dfc6b1975ec4`, lisUSD `0x0782b6d8c4551B9760e74c0545a9bCD90bdc41E5`, slisBNB `0xB0b84D294e0C75A6abe60171b70edEb2EFd14A1B`
 - Docs: https://docs.bsc.lista.org/
-- ❌ Cara baca health/collateral-ratio CDP **tidak ditemukan**. Perlu baca ABI `Interaction` di BscScan.
+- ❌ How to read a CDP's health/collateral ratio was **not found**. We need to read the `Interaction` ABI on BscScan.
 
 ---
 
-## 9. Requirement Environment
+## 9. Environment Requirements
 
-✅ Dari README `@bnbagent/studio-cli@0.0.13`:
+✅ From the `@bnbagent/studio-cli@0.0.13` README:
 
-| Kebutuhan | Detail | Kapan |
+| Requirement | Detail | When |
 |---|---|---|
-| **Node.js ≥ 22** | `"engines": {"node": ">=22"}` | selalu |
-| **Claude Code atau Cursor** | untuk skill `/bnbagent-studio` | alur yang direkomendasikan |
-| **Corepack + pnpm 10** | workspace hasil generate | setelah `bag init` |
-| **Bun ≥ 1.3** | `bag deploy` menjalankan `@bnbagent/deploy-cli` via `bunx --bun` | hanya saat deploy |
-| **Docker** | hanya container path (`twak`) | opsional |
-| **AWS CLI** | hanya read-only AgentCore quota check | opsional, fail-open |
-| **npm `@aws/agentcore` CLI** | hanya untuk `bag dev --container` | opsional |
+| **Node.js ≥ 22** | `"engines": {"node": ">=22"}` | always |
+| **Claude Code or Cursor** | for the `/bnbagent-studio` skill | the recommended flow |
+| **Corepack + pnpm 10** | the generated workspace | after `bag init` |
+| **Bun ≥ 1.3** | `bag deploy` runs `@bnbagent/deploy-cli` through `bunx --bun` | only at deploy time |
+| **Docker** | only the container path (`twak`) | optional |
+| **AWS CLI** | only the read-only AgentCore quota check | optional, fail-open |
+| **The npm `@aws/agentcore` CLI** | only for `bag dev --container` | optional |
 
-**Kredensial / akun:**
-- LLM: default **Pieverse** dengan model `auto/free` = **$0/token, tanpa API key sendiri**. Alternatif (OpenRouter/OpenAI/Anthropic/Bedrock) pakai kredensial kita.
-- Wallet: dibuat lokal oleh `bag wallet new`; `WALLET_PASSWORD` di `.studio/.env.local`.
+**Credentials / accounts:**
+- LLM: the default is **Pieverse** with the `auto/free` model = **$0/token, no API key of your own**. The alternatives (OpenRouter/OpenAI/Anthropic/Bedrock) use our own credentials.
+- Wallet: created locally by `bag wallet new`; `WALLET_PASSWORD` lives in `.studio/.env.local`.
 - BNB trial: `bag platform login` (GitHub device flow).
-- AWS/Azure: akun sendiri kalau self-deploy.
-- **8004scan API key**: via form Pro tier hackathon.
+- AWS/Azure: your own account if self-deploying.
+- **The 8004scan API key**: through the hackathon Pro tier form.
 
-**Env vars penting:** `WALLET_PASSWORD`, `PIEVERSE_LLM_API_KEY`, `RPC_URL`, `STORAGE_API_URL`, `STORAGE_API_KEY`, `MPP_SECRET_KEY` (≥32 byte, mode MPP berbayar), `MPP_REALM`, `ERC8004_REGISTRY_ADDRESS` (override), `ERC8183_COMMERCE_ADDRESS` / `_ROUTER_ADDRESS` / `_POLICY_ADDRESS`, `BNBAGENT_USE_PAYMASTER=0`, `ALTANA_SESSION`, `BNBAGENT_DEPLOY_COMMAND`.
+**Important env vars:** `WALLET_PASSWORD`, `PIEVERSE_LLM_API_KEY`, `RPC_URL`, `STORAGE_API_URL`, `STORAGE_API_KEY`, `MPP_SECRET_KEY` (≥32 bytes, paid MPP mode), `MPP_REALM`, `ERC8004_REGISTRY_ADDRESS` (override), `ERC8183_COMMERCE_ADDRESS` / `_ROUTER_ADDRESS` / `_POLICY_ADDRESS`, `BNBAGENT_USE_PAYMASTER=0`, `ALTANA_SESSION`, `BNBAGENT_DEPLOY_COMMAND`.
 
 ---
 
-## 10. Langkah Instalasi di macOS (Darwin arm64)
+## 10. Installation Steps on macOS (Darwin arm64)
 
-🟡 **Belum saya eksekusi** — disusun dari README resmi. Beri waktu untuk troubleshooting.
+🟡 **Not executed by me** — assembled from the official README. Allow time for troubleshooting.
 
 ```bash
-# 0. Cek Node ≥ 22 (WAJIB)
+# 0. Check Node ≥ 22 (MANDATORY)
 node -v
-# kalau < 22:
-#   brew install node@22   ATAU   nvm install 22 && nvm use 22
+# if < 22:
+#   brew install node@22   OR   nvm install 22 && nvm use 22
 
-# 1. Install CLI global
+# 1. Install the CLI globally
 npm install --global @bnbagent/studio-cli
 bag --version                      # sanity check
 
-# 2. Install IDE skill (deteksi Claude Code / Cursor)
+# 2. Install the IDE skill (detects Claude Code / Cursor)
 bag skills install --target both --scope user
-#    → RESTART / reload IDE setelah ini
+#    → RESTART / reload the IDE afterwards
 
-# 3. Prasyarat workspace
+# 3. Workspace prerequisites
 corepack enable && corepack prepare pnpm@10 --activate
 
-# 4. Bun (hanya dibutuhkan saat deploy) — Apple Silicon didukung native
+# 4. Bun (only needed at deploy time) — natively supported on Apple Silicon
 curl -fsSL https://bun.sh/install | bash
-bun --version                      # butuh ≥ 1.3
+bun --version                      # needs ≥ 1.3
 
-# 5. Scaffold agent pertama (testnet, non-interaktif)
+# 5. Scaffold the first agent (testnet, non-interactive)
 bag init myagent \
   --network bsc-testnet \
   --wallet-kind evm-local \
@@ -755,120 +755,120 @@ bag init myagent \
 cd myagent && pnpm install
 
 # 6. Wallet + funding
-bag wallet new                     # password lewat prompt tersembunyi, JANGAN di argumen
-bag wallet show                    # copy alamat
-#    → minta tBNB & U ke https://t.me/bnbchain_official_bot
+bag wallet new                     # password via a hidden prompt, NEVER as an argument
+bag wallet show                    # copy the address
+#    → request tBNB & U from https://t.me/bnbchain_official_bot
 bag wallet balance --all
 
-# 7. Diagnostik + jalankan lokal
+# 7. Diagnostics + run locally
 bag doctor
 bag dev
 #    A2A card: http://localhost:9000/.well-known/agent-card.json
 #    MCP:      http://localhost:8000/mcp
 
-# 8. Deploy (pilih provider EKSPLISIT)
+# 8. Deploy (pick the provider EXPLICITLY)
 bag deploy prepare
-bag deploy --provider bnb          # trial testnet 48 jam
-#   atau: bag platform login && bag platform credit && bag deploy --provider bnb
-bag deploy verify --provider bnb   # ← mendaftarkan/meng-update endpoint ERC-8004
+bag deploy --provider bnb          # 48-hour testnet trial
+#   or: bag platform login && bag platform credit && bag deploy --provider bnb
+bag deploy verify --provider bnb   # ← registers/updates the ERC-8004 endpoint
 
-# 9. Registrasi identitas manual (kalau perlu di luar alur verify)
-bag erc8004 register --endpoint https://<url-agent-kita>
+# 9. Manual identity registration (if needed outside the verify flow)
+bag erc8004 register --endpoint https://<our-agent-url>
 bag erc8004 show
 bag erc8004 resolve <agent_id>
 ```
 
-### Kemungkinan kendala di macOS arm64
+### Likely problems on macOS arm64
 
-| Kendala | Mitigasi |
+| Problem | Mitigation |
 |---|---|
-| **Node < 22** | Paling sering. `nvm use 22`. Perhatikan `npm -g` terikat ke versi Node aktif. |
-| **`npm install -g` butuh sudo** | Pakai nvm/fnm, jangan Node bawaan sistem. |
-| **`bunx` tidak ada saat deploy** | `bag deploy prepare` gagal CRITICAL. Install Bun ≥1.3 dulu. |
-| **Konflik CLI `agentcore`** | Kalau `bedrock-agentcore-starter-toolkit` (Python) menang di PATH, `bag dev --container` rusak. Pastikan npm `@aws/agentcore` yang duluan. |
-| **RPC publik ter-rate-limit** | Set `RPC_URL` ke RPC berdedikasi. |
-| **RPC default `binance.org` diblokir ISP** ✅ terkonfirmasi di lingkungan riset ini | Override ke `https://bsc-dataseed.bnbchain.org` atau `https://bsc-rpc.publicnode.com`. **Kemungkinan besar kita kena juga di Indonesia.** |
-| **`www.binance.com` diblokir** ✅ terkonfirmasi | Bazaar/B402 discovery tidak akan jalan tanpa VPN. |
-| **Nama proyek ditolak** | ≤23 char, alfanumerik, awali huruf, tanpa `-`/`_`/`.` |
-| **Prompt permission `bag` di IDE** | Normal dan disengaja. Skill doc **melarang** memberi blanket `bag:*` karena mencakup perintah yang membelanjakan uang. |
-| **Docker** | Hanya perlu untuk `twak`. Default `evm-local` = zip, tanpa Docker. |
+| **Node < 22** | The most common one. `nvm use 22`. Note that `npm -g` is tied to the active Node version. |
+| **`npm install -g` needs sudo** | Use nvm/fnm, not the system Node. |
+| **`bunx` missing at deploy time** | `bag deploy prepare` fails CRITICAL. Install Bun ≥1.3 first. |
+| **`agentcore` CLI conflict** | If `bedrock-agentcore-starter-toolkit` (Python) wins on PATH, `bag dev --container` breaks. Make sure the npm `@aws/agentcore` comes first. |
+| **Public RPC rate-limited** | Set `RPC_URL` to a dedicated RPC. |
+| **The default `binance.org` RPC is ISP-blocked** ✅ confirmed in this research environment | Override it to `https://bsc-dataseed.bnbchain.org` or `https://bsc-rpc.publicnode.com`. **We will very likely hit this in Indonesia too.** |
+| **`www.binance.com` is blocked** ✅ confirmed | Bazaar/B402 discovery will not work without a VPN. |
+| **Project name rejected** | ≤23 chars, alphanumeric, starts with a letter, no `-`/`_`/`.` |
+| **`bag` permission prompts in the IDE** | Normal and deliberate. The skill doc **forbids** granting a blanket `bag:*`, because it covers commands that spend money. |
+| **Docker** | Only needed for `twak`. The `evm-local` default is a zip, no Docker. |
 
 ---
 
-## 11. Konteks Hackathon (berdampak langsung ke arsitektur)
+## 11. Hackathon Context (with direct architectural impact)
 
-Sumber: [halaman hackathon](https://www.bnbchain.org/en/hackathons/smart-money-era) dan [blog track utama](https://www.bnbchain.org/en/blog/build-the-era-build-the-official-bnb-agent-studio-marketplace).
+Sources: the [hackathon page](https://www.bnbchain.org/en/hackathons/smart-money-era) and the [main track blog](https://www.bnbchain.org/en/blog/build-the-era-build-the-official-bnb-agent-studio-marketplace).
 
-- **Track utama:** bangun marketplace agent di BSC — hadiah **$30.000** + adopsi sebagai marketplace agent kanonik BSC.
-- **Timeline** 🟡: build 5 Agu – **9 Sep 2026**; judging 9–23 Sep; pengumuman 5 Nov. **VERIFIKASI ULANG — hari ini 8 Sep.**
-- **Empat kategori** (blog memakai penamaan sedikit berbeda dari brief kita): Monitoring / Grid trading / Health factor / Yield. Halaman hackathon memakai: Rebalancing (LP range management), Grid Trading, Yield Optimization (highest APR routing), Health Factor Monitoring (liquidation protection).
-- **Kriteria juri** 🟡: Functionality, Data Quality, Agent Diversity. Satu sumber menyebut 35/35/30, sumber lain menyebut "bobot setara". Yang konsisten: **keempat kategori harus tersurface dengan kedalaman yang setara**.
-- Ukuran inti menurut blog: *"how easily someone can find an agent and hire it."*
-- **Required/recommended tech:** BNB Agent Studio CLI, **8004scan API (Pro tier gratis untuk peserta)**, BSC Testnet Faucet, PancakeSwap Developer Portal, TermiX BSC MCP server, Altana SDK/skills.
-- **Syarat submission:** marketplace harus **publicly accessible & functional selama judging**; agent harus **live di BSC**; sertakan alamat wallet.
-- **Partner track (bisa ditumpuk):** Altana 50.000 XP (butuh session key dengan spend cap + expiry terdaftar on-chain dan revocation yang terlihat user), TermiX $6k/$3k/$1k (butuh "Agent Advantage Report": ≥3 task nyata dijalankan dengan & tanpa agent), PancakeSwap 1.000 CAKE.
+- **Main track:** build an agent marketplace on BSC — **$30,000** in prizes + adoption as BSC's canonical agent marketplace.
+- **Timeline** 🟡: build 5 Aug – **9 Sep 2026**; judging 9–23 Sep; announcement 5 Nov. **RE-VERIFY — today is 8 Sep.**
+- **The four categories** (the blog uses slightly different names than our brief): Monitoring / Grid trading / Health factor / Yield. The hackathon page uses: Rebalancing (LP range management), Grid Trading, Yield Optimization (highest APR routing), Health Factor Monitoring (liquidation protection).
+- **Judging criteria** 🟡: Functionality, Data Quality, Agent Diversity. One source says 35/35/30, another says "equal weighting". What is consistent: **all four categories must be surfaced with equal depth**.
+- The core measure, per the blog: *"how easily someone can find an agent and hire it."*
+- **Required/recommended tech:** the BNB Agent Studio CLI, **the 8004scan API (free Pro tier for participants)**, the BSC Testnet Faucet, the PancakeSwap Developer Portal, the TermiX BSC MCP server, the Altana SDK/skills.
+- **Submission requirements:** the marketplace has to be **publicly accessible and functional throughout judging**; the agents have to be **live on BSC**; include a wallet address.
+- **Partner tracks (stackable):** Altana 50,000 XP (needs a session key with a spend cap + expiry registered on-chain and a user-visible revocation), TermiX $6k/$3k/$1k (needs an "Agent Advantage Report": ≥3 real tasks run with and without the agent), PancakeSwap 1,000 CAKE.
 
 ---
 
-## 12. Rekomendasi Arsitektur
+## 12. Architecture Recommendations
 
-1. **Discovery = 8004scan API sebagai primer, on-chain sebagai fallback.** Ambil API key Pro sekarang. Bangun BFF/proxy di backend (bukan panggilan dari browser) dengan cache + retry/backoff. Upstream terbukti flaky (DATABASE_ERROR intermiten) dan "Data Quality" adalah kriteria juri utama.
-2. **Bangun indexer ERC-8004 tipis sendiri** sebagai jaring pengaman: `eth_getLogs` untuk `Registered` + `URIUpdated` di `0x8004A169…` (56) dan `0x8004A818…` (97), simpan `agentId → owner → agentURI`, resolve URI (tangani base64/gzip/ipfs/https/JSON telanjang), cache. Ini juga membuktikan "data real-time" ke juri.
-3. **Klasifikasi 4 kategori** paling kuat lewat **OASF `skills[]` / `domains[]`** dari registration file, dilengkapi semantic search 8004scan dan pencocokan kata kunci pada `name`/`description`. Sediakan mapping kategori yang di-curate manual sebagai penjamin agar keempat kategori tidak pernah kosong.
-4. **Wajib memfilter spam.** 340k agent mainnet mayoritas bulk registration. Gunakan `is_endpoint_verified`, `owner_publisher_tier`, `min_score`, `has_a2a`, dan metadata `built_with`.
-5. **Publikasikan agent kita sendiri** untuk keempat kategori (Studio memberi identitas + hosting; strategi kita tulis sendiri). Ini sekaligus menjamin cakupan kategori merata — 30% dari nilai.
-6. **Health Factor: baca on-chain langsung** (`Venus.getAccountLiquidity`, `AaveV3Pool.getUserAccountData`), jangan API terindeks.
-7. **Jangan andalkan scheduler Studio — tidak ada.** Sediakan cron/EventBridge sendiri untuk agent monitoring.
-8. **Untuk track Altana**, pakai `--wallet-kind altana` sejak awal; ia satu-satunya yang memberi session key berbatas budget+waktu yang bisa di-revoke — persis yang disyaratkan.
+1. **Discovery = the 8004scan API as the primary source, on-chain as the fallback.** Get the Pro API key now. Build a BFF/proxy in the backend (not browser-side calls) with caching plus retry/backoff. The upstream is demonstrably flaky (intermittent DATABASE_ERROR) and "Data Quality" is a headline judging criterion.
+2. **Build our own thin ERC-8004 indexer** as a safety net: `eth_getLogs` for `Registered` + `URIUpdated` on `0x8004A169…` (56) and `0x8004A818…` (97), store `agentId → owner → agentURI`, resolve the URI (handling base64/gzip/ipfs/https/bare JSON), and cache it. This also demonstrates "real-time data" to the judges.
+3. **Classifying the 4 categories** works best through the **OASF `skills[]` / `domains[]`** in the registration file, backed up by 8004scan semantic search and keyword matching on `name`/`description`. Also provide a manually curated category mapping as a guarantee that none of the four categories is ever empty.
+4. **Spam filtering is mandatory.** Most of the 340k mainnet agents are bulk registrations. Use `is_endpoint_verified`, `owner_publisher_tier`, `min_score`, `has_a2a`, and the `built_with` metadata.
+5. **Publish our own agents** for all four categories (Studio gives identity + hosting; we write the strategies ourselves). This also guarantees even category coverage — 30% of the score.
+6. **Health Factor: read on-chain directly** (`Venus.getAccountLiquidity`, `AaveV3Pool.getUserAccountData`), never an indexed API.
+7. **Do not count on a Studio scheduler — there is none.** Provide our own cron/EventBridge for the monitoring agents.
+8. **For the Altana track**, use `--wallet-kind altana` from the start; it is the only option that gives a budget- and time-bounded session key that can be revoked — exactly what is required.
 
 ---
 
 ## 13. Open Questions / Unverified
 
-### Belum terverifikasi — perlu dicek tim
+### Not yet verified — the team needs to check
 
-1. 🟡 **Tanggal deadline hackathon.** Dua sumber menyebut build berakhir 9 Sep 2026 (besok). Konfirmasi di halaman resmi sebelum menetapkan scope.
-2. 🟡 **Bobot kriteria juri.** 35/35/30 vs "setara" — sumber berbeda. Cari rubrik resmi.
-3. ❌ **"Reference agents" untuk 4 kategori.** Disebut pers, tidak ada di paket CLI 0.0.13 maupun docs. Cek `@bnbagent/studio-cli@0.0.14-alpha.1` dan halaman hackathon.
-4. ❌ **`eth_getLogs` `MetadataSet` bertopik `built_with`** belum selesai (query range besar di RPC publik timeout). **Ini menentukan berapa banyak agent Studio yang benar-benar live di BSC** — pertanyaan yang sangat penting untuk marketplace "agent BNB Agent Studio". Jalankan dengan RPC berdedikasi (QuickNode/NodeReal) dan chunk block range.
-5. ❌ **Skema respons lengkap `GET /api/v1/agents`.** Saya kena HTTP 403 (rate limit anonymous) sebelum sempat men-dump satu record penuh. Setelah punya API key, dump `https://api.8004scan.io/openapi.json` → `components.schemas` untuk field persisnya (rating, kategori, performa, harga).
-6. ❌ **Apakah 8004scan mengekspos "harga" dan "performa/return" agent.** Ada `total_score`, `quality`, `scores/v5`, `feedbacks`, `analytics` — tapi saya belum verifikasi apakah ada harga layanan atau metrik P&L. Kalau tidak ada, harga harus diambil dari ERC-8183 `negotiate` / challenge x402 per agent.
-7. 🟡 **Endpoint Binance Bazaar.** Terdokumentasi di skill file resmi, tapi tidak bisa saya jangkau (diblokir jaringan). Uji dari jaringan lain.
-8. 🟡 **Alamat Lista DAO** dan cara membaca health CDP-nya — belum dari sumber primer.
-9. 🟡 **Endpoint subgraph PancakeSwap v3** — ID subgraph konflik antar sumber.
-10. ❌ **Repo `bnb-chain/bnbagent-studio` (404/private).** Semua isi Studio di dokumen ini berasal dari tarball npm. Kalau repo dibuka, `docs/design/*` dan `docs/guides/*` yang dirujuk skill akan sangat berguna.
-11. ❌ **ERC-8183 sebagai sumber discovery.** `bag erc8183 list` ada, tapi saya belum memetakan apakah kontrak commerce mengekspos daftar provider/seller yang bisa diindeks untuk menemukan agent yang benar-benar bertransaksi. Event `JobCreated` / `ProviderSet` / `JobCompleted` di `0xea4daa31…` (56) berpotensi jadi sumber **track record nyata** — sangat bernilai untuk kriteria "Data Quality".
-12. 🟡 **Kompatibilitas macOS arm64.** Belum dieksekusi. Risiko utama: Node <22, Bun, konflik CLI `agentcore`.
-13. 🟡 **BASCAN** — diumumkan lewat X sebagai "first ERC-8004 Public Agent Registry Scan on BNB Chain". Tidak ada docs/URL produk yang ditemukan. Perlakukan sebagai belum ada.
+1. 🟡 **The hackathon deadline dates.** Two sources say the build ends 9 Sep 2026 (tomorrow). Confirm on the official page before fixing scope.
+2. 🟡 **The judging criteria weights.** 35/35/30 versus "equal" — sources differ. Find the official rubric.
+3. ❌ **The "reference agents" for the 4 categories.** Mentioned in the press, absent from CLI package 0.0.13 and from the docs. Check `@bnbagent/studio-cli@0.0.14-alpha.1` and the hackathon page.
+4. ❌ **`eth_getLogs` for `MetadataSet` on the `built_with` topic** is unfinished (a large block range times out on a public RPC). **This determines how many Studio agents are actually live on BSC** — a very important question for a "BNB Agent Studio agent" marketplace. Run it with a dedicated RPC (QuickNode/NodeReal) and chunk the block range.
+5. ❌ **The full response schema of `GET /api/v1/agents`.** I hit HTTP 403 (anonymous rate limit) before I could dump one complete record. Once we have an API key, dump `https://api.8004scan.io/openapi.json` → `components.schemas` for the exact fields (rating, categories, performance, pricing).
+6. ❌ **Whether 8004scan exposes an agent's "price" and "performance/returns".** There is `total_score`, `quality`, `scores/v5`, `feedbacks`, and `analytics` — but I have not verified whether there is a service price or a P&L metric. If not, prices have to come from each agent's ERC-8183 `negotiate` / x402 challenge.
+7. 🟡 **The Binance Bazaar endpoints.** Documented in the official skill file, but unreachable for me (network-blocked). Test them from another network.
+8. 🟡 **The Lista DAO addresses** and how to read a CDP's health — not from a primary source yet.
+9. 🟡 **The PancakeSwap v3 subgraph endpoint** — the subgraph IDs conflict between sources.
+10. ❌ **The `bnb-chain/bnbagent-studio` repo (404/private).** Everything about Studio in this document comes from the npm tarball. If the repo opens up, the `docs/design/*` and `docs/guides/*` files the skills reference would be very useful.
+11. ❌ **ERC-8183 as a discovery source.** `bag erc8183 list` exists, but I have not mapped out whether the commerce contract exposes an indexable list of providers/sellers for finding agents that actually transact. The `JobCreated` / `ProviderSet` / `JobCompleted` events on `0xea4daa31…` (56) could be a source of a **real track record** — very valuable for the "Data Quality" criterion.
+12. 🟡 **macOS arm64 compatibility.** Not executed yet. The main risks: Node <22, Bun, and the `agentcore` CLI conflict.
+13. 🟡 **BASCAN** — announced on X as the "first ERC-8004 Public Agent Registry Scan on BNB Chain". No docs or product URL found. Treat it as non-existent.
 
-### Yang secara eksplisit TIDAK saya temukan ❌
+### What I explicitly did NOT find ❌
 
-- API discovery agent **resmi milik BNB Agent Studio** (`studio.bnbchain.org/api/...` atau sejenis). Yang ada hanya `bnbagent-api.bnbchain.world` (auth-gated, platform trial, bukan direktori publik).
-- Subgraph resmi (The Graph / Goldsky / Envio) untuk ERC-8004 di BSC.
-- Endpoint API yang mengembalikan "performa"/return terkualifikasi per agent DeFi.
-- Template/skill resmi untuk rebalancing, grid trading, yield optimization, atau health factor monitoring.
+- An **official BNB Agent Studio** agent discovery API (`studio.bnbchain.org/api/...` or similar). All that exists is `bnbagent-api.bnbchain.world` (auth-gated, the trial platform, not a public directory).
+- An official subgraph (The Graph / Goldsky / Envio) for ERC-8004 on BSC.
+- An API endpoint returning qualified "performance"/returns per DeFi agent.
+- Official templates/skills for rebalancing, grid trading, yield optimization, or health factor monitoring.
 
 ---
 
-## Lampiran A — Perintah yang saya jalankan & bisa direproduksi
+## Appendix A — Commands I ran, reproducible
 
 ```bash
-# Verifikasi paket
+# Package verification
 curl -s https://registry.npmjs.org/@bnbagent/studio-cli | jq '.["dist-tags"], .versions|keys'
 curl -s https://pypi.org/pypi/bnbagent/json | jq .info.version
 
-# Unduh & inspeksi CLI (tanpa install)
+# Download & inspect the CLI (without installing)
 URL=$(curl -s https://registry.npmjs.org/@bnbagent/studio-cli \
       | python3 -c "import sys,json;d=json.load(sys.stdin);print(d['versions'][d['dist-tags']['latest']]['dist']['tarball'])")
 curl -sL "$URL" | tar -xz && ls package/skills package/recipes
 
-# Verifikasi registry ERC-8004 live
+# Verify the ERC-8004 registry live
 cast call --rpc-url https://bsc-dataseed.bnbchain.org \
   0x8004A169FB4a3325136EB29fA0ceB6D2e539a432 "name()(string)"      # → AgentIdentity
 cast call --rpc-url https://bsc-dataseed.bnbchain.org \
   0x8004A169FB4a3325136EB29fA0ceB6D2e539a432 "tokenURI(uint256)(string)" 1
 
-# Topic hash untuk indexing
+# Topic hashes for indexing
 cast keccak "Registered(uint256,string,address)"
 cast keccak "built_with"
 
@@ -878,14 +878,14 @@ curl -s "https://api.8004scan.io/api/v1/stats/global" | jq .total_agents
 curl -s "https://api.8004scan.io/api/v1/agents?chain_id=56&limit=5" -H "X-API-Key: $KEY"
 ```
 
-## Lampiran B — Snapshot angka (8 Sep 2026)
+## Appendix B — Snapshot of the numbers (8 Sep 2026)
 
-| Metrik | Nilai | Sumber |
+| Metric | Value | Source |
 |---|---|---|
-| Agent ERC-8004 di BSC mainnet | **340.785** (agentId tertinggi) | binary search `ownerOf()` saya ✅ |
-| Total agent semua chain (8004scan) | **820.100** | `GET /stats/global` ✅ |
-| Total user (8004scan) | 458.338 | idem ✅ |
-| Total feedback | 3.654.749 | idem ✅ |
-| Agent baru per hari | 3.589 | idem ✅ |
-| Skor feedback rata-rata | 82,6 | idem ✅ |
-| Klaim "BNB Chain >200k agent ERC-8004" | **Terkonfirmasi dan sudah terlampaui** — 340k+ | pengukuran on-chain saya ✅ |
+| ERC-8004 agents on BSC mainnet | **340,785** (highest agentId) | my `ownerOf()` binary search ✅ |
+| Total agents across all chains (8004scan) | **820,100** | `GET /stats/global` ✅ |
+| Total users (8004scan) | 458,338 | same ✅ |
+| Total feedbacks | 3,654,749 | same ✅ |
+| New agents per day | 3,589 | same ✅ |
+| Average feedback score | 82.6 | same ✅ |
+| The "BNB Chain has >200k ERC-8004 agents" claim | **Confirmed and already exceeded** — 340k+ | my on-chain measurement ✅ |

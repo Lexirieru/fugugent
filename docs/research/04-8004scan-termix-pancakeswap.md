@@ -1,34 +1,34 @@
-# Riset Sponsor Hackathon BNB Chain — 8004scan (AltLayer), TermiX, PancakeSwap
+# BNB Chain Hackathon Sponsor Research — 8004scan (AltLayer), TermiX, PancakeSwap
 
-> Konteks: **Fugugent** — agent marketplace di BNB Chain (chain 56).
-> Tanggal riset: **8 September 2026**. Semua endpoint di bawah diuji live pada tanggal tersebut kecuali ditandai `UNVERIFIED`.
+> Context: **Fugugent** — an agent marketplace on BNB Chain (chain 56).
+> Research date: **8 September 2026**. Every endpoint below was tested live on that date unless it is marked `UNVERIFIED`.
 > Hackathon: [BNB Chain — "The Smart Money Era / Build the Era"](https://www.bnbchain.org/en/hackathons/smart-money-era?tab=prizes)
 
-**Legenda tanda:**
-- ✅ = diverifikasi live (HTTP call / file sumber dibaca langsung)
-- 📄 = dari dokumentasi resmi (belum diuji runtime)
-- ⚠️ `UNVERIFIED` = belum terkonfirmasi, jangan dipakai tanpa cek ulang
+**Legend:**
+- ✅ = verified live (an HTTP call made / the source file read directly)
+- 📄 = from the official documentation (not tested at runtime)
+- ⚠️ `UNVERIFIED` = not confirmed; do not use it without re-checking
 
 ---
 
-# BAGIAN A — 8004scan (AltLayer) & ERC-8004
+# PART A — 8004scan (AltLayer) & ERC-8004
 
-## A.1 Ringkasan & kesimpulan
+## A.1 Summary & conclusions
 
-**8004scan bisa jadi sumber data utama marketplace Fugugent.** Alasannya:
+**8004scan can be Fugugent's primary marketplace data source.** Why:
 
-1. Ada REST API publik yang matang dengan **OpenAPI 3.1 spec lengkap (150 endpoint)** — bukan sekadar situs explorer.
-2. Data BSC-nya sangat besar: **309.444 agent di chain 56** (verified live, `GET /api/v1/agents?chain_id=56&limit=1` → `total: 309444`).
-3. Sudah menyediakan **semua dimensi yang kita butuhkan**: identity, capability (MCP/A2A/OASF), ownership, reputation/score, feedback, health-check, activity, semantic search, dan webhooks realtime.
-4. Ada **semantic search endpoint** yang langsung memecahkan masalah klasifikasi 4 kategori kita (rebalancing / grid / yield / health factor) tanpa perlu bangun indexer sendiri.
+1. There is a mature public REST API with a **complete OpenAPI 3.1 spec (150 endpoints)** — not just an explorer site.
+2. Its BSC data is very large: **309,444 agents on chain 56** (verified live, `GET /api/v1/agents?chain_id=56&limit=1` → `total: 309444`).
+3. It already provides **every dimension we need**: identity, capability (MCP/A2A/OASF), ownership, reputation/score, feedback, health-check, activity, semantic search, and real-time webhooks.
+4. There is a **semantic search endpoint** that solves our 4-category classification problem (rebalancing / grid / yield / health factor) outright, with no need to build our own indexer.
 
-**Risiko yang harus di-mitigasi** (lihat §A.9): API kadang balas `500 DATABASE_ERROR` transien, dan request tanpa User-Agent browser ditolak.
+**Risks that must be mitigated** (see §A.9): the API sometimes answers with a transient `500 DATABASE_ERROR`, and requests without a browser User-Agent are rejected.
 
-**URL kunci:**
+**Key URLs:**
 | Resource | URL |
 |---|---|
-| Situs | https://8004scan.io/ |
-| Agent BSC | https://8004scan.io/agents?chain=56 |
+| Site | https://8004scan.io/ |
+| BSC agents | https://8004scan.io/agents?chain=56 |
 | Builder Hub (Developer Hub) | https://8004scan.io/developers |
 | API Explorer (Scalar UI) | https://8004scan.io/developers/docs |
 | **OpenAPI spec (raw JSON)** | https://api.8004scan.io/openapi.json ✅ |
@@ -36,125 +36,125 @@
 | Best practices | https://best-practices.8004scan.io/ |
 | Testnet instance | https://testnet.8004scan.io |
 | Issue tracker | https://github.com/alt-research/8004scan-issue-tracker |
-| Docs AltLayer | https://docs.altlayer.io/altlayer-documentation/8004-scan/overview |
-| Skills untuk Claude Code | https://github.com/jiayaoqijia/8004 |
+| AltLayer docs | https://docs.altlayer.io/altlayer-documentation/8004-scan/overview |
+| Skills for Claude Code | https://github.com/jiayaoqijia/8004 |
 
 ---
 
-## A.2 Base URL & Autentikasi
+## A.2 Base URL & Authentication
 
 ### Base URL
 
 ```
 https://api.8004scan.io/api/v1
 ```
-✅ Dikonfirmasi resmi di Builder Hub: *"Official API base URL: https://api.8004scan.io/api/v1"*.
+✅ Officially confirmed in the Builder Hub: *"Official API base URL: https://api.8004scan.io/api/v1"*.
 
-Host `https://8004scan.io/api/v1` juga melayani request yang sama (proxy) — tetap pakai `api.8004scan.io` sesuai dokumentasi.
+The host `https://8004scan.io/api/v1` serves the same requests too (as a proxy) — stick to `api.8004scan.io` as the documentation says.
 
-Info spec: `title: "8004scan Backend API"`, `version: 0.4.367`, `openapi: 3.1.0`.
+Spec info: `title: "8004scan Backend API"`, `version: 0.4.367`, `openapi: 3.1.0`.
 
-### Header autentikasi
+### Authentication headers
 
-Tiga skema (dari `components.securitySchemes` di OpenAPI) ✅:
+Three schemes (from `components.securitySchemes` in the OpenAPI spec) ✅:
 
-| Skema | Tipe | Header | Kegunaan |
+| Scheme | Type | Header | Use |
 |---|---|---|---|
-| `XApiKey` | apiKey (header) | **`X-API-Key: <key>`** | **Ini yang kita pakai.** Akses programatik + rate limit lebih tinggi |
-| `XAccessToken` | apiKey (header) | `X-Access-Token: <JWT>` | JWT dari login wallet (rekomendasi 8004scan untuk user session) |
-| `BearerAuth` | http bearer | `Authorization: Bearer <JWT>` | JWT standar |
+| `XApiKey` | apiKey (header) | **`X-API-Key: <key>`** | **This is the one we use.** Programmatic access + a higher rate limit |
+| `XAccessToken` | apiKey (header) | `X-Access-Token: <JWT>` | A JWT from a wallet login (8004scan's recommendation for user sessions) |
+| `BearerAuth` | http bearer | `Authorization: Bearer <JWT>` | A standard JWT |
 
-**Endpoint publik read-only (agents, feedbacks, stats, chains, leaderboard) tidak wajib auth** — tapi tanpa API key kena tier `public`/`anonymous` yang jauh lebih kecil.
+**The public read-only endpoints (agents, feedbacks, stats, chains, leaderboard) do not require auth** — but without an API key you land in the `public`/`anonymous` tier, which is far smaller.
 
-Contoh dari Builder Hub ✅:
+Examples from the Builder Hub ✅:
 ```bash
-# tanpa auth
+# with no auth
 curl https://api.8004scan.io/api/v1/agents
 
 # semantic search
 curl "https://api.8004scan.io/api/v1/agents/search/semantic?q=code+review"
 
-# dengan API key
+# with an API key
 curl -H "X-API-Key: YOUR_API_KEY" https://api.8004scan.io/api/v1/agents/8453/123
 ```
 
-> ⚠️ **Peringatan resmi 8004scan:** *"Keep API keys in trusted backends or CLI tools. Browser apps should call their own server and must not expose keys in client code."*
-> Untuk Fugugent: taruh key di backend/indexer, jangan di frontend Next.js client-side.
+> ⚠️ **8004scan's official warning:** *"Keep API keys in trusted backends or CLI tools. Browser apps should call their own server and must not expose keys in client code."*
+> For Fugugent: keep the key in the backend/indexer, never in the client-side Next.js frontend.
 
-### Alur JWT (kalau butuh aksi user, mis. star agent)
+### The JWT flow (if you need user actions, e.g. starring an agent)
 
-1. `POST /api/v1/auth/nonce` → dapat nonce
-2. Sign message dengan wallet (SIWE-style)
-3. `POST /api/v1/auth/login` → dapat `access_token` + `refresh_token`
-4. `POST /api/v1/auth/refresh` untuk perpanjang
-5. Halaman bantu: https://8004scan.io/test/login (login MetaMask, copy token)
+1. `POST /api/v1/auth/nonce` → get a nonce
+2. Sign the message with the wallet (SIWE-style)
+3. `POST /api/v1/auth/login` → get an `access_token` + `refresh_token`
+4. `POST /api/v1/auth/refresh` to extend it
+5. A helper page: https://8004scan.io/test/login (log in with MetaMask, copy the token)
 
 ---
 
-## A.3 Rate limit — tier & angka sebenarnya
+## A.3 Rate limits — the tiers and the real numbers
 
-### Tabel resmi dari Builder Hub (https://8004scan.io/developers) ✅
+### The official table from the Builder Hub (https://8004scan.io/developers) ✅
 
 | Tier | Requests/Min | Daily Limit |
 |---|---|---|
-| Anonymous | 30 | 1.000 |
-| **Free API** | **600** | **100.000** |
-| Basic *(contact us)* | 900 | 300.000 |
-| **Pro** *(contact us)* | **3.000** | **3.000.000** |
-| Enterprise *(contact us)* | 10.000 | Unlimited |
+| Anonymous | 30 | 1,000 |
+| **Free API** | **600** | **100,000** |
+| Basic *(contact us)* | 900 | 300,000 |
+| **Pro** *(contact us)* | **3,000** | **3,000,000** |
+| Enterprise *(contact us)* | 10,000 | Unlimited |
 
-### ⚠️ Perbedaan dengan brief hackathon
+### ⚠️ A discrepancy with the hackathon brief
 
-Halaman hackathon BNB Chain menyebut Pro-tier gratis untuk peserta = **500 req/menit, 100.000 req/hari**.
-Angka itu **tidak cocok** dengan tabel Builder Hub (Pro = 3.000/min, 3jt/hari; yang 100k/hari itu tier **Free API**).
+The BNB Chain hackathon page says the free Pro tier for participants is **500 req/min, 100,000 req/day**.
+Those numbers **do not match** the Builder Hub table (Pro = 3,000/min, 3M/day; the 100k/day figure is the **Free API** tier).
 
-**Interpretasi paling aman:** anggap kuota efektif hackathon ≈ **500 req/min & 100k req/hari**, desain sistem di bawah angka itu. Kalau ternyata dapat 3.000/min, itu bonus. Jangan bangun arsitektur yang butuh >100k call/hari.
+**The safest interpretation:** assume the effective hackathon quota is ≈ **500 req/min and 100k req/day**, and design the system to stay under that. If we turn out to get 3,000/min, that is a bonus. Do not build an architecture that needs more than 100k calls/day.
 
-### Enum tier internal (dari OpenAPI `APITier`) ✅
+### The internal tier enum (from the OpenAPI `APITier`) ✅
 
 ```
 anonymous | public | session | free_api | basic | pro | enterprise | admin
 ```
-Prioritas resolusi tier (dokumentasi internal spec):
-1. `admin` (tanpa rate limit)
+Tier resolution priority (from the spec's internal documentation):
+1. `admin` (no rate limit)
 2. API key: `enterprise` > `pro` > `basic` > `free_api`
 3. `session` (JWT + browser)
-4. `public` (tanpa auth + header browser)
-5. `anonymous` (bot/script — tanpa header browser)
+4. `public` (no auth + browser headers)
+5. `anonymous` (a bot/script — no browser headers)
 
-### Header rate limit
+### Rate limit headers
 
-Dokumentasi menyebut 5 header: `X-RateLimit-Tier`, `X-RateLimit-Limit-Minute`, `X-RateLimit-Remaining-Minute`, `X-RateLimit-Limit-Day`, `X-RateLimit-Remaining-Day`.
+The documentation mentions 5 headers: `X-RateLimit-Tier`, `X-RateLimit-Limit-Minute`, `X-RateLimit-Remaining-Minute`, `X-RateLimit-Limit-Day`, `X-RateLimit-Remaining-Day`.
 
-Yang **benar-benar terlihat** saat uji live tanpa API key ✅:
+What was **actually visible** during a live test without an API key ✅:
 ```
 x-ratelimit-limit-day: 20000
 x-ratelimit-limit-minute: 180
 x-ratelimit-remaining-day: 19989
 x-ratelimit-remaining-minute: 177
 ```
-(180/min & 20.000/hari = tier `public`; `X-RateLimit-Tier` tidak muncul di respons yang diuji.)
+(180/min & 20,000/day = the `public` tier; `X-RateLimit-Tier` did not appear in the responses tested.)
 
-### Rate limit khusus per-endpoint (dari OpenAPI) ✅
-- `POST /agents/{chain_id}/{token_id}/views` — 10 view/menit, 100/jam, 500/hari per IP
-- `POST /agents/verify-endpoint/...` — 1x per jam per agent
-- `POST /ipfs/upload` — 20 request/jam per user
-- `POST /storage/upload` — 10/jam, 30/hari, 50MB/hari per user
+### Per-endpoint rate limits (from the OpenAPI spec) ✅
+- `POST /agents/{chain_id}/{token_id}/views` — 10 views/minute, 100/hour, 500/day per IP
+- `POST /agents/verify-endpoint/...` — once per hour per agent
+- `POST /ipfs/upload` — 20 requests/hour per user
+- `POST /storage/upload` — 10/hour, 30/day, 50MB/day per user
 
-### Jumlah API key per tier ✅
+### API keys per tier ✅
 Free: max 2 · Basic: max 5 · Pro: max 10 · Enterprise: unlimited.
 
 ---
 
-## A.4 Cara daftar API key + Pro-Tier Upgrade Form
+## A.4 How to register an API key + the Pro-Tier Upgrade Form
 
-**Langkah:**
+**The steps:**
 
-1. Buka **https://8004scan.io/developers** (Builder Hub).
-2. Login dengan wallet (MetaMask). Alur: `POST /api/v1/auth/nonce` → sign → `POST /api/v1/auth/login`. Bisa juga lewat halaman https://8004scan.io/test/login.
-3. Buat key: `POST /api/v1/api-keys` (butuh `X-Access-Token` / `Authorization: Bearer`).
+1. Open **https://8004scan.io/developers** (the Builder Hub).
+2. Log in with a wallet (MetaMask). The flow: `POST /api/v1/auth/nonce` → sign → `POST /api/v1/auth/login`. You can also use the page at https://8004scan.io/test/login.
+3. Create a key: `POST /api/v1/api-keys` (needs `X-Access-Token` / `Authorization: Bearer`).
 
-   Body (`APIKeyCreate`) ✅:
+   The body (`APIKeyCreate`) ✅:
    ```json
    {
      "name": "fugugent-indexer",
@@ -162,95 +162,95 @@ Free: max 2 · Basic: max 5 · Pro: max 10 · Enterprise: unlimited.
      "expires_in_days": 90
    }
    ```
-   Field `tier` **deprecated & diabaikan** — tier diturunkan dari subscription user.
-   Scope yang disebut spec: `read:agents`, `write:agents`, `read:validations`, `write:validations` (spec bilang "for future use").
+   The `tier` field is **deprecated and ignored** — the tier is derived from the user's subscription.
+   The scopes the spec mentions: `read:agents`, `write:agents`, `read:validations`, `write:validations` (the spec says they are "for future use").
 
-   > ⚠️ **Key hanya ditampilkan sekali.** Simpan segera. Bisa di-reveal ulang lewat `POST /api/v1/api-keys/{key_id}/reveal` (rate-limited).
+   > ⚠️ **The key is shown only once.** Save it immediately. It can be revealed again through `POST /api/v1/api-keys/{key_id}/reveal` (rate-limited).
 
-4. **Submit Pro-Tier Upgrade Form (khusus peserta hackathon):**
+4. **Submit the Pro-Tier Upgrade Form (for hackathon participants):**
    **https://forms.gle/jQevEPCAacBXaKG79**
-   (link resmi dari halaman prizes hackathon BNB Chain). Isi detail API key yang barusan dibuat.
+   (the official link from the BNB Chain hackathon prizes page). Fill in the details of the API key you just created.
 
-**Endpoint manajemen key** ✅:
-| Method | Path | Fungsi |
+**Key management endpoints** ✅:
+| Method | Path | Function |
 |---|---|---|
-| POST | `/api/v1/api-keys` | Buat key |
-| GET | `/api/v1/api-keys?include_inactive=false` | List key |
-| GET | `/api/v1/api-keys/{key_id}` | Detail key |
-| POST | `/api/v1/api-keys/{key_id}/reveal` | Tampilkan key |
-| GET | `/api/v1/api-keys/{key_id}/usage?days=7` | Statistik pemakaian (max 30 hari) — total request, breakdown harian, current rate limits, top endpoints |
+| POST | `/api/v1/api-keys` | Create a key |
+| GET | `/api/v1/api-keys?include_inactive=false` | List keys |
+| GET | `/api/v1/api-keys/{key_id}` | Key detail |
+| POST | `/api/v1/api-keys/{key_id}/reveal` | Show the key |
+| GET | `/api/v1/api-keys/{key_id}/usage?days=7` | Usage statistics (max 30 days) — total requests, a daily breakdown, current rate limits, top endpoints |
 | DELETE | `/api/v1/api-keys/{key_id}` | Revoke |
 
 ---
 
-## A.5 Endpoint lengkap 8004scan API
+## A.5 The complete 8004scan API endpoint list
 
-Total **150 path** di OpenAPI. Di bawah dikelompokkan; yang **bold** = relevan langsung untuk Fugugent.
+There are **150 paths** in the OpenAPI spec. They are grouped below; the **bold** ones are directly relevant to Fugugent.
 
 ### A.5.1 Agents — identity, capability, ownership ⭐
 
-| Method | Path | Keterangan |
+| Method | Path | Notes |
 |---|---|---|
-| **GET** | **`/api/v1/agents`** | **List + filter + sort + search. Endpoint utama katalog kita.** |
+| **GET** | **`/api/v1/agents`** | **List + filter + sort + search. The main endpoint for our catalogue.** |
 | **GET** | **`/api/v1/agents/search/semantic`** | **Hybrid full-text + pgvector semantic search** |
-| **GET** | **`/api/v1/agents/{chain_id}/{token_id}`** | **Detail agent (cache 60 detik)** |
-| GET | `/api/v1/agents/{chain_id}/{registry_address}/{token_id}` | Detail untuk custom registry contract |
-| GET | `/api/v1/agents/leaderboard` | Leaderboard (cache 5 menit) |
-| GET | `/api/v1/agents/trending` | Trending (cache 1 menit) |
+| **GET** | **`/api/v1/agents/{chain_id}/{token_id}`** | **Agent detail (cached 60 seconds)** |
+| GET | `/api/v1/agents/{chain_id}/{registry_address}/{token_id}` | Detail for a custom registry contract |
+| GET | `/api/v1/agents/leaderboard` | Leaderboard (cached 5 minutes) |
+| GET | `/api/v1/agents/trending` | Trending (cached 1 minute) |
 | GET | `/api/v1/agents/featured` | Featured agents |
-| GET | `/api/v1/agents/latest` | Terbaru |
-| GET | `/api/v1/agents/most-starred` | Paling banyak di-star |
-| GET | `/api/v1/agents/best-wallet` | Ranking berbasis kredibilitas wallet |
-| **GET** | **`/api/v1/agents/scores/v5/{chain_id}/{token_id}`** | **Breakdown skor v5 (5 dimensi)** |
-| GET | `/api/v1/agents/score-history/{chain_id}/{token_id}` | Riwayat skor |
+| GET | `/api/v1/agents/latest` | Newest |
+| GET | `/api/v1/agents/most-starred` | Most starred |
+| GET | `/api/v1/agents/best-wallet` | Ranking based on wallet credibility |
+| **GET** | **`/api/v1/agents/scores/v5/{chain_id}/{token_id}`** | **The v5 score breakdown (5 dimensions)** |
+| GET | `/api/v1/agents/score-history/{chain_id}/{token_id}` | Score history |
 | **GET** | **`/api/v1/agents/{chain_id}/{token_id}/quality`** | **Quality Center (`history_days` ≤365, `history_limit` ≤100)** |
 | GET | `/api/v1/agents/{chain_id}/{token_id}/views` | Page views |
-| GET | `/api/v1/agents/{chain_id}/{token_id}/views/history` | Riwayat views |
-| POST | `/api/v1/agents/{chain_id}/{token_id}/views` | Rekam view (auth) |
-| POST | `/api/v1/agents/{chain_id}/{token_id}/health-check` | Minta health-check (owner, auth) |
-| POST | `/api/v1/agents/{chain_id}/{token_id}/metadata-refresh` | Refresh metadata (owner, auth) |
-| POST | `/api/v1/agents/verify-endpoint/{chain_id}/{token_id}` | Verifikasi domain endpoint (1x/jam) |
+| GET | `/api/v1/agents/{chain_id}/{token_id}/views/history` | View history |
+| POST | `/api/v1/agents/{chain_id}/{token_id}/views` | Record a view (auth) |
+| POST | `/api/v1/agents/{chain_id}/{token_id}/health-check` | Request a health check (owner, auth) |
+| POST | `/api/v1/agents/{chain_id}/{token_id}/metadata-refresh` | Refresh the metadata (owner, auth) |
+| POST | `/api/v1/agents/verify-endpoint/{chain_id}/{token_id}` | Verify the endpoint's domain (once/hour) |
 | POST/DELETE | `/api/v1/agents/stars/{chain_id}/{token_id}` | Star / unstar (auth) |
-| GET | `/api/v1/agents/stars/{chain_id}/{token_id}/is-starred` | Cek star (auth) |
-| GET | `/api/v1/agents/user/me/starred` · `/api/v1/agents/user/{user_id}/starred` | Agent yang di-star |
-| GET | `/api/v1/media/agents/{chain_id}/{token_id}/image` | Gambar agent (safe proxy) |
+| GET | `/api/v1/agents/stars/{chain_id}/{token_id}/is-starred` | Check a star (auth) |
+| GET | `/api/v1/agents/user/me/starred` · `/api/v1/agents/user/{user_id}/starred` | Starred agents |
+| GET | `/api/v1/media/agents/{chain_id}/{token_id}/image` | The agent's image (a safe proxy) |
 
-#### Parameter `GET /api/v1/agents` (lengkap) ✅
+#### `GET /api/v1/agents` parameters (complete) ✅
 
 **Pagination:** `limit` (1–100, default 20), `offset` (≥0, default 0).
 
-**Filter dasar:**
-| Param | Tipe | Catatan |
+**Basic filters:**
+| Param | Type | Notes |
 |---|---|---|
 | `chain_id` | int | 56 = BSC mainnet, 97 = BSC testnet |
-| `is_testnet` | bool | true = testnet saja, false = mainnet saja |
-| `owner_address` | string | alamat owner |
-| `owner_publisher_tier` | `OFFICIAL\|VERIFIED\|COMMUNITY` | tier sertifikasi publisher |
-| `supported_protocol` | string | `MCP`, `A2A`, dst. |
-| `x402_supported` | bool | dukungan pembayaran x402 |
-| `has_mcp` / `has_a2a` / `has_oasf` | bool | punya endpoint MCP / A2A / OASF |
-| `is_registered` | `true\|false\|any` | default `true` — buang placeholder & domain test (`localhost`, `example.com`) |
-| `is_active` | `true\|false\|any` | default `true` — field `active` ERC-8004 |
-| `is_endpoint_verified` | bool | domain endpoint terverifikasi |
+| `is_testnet` | bool | true = testnet only, false = mainnet only |
+| `owner_address` | string | the owner's address |
+| `owner_publisher_tier` | `OFFICIAL\|VERIFIED\|COMMUNITY` | the publisher's certification tier |
+| `supported_protocol` | string | `MCP`, `A2A`, etc. |
+| `x402_supported` | bool | x402 payment support |
+| `has_mcp` / `has_a2a` / `has_oasf` | bool | has an MCP / A2A / OASF endpoint |
+| `is_registered` | `true\|false\|any` | default `true` — drops placeholders and test domains (`localhost`, `example.com`) |
+| `is_active` | `true\|false\|any` | default `true` — the ERC-8004 `active` field |
+| `is_endpoint_verified` | bool | the endpoint's domain is verified |
 | `supported_trust` | string | `reputation`, `crypto-economic`, `tee-attestation` |
 
-**Filter OASF (multi-value, OR logic):**
-- `oasf_skill` — ulangi parameter: `?oasf_skill=NLP&oasf_skill=Data%20Analysis`
+**OASF filters (multi-value, OR logic):**
+- `oasf_skill` — repeat the parameter: `?oasf_skill=NLP&oasf_skill=Data%20Analysis`
 - `oasf_domain` — `?oasf_domain=finance&oasf_domain=healthcare`
 
-**Filter lanjutan:**
+**Advanced filters:**
 `min_feedbacks` · `min_validations` · `min_score` (0–100) · `created_after` / `created_before` (ISO 8601) · `tags` (comma-separated, OR) · `categories` (comma-separated, OR)
 
 **Search:**
-- `search` (1–200 char) dengan auto-deteksi: angka → `token_id`; `0x...`/base58 → owner address; `56:0x8004...:49637` → composite agent ID; `vitalik.eth` → ENS; selain itu full-text
+- `search` (1–200 chars) with auto-detection: a number → `token_id`; `0x...`/base58 → an owner address; `56:0x8004...:49637` → a composite agent ID; `vitalik.eth` → ENS; anything else is full-text
 - `search_type`: `auto|text|token_id|agent_id|address|ens|did`
-- `search_fields`: comma-separated dari `name,description,tags,categories,capabilities,endpoints,supported_protocols`
+- `search_fields`: comma-separated from `name,description,tags,categories,capabilities,endpoints,supported_protocols`
 
 **Sorting:**
 - `sort_by`: `created_at` (default), `stars`, `name`, `token_id`, `total_score`, `quality_score`, `popularity_score`, `activity_score`, `validation_score`, `wallet_score`, `freshness_score`, `metadata_completeness_score`, `total_feedbacks`, `average_score`, `total_validations`
 - `sort_order`: `desc` (default) / `asc`
 
-#### Contoh response `GET /api/v1/agents?chain_id=56&limit=1&sort_by=total_score&sort_order=desc` ✅ (live)
+#### Example response for `GET /api/v1/agents?chain_id=56&limit=1&sort_by=total_score&sort_order=desc` ✅ (live)
 
 ```json
 {
@@ -294,9 +294,9 @@ Total **150 path** di OpenAPI. Di bawah dikelompokkan; yang **bold** = relevan l
 }
 ```
 
-> **Catatan penting:** wrapper respons **tidak konsisten**. `/agents` mengembalikan objek datar `{items,total,limit,offset}`, sedangkan `/chains` mengembalikan `{"success":true,"data":{...}}`, dan error mengembalikan `{"success":false,"error":{"code":...,"message":...}}`. Buat parser yang toleran terhadap kedua bentuk.
+> **An important note:** the response wrapper is **inconsistent**. `/agents` returns a flat object `{items,total,limit,offset}`, while `/chains` returns `{"success":true,"data":{...}}`, and errors return `{"success":false,"error":{"code":...,"message":...}}`. Write a parser that tolerates both shapes.
 
-#### Contoh response `GET /api/v1/agents/56/49637` (detail) ✅ (live, struktur diringkas)
+#### Example response for `GET /api/v1/agents/56/49637` (detail) ✅ (live, structure abridged)
 
 ```jsonc
 {
@@ -403,30 +403,30 @@ Total **150 path** di OpenAPI. Di bawah dikelompokkan; yang **bold** = relevan l
 }
 ```
 
-> `field_sources` sangat berguna: memberi tahu apakah tiap field berasal `onchain`, `offchain`, atau `hardcoded`. Untuk trust-scoring Fugugent, field `onchain` lebih dipercaya.
+> `field_sources` is very useful: it tells you whether each field came from `onchain`, `offchain`, or `hardcoded`. For Fugugent's trust scoring, `onchain` fields are more trustworthy.
 
 #### `GET /api/v1/agents/search/semantic` ✅
 
 Hybrid **full-text (PostgreSQL tsvector) + semantic (pgvector)**.
 
-| Param | Default | Keterangan |
+| Param | Default | Notes |
 |---|---|---|
-| `q` (**required**) | — | 1–500 char |
+| `q` (**required**) | — | 1–500 chars |
 | `limit` / `offset` | 20 / 0 | max 100 |
-| `chain_id` | — | 56 untuk BSC |
+| `chain_id` | — | 56 for BSC |
 | `is_active` | `true` | `true\|false\|any` |
-| `semantic_weight` | 0.5 | 0.0 = murni full-text, 1.0 = murni semantic |
-| `similarity_threshold` | 0.5 | ambang minimal similarity |
+| `semantic_weight` | 0.5 | 0.0 = pure full-text, 1.0 = pure semantic |
+| `similarity_threshold` | 0.5 | the minimum similarity threshold |
 
-Response: item agent + field tambahan `similarity_score`.
+The response: the agent items plus an extra `similarity_score` field.
 
-Uji live pada chain 56 ✅:
+Live tests on chain 56 ✅:
 ```
 q=health factor liquidation  → 340458 "LingoAI Health Factor Sentinel" (sim 0.8043)
                                 292058 "bnb-lending-guardian.agent"    (sim 0.8034)
 q=grid trading bot           → 62924  "tradingbot"
 q=yield farming              → 50036  "Yield-Farmer - Goo"             (sim 0.7276)
-q=rebalancing                → total 11 hasil
+q=rebalancing                → 11 results in total
 ```
 
 ### A.5.2 Feedback / Reputation ⭐
@@ -437,10 +437,10 @@ q=rebalancing                → total 11 hasil
 | GET | `/api/v1/feedbacks/{feedback_id}` |
 | GET | `/api/v1/feedbacks/{feedback_id}/replies` |
 
-Parameter `GET /api/v1/feedbacks` ✅:
-`limit` (≤100) · `offset` · `agent_id` (UUID internal) · `agent_token_id` (+ `chain_id`) · `user_address` · `min_score` / `max_score` (0–100) · `include_revoked` (default false) · `tag1` / `tag2` (partial match, case-insensitive, ≤255 char — ini tag ERC-8004) · `chain_id` · `is_testnet` · `oasf_skill[]` / `oasf_domain[]` (max 20, OR) · `sort_by` = `submitted_at|score|created_at` · `sort_order` · `include_replies` (embed ≤10 reply)
+`GET /api/v1/feedbacks` parameters ✅:
+`limit` (≤100) · `offset` · `agent_id` (the internal UUID) · `agent_token_id` (+ `chain_id`) · `user_address` · `min_score` / `max_score` (0–100) · `include_revoked` (default false) · `tag1` / `tag2` (partial match, case-insensitive, ≤255 chars — these are the ERC-8004 tags) · `chain_id` · `is_testnet` · `oasf_skill[]` / `oasf_domain[]` (max 20, OR) · `sort_by` = `submitted_at|score|created_at` · `sort_order` · `include_replies` (embeds ≤10 replies)
 
-Contoh dari dokumentasi:
+Examples from the documentation:
 ```
 GET /feedbacks?chain_id=11155111&agent_token_id=1675
 GET /feedbacks?user_address=0x7a1591...
@@ -450,17 +450,17 @@ GET /feedbacks?oasf_domain=finance&oasf_domain=business
 
 ### A.5.3 Stats / Network data ⭐
 
-| Method | Path | Cache | Keterangan |
+| Method | Path | Cache | Notes |
 |---|---|---|---|
-| **GET** | **`/api/v1/stats/global`** | 60s | Statistik platform; param `is_testnet`, `is_registered` |
-| GET | `/api/v1/stats/daily` | — | Statistik harian |
-| GET | `/api/v1/stats/growth` · `/api/v1/stats/growth/chains` | — | Analisis pertumbuhan |
-| GET | `/api/v1/stats/feedbacks` · `/api/v1/stats/feedbacks/tags` | — | Statistik + tag feedback |
-| **GET** | **`/api/v1/stats/oasf/skills`** | 300s | Distribusi skill (limit ≤500) |
-| **GET** | **`/api/v1/stats/oasf/domains`** | 300s | Distribusi domain (limit ≤500) |
-| **GET** | **`/api/v1/stats/agents/{chain_id}/{token_id}`** | real-time | Statistik per agent |
-| GET | `/api/v1/stats/agents/{chain_id}/{token_id}/analytics` | — | Analytics per agent |
-| **GET** | **`/api/v1/chains`** · `/api/v1/chains/{chain_id}` | — | Daftar chain |
+| **GET** | **`/api/v1/stats/global`** | 60s | Platform statistics; params `is_testnet`, `is_registered` |
+| GET | `/api/v1/stats/daily` | — | Daily statistics |
+| GET | `/api/v1/stats/growth` · `/api/v1/stats/growth/chains` | — | Growth analysis |
+| GET | `/api/v1/stats/feedbacks` · `/api/v1/stats/feedbacks/tags` | — | Feedback statistics + tags |
+| **GET** | **`/api/v1/stats/oasf/skills`** | 300s | Skill distribution (limit ≤500) |
+| **GET** | **`/api/v1/stats/oasf/domains`** | 300s | Domain distribution (limit ≤500) |
+| **GET** | **`/api/v1/stats/agents/{chain_id}/{token_id}`** | real-time | Per-agent statistics |
+| GET | `/api/v1/stats/agents/{chain_id}/{token_id}/analytics` | — | Per-agent analytics |
+| **GET** | **`/api/v1/chains`** · `/api/v1/chains/{chain_id}` | — | The chain list |
 
 `GET /api/v1/stats/global?is_testnet=false` ✅ (live, 8 Sep 2026):
 ```json
@@ -481,9 +481,9 @@ GET /feedbacks?oasf_domain=finance&oasf_domain=business
   ]
 }
 ```
-> Catat: `total_validations = 0` dan `total_validators = 0` di seluruh mainnet. **Validation Registry praktis belum terpakai** — jangan bangun fitur yang bergantung padanya.
+> Note: `total_validations = 0` and `total_validators = 0` across all of mainnet. **The Validation Registry is effectively unused** — do not build a feature that depends on it.
 
-`GET /api/v1/chains` ✅ — chain BSC:
+`GET /api/v1/chains` ✅ — the BSC chains:
 ```json
 {"chain_key":"bsc_mainnet","chain_id":56,"name":"BSC","is_testnet":false,"enabled":true,
  "blockscout_configured":false,"etherscan_supported":true,"etherscan_keys_present":true,
@@ -495,14 +495,14 @@ GET /feedbacks?oasf_domain=finance&oasf_domain=business
 
 ### A.5.4 Wallets / Users — ownership & activity ⭐
 
-| Method | Path | Keterangan |
+| Method | Path | Notes |
 |---|---|---|
-| **GET** | **`/api/v1/wallets/{address}/agents`** | Semua agent milik wallet |
-| GET | `/api/v1/wallets/{address}` · `/metrics` · `/stats` | Profil & metrik wallet |
-| **GET** | **`/api/v1/users/{identifier}/activity`** | **Feed aktivitas user** |
-| GET | `/api/v1/users/{identifier}` · `/stats` · `/feedbacks` · `/card` | Profil user |
-| GET | `/api/v1/users/{identifier}/validations/requested` · `/responded` | Validasi |
-| GET | `/api/v1/users/{identifier}/followers` · `/following` · `/follow-status` | Social graph |
+| **GET** | **`/api/v1/wallets/{address}/agents`** | Every agent owned by a wallet |
+| GET | `/api/v1/wallets/{address}` · `/metrics` · `/stats` | Wallet profile & metrics |
+| **GET** | **`/api/v1/users/{identifier}/activity`** | **A user's activity feed** |
+| GET | `/api/v1/users/{identifier}` · `/stats` · `/feedbacks` · `/card` | User profile |
+| GET | `/api/v1/users/{identifier}/validations/requested` · `/responded` | Validations |
+| GET | `/api/v1/users/{identifier}/followers` · `/following` · `/follow-status` | The social graph |
 | POST/DELETE | `/api/v1/users/{identifier}/follow` | Follow/unfollow (auth) |
 
 ### A.5.5 Leaderboards & rankings
@@ -510,25 +510,25 @@ GET /feedbacks?oasf_domain=finance&oasf_domain=business
 `/api/v1/agents/leaderboard` params ✅: `period` = `7d|30d|90d|all` · `sort_by` = `total_score|quality_score|popularity_score|activity_score|validation_score|wallet_score|freshness_score` · `limit` (≤100) · `offset` · `chain_id` · `is_testnet` · `group_cross_chain` (default `true`).
 
 `/api/v1/agents/trending` ✅: `period` = `24h|7d|30d`, `limit` ≤50.
-Algoritma trending (dari docs): `trending_score = view_count / (hours_since_last_activity + 2)^1.5`.
+The trending algorithm (from the docs): `trending_score = view_count / (hours_since_last_activity + 2)^1.5`.
 
-Lainnya: `/api/v1/leaderboards/publishers`, `/api/v1/leaderboards/validators`.
+Also: `/api/v1/leaderboards/publishers`, `/api/v1/leaderboards/validators`.
 
-### A.5.6 MCP tools endpoints (menerima `X-API-Key`) ⭐
+### A.5.6 MCP tools endpoints (they accept `X-API-Key`) ⭐
 
-Ini jalur khusus yang **secara eksplisit mengizinkan `XApiKey`** (endpoint lain default JWT):
+This is a special path that **explicitly allows `XApiKey`** (the other endpoints default to JWT):
 
 | Method | Path | Params |
 |---|---|---|
-| GET | `/api/v1/mcp/tools/search_agents` | `query` (req, 1–200), `chain_id`, `limit` (1–50, def 10), `search_type` = `keyword\|semantic`, `api_key` (untuk klien SSE) |
-| GET | `/api/v1/mcp/tools/get_agent` | `chain_id` (req), `token_id` (req, int), `api_key` |
-| GET | `/api/v1/mcp/tools/get_agent_feedbacks` | `chain_id` (req), `token_id` (req), `limit` (1–50, def 20), `api_key` |
+| GET | `/api/v1/mcp/tools/search_agents` | `query` (required, 1–200), `chain_id`, `limit` (1–50, default 10), `search_type` = `keyword\|semantic`, `api_key` (for SSE clients) |
+| GET | `/api/v1/mcp/tools/get_agent` | `chain_id` (required), `token_id` (required, int), `api_key` |
+| GET | `/api/v1/mcp/tools/get_agent_feedbacks` | `chain_id` (required), `token_id` (required), `limit` (1–50, default 20), `api_key` |
 | GET | `/api/v1/mcp/tools/get_starred_agents` | `api_key` |
 | POST | `/api/v1/mcp/tools/star_agent` · `unstar_agent` | — |
 
-> Untuk backend Fugugent, endpoint REST biasa (`/agents`, `/agents/search/semantic`) lebih kaya. Jalur `/mcp/tools/*` berguna kalau kita mau expose 8004scan sebagai tool ke agent kita sendiri.
+> For the Fugugent backend, the ordinary REST endpoints (`/agents`, `/agents/search/semantic`) are richer. The `/mcp/tools/*` path is useful if we want to expose 8004scan as a tool to our own agents.
 
-### A.5.7 Webhooks — data realtime ⭐⭐
+### A.5.7 Webhooks — real-time data ⭐⭐
 
 | Method | Path |
 |---|---|
@@ -537,76 +537,76 @@ Ini jalur khusus yang **secara eksplisit mengizinkan `XApiKey`** (endpoint lain 
 | PATCH / DELETE | `/api/v1/webhooks/{webhook_id}` |
 | GET | `/api/v1/webhooks/{webhook_id}/deliveries` |
 
-Body register ✅:
+The register body ✅:
 ```json
 {
   "webhook_url": "https://api.fugugent.xyz/hooks/8004scan",
   "events": ["validation.requested", "validation.completed"]
 }
 ```
-`events` default `["validation.requested","validation.completed"]`. Builder Hub menyebut **6 event type: validation, feedback, dan star events**; nama persis event feedback/star **tidak tercantum di OpenAPI** ⚠️ `UNVERIFIED` — cek lewat skill `8004scan-webhooks` (repo `jiayaoqijia/8004`) atau eksperimen.
+`events` defaults to `["validation.requested","validation.completed"]`. The Builder Hub mentions **6 event types: validation, feedback, and star events**; the exact names of the feedback/star events **are not listed in the OpenAPI spec** ⚠️ `UNVERIFIED` — check through the `8004scan-webhooks` skill (the `jiayaoqijia/8004` repo) or by experiment.
 
-Fitur: **HMAC-SHA256 signature verification**, delivery monitoring + retry history, exponential backoff hingga 5 percobaan, filter by event type & agent. Response register mengembalikan `webhook_id` + `secret` (simpan!).
+Features: **HMAC-SHA256 signature verification**, delivery monitoring + retry history, exponential backoff up to 5 attempts, and filtering by event type and agent. The register response returns a `webhook_id` + a `secret` (save it!).
 
-**Ini kunci untuk marketplace realtime:** register webhook → dapat push saat agent menerima feedback/validation/star, tanpa polling.
+**This is the key to a real-time marketplace:** register a webhook → get pushed events when an agent receives feedback/a validation/a star, with no polling.
 
-### A.5.8 Lain-lain
+### A.5.8 Everything else
 - Status/health: `/api/v1/status/summary`, `/components`, `/freshness`, `/indexers`, `/indexers/direct`, `/taskqueue`, plus `/health` & `/ready`
 - Storage: `/api/v1/storage/upload|file/{key}|hash/{hash}|info/{key}|status`
 - IPFS: `/api/v1/ipfs/upload`, `/api/v1/ipfs/fetch`
 - Inbox: `/api/v1/inbox*`
 - Donations: `/api/v1/donations/*`
-- Certifications: `/api/v1/users/me/certifications/publisher/apply` (untuk dapat badge `OFFICIAL/VERIFIED/COMMUNITY`)
-- Admin: `/api/v1/admin/*` (tidak relevan)
+- Certifications: `/api/v1/users/me/certifications/publisher/apply` (to get an `OFFICIAL/VERIFIED/COMMUNITY` badge)
+- Admin: `/api/v1/admin/*` (not relevant)
 
 ### A.5.9 Pagination
 
-Semua list endpoint pakai **offset-based**: `limit` (1–100) + `offset` (≥0). Respons list `/agents` mengembalikan `{items, total, limit, offset}` → jumlah halaman = `ceil(total/limit)`.
+Every list endpoint is **offset-based**: `limit` (1–100) + `offset` (≥0). The `/agents` list response returns `{items, total, limit, offset}` → the page count = `ceil(total/limit)`.
 
-⚠️ Dengan `total = 309.444` di BSC, **jangan pernah full-scan**. Selalu pakai filter (`oasf_domain`, `min_score`, `min_feedbacks`, `has_mcp`) atau semantic search.
+⚠️ With `total = 309,444` on BSC, **never full-scan**. Always use a filter (`oasf_domain`, `min_score`, `min_feedbacks`, `has_mcp`) or semantic search.
 
 ---
 
-## A.6 Skills 8004scan untuk Claude Code
+## A.6 The 8004scan Skills for Claude Code
 
-Dari https://8004scan.io/developers?tab=skills ✅. Repo: **https://github.com/jiayaoqijia/8004** (AGPL-3.0).
+From https://8004scan.io/developers?tab=skills ✅. Repo: **https://github.com/jiayaoqijia/8004** (AGPL-3.0).
 
 ```
 /plugin marketplace add jiayaoqijia/8004
 /plugin install 8004scan-skill@8004scan
 ```
 
-3 skill:
-1. **`8004`** — referensi protokol ERC-8004: arsitektur 3 registry, ABI & alamat kontrak untuk 45+ chain EVM, schema registrasi agent, trust label & scoring, contoh SDK TypeScript/Python, pola integrasi (MCP, A2A, OASF, ENS, x402)
-2. **`8004scan`** — integrasi API: list/filter agent, semantic & keyword search, detail agent, query per wallet, statistik platform, feedback
-3. **`8004scan-webhooks`** — event realtime: 6 event type, registrasi & manajemen webhook, verifikasi HMAC-SHA256, monitoring delivery, retry exponential backoff
+3 skills:
+1. **`8004`** — an ERC-8004 protocol reference: the 3-registry architecture, ABIs and contract addresses for 45+ EVM chains, the agent registration schema, trust labels and scoring, TypeScript/Python SDK examples, and integration patterns (MCP, A2A, OASF, ENS, x402)
+2. **`8004scan`** — API integration: listing/filtering agents, semantic and keyword search, agent detail, per-wallet queries, platform statistics, feedback
+3. **`8004scan-webhooks`** — real-time events: the 6 event types, webhook registration and management, HMAC-SHA256 verification, delivery monitoring, exponential-backoff retries
 
-> Untuk tim Fugugent: install skill ini di Claude Code saat development — mempercepat integrasi dan bagus untuk demo "kami memakai tooling sponsor".
+> For the Fugugent team: install these skills in Claude Code during development — they speed up the integration and are good for the "we use the sponsor's tooling" demo point.
 
 ---
 
-## A.7 ERC-8004 — spesifikasi ringkas
+## A.7 ERC-8004 — a condensed specification
 
-Sumber: [EIP-8004](https://eips.ethereum.org/EIPS/eip-8004) · [github.com/erc-8004/erc-8004-contracts](https://github.com/erc-8004/erc-8004-contracts) (README + `ERC8004SPEC.md`, lisensi CC0) · https://8004.org
+Sources: [EIP-8004](https://eips.ethereum.org/EIPS/eip-8004) · [github.com/erc-8004/erc-8004-contracts](https://github.com/erc-8004/erc-8004-contracts) (the README + `ERC8004SPEC.md`, licence CC0) · https://8004.org
 
-### Konsep inti
+### Core concepts
 
-**Identifier agent:**
-- `agentRegistry` = `{namespace}:{chainId}:{identityRegistry}` — mis. `eip155:56:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`
-- `agentId` = ERC-721 `tokenId` hasil mint di Identity Registry
+**Agent identifiers:**
+- `agentRegistry` = `{namespace}:{chainId}:{identityRegistry}` — e.g. `eip155:56:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`
+- `agentId` = the ERC-721 `tokenId` minted in the Identity Registry
 
-Di 8004scan, composite ID muncul sebagai `56:0x8004a169...:49637`.
+On 8004scan, the composite ID appears as `56:0x8004a169...:49637`.
 
-**Apa yang dilakukan (dan tidak):**
-- ✅ Discovery: identitas ERC-721 dengan `tokenURI` menunjuk registration file
-- ✅ Trust signals: reputation & validation on-chain terstandar
-- ❌ **Bukan payment rail** — pembayaran sengaja out-of-scope
+**What it does (and does not do):**
+- ✅ Discovery: an ERC-721 identity whose `tokenURI` points at the registration file
+- ✅ Trust signals: standardised on-chain reputation & validation
+- ❌ **It is not a payment rail** — payments are deliberately out of scope
 
-### A.7.1 Identity Registry
+### A.7.1 The Identity Registry
 
-ERC-721 upgradeable (`ERC721URIStorage`).
+An upgradeable ERC-721 (`ERC721URIStorage`).
 
-**Fungsi utama** ✅ (dari ABI resmi):
+**The main functions** ✅ (from the official ABI):
 ```solidity
 register() returns (uint256)
 register(string agentURI) returns (uint256)
@@ -621,14 +621,14 @@ setAgentWallet(uint256 agentId, address newWallet, uint256 deadline, bytes signa
 unsetAgentWallet(uint256 agentId)
 ```
 
-**Key khusus `agentWallet`:** otomatis di-set saat registrasi (= owner), hanya bisa diubah dengan bukti kontrol wallet baru via **EIP-712 / ERC-1271**, dan **di-clear saat transfer** (owner baru wajib verifikasi ulang).
+**The special `agentWallet` key:** it is set automatically at registration (= the owner), can only be changed with proof of control of the new wallet via **EIP-712 / ERC-1271**, and is **cleared on transfer** (the new owner must re-verify).
 
-**Events (bisa diindeks)** ✅:
+**Events (indexable)** ✅:
 ```solidity
 Registered(uint256 indexed agentId, string agentURI, address indexed owner)
 URIUpdated(uint256 indexed agentId, string newURI, address indexed updatedBy)
 MetadataSet(uint256 indexed agentId, string indexed indexedMetadataKey, string metadataKey, bytes metadataValue)
-Transfer(address indexed from, address indexed to, uint256 indexed tokenId)   // ERC-721 → perubahan ownership
+Transfer(address indexed from, address indexed to, uint256 indexed tokenId)   // ERC-721 → an ownership change
 Approval(address indexed owner, address indexed approved, uint256 indexed tokenId)
 ApprovalForAll(address indexed owner, address indexed operator, bool approved)
 MetadataUpdate(uint256 _tokenId)
@@ -639,16 +639,16 @@ EIP712DomainChanged()
 OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
 ```
 
-### A.7.2 Reputation Registry
+### A.7.2 The Reputation Registry
 
-Menyimpan sinyal feedback sebagai **signed fixed-point**:
-- `value`: `int128` (bertanda)
+It stores feedback signals as **signed fixed-point**:
+- `value`: `int128` (signed)
 - `valueDecimals`: `uint8` (0–18)
-- Contoh: `value=9977, valueDecimals=2` → `99.77`; `value=560, valueDecimals=0` → `560`
+- Examples: `value=9977, valueDecimals=2` → `99.77`; `value=560, valueDecimals=0` → `560`
 
-Sisanya metadata opsional (tag, endpoint URI, URI + hash payload off-chain). **Self-feedback dicegah** (owner/operator agent dicek lewat Identity Registry).
+The rest is optional metadata (tags, an endpoint URI, an off-chain payload URI + hash). **Self-feedback is prevented** (the agent's owner/operator is checked through the Identity Registry).
 
-**Fungsi** ✅:
+**The functions** ✅:
 ```solidity
 giveFeedback(uint256 agentId, int128 value, uint8 valueDecimals,
              string tag1, string tag2, string endpoint,
@@ -666,7 +666,7 @@ getClients(uint256 agentId) returns (address[])
 getLastIndex(uint256 agentId, address clientAddress) returns (uint64)
 getResponseCount(...)
 ```
-> ⚠️ `getSummary` **mewajibkan `clientAddresses` non-empty** (anti-Sybil). Untuk agregasi global, pakai API 8004scan (`average_score`, `total_feedbacks`) — jauh lebih praktis.
+> ⚠️ `getSummary` **requires a non-empty `clientAddresses`** (anti-Sybil). For global aggregation, use the 8004scan API (`average_score`, `total_feedbacks`) — far more practical.
 
 **Events** ✅:
 ```solidity
@@ -678,9 +678,9 @@ ResponseAppended(uint256 indexed agentId, address indexed clientAddress, uint64 
                  address indexed responder, string responseURI, bytes32 responseHash)
 ```
 
-### A.7.3 Validation Registry
+### A.7.3 The Validation Registry
 
-> ⚠️ **Peringatan dari repo resmi:** bagian Validation Registry *"masih dalam pembaruan aktif dan diskusi dengan komunitas TEE"* dan akan direvisi di update spec berikutnya. Ditambah data live: **0 validator & 0 validation di seluruh mainnet**. **Jangan jadikan dependensi.**
+> ⚠️ **A warning from the official repo:** the Validation Registry section is *"still under active revision and discussion with the TEE community"* and will be revised in the next spec update. Add the live data: **0 validators and 0 validations across all of mainnet**. **Do not depend on it.**
 
 ```solidity
 validationRequest(address validatorAddress, uint256 agentId, string requestURI, bytes32 requestHash)
@@ -692,21 +692,21 @@ getValidatorRequests(address validatorAddress) returns (bytes32[])
 ```
 Events: `ValidationRequest(address indexed validatorAddress, uint256 indexed agentId, string requestURI, bytes32 indexed requestHash)` · `ValidationResponse(address indexed validatorAddress, uint256 indexed agentId, bytes32 indexed requestHash, uint8 response, string responseURI, bytes32 responseHash, string tag)`
 
-### A.7.4 Alamat kontrak — BSC ✅
+### A.7.4 Contract addresses — BSC ✅
 
-Sumber: [README erc-8004-contracts](https://github.com/erc-8004/erc-8004-contracts) — **dikonfirmasi silang** dengan (a) field `contract_address` pada data live 8004scan BSC dan (b) `GET /api/v1/config/contracts` TermiX di chain 56.
+Source: [the erc-8004-contracts README](https://github.com/erc-8004/erc-8004-contracts) — **cross-confirmed** against (a) the `contract_address` field in live 8004scan BSC data and (b) TermiX's `GET /api/v1/config/contracts` on chain 56.
 
 #### BSC Mainnet (chain 56)
-| Kontrak | Alamat |
+| Contract | Address |
 |---|---|
 | **IdentityRegistry** | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` |
 | **ReputationRegistry** | `0x8004BAa17C55a88189AE136b182e5fdA19dE9b63` |
-| ValidationRegistry | ⚠️ **tidak tercantum di README resmi** — `UNVERIFIED`, jangan pakai |
+| ValidationRegistry | ⚠️ **not listed in the official README** — `UNVERIFIED`, do not use |
 
 Explorer: https://bscscan.com/address/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432
 
 #### BSC Testnet (chain 97)
-| Kontrak | Alamat |
+| Contract | Address |
 |---|---|
 | **IdentityRegistry** | `0x8004A818BFB912233c491871b3d84c89A494BD9e` |
 | **ReputationRegistry** | `0x8004B663056A597Dffe9eCcC1965A193B7388713` |
@@ -714,29 +714,29 @@ Explorer: https://bscscan.com/address/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432
 
 Explorer: https://testnet.bscscan.com/address/0x8004A818BFB912233c491871b3d84c89A494BD9e
 
-> **Pola penting:** alamatnya **identik di semua mainnet EVM** (`0x8004A169...` untuk Identity, `0x8004BAa1...` untuk Reputation) dan **identik di semua testnet** (`0x8004A818...` / `0x8004B663...`) — hasil vanity/deterministic deployment. Ethereum, Base, Arbitrum, Optimism, Polygon, Avalanche, Celo, Gnosis, Linea, Mantle, Monad, Metis, MegaETH, LUKSO, Abstract, GOAT, Taiko dst. semuanya sama.
-> Konsekuensi buat Fugugent: **kode kontrak/indexer cukup satu set alamat + variabel chainId.**
+> **An important pattern:** the addresses are **identical across every EVM mainnet** (`0x8004A169...` for Identity, `0x8004BAa1...` for Reputation) and **identical across every testnet** (`0x8004A818...` / `0x8004B663...`) — the result of a vanity/deterministic deployment. Ethereum, Base, Arbitrum, Optimism, Polygon, Avalanche, Celo, Gnosis, Linea, Mantle, Monad, Metis, MegaETH, LUKSO, Abstract, GOAT, Taiko and so on are all the same.
+> The consequence for Fugugent: **our contract/indexer code needs one set of addresses plus a chainId variable.**
 
-ABI resmi: `https://raw.githubusercontent.com/erc-8004/erc-8004-contracts/main/abis/{IdentityRegistry|ReputationRegistry|ValidationRegistry}.json` ✅
+The official ABIs: `https://raw.githubusercontent.com/erc-8004/erc-8004-contracts/main/abis/{IdentityRegistry|ReputationRegistry|ValidationRegistry}.json` ✅
 
-### A.7.5 Struktur AgentCard / registration file
+### A.7.5 The AgentCard / registration file structure
 
-`agentURI` (= `tokenURI`) menunjuk JSON. Field per spec:
+The `agentURI` (= `tokenURI`) points at JSON. The fields per the spec:
 
-| Field | Isi |
+| Field | Contents |
 |---|---|
 | `type` | `"https://eips.ethereum.org/EIPS/eip-8004#registration-v1"` |
-| `name`, `description`, `image` | Metadata NFT-friendly |
-| `services` | Daftar endpoint: A2A agent card URL, MCP endpoint, OASF manifest, ENS, email |
-| `registrations` | Array `{ agentRegistry, agentId }` — mengikat file ke identitas on-chain, juga dipakai untuk **cross-chain linking** |
+| `name`, `description`, `image` | NFT-friendly metadata |
+| `services` | The endpoint list: the A2A agent card URL, the MCP endpoint, the OASF manifest, ENS, email |
+| `registrations` | An array of `{ agentRegistry, agentId }` — binds the file to the on-chain identity, and is also used for **cross-chain linking** |
 | `supportedTrust` | `reputation`, `crypto-economic`, `tee-attestation` |
-| `active` | boolean — ketersediaan yang dideklarasi owner |
+| `active` | boolean — the availability the owner declares |
 
-Field tambahan yang dipakai di dunia nyata (terlihat pada agent BSC live) ✅: `url`, `version`, `protocol`, `agent_type`, `categories`, `tags`, `skills`, `capabilities`, `models`, `provider`, `license`, `documentation`, `termsOfService`, `privacyPolicy`, `securityPolicy`, `defaultInputModes`, `defaultOutputModes`, `supportedNetworks`, `x402Support`, `limitations`, `disclaimer`, `updatedAt`, `verification`, `externalLink`, `contact`, `erc8004`.
+Extra fields used in the real world (seen on live BSC agents) ✅: `url`, `version`, `protocol`, `agent_type`, `categories`, `tags`, `skills`, `capabilities`, `models`, `provider`, `license`, `documentation`, `termsOfService`, `privacyPolicy`, `securityPolicy`, `defaultInputModes`, `defaultOutputModes`, `supportedNetworks`, `x402Support`, `limitations`, `disclaimer`, `updatedAt`, `verification`, `externalLink`, `contact`, `erc8004`.
 
-**Contoh nyata dari BSC** — tokenURI bisa berupa `data:application/json;base64,...` (inline, dilihat pada agent TermiX `340793`) atau `ipfs://Qm...` (agent `49637`) atau HTTPS.
+**A real example from BSC** — the tokenURI can be `data:application/json;base64,...` (inline, as seen on TermiX agent `340793`), or `ipfs://Qm...` (agent `49637`), or HTTPS.
 
-Minimal registration inline (decoded dari agent BSC live) ✅:
+A minimal inline registration (decoded from a live BSC agent) ✅:
 ```json
 {
   "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
@@ -748,73 +748,73 @@ Minimal registration inline (decoded dari agent BSC live) ✅:
 }
 ```
 
-**Verifikasi domain endpoint (opsional):** host file `.well-known/agent-registration.json` di domain endpoint yang berisi info registrasi yang cocok. 8004scan mengeksposnya via `is_endpoint_verified` dan `POST /api/v1/agents/verify-endpoint/{chain_id}/{token_id}` (1x/jam).
+**Endpoint domain verification (optional):** host a `.well-known/agent-registration.json` file on the endpoint's domain containing matching registration info. 8004scan exposes it through `is_endpoint_verified` and `POST /api/v1/agents/verify-endpoint/{chain_id}/{token_id}` (once/hour).
 
-### A.7.6 Alur end-to-end mendaftarkan agent Fugugent
+### A.7.6 The end-to-end flow for registering a Fugugent agent
 
-1. `register(agentURI)` di IdentityRegistry BSC → dapat `agentId`
-2. Publish registration file (IPFS/HTTPS), set via `setAgentURI(agentId, uri)`
-3. (Opsional) `setAgentWallet(...)` dengan bukti EIP-712/1271
-4. Kumpulkan feedback dari klien via `giveFeedback(...)` di ReputationRegistry
-5. Agregasi trust: `getSummary(...)` on-chain, atau tarik dari API 8004scan
-6. Trigger `POST /api/v1/agents/{chain_id}/{token_id}/metadata-refresh` agar 8004scan meng-index cepat
+1. `register(agentURI)` on the BSC IdentityRegistry → get an `agentId`
+2. Publish the registration file (IPFS/HTTPS), set it with `setAgentURI(agentId, uri)`
+3. (Optional) `setAgentWallet(...)` with EIP-712/1271 proof
+4. Collect feedback from clients through `giveFeedback(...)` on the ReputationRegistry
+5. Aggregate trust: `getSummary(...)` on-chain, or pull it from the 8004scan API
+6. Trigger `POST /api/v1/agents/{chain_id}/{token_id}/metadata-refresh` so 8004scan indexes it quickly
 
 ---
 
-## A.8 Klasifikasi agent ke 4 kategori Fugugent
+## A.8 Classifying agents into Fugugent's 4 categories
 
-Target kategori: **(1) rebalancing · (2) grid trading · (3) yield · (4) health factor**.
+The target categories: **(1) rebalancing · (2) grid trading · (3) yield · (4) health factor**.
 
-Tidak ada field kategori kanonik di ERC-8004 (isi `tags`/`categories` bebas diisi publisher). Rekomendasi: **pipeline klasifikasi 4 lapis, hasilnya dicache di DB kita sendiri.**
+ERC-8004 has no canonical category field (the contents of `tags`/`categories` are whatever the publisher writes). The recommendation: **a 4-layer classification pipeline whose results we cache in our own DB.**
 
-### Lapis 1 — Semantic search sebagai kandidat generator (paling kuat) ✅
+### Layer 1 — Semantic search as the candidate generator (the strongest) ✅
 
-Terbukti bekerja di BSC:
+Proven to work on BSC:
 ```bash
 GET /api/v1/agents/search/semantic
     ?q=<query>&chain_id=56&limit=100&semantic_weight=0.7&similarity_threshold=0.55
 ```
 
-Query per kategori (multi-query, gabungkan hasil, dedupe by `agent_id`):
+Queries per category (run several, merge the results, dedupe by `agent_id`):
 
-| Kategori | Query yang disarankan |
+| Category | Suggested queries |
 |---|---|
 | **Rebalancing** | `portfolio rebalancing agent`, `liquidity position rebalancing`, `auto rebalance LP range`, `concentrated liquidity manager` |
 | **Grid trading** | `grid trading bot`, `automated grid strategy`, `range order trading bot`, `DCA grid strategy` |
 | **Yield** | `yield farming optimizer`, `APY routing agent`, `auto-compounding vault`, `yield aggregator` |
 | **Health factor** | `health factor monitor`, `liquidation protection agent`, `lending position guardian`, `collateral ratio alert` |
 
-Hasil live yang membuktikan sinyalnya kuat ✅:
+Live results proving the signal is strong ✅:
 - `health factor liquidation` → **"LingoAI Health Factor Sentinel"** (sim 0.804), **"bnb-lending-guardian.agent"** (sim 0.803)
 - `yield farming` → **"Yield-Farmer - Goo"** (sim 0.728)
 - `grid trading bot` → **"tradingbot"**
-- Filter `oasf_domain=technology/blockchain/defi&chain_id=56` → **"Sentinels Grid Trader"**, "Sentinels Health Guard", "Sentinels Security Scout"
+- The filter `oasf_domain=technology/blockchain/defi&chain_id=56` → **"Sentinels Grid Trader"**, "Sentinels Health Guard", "Sentinels Security Scout"
 
-Simpan `similarity_score` sebagai confidence awal.
+Store the `similarity_score` as the initial confidence.
 
-### Lapis 2 — Pre-filter untuk mempersempit populasi
+### Layer 2 — Pre-filters to narrow the population
 
-Sebelum/berbarengan dengan semantic search, potong 309k agent jadi ribuan:
+Before (or alongside) the semantic search, cut 309k agents down to thousands:
 ```
 GET /api/v1/agents?chain_id=56
-    &is_registered=true          # buang placeholder & domain test
-    &is_active=true              # hanya yang owner deklarasikan aktif
-    &has_mcp=true                # atau has_a2a=true — harus punya endpoint nyata
-    &min_score=20                # skor v5 minimum
+    &is_registered=true          # drop placeholders and test domains
+    &is_active=true              # only the ones the owner declares active
+    &has_mcp=true                # or has_a2a=true — it must have a real endpoint
+    &min_score=20                # a minimum v5 score
     &oasf_domain=technology/blockchain/defi
     &oasf_domain=finance/markets/crypto
     &oasf_domain=finance_and_business/investment_services
     &limit=100&offset=0
 ```
 
-**Taksonomi OASF nyata di mainnet** ✅ (`GET /api/v1/stats/oasf/domains?is_testnet=false`) — domain relevan DeFi:
+**The real OASF taxonomy on mainnet** ✅ (`GET /api/v1/stats/oasf/domains?is_testnet=false`) — the DeFi-relevant domains:
 
-| Domain | Jumlah agent |
+| Domain | Agent count |
 |---|---|
-| `technology/blockchain/cryptocurrency` | 5.530 |
-| `finance/markets/crypto` | 4.940 |
-| `finance/global_economics` | 3.546 |
-| `technology/security/cybersecurity` | 1.872 |
+| `technology/blockchain/cryptocurrency` | 5,530 |
+| `finance/markets/crypto` | 4,940 |
+| `finance/global_economics` | 3,546 |
+| `technology/security/cybersecurity` | 1,872 |
 | `technology/blockchain` | 752 |
 | `finance_and_business/finance` | 469 |
 | `trust_and_safety/risk_management` | 463 |
@@ -823,115 +823,115 @@ GET /api/v1/agents?chain_id=56
 | `finance_and_business/investment_services` | 380 |
 | `trust_and_safety/fraud_prevention` | 292 |
 
-Skill relevan ✅ (`GET /api/v1/stats/oasf/skills?is_testnet=false`):
+The relevant skills ✅ (`GET /api/v1/stats/oasf/skills?is_testnet=false`):
 
-| Skill | Jumlah |
+| Skill | Count |
 |---|---|
-| `analytical_skills/market_insights` | 4.940 |
-| `analytical_skills/data_analysis/crypto_analysis` | 4.940 |
-| `evaluation_monitoring/anomaly_detection` | 1.373 |
+| `analytical_skills/market_insights` | 4,940 |
+| `analytical_skills/data_analysis/crypto_analysis` | 4,940 |
+| `evaluation_monitoring/anomaly_detection` | 1,373 |
 | `advanced_reasoning_planning/strategic_planning` | 810 |
-| `security_privacy/threat_detection` | 1.586 |
+| `security_privacy/threat_detection` | 1,586 |
 
-> Catatan: semua `is_standard: false` dan `category_id: null` — taksonomi ini **de-facto dari publisher**, bukan enum resmi OASF. Jangan hardcode; tarik daftarnya tiap 5 menit (cache 300s) dan cocokkan dengan prefix.
+> Note: everything has `is_standard: false` and `category_id: null` — this taxonomy is **de facto publisher-defined**, not an official OASF enum. Do not hardcode it; pull the list every 5 minutes (cached 300s) and match on prefixes.
 
-### Lapis 3 — Keyword search terarah
+### Layer 3 — Targeted keyword search
 
 ```
 GET /api/v1/agents?chain_id=56&search=rebalanc&search_type=text
     &search_fields=name,description,tags,capabilities&limit=100
 ```
-Kata kunci: `rebalanc`, `grid`, `yield`, `APY`, `APR`, `health factor`, `liquidation`, `collateral`, `LP`, `liquidity`, `vault`, `compound`, `pancakeswap`, `venus`, `aave`.
-Juga filter langsung: `tags=defi,trading,yield` dan `categories=...`.
+Keywords: `rebalanc`, `grid`, `yield`, `APY`, `APR`, `health factor`, `liquidation`, `collateral`, `LP`, `liquidity`, `vault`, `compound`, `pancakeswap`, `venus`, `aave`.
+Also filter directly: `tags=defi,trading,yield` and `categories=...`.
 
-### Lapis 4 — Klasifikasi LLM atas `raw_metadata.offchain_content`
+### Layer 4 — LLM classification over `raw_metadata.offchain_content`
 
-Untuk tiap kandidat, ambil detail (`GET /api/v1/agents/56/{token_id}`) dan feed ke LLM:
+For each candidate, fetch the detail (`GET /api/v1/agents/56/{token_id}`) and feed the LLM:
 - `raw_metadata.offchain_content.description`, `.skills`, `.capabilities`, `.categories`, `.tags`, `.agent_type`
-- `services.mcp.tools[]` — **nama tool MCP adalah sinyal terkuat** (mis. tool `rebalancePosition`, `openGridOrder`, `getHealthFactor`)
+- `services.mcp.tools[]` — **the MCP tool names are the strongest signal** (e.g. a `rebalancePosition`, `openGridOrder`, or `getHealthFactor` tool)
 - `services.a2a.skills[]`
 
-Output: `{category, confidence, evidence}`. Simpan ke DB Fugugent, refresh mingguan atau saat webhook memberi tahu ada perubahan.
+The output: `{category, confidence, evidence}`. Store it in the Fugugent DB and refresh it weekly, or when a webhook tells us something changed.
 
-### Sinyal kualitas untuk ranking dalam kategori
+### Quality signals for ranking within a category
 
-Setelah dikategorikan, urutkan pakai field yang sudah disediakan 8004scan:
-| Sinyal | Field |
+Once classified, sort using the fields 8004scan already provides:
+| Signal | Field |
 |---|---|
-| Skor keseluruhan | `total_score` (5–95), `scores.breakdown` (v5, 5 dimensi) |
+| Overall score | `total_score` (5–95), `scores.breakdown` (v5, 5 dimensions) |
 | Liveness | `health_score`, `health_status.overall_status`, `health_checked_at` |
-| Reputasi | `average_score`, `total_feedbacks` (pakai `min_feedbacks=1`) |
-| Kredibilitas publisher | `owner_publisher_tier` (`OFFICIAL`/`VERIFIED`/`COMMUNITY`), `scores.wallet` |
-| Keaslian endpoint | `is_endpoint_verified`, `endpoint_verified_domain` |
-| Kelengkapan | `scores.metadata_completeness`, `parse_status.status` |
-| Traksi | `star_count`, views (`/views`, `/views/history`) |
-| Kesegaran | `scores.freshness`, `updated_at` |
-| Model bayar | `x402_supported` |
+| Reputation | `average_score`, `total_feedbacks` (use `min_feedbacks=1`) |
+| Publisher credibility | `owner_publisher_tier` (`OFFICIAL`/`VERIFIED`/`COMMUNITY`), `scores.wallet` |
+| Endpoint authenticity | `is_endpoint_verified`, `endpoint_verified_domain` |
+| Completeness | `scores.metadata_completeness`, `parse_status.status` |
+| Traction | `star_count`, views (`/views`, `/views/history`) |
+| Freshness | `scores.freshness`, `updated_at` |
+| Payment model | `x402_supported` |
 
-Bobot skor v5 (dari dokumentasi leaderboard) ✅: Engagement 30% · Service 25% · Publisher 20% · Compliance 15% · Momentum 10%.
+The v5 score weights (from the leaderboard documentation) ✅: Engagement 30% · Service 25% · Publisher 20% · Compliance 15% · Momentum 10%.
 
-### Rekomendasi arsitektur data Fugugent
+### Recommended Fugugent data architecture
 
 ```
-8004scan API (X-API-Key)                      ERC-8004 di BSC (fallback)
+8004scan API (X-API-Key)                      ERC-8004 on BSC (fallback)
    │                                                │
-   ├─ cron sync (semantic + filtered list)          ├─ event Registered / URIUpdated
-   ├─ webhook push (feedback/star/validation)       ├─ event NewFeedback
+   ├─ cron sync (semantic + filtered list)          ├─ Registered / URIUpdated events
+   ├─ webhook push (feedback/star/validation)       ├─ NewFeedback events
    ▼                                                ▼
-        Postgres Fugugent  ──►  classifier (rule + LLM)  ──►  4 kategori
-                           ──►  cache TTL 60s untuk detail, 5m untuk leaderboard
+        Fugugent Postgres  ──►  classifier (rules + LLM)  ──►  4 categories
+                           ──►  cache TTL 60s for detail, 5m for the leaderboard
                            ▼
-                     Marketplace API/UI Fugugent
+                     Fugugent Marketplace API/UI
 ```
-Sinkronkan TTL dengan cache upstream: detail agent 60s, leaderboard 5 menit, trending 1 menit, OASF stats 5 menit, global stats 60s.
+Match our TTLs to the upstream cache: agent detail 60s, leaderboard 5 minutes, trending 1 minute, OASF stats 5 minutes, global stats 60s.
 
 ---
 
-## A.9 ⚠️ Masalah operasional yang ditemukan saat uji live (8 Sep 2026)
+## A.9 ⚠️ Operational problems found during live testing (8 Sep 2026)
 
-1. **Request tanpa User-Agent browser dikembalikan `HTTP 500`.**
+1. **A request without a browser User-Agent comes back `HTTP 500`.**
    ```
    curl "https://api.8004scan.io/api/v1/agents?limit=1"                    → 500
    curl -H "User-Agent: curl/8.0" ".../agents?limit=1"                     → 500
    curl -A "Mozilla/5.0 ... Chrome/131.0.0.0 Safari/537.36" ".../agents"   → 200 ✅
    ```
-   Ini konsisten dengan tier `ANONYMOUS` ("Bot/script — tanpa header browser"), tapi seharusnya 429 bukan 500.
-   **Mitigasi:** selalu kirim `User-Agent` yang wajar **dan** `X-API-Key` dari backend.
+   This is consistent with the `ANONYMOUS` tier ("a bot/script — no browser headers"), but it should be a 429, not a 500.
+   **Mitigation:** always send a sensible `User-Agent` **and** an `X-API-Key`, from the backend.
 
-2. **`500 {"success":false,"error":{"code":"DATABASE_ERROR"}}` bersifat transien.**
-   `has_mcp=true` gagal sekali lalu berhasil saat diulang. `tags=`, `search_type=text` juga sempat gagal.
-   **Mitigasi wajib:** retry dengan exponential backoff (3–5x), circuit breaker, dan **selalu punya cache lokal** agar UI tidak kosong.
+2. **`500 {"success":false,"error":{"code":"DATABASE_ERROR"}}` is transient.**
+   `has_mcp=true` failed once and then worked on retry. `tags=` and `search_type=text` also failed at times.
+   **Mandatory mitigation:** retry with exponential backoff (3–5 attempts), a circuit breaker, and **always keep a local cache** so the UI is never empty.
 
-3. **Bentuk respons tidak seragam** — `{items,...}` vs `{success,data}` vs `{success,error}`. Buat wrapper parser.
+3. **The response shape is not uniform** — `{items,...}` vs `{success,data}` vs `{success,error}`. Write a wrapper parser.
 
-4. **Validation Registry kosong** (0 validator, 0 validation di semua mainnet). Fitur trust harus bertumpu pada reputation + health, bukan validation.
+4. **The Validation Registry is empty** (0 validators, 0 validations across every mainnet). Trust features have to rest on reputation + health, not validation.
 
-5. **Volume besar:** 309k agent di BSC, 3.197 agent baru/hari platform-wide. Banyak yang placeholder/spam (`"Agent #340784"` tanpa deskripsi, `total_score: 0`). **Wajib** pakai `is_registered=true`, `min_score`, `min_feedbacks`, atau `has_mcp=true`.
+5. **The volume is large:** 309k agents on BSC, 3,197 new agents per day platform-wide. Many are placeholders/spam (`"Agent #340784"` with no description and `total_score: 0`). Using `is_registered=true`, `min_score`, `min_feedbacks`, or `has_mcp=true` is **mandatory**.
 
 ---
 
-# BAGIAN B — TermiX
+# PART B — TermiX
 
-## B.1 Produk & rebranding penting ⚠️
+## B.1 The product and an important rebranding ⚠️
 
-**`https://app.termix.ai/` sekarang 301-redirect ke `https://www.agent.family/`** ✅ (diverifikasi live 8 Sep 2026). Produknya tetap TermiX/AACP; brand front-end-nya berubah. Dokumentasi tetap di `docs.termix.ai`.
+**`https://app.termix.ai/` now 301-redirects to `https://www.agent.family/`** ✅ (verified live on 8 Sep 2026). The product is still TermiX/AACP; its front-end brand has changed. The documentation stays at `docs.termix.ai`.
 
 **Tagline:** *"The marketplace where AI agents hire agents."*
 
-**AACP = Agent Autonomous Commerce Protocol** — *"trustless economic infrastructure for autonomous AI agent commerce"*. TermiX Platform adalah implementasi marketplace dari AACP.
+**AACP = the Agent Autonomous Commerce Protocol** — *"trustless economic infrastructure for autonomous AI agent commerce"*. The TermiX Platform is AACP's marketplace implementation.
 
-Berdiri di atas:
-- **[ERC-8004](https://eips.ethereum.org/EIPS/eip-8004)** untuk identitas & reputasi agent
-- **ERC-8183** untuk job escrow
-- Settlement **USDC/USDT** di BNB Chain & Base
+It stands on:
+- **[ERC-8004](https://eips.ethereum.org/EIPS/eip-8004)** for agent identity and reputation
+- **ERC-8183** for job escrow
+- **USDC/USDT** settlement on BNB Chain & Base
 
-> 🔑 **Insight strategis untuk Fugugent:** TermiX memakai **IdentityRegistry ERC-8004 yang sama persis** di BSC (`0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`) — terkonfirmasi dari `GET /api/v1/config/contracts` live. Artinya **agent yang kita daftarkan di ERC-8004 BSC otomatis punya identitas yang sama di TermiX dan terlihat di 8004scan.** Satu registrasi → tiga permukaan. Ini poin naratif yang sangat kuat untuk juri.
+> 🔑 **A strategic insight for Fugugent:** TermiX uses **exactly the same ERC-8004 IdentityRegistry** on BSC (`0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`) — confirmed from a live `GET /api/v1/config/contracts`. That means **an agent we register in ERC-8004 on BSC automatically has the same identity on TermiX and is visible on 8004scan.** One registration → three surfaces. That is a very strong narrative point for the judges.
 
-### URL
+### URLs
 
 | Resource | URL |
 |---|---|
-| Aplikasi | https://www.agent.family/ (ex-https://app.termix.ai/) |
+| The app | https://www.agent.family/ (formerly https://app.termix.ai/) |
 | Docs | https://docs.termix.ai/ |
 | Docs index (llms.txt) | https://docs.termix.ai/llms.txt |
 | OpenAPI | https://docs.termix.ai/api-reference/openapi.json |
@@ -940,120 +940,120 @@ Berdiri di atas:
 | Whitepaper | https://github.com/TermiX-official/aacp-whitepaper |
 | Testnet AACP frontend | https://aacp.termix.live |
 | Testnet AACP backend | https://aacp-backend.termix.live |
-| Org GitHub | https://github.com/TermiX-official |
+| GitHub org | https://github.com/TermiX-official |
 | X/Twitter | https://x.com/termix_ai |
 
-## B.2 Model hiring & pricing
+## B.2 The hiring & pricing model
 
-### Identitas terpadu, peran per-transaksi
+### One identity, roles decided per transaction
 
-Setiap peserta punya **Agent NFT** yang di-mint lewat ERC-8004 Identity Registry. Identitas **tidak** dibedakan "client" vs "provider" — agent yang sama bisa jadi pembeli di satu order dan penjual di order lain.
+Every participant has an **Agent NFT** minted through the ERC-8004 Identity Registry. Identity is **not** split into "client" versus "provider" — the same agent can be the buyer on one order and the seller on another.
 
-Dua peran tambahan **diberikan operator** (muncul di array `roles[]`):
-- **Evaluator** — duduk di panel 3 kursi yang memvoting delivery yang di-challenge; dapat evaluator fee
-- **Arbitrator** — memutus sengketa yang dieskalasi; dapat arbitrator fee
+Two extra roles are **granted by the operator** (they appear in the `roles[]` array):
+- **Evaluator** — sits on a 3-seat panel that votes on challenged deliveries; earns an evaluator fee
+- **Arbitrator** — decides escalated disputes; earns an arbitrator fee
 
-`roles[]` kosong itu normal, tidak menghalangi jual/beli.
+An empty `roles[]` is normal and does not stop you buying or selling.
 
-### Dua jalur memulai kerja
+### Two ways work starts
 
-| Jalur | Cara mulai | Cocok untuk |
+| Path | How it starts | Suited to |
 |---|---|---|
-| **Listing** | Provider publish layanan berharga tetap. Buyer beli langsung, atau buka percakapan dan terima custom offer | Layanan produk, berulang |
-| **Request** | Buyer publish request ("prepayment order") dengan rentang budget. Provider menemukan lalu submit offer | Kerja bespoke, quoting kompetitif |
-| **Bounty** | Brand mendanai kolam reward slot identik; provider mana pun yang memenuhi syarat bisa claim, fulfil dengan bukti, lalu dibayar (via `CampaignVault`, mengunci `providerBond`) | Kampanye massal |
+| **Listing** | The provider publishes a fixed-price service. The buyer buys it directly, or opens a conversation and accepts a custom offer | Productised, repeatable services |
+| **Request** | The buyer publishes a request (a "prepayment order") with a budget range. Providers find it and submit offers | Bespoke work, competitive quoting |
+| **Bounty** | A brand funds a pool of identical reward slots; any qualifying provider can claim one, fulfil it with proof, and get paid (through `CampaignVault`, which locks the `providerBond`) | Mass campaigns |
 
-### Siklus hidup order
+### The order lifecycle
 
 ```
 PENDING_ACCEPT → FUNDED / IN_PROGRESS → DELIVERED → SETTLED
                                             │
-                                            ├─ redo (sekali) → IN_PROGRESS
+                                            ├─ redo (once) → IN_PROGRESS
                                             └─ challenge → IN_DISPUTE → SETTLED
 ```
-Uang **hanya** bergerak lewat kontrak escrow, dan state database diproyeksikan dari event on-chain oleh indexer — bukan dari fakta bahwa kita broadcast transaksi.
+Money moves **only** through the escrow contract, and the database state is projected from on-chain events by an indexer — not from the fact that we broadcast a transaction.
 
-**Backend tidak pernah memegang key dan tidak pernah broadcast untuk kita.** Endpoint yang mengubah state on-chain mengembalikan **unsigned tx-intent**:
+**The backend never holds keys and never broadcasts on our behalf.** Endpoints that change on-chain state return an **unsigned tx-intent**:
 ```json
 { "action": "submitDelivery", "chainId": 56, "contract": "0x…",
   "callData": "0x…", "value": "0", "status": "PREPARED", "nonceKey": "…" }
 ```
 
-### Fee & settlement
+### Fees & settlement
 
-| Parameter | Berlaku untuk | Dibaca dari |
+| Parameter | Applies to | Read from |
 |---|---|---|
-| `protocolFeeBps` | Bagian protokol dari amount yang di-settle | `GET /api/v1/config/contracts`, per currency |
-| `campaignProtocolFeeBps` | Bagian protokol dari reward bounty | `GET /api/v1/config/contracts` |
-| `evaluatorFeeBps` | Panel evaluator (hanya order yang disengketakan) | Kontrak escrow → `evaluatorFeeAmount` |
-| `arbitratorFeeBps` | Arbitrator (hanya jika eskalasi) | Kontrak escrow → `arbitratorFeeAmount` |
-| `challengeBondAmount` | Dipasang oleh yang membuka challenge | Kontrak escrow |
+| `protocolFeeBps` | The protocol's share of a settled amount | `GET /api/v1/config/contracts`, per currency |
+| `campaignProtocolFeeBps` | The protocol's share of a bounty reward | `GET /api/v1/config/contracts` |
+| `evaluatorFeeBps` | The evaluator panel (disputed orders only) | The escrow contract → `evaluatorFeeAmount` |
+| `arbitratorFeeBps` | The arbitrator (only on escalation) | The escrow contract → `arbitratorFeeAmount` |
+| `challengeBondAmount` | Posted by whoever opens a challenge | The escrow contract |
 
-**Nilai live di BSC (8 Sep 2026)** ✅: `protocolFeeBps: 200` dan `campaignProtocolFeeBps: 200` → **2%**. Situs memasarkannya sebagai "1–3%" vs "~20%" platform konvensional.
+**The live values on BSC (8 Sep 2026)** ✅: `protocolFeeBps: 200` and `campaignProtocolFeeBps: 200` → **2%**. The site markets this as "1–3%" versus "~20%" on conventional platforms.
 
-**Settlement tanpa sengketa:** Provider dapat `budget − protocol fee`; protocol fee recipient dapat `budget × protocolFeeBps / 10_000`. Locked stake provider dilepas, hasil dicatat ke reputasi sebagai sukses. `claimAfterTimeout` membayar identik dengan accept eksplisit.
+**Settlement with no dispute:** the provider gets `budget − protocol fee`; the protocol fee recipient gets `budget × protocolFeeBps / 10_000`. The provider's locked stake is released, and the result is recorded to reputation as a success. `claimAfterTimeout` pays out identically to an explicit accept.
 
-**Settlement dengan sengketa:**
+**Settlement with a dispute:**
 ```
 budget
   ├─ protocol fee   budget × protocolFeeBps
-  ├─ evaluator fee  budget × evaluatorFeeBps   (dibagi rata 3 kursi, dust ke kursi pertama)
-  ├─ arbitrator fee budget × arbitratorFeeBps  (hanya jika eskalasi)
-  └─ sisanya ──────► pihak yang dimenangkan
+  ├─ evaluator fee  budget × evaluatorFeeBps   (split evenly across 3 seats, the dust to the first seat)
+  ├─ arbitrator fee budget × arbitratorFeeBps  (only on escalation)
+  └─ the remainder ──────► the winning party
 ```
-Kalau provider kalah, locked stake-nya di-slash ke buyer. Challenge bond pindah ke pihak yang menang.
+If the provider loses, its locked stake is slashed to the buyer. The challenge bond goes to the winning party.
 
-**Pembatalan:** `cancelPending` (buyer, sebelum provider accept) → refund penuh. `cancelExpired` (siapa pun, setelah `deliveryDueAt` lewat tanpa delivery) → refund penuh, **tanpa protocol fee**.
+**Cancellation:** `cancelPending` (the buyer, before the provider accepts) → a full refund. `cancelExpired` (anyone, once `deliveryDueAt` passes with no delivery) → a full refund, **with no protocol fee**.
 
-**Tidak ada yang menggantung** — semua jalur punya exit permissionless: `claimAfterTimeout`, `cancelExpired`, `finalizeAfterTimeout`, `reclaimExpired`. *"There is no auto-settle worker anywhere in the system."*
+**Nothing is left hanging** — every path has a permissionless exit: `claimAfterTimeout`, `cancelExpired`, `finalizeAfterTimeout`, `reclaimExpired`. *"There is no auto-settle worker anywhere in the system."*
 
 ### Staking
 
-Stake per agent, per currency, di kontrak `TermixStaking`. Tiga saldo: `available`, `locked`, `slashed`.
+Stake is per agent, per currency, in the `TermixStaking` contract. Three balances: `available`, `locked`, `slashed`.
 
-**Threshold ≠ Lock** (kesalahan integrasi paling umum):
-- **Threshold** = stake total minimum untuk memenuhi syarat; tidak mengunci apa pun. Sumbernya: `minStake` request, `desiredStake` order, `bondAmount` listing, `providerBond` bounty
-- **Lock** = dipindah dari available ke locked saat kerja diambil; `providerLockBps × budget` untuk order, **full `providerBond`** untuk bounty slot
+**Threshold ≠ Lock** (the most common integration mistake):
+- **A threshold** = the minimum total stake needed to qualify; it locks nothing. Its sources: a request's `minStake`, an order's `desiredStake`, a listing's `bondAmount`, a bounty's `providerBond`
+- **A lock** = moved from available to locked when work is taken on; `providerLockBps × budget` for an order, and the **full `providerBond`** for a bounty slot
 
-Live di BSC ✅: `providerLockBps: 0` untuk USDC dan USDT → **order reguler tidak mengunci stake**; angka stake buyer murni threshold kualifikasi.
+Live on BSC ✅: `providerLockBps: 0` for both USDC and USDT → **ordinary orders lock no stake**; a buyer's stake number is purely a qualification threshold.
 
-Gate error: `STAKE_GATE_NOT_MET`, `STAKE_FREE_INSUFFICIENT` (HTTP 403 dengan pesan kekurangan persis).
+Gate errors: `STAKE_GATE_NOT_MET`, `STAKE_FREE_INSUFFICIENT` (HTTP 403 with a message giving the exact shortfall).
 
-**Slashing** terjadi saat: kalah sengketa order (→ buyer), kalah sengketa bounty slot / lewat `maxSubmitSeconds` / rejection tak dilawan / dihapus sebagai claim terbengkalai (→ brand). Slashing dibatasi jumlah yang benar-benar di-lock untuk order/slot itu. **Provider yang sekadar telat delivery tidak di-slash** — `cancelExpired` refund penuh tanpa fee; biayanya adalah kehilangan bayaran + hit reputasi.
+**Slashing** happens when: an order dispute is lost (→ to the buyer), a bounty slot dispute is lost / `maxSubmitSeconds` passes / a rejection goes unchallenged / a claim is removed as abandoned (→ to the brand). Slashing is capped at the amount actually locked for that order/slot. **A provider who is merely late delivering is not slashed** — `cancelExpired` refunds in full with no fee; the cost is the lost payment plus a reputation hit.
 
-### Reputasi (kontrak `TermixReputation`)
+### Reputation (the `TermixReputation` contract)
 
-Skor **1–100**, tidak self-reported, tidak editable. Hanya recorder terotorisasi (escrow & bounty vault) yang boleh menulis, saat settlement.
+A score from **1–100**, not self-reported and not editable. Only authorised recorders (the escrow and the bounty vault) may write it, at settlement.
 
-Empat angka per agent: `completedOrders`, `successfulOrders`, `disputedOrders`, `lastUpdatedAt`.
-Fungsi penulis: `recordOrderResult(agentId, success, disputed)` dan `recordChallengeResult(agentId, providerUpheld)`.
+Four numbers per agent: `completedOrders`, `successfulOrders`, `disputedOrders`, `lastUpdatedAt`.
+The writer functions: `recordOrderResult(agentId, success, disputed)` and `recordChallengeResult(agentId, providerUpheld)`.
 
-**Formula** (success rate dengan Bayesian prior, dikurangi dispute rate):
+**The formula** (a success rate with a Bayesian prior, minus the dispute rate):
 ```
 total        = completedOrders + priorTotal
 successScore = (successfulOrders + priorSuccess) × 100 / total
 disputeRate  = disputedOrders × 100 / total
-score        = successScore − disputeRate      (lantai 1)
+score        = successScore − disputeRate      (floor of 1)
 ```
-Default prior: 5 virtual order, 3 sukses → agent baru mulai di **60**.
+The default prior: 5 virtual orders, 3 successful → a new agent starts at **60**.
 
-| Completed orders (semua sukses, tanpa dispute) | Skor |
+| Completed orders (all successful, no disputes) | Score |
 |---|---|
 | 0 | 60 |
 | 5 | 80 |
 | 20 | 92 |
 | 50 | 96 |
 
-Konvensi tampilan: ≥80 tinggi, 50–79 sedang, <50 rendah.
-Baca dari: `GET /api/v1/explorer/agents` (`reputationScore`, `completedJobs`, `passRate`, `stake`) · `GET /api/v1/agents/:handle` · `GET /api/v1/explorer/leaderboard` (window `24h|7d|30d|all`) · on-chain `TermixReputation.getScore(agentId)`.
+The display convention: ≥80 is high, 50–79 medium, <50 low.
+Read it from: `GET /api/v1/explorer/agents` (`reputationScore`, `completedJobs`, `passRate`, `stake`) · `GET /api/v1/agents/:handle` · `GET /api/v1/explorer/leaderboard` (window `24h|7d|30d|all`) · on-chain `TermixReputation.getScore(agentId)`.
 
-Reputasi **portabel** (hidup di kontrak, bukan DB platform) tapi **per-chain** — agent di BNB Chain dan Base adalah identitas terpisah.
+Reputation is **portable** (it lives in the contract, not the platform's DB) but **per chain** — an agent on BNB Chain and one on Base are separate identities.
 
-### Kategori layanan di marketplace
-Code & Smart Contracts (audit, integrasi, script) · Security & Verification (review, threat model, analisis eksploit) · Data & Research (labeling, ekstraksi, analisis, dataset) · Design & Brand · Market & Protocol Research · AI Automation.
-(Kategori terakhir dua terlihat pada data live `GET /api/v1/listings`.)
+### Service categories in the marketplace
+Code & Smart Contracts (audits, integrations, scripts) · Security & Verification (reviews, threat models, exploit analysis) · Data & Research (labelling, extraction, analysis, datasets) · Design & Brand · Market & Protocol Research · AI Automation.
+(The last two categories were seen in live `GET /api/v1/listings` data.)
 
-## B.3 Network & kontrak TermiX ✅
+## B.3 TermiX networks & contracts ✅
 
 | | BNB Chain (default) | Base |
 |---|---|---|
@@ -1064,36 +1064,36 @@ Code & Smart Contracts (audit, integrasi, script) · Security & Verification (re
 | Gas token | BNB | ETH |
 | Settlement | USDC, USDT | USDC, USDT |
 
-> ⚠️ Tiap chain adalah dunia terpisah: account, agent, listing, order, stake, settlement sendiri. `404` pada ID yang kita yakin benar biasanya berarti base URL chain yang salah.
+> ⚠️ Each chain is a separate world: its own accounts, agents, listings, orders, stake, and settlement. A `404` on an ID you are sure is right usually means the wrong chain's base URL.
 
-**Alamat kontrak live BSC** — hasil `GET https://platform-backend.prod.termix.live/api/v1/config/contracts` ✅ (8 Sep 2026):
+**The live BSC contract addresses** — the result of `GET https://platform-backend.prod.termix.live/api/v1/config/contracts` ✅ (8 Sep 2026):
 
-| Kontrak | Alamat |
+| Contract | Address |
 |---|---|
-| IdentityRegistry / agentNft | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` *(= ERC-8004 kanonik)* |
+| IdentityRegistry / agentNft | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` *(= the canonical ERC-8004 one)* |
 | TermixReputation | `0xFf3f7038c4919A420B30D7B3533cb386D5898189` |
-| **USDC** (token) | `0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d` (18 desimal) |
+| **USDC** (token) | `0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d` (18 decimals) |
 | USDC — TermixEscrow | `0x6A52ba4C84b348FaEAe13dDC7A97b4F6af23913C` |
 | USDC — TermixStaking | `0x0Bd066f5113e6B8336b06F8Aa3EF90D37F7e65FC` |
 | USDC — CampaignVault | `0x5BaE7834B32a4b357F65dd20248068993466D294` |
-| **USDT** (token) | `0x55d398326f99059fF775485246999027B3197955` (18 desimal) |
+| **USDT** (token) | `0x55d398326f99059fF775485246999027B3197955` (18 decimals) |
 | USDT — TermixEscrow | `0xCE02f987D8b8AF694E13C8a843Db9c77caBF544c` |
 | USDT — TermixStaking | `0x1DcafFB7275fa2650d480a4F939A0C0D5874750B` |
 | USDT — CampaignVault | `0x16261F2BCbE8Ee47065C5ecB4be32c1571289809` |
 
-> 📌 **Jangan hardcode.** Dokumentasi tegas: fetch `/api/v1/config/contracts` saat startup dan cache per sesi. Tiap settlement currency punya set kontrak sendiri. `settlementCurrency` (tunggal) adalah field legacy USDC-only — jangan dipakai untuk alur USDT.
+> 📌 **Do not hardcode these.** The documentation is firm: fetch `/api/v1/config/contracts` at startup and cache it per session. Each settlement currency has its own set of contracts. `settlementCurrency` (singular) is a legacy USDC-only field — do not use it for USDT flows.
 
-## B.4 REST API TermiX
+## B.4 The TermiX REST API
 
-Base: `https://platform-backend.prod.termix.live`, semua di-prefix `/api/v1/`.
+Base: `https://platform-backend.prod.termix.live`, everything prefixed with `/api/v1/`.
 
-**Autentikasi:**
-| Mode | Header | Cakupan |
+**Authentication:**
+| Mode | Header | Scope |
 |---|---|---|
 | None | — | Public reads: config, stats, explorer, listings, bounties, request discovery |
-| Session JWT | `Authorization: Bearer <accessToken>` | Semua yang dilakukan wallet owner |
-| API key | `Authorization: Bearer <apiKey>` | M2M, scope `acn:rpc` / `a2a:rpc` |
-| A2A runtime token | `Authorization: Bearer <runtimeToken>` | Inbox & reply satu agent |
+| Session JWT | `Authorization: Bearer <accessToken>` | Everything the wallet owner does |
+| API key | `Authorization: Bearer <apiKey>` | M2M, scopes `acn:rpc` / `a2a:rpc` |
+| A2A runtime token | `Authorization: Bearer <runtimeToken>` | One agent's inbox and replies |
 
 ```bash
 curl -X POST "$AACP_API/api/v1/auth/nonce" \
@@ -1101,50 +1101,50 @@ curl -X POST "$AACP_API/api/v1/auth/nonce" \
   -d '{"walletAddress":"0xYourAddress"}'
 ```
 
-**Konvensi:** uang = decimal display string (`"15"`, `"33.5"`), skala pakai `settlementCurrencies[].decimals` · timestamp ISO-8601 UTC · ID = cuid database (beberapa endpoint terima `agentTokenId` on-chain) · paging `page` + `pageSize` (max 100) → `{items, page, pageSize, total, totalPages}` · **schema strict**: field tak dikenal → HTTP 400.
+**Conventions:** money = a decimal display string (`"15"`, `"33.5"`), scaled using `settlementCurrencies[].decimals` · timestamps are ISO-8601 UTC · IDs are database cuids (some endpoints also accept the on-chain `agentTokenId`) · paging is `page` + `pageSize` (max 100) → `{items, page, pageSize, total, totalPages}` · the **schema is strict**: an unknown field → HTTP 400.
 
-**Grup endpoint** (docs: https://docs.termix.ai/api-reference/overview):
-`/config` · `/agents` (mint, storefront, explorer, stake, A2A) · `/listings` · `/requests` · `/offers` (quote, revisi, acceptance, funding) · `/orders` · `/disputes` · `/bounties` · `/explorer` + `/metrics` (stats, leaderboard, dashboard) · `/realtime` (SSE)
+**Endpoint groups** (docs: https://docs.termix.ai/api-reference/overview):
+`/config` · `/agents` (mint, storefront, explorer, stake, A2A) · `/listings` · `/requests` · `/offers` (quotes, revisions, acceptance, funding) · `/orders` · `/disputes` · `/bounties` · `/explorer` + `/metrics` (stats, leaderboard, dashboard) · `/realtime` (SSE)
 
-**Diuji live** ✅:
-- `GET /api/v1/config/contracts` → 200, config lengkap
-- `GET /api/v1/listings?pageSize=2` → 200, listing nyata dengan `title`, `category`, `skillTag`, `tags[]`, `description`
-- `GET /api/v1/explorer/agents?pageSize=2` → 200; item berisi `completedJobs`, `stake`, `reputationScore`, `passRate`, `onTimeRate`, dan nested `agent{agentTokenId, name, description, tokenUri, a2aEndpoint, a2aStatus, presence, verified, topRated, pro, metrics{...}}`
-- `GET /api/v1/metrics/network` → **401 UNAUTHORIZED** (butuh auth)
-- `GET /api/v1/explorer/leaderboard?window=7d&pageSize=2` → **400** `Unrecognized key(s) in object: 'pageSize'` (bukti schema strict — pakai `page`/nama param yang benar per docs)
+**Tested live** ✅:
+- `GET /api/v1/config/contracts` → 200, the full config
+- `GET /api/v1/listings?pageSize=2` → 200, real listings with `title`, `category`, `skillTag`, `tags[]`, `description`
+- `GET /api/v1/explorer/agents?pageSize=2` → 200; the items contain `completedJobs`, `stake`, `reputationScore`, `passRate`, `onTimeRate`, and a nested `agent{agentTokenId, name, description, tokenUri, a2aEndpoint, a2aStatus, presence, verified, topRated, pro, metrics{...}}`
+- `GET /api/v1/metrics/network` → **401 UNAUTHORIZED** (needs auth)
+- `GET /api/v1/explorer/leaderboard?window=7d&pageSize=2` → **400** `Unrecognized key(s) in object: 'pageSize'` (proof of the strict schema — use `page`/the correct param names per the docs)
 
-Endpoint stake: `POST /api/v1/agents/:id/stake/deposit-intent` (approveStake lalu depositStake) · `POST /api/v1/agents/:id/stake/withdraw-intent` · `GET /api/v1/metrics/provider/treasury`.
+The stake endpoints: `POST /api/v1/agents/:id/stake/deposit-intent` (approveStake then depositStake) · `POST /api/v1/agents/:id/stake/withdraw-intent` · `GET /api/v1/metrics/provider/treasury`.
 
-## B.5 BSC MCP server open-source TermiX ⭐
+## B.5 TermiX's open-source BSC MCP server ⭐
 
-**Repo:** https://github.com/TermiX-official/bsc-mcp (public, MIT, org `TermiX-official`) ✅
+**Repo:** https://github.com/TermiX-official/bsc-mcp (public, MIT, the `TermiX-official` org) ✅
 
-**⚠️ Nama paket npm ≠ nama repo.** Repo `bsc-mcp`, tapi `package.json` mendeklarasikan:
+**⚠️ The npm package name ≠ the repo name.** The repo is `bsc-mcp`, but `package.json` declares:
 ```json
 { "name": "bnbchain-mcp", "version": "1.0.12", "bin": { "bnbchain-mcp": "build/index.js" } }
 ```
-Nama MCP server yang di-expose ke klien: `"bsc-mcp"` (dari `src/main.ts`).
+The MCP server name exposed to clients is `"bsc-mcp"` (from `src/main.ts`).
 
-### Install & konfigurasi ✅
+### Install & configuration ✅
 
 ```bash
-# 1. Install global
+# 1. Install globally
 npm install -g bnbchain-mcp
 
-# 2. Wizard setup
+# 2. The setup wizard
 bnbchain-mcp --init
 ```
-Wizard menanyakan:
-- **BSC Wallet Private Key** (wajib)
-- **Wallet Password** (wajib, min 6 karakter) — private key disimpan terenkripsi **AES-256 + bcrypt**
-- **Custom RPC URL** (opsional, default `https://bsc-dataseed.binance.org`)
+The wizard asks for:
+- **A BSC Wallet Private Key** (required)
+- **A Wallet Password** (required, at least 6 characters) — the private key is stored encrypted with **AES-256 + bcrypt**
+- **A custom RPC URL** (optional, defaults to `https://bsc-dataseed.binance.org`)
 
-Setelah setup, tool **auto-configure ke Claude Desktop** dengan memodifikasi:
+After setup, the tool **auto-configures Claude Desktop** by modifying:
 ```
 ~/Library/Application Support/Claude/claude_desktop_config.json
 ```
 
-Konfigurasi manual (Claude Desktop / Claude Code / Cursor — bentuk standar MCP):
+Manual configuration (Claude Desktop / Claude Code / Cursor — the standard MCP form):
 ```json
 {
   "mcpServers": {
@@ -1154,39 +1154,39 @@ Konfigurasi manual (Claude Desktop / Claude Code / Cursor — bentuk standar MCP
   }
 }
 ```
-> ⚠️ Repo tidak mendokumentasikan blok JSON eksplisit ini; bentuk di atas diturunkan dari `bin` di `package.json` + `StdioServerTransport` di `src/main.ts`. Tandai `UNVERIFIED` sampai dites. Alternatif yang pasti jalan: `"command": "node", "args": ["<path>/build/index.js"]`.
+> ⚠️ The repo does not document this exact JSON block; the form above is derived from the `bin` entry in `package.json` plus the `StdioServerTransport` in `src/main.ts`. Mark it `UNVERIFIED` until tested. A guaranteed alternative: `"command": "node", "args": ["<path>/build/index.js"]`.
 
 CLI flags: `--init`/`-i`, `--help`/`-h`, `--version`/`-v`.
 Dev: `npm run build` (tsc) · `npm start` / `node build/index.js`.
 
-### Tools yang benar-benar terdaftar (dari `src/main.ts`) ✅
+### The tools actually registered (from `src/main.ts`) ✅
 
-| Tool | Fungsi |
+| Tool | Function |
 |---|---|
-| `transferNativeToken` | Kirim BNB |
-| `transferBEP20Token` | Transfer BEP-20 via symbol/address |
-| **`pancakeSwap`** | **Swap token via PancakeSwap** |
-| `getWalletInfo` | Info wallet |
-| `getBalance` | Saldo native + token *(disebut README)* |
-| `buyMemeToken` | Beli token Four.Meme |
-| `sellMemeToken` | Jual token Four.Meme |
-| **`pancakeAddLiquidity`** | **Tambah likuiditas PancakeSwap** |
-| **`pancakeMyPosition`** | **Lihat posisi likuiditas** |
-| **`pancakeRemovePosition`** | **Tarik likuiditas** |
-| `goplusSecurityCheck` | Cek keamanan token BSC via GoPlus |
-| `queryMemeTokenDetails` | Detail token Four.Meme |
+| `transferNativeToken` | Send BNB |
+| `transferBEP20Token` | Transfer a BEP-20 by symbol/address |
+| **`pancakeSwap`** | **Swap tokens through PancakeSwap** |
+| `getWalletInfo` | Wallet info |
+| `getBalance` | Native + token balances *(mentioned in the README)* |
+| `buyMemeToken` | Buy a Four.Meme token |
+| `sellMemeToken` | Sell a Four.Meme token |
+| **`pancakeAddLiquidity`** | **Add PancakeSwap liquidity** |
+| **`pancakeMyPosition`** | **View liquidity positions** |
+| **`pancakeRemovePosition`** | **Withdraw liquidity** |
+| `goplusSecurityCheck` | Check a BSC token's safety through GoPlus |
+| `queryMemeTokenDetails` | Four.Meme token detail |
 
-> ⚠️ README juga menyebut `createBEP20Token`, `createFourMeme`, dan `callContractFunction`, tetapi **ketiganya tidak ter-register di `src/main.ts`** pada branch `main` saat diperiksa. Anggap README lebih ambisius dari kode. `UNVERIFIED`.
+> ⚠️ The README also mentions `createBEP20Token`, `createFourMeme`, and `callContractFunction`, but **none of the three is registered in `src/main.ts`** on the `main` branch as inspected. Treat the README as more ambitious than the code. `UNVERIFIED`.
 
-### Stack teknis ✅ (dari `package.json`)
+### The technical stack ✅ (from `package.json`)
 - `viem ^2.23.11`
 - **`@pancakeswap/sdk ^5.8.8`**, **`@pancakeswap/v3-sdk ^3.9.0`**, **`@pancakeswap/smart-router 6.1.6`**, **`@pancakeswap/tokens ^0.6.24`**
 - `@modelcontextprotocol/sdk ^1.4.0`
 - `@goplus/sdk-node ^1.0.12`, `moralis ^2.27.2`, `graphql-request ^7.1.2`
 - `bcrypt ^5.1.1`, `dotenv`, `chalk`, `figlet`, `ora`, `prompts`, `fs-extra`
-- Network: BNB Smart Chain Mainnet (chain ID 56), RPC default `https://bsc-dataseed.binance.org`
+- Network: BNB Smart Chain Mainnet (chain ID 56), default RPC `https://bsc-dataseed.binance.org`
 
-Alamat kontrak yang di-hardcode di `src/addressConfig.ts` ✅ (hanya Four.Meme — PancakeSwap diakses via SDK):
+The contract addresses hardcoded in `src/addressConfig.ts` ✅ (Four.Meme only — PancakeSwap is reached through the SDK):
 ```ts
 FourMemeTryBuyContract:        0xF251F83e40a78868FcfA3FA4599Dad6494E46034
 FourMemeBuyTokenAMAPContract:  0x5c952063c7fc8610FFDB798152D69F0B9550762b
@@ -1194,9 +1194,9 @@ FourMemeSellTokenAMAPContract: 0x5c952063c7fc8610FFDB798152D69F0B9550762b
 FourMemeCreateTokenContract:   0x5c952063c7fc8610FFDB798152D69F0B9550762b
 ```
 
-> ⚠️ **Peringatan keamanan untuk Fugugent:** MCP ini menyimpan **private key mentah** (terenkripsi lokal) dan mengeksekusi transaksi langsung. Ini bertentangan dengan prinsip "tidak memegang dana user" (lihat Bagian C). **Rekomendasi: pakai bsc-mcp hanya untuk (a) dev/testing dengan wallet burner, dan (b) menjalankan baseline eksperimen Agent Advantage Report.** Untuk produk, pakai pola session-key/delegation.
+> ⚠️ **A security warning for Fugugent:** this MCP stores a **raw private key** (encrypted locally) and executes transactions directly. That contradicts the "we never hold user funds" principle (see Part C). **Recommendation: use bsc-mcp only for (a) dev/testing with a burner wallet, and (b) running the Agent Advantage Report baseline experiments.** For the product, use a session-key/delegation pattern.
 
-### Skill AACP TermiX (terpisah dari MCP)
+### The TermiX AACP skills (separate from the MCP)
 
 Repo: https://github.com/TermiX-official/termix-agent-skills ✅ (MIT)
 
@@ -1204,74 +1204,74 @@ Repo: https://github.com/TermiX-official/termix-agent-skills ✅ (MIT)
 /plugin marketplace add TermiX-official/termix-agent-skills
 /plugin install termix-agent-skills@termix-agent-skills
 ```
-atau `npx skills add TermiX-official/termix-agent-skills [-g]`, atau `help me install http://termix.ai/skills`.
+or `npx skills add TermiX-official/termix-agent-skills [-g]`, or `help me install http://termix.ai/skills`.
 
-Env: `AACP_CHAIN` (`bsc` default / `base`) · `WALLET_KEY` · `AACP_BASE_URL` · `A2A_RPC_URL` · `OPENROUTER_API_KEY`/`OPENAI_API_KEY` · `A2A_LLM_MODEL` (default `openai/gpt-4o-mini`).
-Butuh Node.js 18+, script `.mjs` dependency-free (pakai `fetch` bawaan, tanpa viem/ethers).
-Verifikasi install: `node <skill-dir>/scripts/aacp-config.mjs`.
+Env: `AACP_CHAIN` (`bsc` by default / `base`) · `WALLET_KEY` · `AACP_BASE_URL` · `A2A_RPC_URL` · `OPENROUTER_API_KEY`/`OPENAI_API_KEY` · `A2A_LLM_MODEL` (default `openai/gpt-4o-mini`).
+Requires Node.js 18+; the `.mjs` scripts are dependency-free (they use the built-in `fetch`, no viem/ethers).
+Verify the install: `node <skill-dir>/scripts/aacp-config.mjs`.
 
-> ⚠️ README repo skill menyebut base URL `https://aacp-backend.termix.live` dan chain **BSC Testnet**, sedangkan docs resmi menyebut produksi `https://platform-backend.prod.termix.live` di BSC mainnet. README repo tampaknya tertinggal. Pakai `docs.termix.ai` sebagai sumber kebenaran.
+> ⚠️ The skills repo's README mentions the base URL `https://aacp-backend.termix.live` and the **BSC Testnet** chain, whereas the official docs give production as `https://platform-backend.prod.termix.live` on BSC mainnet. The repo README appears to be out of date. Treat `docs.termix.ai` as the source of truth.
 
-## B.6 Kriteria juri TermiX & rancangan Agent Advantage Report
+## B.6 The TermiX judging criteria & the Agent Advantage Report design
 
-**Hadiah:** $6.000 (1) / $3.000 (2) / $1.000 (3).
+**Prizes:** $6,000 (1st) / $3,000 (2nd) / $1,000 (3rd).
 
-| Kriteria | Bobot | Yang dinilai |
+| Criterion | Weight | What is judged |
 |---|---|---|
-| **Value of the services** | **30%** | Agent mengalahkan alternatif dalam harga/kecepatan |
-| **Proven agent advantage** | **30%** | Hasil terukur, didukung *Agent Advantage Report* wajib |
-| **High-stakes categories & track record** | **20%** | Trading/security diberi bobot lebih tinggi |
+| **Value of the services** | **30%** | The agent beats the alternative on price/speed |
+| **Proven agent advantage** | **30%** | Measured results, backed by the mandatory *Agent Advantage Report* |
+| **High-stakes categories & track record** | **20%** | Trading/security are weighted higher |
 | **Marketplace quality** | **20%** | Discoverability & usability |
 
-**Syarat wajib Agent Advantage Report:**
-- Minimal **3 task nyata** dijalankan **dua kali** — dengan agent dan tanpa agent
-- Metrik **waktu, biaya, dan kualitas output**, dengan **output nyata dilampirkan**
-- Minimal **1 task** dari kategori **trading / stock / security**
+**Mandatory Agent Advantage Report requirements:**
+- At least **3 real tasks** run **twice** — with the agent and without it
+- Metrics for **time, cost, and output quality**, with **the real outputs attached**
+- At least **1 task** from the **trading / stock / security** categories
 
 ---
 
-### B.6.1 Rancangan eksperimen yang meyakinkan
+### B.6.1 Designing a convincing experiment
 
-#### Prinsip metodologi
+#### Methodology principles
 
-1. **Paired design, bukan A/B terpisah.** Task yang **identik**, input yang **identik**, dijalankan dua kali. Kondisi berbeda hanya pada tooling. Ini menghilangkan variasi task sebagai perancu.
-2. **Pre-register.** Tulis task, metrik, dan kriteria "berhasil" **sebelum** menjalankan. Simpan sebagai file dengan git commit bertanggal — bukti kepada juri bahwa metrik tidak dipilih setelah melihat hasil.
-3. **Baseline yang jujur.** Kondisi "tanpa agent" harus **manusia kompeten dengan tool standar** (BscScan, UI PancakeSwap, DefiLlama, spreadsheet, kalkulator) — **bukan** straw man. Juri akan mendeteksi baseline yang sengaja dilemahkan, dan itu merusak semua klaim.
-4. **Ulangi ≥3x per kondisi** dan laporkan **median + rentang**, bukan hanya satu angka. Untuk trading, ulangi jauh lebih banyak (lihat B.6.4).
-5. **Deterministik semaksimal mungkin.** Pin block height untuk pembacaan on-chain, catat timestamp, pin versi model & seed, simpan raw response.
-6. **Blind grading kualitas.** Output dari kedua kondisi dianonimkan, diacak urutannya, dinilai 2+ rater independen dengan rubrik tertulis. Laporkan **inter-rater agreement** (Cohen's κ atau korelasi sederhana).
-7. **Laporkan yang gagal.** Kalau satu task tidak menunjukkan keunggulan agent, **tulis apa adanya** dan jelaskan kapan agent tidak cocok. Kredibilitas naik, dan juri sudah pasti mencari tanda cherry-picking.
+1. **A paired design, not a separate A/B.** The **same** task with the **same** inputs, run twice. The only difference between conditions is the tooling. This removes task variation as a confounder.
+2. **Pre-register.** Write the tasks, the metrics, and the "success" criteria **before** running anything. Save it as a file with a dated git commit — proof to the judges that the metrics were not picked after seeing the results.
+3. **An honest baseline.** The "without an agent" condition has to be **a competent human with standard tools** (BscScan, the PancakeSwap UI, DefiLlama, a spreadsheet, a calculator) — **not** a straw man. Judges will spot a deliberately weakened baseline, and it destroys every claim.
+4. **Repeat ≥3 times per condition** and report the **median + range**, not just one number. For trading, repeat far more (see B.6.4).
+5. **Be as deterministic as possible.** Pin the block height for on-chain reads, record timestamps, pin the model version and seed, and keep the raw responses.
+6. **Grade quality blind.** Anonymise the outputs from both conditions, shuffle the order, and have 2+ independent raters score them against a written rubric. Report the **inter-rater agreement** (Cohen's κ or a simple correlation).
+7. **Report what failed.** If a task shows no advantage for the agent, **write it up as it is** and explain when the agent is the wrong tool. Credibility goes up, and the judges are definitely looking for signs of cherry-picking.
 
-#### Metrik inti (semua task)
+#### Core metrics (all tasks)
 
-| Dimensi | Metrik | Cara ukur |
+| Dimension | Metric | How to measure it |
 |---|---|---|
-| **Waktu** | Wall-clock time to first useful output; time to complete; jumlah langkah manual | Stopwatch + screen recording; catat per-langkah |
-| **Biaya** | Biaya LLM token (USD, `input_tokens × harga + output_tokens × harga`); gas on-chain (BNB → USD, dari receipt tx); waktu manusia × tarif ($50/jam, sebutkan asumsinya) | Log token dari API; `gasUsed × effectiveGasPrice` |
-| **Kualitas** | Skor rubrik 0–5 per dimensi; correctness (fakta benar/salah, diverifikasi on-chain); completeness (butir wajib tercakup); actionability | Blind grading 2 rater |
-| **Keandalan** | Success rate lintas percobaan; jumlah error/retry; jumlah halusinasi (klaim yang tidak terverifikasi on-chain) | Hitung dari log |
+| **Time** | Wall-clock time to the first useful output; time to complete; the number of manual steps | A stopwatch + a screen recording; record it per step |
+| **Cost** | LLM token cost (USD, `input_tokens × price + output_tokens × price`); on-chain gas (BNB → USD, from the tx receipt); human time × a rate ($50/hour, state the assumption) | Token logs from the API; `gasUsed × effectiveGasPrice` |
+| **Quality** | A 0–5 rubric score per dimension; correctness (facts right or wrong, verified on-chain); completeness (the required items covered); actionability | Blind grading by 2 raters |
+| **Reliability** | The success rate across attempts; the number of errors/retries; the number of hallucinations (claims not verifiable on-chain) | Counted from the logs |
 
-Sajikan sebagai satu tabel per task:
+Present it as one table per task:
 
-| Task | Kondisi | Waktu (median) | Biaya LLM | Gas | Waktu manusia | Kualitas (0–5) | Success rate | Artefak |
+| Task | Condition | Time (median) | LLM cost | Gas | Human time | Quality (0–5) | Success rate | Artefacts |
 |---|---|---|---|---|---|---|---|---|
-| T1 | Tanpa agent | 42m | $0 | $0.41 | 42m ≈ $35.00 | 3.5 | 3/3 | `artifacts/T1-baseline/` |
-| T1 | Dengan agent | 4m10s | $0.18 | $0.39 | 1m ≈ $0.83 | 4.2 | 3/3 | `artifacts/T1-agent/` |
+| T1 | Without an agent | 42m | $0 | $0.41 | 42m ≈ $35.00 | 3.5 | 3/3 | `artifacts/T1-baseline/` |
+| T1 | With an agent | 4m10s | $0.18 | $0.39 | 1m ≈ $0.83 | 4.2 | 3/3 | `artifacts/T1-agent/` |
 
-Sertakan **delta dan rasio**: "9,9× lebih cepat, 96% lebih murah dalam biaya manusia, +0,7 poin kualitas".
+Include the **delta and the ratio**: "9.9× faster, 96% cheaper in human cost, +0.7 quality points".
 
-#### Struktur repo laporan
+#### The report repo structure
 
 ```
 agent-advantage-report/
-├── README.md                  # ringkasan eksekutif + tabel hasil
-├── methodology.md             # pre-registration, rubrik, asumsi biaya
+├── README.md                  # executive summary + the results table
+├── methodology.md             # pre-registration, the rubric, cost assumptions
 ├── tasks/
 │   ├── T1-lp-rebalance/
-│   │   ├── task.md            # prompt/instruksi identik untuk kedua kondisi
-│   │   ├── baseline/          # screen recording, catatan, output mentah
-│   │   ├── agent/             # transcript, tool calls, output mentah
-│   │   └── results.json       # metrik terstruktur
+│   │   ├── task.md            # the identical prompt/instructions for both conditions
+│   │   ├── baseline/          # screen recording, notes, raw output
+│   │   ├── agent/             # transcript, tool calls, raw output
+│   │   └── results.json       # structured metrics
 │   ├── T2-health-factor/
 │   ├── T3-token-security/
 │   └── T4-yield-routing/
@@ -1280,113 +1280,113 @@ agent-advantage-report/
 │   ├── rater-A.csv
 │   └── rater-B.csv
 └── evidence/
-    ├── tx-hashes.md           # semua tx BscScan
-    └── agent-ids.md           # agentId ERC-8004 + order TermiX
+    ├── tx-hashes.md           # every BscScan tx
+    └── agent-ids.md           # the ERC-8004 agentIds + TermiX orders
 ```
 
 ---
 
-### B.6.2 Empat task yang direkomendasikan
+### B.6.2 The four recommended tasks
 
-Semuanya memakai stack yang kita bangun, dan **T3 memenuhi syarat "minimal 1 task trading/stock/security"** (bahkan T1 & T3 dua-duanya memenuhi).
+All of them use the stack we are building, and **T3 satisfies the "at least 1 trading/stock/security task" requirement** (in fact T1 and T3 both do).
 
-#### **T1 — Rebalancing posisi LP PancakeSwap v3** *(kategori: trading — high stakes)*
+#### **T1 — Rebalancing a PancakeSwap v3 LP position** *(category: trading — high stakes)*
 
-*Task:* "Diberikan posisi v3 CAKE/BNB dengan range [tickLower, tickUpper] yang sudah keluar range, tentukan range baru yang optimal untuk horizon 7 hari, hitung fee yang belum diklaim, estimasi gas rebalance, dan tentukan apakah rebalance menguntungkan setelah biaya. Hasilkan rencana eksekusi."
+*The task:* "Given a CAKE/BNB v3 position with a range [tickLower, tickUpper] that has gone out of range, determine the optimal new range for a 7-day horizon, compute the unclaimed fees, estimate the rebalance gas, and decide whether rebalancing is profitable after costs. Produce an execution plan."
 
-- **Baseline:** buka UI PancakeSwap, baca posisi manual, salin ke spreadsheet, hitung fee APR dari data pool, estimasi gas via BscScan, putuskan.
-- **Agent:** agent rebalancing Fugugent + `pancakeMyPosition` (bsc-mcp) + data subgraph.
-- **Metrik tambahan:** akurasi ambang break-even (bandingkan dengan perhitungan ground truth yang dihitung terpisah), apakah range yang diusulkan benar-benar mengandung harga selama 7 hari berikutnya (backtest).
+- **Baseline:** open the PancakeSwap UI, read the position by hand, copy it into a spreadsheet, compute the fee APR from pool data, estimate gas through BscScan, decide.
+- **Agent:** the Fugugent rebalancing agent + `pancakeMyPosition` (bsc-mcp) + subgraph data.
+- **Extra metrics:** the accuracy of the break-even threshold (compare against a separately computed ground-truth calculation), and whether the proposed range actually contained the price over the following 7 days (a backtest).
 
-#### **T2 — Monitor & remediasi health factor** *(kategori: risk)*
+#### **T2 — Health factor monitoring & remediation** *(category: risk)*
 
-*Task:* "Untuk wallet X dengan posisi pinjam di protokol lending BSC, hitung health factor saat ini, harga likuidasi per aset kolateral, jumlah tepat yang harus dibayar untuk mencapai HF 1.8, dan biaya melakukannya. Hasilkan pemberitahuan yang dapat ditindak."
+*The task:* "For wallet X with a borrow position on a BSC lending protocol, compute the current health factor, the liquidation price per collateral asset, the exact amount that must be repaid to reach HF 1.8, and the cost of doing so. Produce an actionable notification."
 
-- **Baseline:** UI protokol + kalkulator manual + oracle harga.
-- **Agent:** agent health-factor Fugugent.
-- **Metrik tambahan:** akurasi (bandingkan HF hitungan dengan yang dibaca on-chain), waktu deteksi saat harga bergerak (simulasikan dengan skenario harga historis).
+- **Baseline:** the protocol UI + a manual calculator + a price oracle.
+- **Agent:** the Fugugent health-factor agent.
+- **Extra metrics:** accuracy (compare the computed HF against the on-chain reading), and detection time when the price moves (simulate it with historical price scenarios).
 
-#### **T3 — Audit keamanan token sebelum trading** *(kategori: security — high stakes)* ⭐ wajib
+#### **T3 — A token security audit before trading** *(category: security — high stakes)* ⭐ required
 
-*Task:* "Diberikan 10 alamat token BEP-20 (campuran: aman, honeypot, high-tax, proxy upgradeable, unverified), klasifikasikan tiap token sebagai SAFE / CAUTION / AVOID dengan alasan tertulis dan bukti on-chain."
+*The task:* "Given 10 BEP-20 token addresses (a mix: safe, honeypot, high-tax, upgradeable proxy, unverified), classify each token as SAFE / CAUTION / AVOID with written reasoning and on-chain evidence."
 
-- **Baseline:** BscScan manual + baca kode + cek holder.
-- **Agent:** `goplusSecurityCheck` (bsc-mcp) + agent analisis kita.
-- **Metrik tambahan:** ini punya **ground truth** — precision/recall/F1 terhadap label yang sudah diketahui. **Confusion matrix adalah bukti paling kuat yang bisa kita tunjukkan ke juri.** Tekankan false-negative (token berbahaya diberi label SAFE) karena itu kerugian nyata.
+- **Baseline:** BscScan by hand + reading the code + checking holders.
+- **Agent:** `goplusSecurityCheck` (bsc-mcp) + our analysis agent.
+- **Extra metrics:** this one has **ground truth** — precision/recall/F1 against known labels. **The confusion matrix is the strongest evidence we can show the judges.** Emphasise the false negatives (a dangerous token labelled SAFE), because that is a real loss.
 
-#### **T4 — Riset routing yield lintas pool** *(kategori: yield)*
+#### **T4 — Cross-pool yield routing research** *(category: yield)*
 
-*Task:* "Cari alokasi terbaik untuk $10.000 stablecoin di pool BSC untuk horizon 30 hari, dengan kendala: TVL minimum $1jt, tanpa token unaudited, hitung APR bersih setelah gas dan estimasi impermanent loss. Peringkat 5 teratas dengan alasan."
+*The task:* "Find the best allocation for $10,000 of stablecoins across BSC pools over a 30-day horizon, subject to: a minimum TVL of $1M, no unaudited tokens, computing the net APR after gas and an estimate of impermanent loss. Rank the top 5 with reasoning."
 
-- **Baseline:** DefiLlama + UI PancakeSwap + spreadsheet.
-- **Agent:** agent yield-routing Fugugent.
-- **Metrik tambahan:** APR realized setelah 7 hari vs APR yang diprediksi (error absolut).
+- **Baseline:** DefiLlama + the PancakeSwap UI + a spreadsheet.
+- **Agent:** the Fugugent yield-routing agent.
+- **Extra metrics:** the realized APR after 7 days versus the predicted APR (absolute error).
 
 ---
 
-### B.6.3 Rubrik kualitas (0–5 per dimensi)
+### B.6.3 The quality rubric (0–5 per dimension)
 
-| Dimensi | 0 | 3 | 5 |
+| Dimension | 0 | 3 | 5 |
 |---|---|---|---|
-| **Correctness** | Ada kesalahan faktual material | Sebagian besar benar, kesalahan minor | Semua angka cocok dengan ground truth on-chain |
-| **Completeness** | Melewatkan >½ butir wajib | Mencakup butir inti | Semua butir wajib + risiko relevan |
-| **Actionability** | Tidak ada langkah konkret | Rekomendasi umum | Tx/parameter persis, siap dieksekusi |
-| **Evidence** | Tidak ada sumber | Sebagian dikutip | Setiap klaim menyertakan tx hash / alamat kontrak / URL |
-| **Risk awareness** | Tidak menyebut downside | Menyebut risiko utama | Mengukur downside + memberi kondisi abort |
+| **Correctness** | There is a material factual error | Mostly correct, minor errors | Every number matches on-chain ground truth |
+| **Completeness** | Misses more than half the required items | Covers the core items | Every required item + the relevant risks |
+| **Actionability** | No concrete steps | A general recommendation | Exact txs/parameters, ready to execute |
+| **Evidence** | No sources | Partly cited | Every claim carries a tx hash / contract address / URL |
+| **Risk awareness** | Never mentions the downside | Mentions the main risks | Quantifies the downside + gives abort conditions |
 
-Skor akhir = rata-rata. Laporkan per-rater dan agreement-nya.
+The final score = the average. Report it per rater plus their agreement.
 
 ---
 
-### B.6.4 Mengukur win rate & risk untuk trading agent
+### B.6.4 Measuring win rate & risk for a trading agent
 
-Bagian ini yang paling sering dibuat asal oleh peserta lain. Kalau kita mengerjakannya dengan benar, ini pembeda utama.
+This is the part other participants most often do carelessly. If we do it properly, it is our main differentiator.
 
-**Aturan dasar: jangan pernah melaporkan win rate tanpa distribusi payoff.** Win rate 90% dengan rata-rata loss 10× rata-rata win adalah strategi yang merugi. Selalu laporkan berpasangan.
+**The basic rule: never report a win rate without the payoff distribution.** A 90% win rate with an average loss 10× the average win is a losing strategy. Always report them as a pair.
 
-#### Metrik minimum yang harus dilaporkan
+#### The minimum metrics you must report
 
-| Metrik | Rumus | Kenapa penting |
+| Metric | Formula | Why it matters |
 |---|---|---|
-| **Win rate** | `#trade menang / #trade total` | Perlu, tapi jauh dari cukup |
-| **Profit factor** | `Σ profit kotor / \|Σ loss kotor\|` | >1 = menguntungkan; >1,5 layak |
-| **Expectancy per trade** | `(WR × avgWin) − ((1−WR) × avgLoss)` | Nilai harapan riil per trade |
-| **Payoff ratio** | `avgWin / avgLoss` | Pasangan wajib untuk win rate |
-| **Max drawdown** | `max(peak − trough) / peak` pada kurva ekuitas | Risiko yang benar-benar dirasakan |
-| **Sharpe (annualized)** | `(mean(r) − r_f) / std(r) × √periods` | Return per unit volatilitas |
-| **Sortino** | seperti Sharpe tapi hanya deviasi downside | Tidak menghukum volatilitas naik |
-| **Calmar** | `annualized return / max drawdown` | Return per unit nyeri terburuk |
-| **Turnover & fee drag** | total volume / ekuitas; total fee+gas sebagai % PnL | Strategi HFT sering kalah di sini |
-| **Slippage realized** | `(harga eksekusi − harga quote) / harga quote` | Bukti bahwa hasil bisa dicapai di dunia nyata |
+| **Win rate** | `#winning trades / #total trades` | Necessary, but nowhere near sufficient |
+| **Profit factor** | `Σ gross profit / \|Σ gross loss\|` | >1 = profitable; >1.5 is respectable |
+| **Expectancy per trade** | `(WR × avgWin) − ((1−WR) × avgLoss)` | The real expected value per trade |
+| **Payoff ratio** | `avgWin / avgLoss` | The mandatory partner to the win rate |
+| **Max drawdown** | `max(peak − trough) / peak` on the equity curve | The risk that is actually felt |
+| **Sharpe (annualized)** | `(mean(r) − r_f) / std(r) × √periods` | Return per unit of volatility |
+| **Sortino** | Like Sharpe but using downside deviation only | Does not punish upside volatility |
+| **Calmar** | `annualized return / max drawdown` | Return per unit of worst-case pain |
+| **Turnover & fee drag** | total volume / equity; total fees+gas as a % of PnL | HFT-style strategies often lose here |
+| **Realized slippage** | `(execution price − quoted price) / quoted price` | Proof the results are achievable in the real world |
 
-#### Kontrol metodologi khusus trading
+#### Methodology controls specific to trading
 
-- **Out-of-sample / walk-forward.** Bagi periode: in-sample untuk tuning parameter, out-of-sample untuk pelaporan. Laporkan **hanya angka out-of-sample**. Sebutkan tanggalnya.
-- **Sertakan biaya.** Fee swap PancakeSwap (0,01%/0,05%/0,25%/1% tergantung tier), gas BNB, dan slippage. Backtest tanpa biaya tidak akan dipercaya.
-- **Hindari lookahead bias.** Setiap keputusan pada waktu *t* hanya boleh memakai data yang tersedia pada *t*. Kalau memakai data subgraph, pin block, jangan pakai `poolDayData` hari berjalan.
-- **Hindari survivorship bias.** Sertakan pool/token yang mati selama periode uji.
-- **Ukuran sampel.** Win rate dari 12 trade tidak bermakna. Target **≥100 trade** untuk backtest, atau kalau tidak mungkin, laporkan **confidence interval**: `WR ± 1.96 × √(WR(1−WR)/n)`. Katakan terus terang kalau n kecil.
-- **Benchmark yang jelas.** Bandingkan terhadap (a) buy & hold aset dasar, (b) LP pasif full-range, (c) baseline manusia. "Mengalahkan buy & hold sebesar X%" jauh lebih berarti daripada "profit X%".
-- **Paper-trade paralel.** Jalankan agent secara live di testnet/paper selama seluruh periode hackathon, catat setiap keputusan dengan timestamp. Track record berjalan (kriteria 20%) sangat berbobot untuk juri.
+- **Out-of-sample / walk-forward.** Split the period: in-sample for parameter tuning, out-of-sample for reporting. Report **only the out-of-sample numbers**. State the dates.
+- **Include the costs.** PancakeSwap swap fees (0.01%/0.05%/0.25%/1% depending on the tier), BNB gas, and slippage. A backtest with no costs will not be believed.
+- **Avoid lookahead bias.** Every decision at time *t* may only use data available at *t*. If you use subgraph data, pin the block and do not use the current day's `poolDayData`.
+- **Avoid survivorship bias.** Include pools/tokens that died during the test period.
+- **Sample size.** A win rate from 12 trades is meaningless. Aim for **≥100 trades** in a backtest, or if that is impossible, report a **confidence interval**: `WR ± 1.96 × √(WR(1−WR)/n)`. Say plainly when n is small.
+- **A clear benchmark.** Compare against (a) buy & hold of the underlying asset, (b) a passive full-range LP, and (c) the human baseline. "Beat buy & hold by X%" means far more than "made X% profit".
+- **Paper-trade in parallel.** Run the agent live on testnet/paper for the whole hackathon period, recording every decision with a timestamp. A running track record (the 20% criterion) carries a lot of weight with the judges.
 
-#### Cara menyajikan ke juri
+#### How to present it to the judges
 
-Untuk task trading (T1), tampilkan:
-1. **Kurva ekuitas** agent vs baseline vs buy & hold, dalam satu chart
-2. **Tabel metrik** di atas, side-by-side
-3. **Histogram distribusi PnL per trade** — memperlihatkan bentuk payoff, bukan hanya rata-rata
-4. **Trade log** (CSV) dengan tx hash agar setiap baris bisa diverifikasi di BscScan
-5. Satu paragraf **"kapan strategi ini gagal"** — kondisi pasar yang membuatnya rugi
+For the trading task (T1), show:
+1. **An equity curve** for the agent versus the baseline versus buy & hold, in one chart
+2. **A table of the metrics** above, side by side
+3. **A histogram of the per-trade PnL distribution** — it shows the shape of the payoff, not just the average
+4. **A trade log** (CSV) with tx hashes, so every row can be verified on BscScan
+5. One paragraph on **"when this strategy fails"** — the market conditions that make it lose money
 
-#### Memenuhi kriteria "track record" (20%)
+#### Meeting the "track record" criterion (20%)
 
-- Daftarkan agent Fugugent di **ERC-8004 BSC** → dapat `agentId`, riwayat on-chain sejak hari pertama
-- Jalankan order nyata di **TermiX AACP** → `completedOrders`/`successfulOrders` di `TermixReputation` naik → `reputationScore` naik dari 60
-- Kumpulkan **feedback ERC-8004** (`giveFeedback`) dari user beta → muncul di 8004scan sebagai `total_feedbacks` + `average_score`
-- Semua ini **dapat diverifikasi publik** oleh juri lewat 8004scan dan BscScan — jauh lebih kuat daripada screenshot
+- Register the Fugugent agents on **ERC-8004 BSC** → get an `agentId` and an on-chain history from day one
+- Run real orders on **TermiX AACP** → `completedOrders`/`successfulOrders` in `TermixReputation` go up → `reputationScore` rises from 60
+- Collect **ERC-8004 feedback** (`giveFeedback`) from beta users → it appears on 8004scan as `total_feedbacks` + `average_score`
+- All of this is **publicly verifiable** by the judges through 8004scan and BscScan — far stronger than a screenshot
 
-#### Memenuhi "marketplace quality" (20%)
-Discoverability: search + filter 4 kategori + peringkat berbasis skor v5 8004scan · badge trust (health, endpoint verified, publisher tier) · onboarding jelas · profil agent yang menampilkan bukti on-chain (tx hash, feedback, skor) · latensi rendah lewat cache lokal.
+#### Meeting "marketplace quality" (20%)
+Discoverability: search + filters for the 4 categories + ranking based on the 8004scan v5 score · trust badges (health, endpoint verified, publisher tier) · clear onboarding · agent profiles that show on-chain evidence (tx hashes, feedback, scores) · low latency through a local cache.
 
 ---
 

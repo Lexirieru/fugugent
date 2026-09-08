@@ -1,300 +1,306 @@
-# Riset 05 — Lanskap Kompetitif: Marketplace/Registry Agent Kripto & AI
+# Research 05 — Competitive Landscape: Crypto & AI Agent Marketplaces/Registries
 
-Tanggal: 2026-09-08
-Status: riset sekunder (web), untuk mengisi keputusan desain marketplace Fugugent.
-Catatan: **HelloMinds** sudah diriset mendalam di `docs/research/02-hellominds-benchmark.md` —
-di sini hanya disebut sekilas sebagai pembanding UX, tidak diulang.
+Date: 2026-09-08
+Status: secondary research (web), to feed the Fugugent marketplace design decisions.
+Note: **HelloMinds** has already been researched in depth in `docs/research/02-hellominds-benchmark.md` —
+it is only mentioned in passing here as a UX comparison, not repeated.
 
-Kriteria juri yang jadi lensa analisis:
-1. **Functionality** — journey land → cari agent per kategori → paham fungsinya → aktivasi,
-   tanpa dead end, untuk orang nol pengetahuan.
-2. **Data Quality** — data real-time akurat melampaui hitungan dasar, cukup untuk memutuskan
-   agent mana yang dihire.
-3. **Agent Diversity** — 4 kategori (rebalancing LP, grid trading, yield optimisation,
-   health factor monitoring) sama dalamnya.
+The judging criteria used as the analysis lens:
+1. **Functionality** — the journey from landing → finding an agent by category → understanding what
+   it does → activation, with no dead ends, for someone with zero prior knowledge.
+2. **Data Quality** — accurate real-time data that goes beyond basic counts, enough to decide which
+   agent to hire.
+3. **Agent Diversity** — 4 categories (LP rebalancing, grid trading, yield optimisation,
+   health factor monitoring) with equal depth.
 
 ---
 
 ## 1. Virtuals Protocol (Base, agent commerce)
 
-- **Sumber**: [whitepaper.virtuals.io/acp/acp-changelogs](https://whitepaper.virtuals.io/acp/acp-changelogs), [rockawayx.com](https://www.rockawayx.com/insights/virtuals-agent-commerce-protocol-in-public-beta), [messari.io](https://messari.io/report/understanding-virtuals-protocol-a-comprehensive-overview), [datawallet.com](https://www.datawallet.com/crypto/what-is-virtuals-protocol)
-- **Discovery**: Agent Commerce Protocol (ACP) marketplace punya tag visual per layanan, tombol
-  **Hire** dan **Trade** terpisah dan langsung terlihat di kartu. Filter mencakup status
-  graduated/sandbox dan online/offline. Tidak ada bukti kategori DeFi granular (rebalancing/grid/
-  health factor) — kategorisasi lebih ke jenis layanan agent umum (trading, content, dsb).
-- **Data di kartu/detail**: aGDP (agent GDP) ranking, job volume & success rate, metrik mingguan
-  (aGDP output, interaksi, unique users), status aktif (hijau jika terhubung <10 menit terakhir),
-  rating bintang + ulasan tertulis pasca-job, modul "Agent Examples" (contoh output nyata sebelum
-  hire).
-- **Aktivasi/hire**: tombol **Hire** di profil agent langsung memicu chat dengan intent hire;
-  dashboard job melacak status; retry otomatis ke agent terbaik berikutnya jika job gagal. Model
-  ekonomi: agent punya token sendiri (bonding curve), bukan sekadar biaya langganan.
-- **Sinyal kepercayaan**: rating pasca-job, status online real-time, riwayat job. Tidak ada audit
-  kontrak per-agent yang terlihat publik di level marketplace.
-- **Kekurangan nyata**: mayoritas dari 18.000+ agent yang ditokenisasi punya market cap kecil dan
-  turun tajam dari puncak Januari 2025; revenue protokol turun signifikan dari puncak $3.9jt/bulan;
-  ekor panjang didominasi proyek tanpa produk/audiens nyata — masalah klasik "kuantitas tanpa
-  kualitas" pada marketplace terbuka. Juga ada situs phishing yang meniru Virtuals (bukan cacat
-  produk asli, tapi menandakan risiko kepercayaan brand di ruang ini).
-  Sumber: [ventureburn.com](https://ventureburn.com/virtuals-protocol-explained-the-ai-agent-launchpad-taking-crypto-by-storm/), [pcrisk.com](https://www.pcrisk.com/removal-guides/31469-fake-virtuals-protocol-website-scam)
+- **Sources**: [whitepaper.virtuals.io/acp/acp-changelogs](https://whitepaper.virtuals.io/acp/acp-changelogs), [rockawayx.com](https://www.rockawayx.com/insights/virtuals-agent-commerce-protocol-in-public-beta), [messari.io](https://messari.io/report/understanding-virtuals-protocol-a-comprehensive-overview), [datawallet.com](https://www.datawallet.com/crypto/what-is-virtuals-protocol)
+- **Discovery**: the Agent Commerce Protocol (ACP) marketplace has a visual tag per service, with
+  separate **Hire** and **Trade** buttons visible directly on the card. Filters cover
+  graduated/sandbox status and online/offline. No evidence of granular DeFi categories
+  (rebalancing/grid/health factor) — the categorisation is closer to general agent service types
+  (trading, content, and so on).
+- **Data on the card/detail page**: aGDP (agent GDP) ranking, job volume & success rate, weekly
+  metrics (aGDP output, interactions, unique users), active status (green if connected in the last
+  10 minutes), star rating + written post-job reviews, and an "Agent Examples" module (real sample
+  output before you hire).
+- **Activation/hire**: the **Hire** button on the agent profile immediately starts a chat with a
+  hire intent; a job dashboard tracks status; failed jobs automatically retry with the next-best
+  agent. Economic model: each agent has its own token (bonding curve), not just a subscription fee.
+- **Trust signals**: post-job ratings, real-time online status, job history. No per-agent contract
+  audit is publicly visible at the marketplace level.
+- **Real weaknesses**: most of the 18,000+ tokenised agents have a small market cap and have fallen
+  sharply from the January 2025 peak; protocol revenue is down significantly from its $3.9M/month
+  peak; the long tail is dominated by projects with no real product or audience — the classic
+  "quantity without quality" problem of an open marketplace. There are also phishing sites
+  impersonating Virtuals (not a flaw in the real product, but it signals brand trust risk in this
+  space).
+  Sources: [ventureburn.com](https://ventureburn.com/virtuals-protocol-explained-the-ai-agent-launchpad-taking-crypto-by-storm/), [pcrisk.com](https://www.pcrisk.com/removal-guides/31469-fake-virtuals-protocol-website-scam)
 
 ## 2. Olas / Pearl (Autonolas)
 
-- **Sumber**: [olas.network/blog/introducing-pearl-v1](https://olas.network/blog/introducing-pearl-v1-the-ai-agent-app-store-powered-by-olas), [olas.network/blog/pearl](https://olas.network/blog/pearl), [ownyourmind.ai](https://ownyourmind.ai/projects/autonolas/), marketplace.olas.network
-- **Discovery**: Pearl diposisikan sebagai "AI Agent App Store" desktop (Mac/Windows) — install app,
-  lalu browse agent bawaan (mis. Optimus Agent = portfolio manager adaptif, Prediction Agent =
-  forecaster). Marketplace on-chain terpisah di `marketplace.olas.network` — agent saling
-  menyewa skill agent lain, transaksi terbuka/transparan ("AI Agent Bazaar"). Dokumentasi publik
-  tidak merinci UI filter/kategori/search yang jelas.
-- **Data**: user memonitor parameter & aksi real-time agent sendiri layaknya portofolio pribadi.
-  Angka jaringan publik: ~3.670 agent deployed, 614 Daily Active Agents, 4,4M OLAS staked
-  (per 29 Jun 2026). Tidak ada bukti tampilan APR/PnL per-agent yang dibakukan di kartu marketplace.
-- **Aktivasi**: install Pearl → setup agent (wizard beberapa menit) → stake OLAS awal → klik
-  "Start Agent". Dana diamankan lewat **Safe smart wallet** (non-custodial), bisa top-up
-  kartu debit/kredit lewat bridging otomatis. Staking reward tidak dijamin, tergantung agent
-  memenuhi target performa.
-- **Sinyal kepercayaan**: staking sebagai skin-in-the-game, transparansi on-chain marketplace.
-- **Kekurangan nyata**: dokumentasi publik minim soal metrik performa per-agent yang bisa
-  dibandingkan sebelum stake (user harus percaya dulu, baru lihat hasil).
+- **Sources**: [olas.network/blog/introducing-pearl-v1](https://olas.network/blog/introducing-pearl-v1-the-ai-agent-app-store-powered-by-olas), [olas.network/blog/pearl](https://olas.network/blog/pearl), [ownyourmind.ai](https://ownyourmind.ai/projects/autonolas/), marketplace.olas.network
+- **Discovery**: Pearl is positioned as a desktop "AI Agent App Store" (Mac/Windows) — install the
+  app, then browse the built-in agents (e.g. Optimus Agent = adaptive portfolio manager, Prediction
+  Agent = forecaster). A separate on-chain marketplace lives at `marketplace.olas.network` — agents
+  rent skills from other agents, with open/transparent transactions ("AI Agent Bazaar"). The public
+  documentation does not spell out a clear filter/category/search UI.
+- **Data**: users monitor their own agent's parameters and actions in real time, like a personal
+  portfolio. Public network numbers: ~3,670 agents deployed, 614 Daily Active Agents, 4.4M OLAS
+  staked (as of 29 Jun 2026). No evidence of a standardised per-agent APR/PnL display on the
+  marketplace card.
+- **Activation**: install Pearl → set up the agent (a few-minute wizard) → stake an initial amount
+  of OLAS → click "Start Agent". Funds are secured through a **Safe smart wallet** (non-custodial),
+  and can be topped up with a debit/credit card via automatic bridging. Staking rewards are not
+  guaranteed; they depend on the agent meeting performance targets.
+- **Trust signals**: staking as skin in the game, on-chain marketplace transparency.
+- **Real weaknesses**: the public documentation says very little about comparable per-agent
+  performance metrics you could look at before staking (you have to trust first and see the results
+  afterwards).
 
 ## 3. Almanak
 
-- **Sumber**: [almanak.co](https://almanak.co/), [docs.almanak.co/docs/wallets](https://docs.almanak.co/docs/wallets/), [docs.almanak.co/docs/set-permissions](https://docs.almanak.co/docs/set-permissions/), [github.com/almanak-co/sdk](https://github.com/almanak-co/sdk), [blocmates.com](https://www.blocmates.com/articles/almanak-your-personal-ai-quant)
-- **Discovery**: "Strategy Marketplace" — user bisa publikasikan & invest ke strategi orang lain;
-  ada juga repositori strategi dari protokol pihak ketiga untuk ekosistem mereka sendiri.
-- **Data**: sebelum deploy, strategi bisa **backtest & paper-trade di mainnet fork** (simulasi
-  agent-based) — jadi calon "hire" bisa lihat hasil simulasi historis dulu, bukan cuma klaim.
-  Almanak's Strategy Optimisation Suite menonjol sebagai fitur unik dibanding kompetitor lain.
-- **Aktivasi/custody** (paling detail & relevan untuk desain Fugugent): user pakai **Safe Wallet**
-  (1-of-1 multisig, user tetap sole owner) + **Zodiac Roles Modifier** untuk permission granular
-  — whitelist fungsi kontrak spesifik + batasan parameter yang boleh dipanggil "Deployment EOA"
-  (akun eksekusi otomatis terpisah dari Safe). Saat membuat Deployment dari strategi, user
-  **tanda tangan satu transaksi** untuk apply permission tsb ke wallet-nya. Deployment EOA yang
-  bayar gas & sign transaksi eksekusi harian — bukan wallet utama user. Model ini sangat mirip
-  dengan rencana Fugugent (Altana session key: call allowlist + spend cap + expiry).
-- **Sinyal kepercayaan**: kode strategi versioned & dimiliki user (bukan black box), backtest
-  wajib sebelum live.
-- **Kekurangan nyata**: dokumentasi publik untuk UI marketplace (kartu, filter, rating) minim;
-  produk terasa lebih untuk quant/developer (butuh paham Python/strategi) daripada "orang nol
-  pengetahuan" — gap besar dibanding target UX Fugugent.
+- **Sources**: [almanak.co](https://almanak.co/), [docs.almanak.co/docs/wallets](https://docs.almanak.co/docs/wallets/), [docs.almanak.co/docs/set-permissions](https://docs.almanak.co/docs/set-permissions/), [github.com/almanak-co/sdk](https://github.com/almanak-co/sdk), [blocmates.com](https://www.blocmates.com/articles/almanak-your-personal-ai-quant)
+- **Discovery**: a "Strategy Marketplace" — users can publish strategies and invest in other
+  people's; there is also a repository of strategies from third-party protocols for their own
+  ecosystems.
+- **Data**: before deployment, a strategy can be **backtested and paper-traded on a mainnet fork**
+  (agent-based simulation) — so a prospective "hire" can see historical simulation results first,
+  not just claims. Almanak's Strategy Optimisation Suite stands out as a feature no other competitor
+  has.
+- **Activation/custody** (the most detailed and most relevant part for the Fugugent design): the
+  user uses a **Safe Wallet** (1-of-1 multisig, the user stays sole owner) + the **Zodiac Roles
+  Modifier** for granular permissions — whitelisting specific contract functions plus parameter
+  limits that the "Deployment EOA" (an automated execution account separate from the Safe) is
+  allowed to call. When creating a Deployment from a strategy, the user **signs one transaction** to
+  apply those permissions to their wallet. It is the Deployment EOA that pays gas and signs the
+  day-to-day execution transactions — not the user's main wallet. This model is very close to the
+  Fugugent plan (Altana session key: call allowlist + spend cap + expiry).
+- **Trust signals**: strategy code is versioned and owned by the user (not a black box), and a
+  backtest is mandatory before going live.
+- **Real weaknesses**: public documentation of the marketplace UI (cards, filters, ratings) is thin;
+  the product feels aimed at quants/developers (you need to understand Python/strategies) rather
+  than "someone with zero prior knowledge" — a large gap versus the Fugugent UX target.
 
-## 4. Giza / ARMA — kasus penting: proyek yang gagal & "metric inflation"
+## 4. Giza / ARMA — an important case: a failed project and "metric inflation"
 
-- **Sumber**: [ownyourmind.ai/projects/giza](https://ownyourmind.ai/projects/giza/), [defillama.com/protocol/giza](https://defillama.com/protocol/giza), [chainwire.org](https://chainwire.org/2025/01/29/gizas-arma-breaks-new-ground-on-base-with-advanced-defi-automation/), [stablewatch.io](https://www.stablewatch.io/research/giza-project-spotlight)
-- **Discovery/data**: dashboard ARMA menampilkan deposit (TVL) & APY per market, filter per
-  protokol, sort by deposit/APY. Mendukung AAVE, Morpho, Compound, Moonwell.
-- **Klaim awal**: TVL >$16M, $1.3B "agentic volume", APY iklan 15%, backtest klaim "2x yield
-  enhancement" vs posisi statis.
-- **Yang terjadi**: **26 Feb 2026 Giza mengumumkan ARMA & Pulse di-wind-down**, deadline migrasi
-  26 Mar 2026, dana user dikembalikan. Digantikan "Giza World" (agent unified) yang klaim
-  assets-under-agent & volume besar **tanpa verifikasi pihak ketiga** — dan pengukuran on-chain
-  independen per 24 Jun 2026 menunjukkan posisi agent nyaris nol, kontras dengan angka yang
-  ditampilkan di homepage. **Ini adalah bukti nyata risiko "vanity metrics tanpa verifikasi
-  on-chain"** — argumen kuat untuk kenapa Data Quality (metrik yang bisa diverifikasi on-chain,
-  bukan self-reported) adalah pembeda krusial.
-- **Pelajaran untuk Fugugent**: jangan pernah menampilkan AUM/volume/APY tanpa link ke sumber
-  on-chain yang bisa diaudit siapa pun (block explorer, event log, atau agregator independen).
+- **Sources**: [ownyourmind.ai/projects/giza](https://ownyourmind.ai/projects/giza/), [defillama.com/protocol/giza](https://defillama.com/protocol/giza), [chainwire.org](https://chainwire.org/2025/01/29/gizas-arma-breaks-new-ground-on-base-with-advanced-defi-automation/), [stablewatch.io](https://www.stablewatch.io/research/giza-project-spotlight)
+- **Discovery/data**: the ARMA dashboard shows deposits (TVL) and APY per market, a filter per
+  protocol, and sorting by deposit/APY. It supports AAVE, Morpho, Compound, Moonwell.
+- **Initial claims**: TVL >$16M, $1.3B in "agentic volume", 15% advertised APY, and a backtest
+  claiming "2x yield enhancement" versus a static position.
+- **What happened**: **on 26 Feb 2026 Giza announced that ARMA and Pulse were being wound down**,
+  with a 26 Mar 2026 migration deadline and user funds returned. They were replaced by "Giza World"
+  (a unified agent) claiming large assets-under-agent and volume figures **with no third-party
+  verification** — and an independent on-chain measurement as of 24 Jun 2026 showed agent positions
+  at close to zero, in stark contrast to the numbers shown on the homepage. **This is hard evidence
+  of the "vanity metrics with no on-chain verification" risk** — a strong argument for why Data
+  Quality (metrics verifiable on-chain, not self-reported) is the crucial differentiator.
+- **Lesson for Fugugent**: never display AUM/volume/APY without a link to an on-chain source that
+  anyone can audit (block explorer, event log, or an independent aggregator).
 
 ## 5. Fetch.ai Agentverse
 
-- **Sumber**: [docs.agentverse.ai/documentation/getting-started/agentverse-marketplace](https://docs.agentverse.ai/documentation/getting-started/agentverse-marketplace), [agentverse.ai/ai-agent-marketplace](https://agentverse.ai/ai-agent-marketplace), [progressiverobot.com](https://www.progressiverobot.com/2026/04/14/what-is-agentverse/)
-- **Discovery**: kategori seperti Finance, Crypto, Trading, Image generation, Search, Travel,
-  Weather, News, Data & analytics, Developer tools, Productivity, Translation. Search bar
-  (alamat agent/protokol) + 3 dropdown filter (agent type, state Active/Inactive, trust level
-  Verified/Unverified). Ada **advanced search syntax mirip GitHub**: `is:active`, `is:verified`,
-  `is:fetch-ai`, `has:location`, `has:readme`, `has:guide`, `has:interactions:1k/10k/100k/1m`,
-  `tag:finance` dsb — ini pola query yang cukup canggih untuk power user, tapi berpotensi jadi
-  dead-end bagi user awam yang tidak tahu sintaksnya.
-- **Data di kartu**: status tag (Active/Offline), badge Verified/Unverified, **rating score**
-  (dipengaruhi frekuensi muncul di search, frekuensi dipakai, kecocokan konten), lokasi
-  geografis, ikon manifest protokol.
-- **Aktivasi**: tombol **"Chat with Agent"** yang fungsional secara langsung membuka percakapan
-  lewat integrasi ASI:One — tidak ada alur "hire" formal dengan pembayaran/scoping tugas yang
-  terdokumentasi publik.
-- **Kekurangan nyata**: dokumentasi tidak menyebut uptime %, struktur biaya/harga eksplisit, atau
-  alur pembayaran — data finansial (APR/PnL/fee) tampaknya tidak menjadi fokus utama kartu
-  (Agentverse lebih general-purpose agent directory daripada marketplace DeFi khusus).
+- **Sources**: [docs.agentverse.ai/documentation/getting-started/agentverse-marketplace](https://docs.agentverse.ai/documentation/getting-started/agentverse-marketplace), [agentverse.ai/ai-agent-marketplace](https://agentverse.ai/ai-agent-marketplace), [progressiverobot.com](https://www.progressiverobot.com/2026/04/14/what-is-agentverse/)
+- **Discovery**: categories such as Finance, Crypto, Trading, Image generation, Search, Travel,
+  Weather, News, Data & analytics, Developer tools, Productivity, Translation. A search bar
+  (agent/protocol address) plus 3 dropdown filters (agent type, state Active/Inactive, trust level
+  Verified/Unverified). There is also a **GitHub-like advanced search syntax**: `is:active`,
+  `is:verified`, `is:fetch-ai`, `has:location`, `has:readme`, `has:guide`,
+  `has:interactions:1k/10k/100k/1m`, `tag:finance` and so on — a query pattern powerful enough for
+  power users, but likely to be a dead end for a novice who does not know the syntax.
+- **Data on the card**: status tag (Active/Offline), Verified/Unverified badge, a **rating score**
+  (influenced by how often it appears in search, how often it is used, and content relevance),
+  geographic location, protocol manifest icons.
+- **Activation**: a working **"Chat with Agent"** button opens a conversation directly through the
+  ASI:One integration — there is no publicly documented formal "hire" flow with payment or task
+  scoping.
+- **Real weaknesses**: the documentation mentions no uptime %, no explicit fee/pricing structure,
+  and no payment flow — financial data (APR/PnL/fees) does not appear to be a focus of the card
+  (Agentverse is a general-purpose agent directory rather than a dedicated DeFi marketplace).
 
 ## 6. Recall Network
 
-- **Sumber**: [messari.io/report/recall-onchain-ai-and-intelligence-competitions](https://messari.io/report/recall-onchain-ai-and-intelligence-competitions), [docs.recall.network/competitions](https://docs.recall.network/competitions) (404 saat diakses — dicatat, lanjut pakai sumber sekunder), [koreaittimes.com](https://www.koreaittimes.com/news/articleView.html?idxno=143609), [recall.network](https://recall.network/)
-- **Discovery**: bukan marketplace hire langsung, melainkan **arena kompetisi** — agent trading
-  bersaing di leaderboard real-time selama periode tetap (mis. AlphaWave, 7 hari, prize pool
-  $25.000 USDC).
-- **Data**: leaderboard real-time menampilkan **PnL**, dan smart contract mencatat setiap
-  aksi/input/output/waktu/metrik performa. **AgentRank** (diluncurkan 29 Agu 2025, terinspirasi
-  PageRank) mengonversi hasil kompetisi jadi ranking permanen & skill-specific — "queryable
-  source of reputation" yang dipakai marketplace/app lain. Setiap kompetisi pakai metrik tetap &
-  publik: PnL untuk trading, akurasi untuk reasoning, konsistensi dari waktu ke waktu; **reputasi
-  meluruh (decay) kalau agent tidak aktif**.
-- **Sinyal kepercayaan**: karena berbasis kompetisi head-to-head dengan hasil on-chain/tercatat,
-  ini adalah salah satu model **track record terverifikasi paling kredibel** di antara semua yang
-  diriset — layak dicontoh untuk konsep "leaderboard 4 kategori Fugugent".
-- **Kekurangan nyata**: fokus ke kompetisi/paper-trading, bukan alur hire-untuk-kelola-dana-nyata
-  yang mulus untuk user awam.
+- **Sources**: [messari.io/report/recall-onchain-ai-and-intelligence-competitions](https://messari.io/report/recall-onchain-ai-and-intelligence-competitions), [docs.recall.network/competitions](https://docs.recall.network/competitions) (404 when accessed — noted, we fall back to secondary sources), [koreaittimes.com](https://www.koreaittimes.com/news/articleView.html?idxno=143609), [recall.network](https://recall.network/)
+- **Discovery**: not a direct hire marketplace but a **competition arena** — trading agents compete
+  on a real-time leaderboard over a fixed period (e.g. AlphaWave, 7 days, $25,000 USDC prize pool).
+- **Data**: the real-time leaderboard shows **PnL**, and the smart contract records every
+  action/input/output/timestamp/performance metric. **AgentRank** (launched 29 Aug 2025, inspired by
+  PageRank) converts competition results into a permanent, skill-specific ranking — a "queryable
+  source of reputation" used by other marketplaces/apps. Every competition uses fixed, public
+  metrics: PnL for trading, accuracy for reasoning, consistency over time; **reputation decays if an
+  agent goes inactive**.
+- **Trust signals**: because it is based on head-to-head competition with on-chain/recorded results,
+  this is one of the **most credible verified-track-record models** of everything researched —
+  worth copying for a "leaderboard across the 4 Fugugent categories" concept.
+- **Real weaknesses**: the focus is competition/paper trading, not a smooth
+  hire-to-manage-real-money flow for a novice user.
 
 ## 7. Theoriq
 
-- **Sumber**: [theoriq.ai](https://theoriq.ai/), [crypto.news](https://crypto.news/theoriq-unveils-mainnet-touts-new-era-ai-driven-defi/), [theoriq.ai/blog/theoriq-mainnet-thq-tge-launch-guide-details](https://www.theoriq.ai/blog/theoriq-mainnet-thq-tge-launch-guide-details), Medium (XT Exchange)
-- **Status**: mainnet baru live **15 Des 2025**, jadi masih sangat baru — AlphaSwarm &
-  AlphaProtocol sudah publik, termasuk "Theoriq Knowledge Agent".
-- **Discovery/model**: bukan marketplace kartu-agent klasik, melainkan **agent swarm** —
-  agent register, publish kapabilitas, lalu dinamis membentuk swarm (role allocation, voting,
-  strategi adaptif) untuk tugas kompleks (trading, yield optimization, treasury management).
-- **Sinyal kepercayaan**: reputasi dibangun dari aksi tercatat on-chain/anchored off-chain +
-  evaluator agent independen menilai hasil — mirip konsep "independent audit agent" yang bisa
-  jadi diferensiasi Fugugent (agent yang mengaudit agent lain).
-- **Kekurangan nyata**: karena baru live, data publik tentang UI marketplace (kartu, filter) dan
-  track record jangka panjang masih minim/belum matang untuk dibandingkan.
+- **Sources**: [theoriq.ai](https://theoriq.ai/), [crypto.news](https://crypto.news/theoriq-unveils-mainnet-touts-new-era-ai-driven-defi/), [theoriq.ai/blog/theoriq-mainnet-thq-tge-launch-guide-details](https://www.theoriq.ai/blog/theoriq-mainnet-thq-tge-launch-guide-details), Medium (XT Exchange)
+- **Status**: mainnet only went live on **15 Dec 2025**, so it is still very new — AlphaSwarm and
+  AlphaProtocol are public, including a "Theoriq Knowledge Agent".
+- **Discovery/model**: not a classic agent-card marketplace but an **agent swarm** — agents register,
+  publish their capabilities, then dynamically form a swarm (role allocation, voting, adaptive
+  strategy) for complex tasks (trading, yield optimization, treasury management).
+- **Trust signals**: reputation is built from actions recorded on-chain/anchored off-chain plus
+  independent evaluator agents scoring the results — similar to the "independent audit agent"
+  concept that could differentiate Fugugent (an agent that audits other agents).
+- **Real weaknesses**: because it just went live, public data on the marketplace UI (cards, filters)
+  and long-term track record is still thin/immature to compare against.
 
-## 8. OpenAI GPT Store (pembanding UX non-kripto)
+## 8. OpenAI GPT Store (non-crypto UX comparison)
 
-- **Sumber**: [openai.com/index/introducing-the-gpt-store](https://openai.com/index/introducing-the-gpt-store/), [venturebeat.com](https://venturebeat.com/ai/openai-updates-gpt-store-with-ratings-and-expanded-builder-profiles), Medium ("How to Rank Your GPT"), OpenAI Developer Community
-- **Discovery**: kategori seperti DALL·E, writing, research, programming, education, lifestyle.
-  Ranking mirip app-store + search engine: keyword, relevansi, rating, level aktivitas — GPT yang
-  update rutin naik peringkat, yang ditinggalkan turun.
-- **Data**: rating bintang 1-5, jumlah rating, **jumlah total percakapan yang pernah dimulai**
-  ditampilkan di profil builder — metrik penggunaan riil, bukan cuma klaim.
-- **Aktivasi**: 1 klik untuk mulai chat — tidak ada friksi wallet/dana karena bukan produk
-  finansial.
-- **Kekurangan nyata (relevan sebagai warning)**: dengan >3 juta GPT dibuat, store jadi penuh
-  spam/duplikat, banyak clone nama mirip yang "farm interaksi lalu rusak atau menyuntik prompt
-  tanpa izin", beberapa GPT membocorkan prompt internal atau gampang dimanipulasi jadi
-  phishing, dan proses takedown sering tanpa penjelasan jelas ke creator. **Pelajaran: rating +
-  jumlah percakapan saja tidak cukup untuk moderasi kualitas — perlu sinyal tambahan (verifikasi,
-  audit, atau kurasi manual untuk kategori berisiko tinggi).**
+- **Sources**: [openai.com/index/introducing-the-gpt-store](https://openai.com/index/introducing-the-gpt-store/), [venturebeat.com](https://venturebeat.com/ai/openai-updates-gpt-store-with-ratings-and-expanded-builder-profiles), Medium ("How to Rank Your GPT"), OpenAI Developer Community
+- **Discovery**: categories such as DALL·E, writing, research, programming, education, lifestyle.
+  Ranking is app-store-plus-search-engine: keywords, relevance, rating, activity level — GPTs that
+  are updated regularly rise, abandoned ones fall.
+- **Data**: 1-5 star ratings, number of ratings, and the **total number of conversations ever
+  started** shown on the builder profile — real usage metrics, not just claims.
+- **Activation**: 1 click to start chatting — no wallet or funding friction, because it is not a
+  financial product.
+- **Real weaknesses (relevant as a warning)**: with over 3 million GPTs created, the store is full
+  of spam and duplicates; there are many clones with near-identical names that "farm interactions
+  and then break or inject prompts without permission"; some GPTs leak their internal prompts or are
+  easily manipulated into phishing; and takedowns often happen with no clear explanation to the
+  creator. **Lesson: ratings plus conversation counts alone are not enough to moderate quality — you
+  need additional signals (verification, audits, or manual curation for high-risk categories).**
 
-## 9. Poe (pembanding UX non-kripto)
+## 9. Poe (non-crypto UX comparison)
 
-- **Sumber**: [poe.com/blog/introducing-creator-monetization-for-poe](https://poe.com/blog/introducing-creator-monetization-for-poe), [creator.poe.com/docs/resources/creator-monetization](https://creator.poe.com/docs/resources/creator-monetization), [perplexityaimagazine.com](https://perplexityaimagazine.com/ai-tools/poe-ai-review-2026/)
-- **Discovery**: kategori luas (tutoring, knowledge, therapy, entertainment, assistant, analysis,
-  storytelling, roleplay, generasi media). "Distribution tetap masalah tersulit" — banyak bot
-  bernama mirip, prompt tipis, output kualitas rendah bikin discovery noisy.
-- **Data**: dashboard analitik creator melacak rata-rata earning dari paywall/subscription/pesan
-  per periode waktu, update harian; API monetisasi mendukung harga variabel berdasar panjang
-  input/output/kompleksitas komputasi.
-- **Aktivasi**: langsung chat, model bayar per-pesan atau via subscription — sangat rendah friksi.
-- **Kekurangan nyata**: total payout kreator baru >$100rb per pertengahan 2026 — menunjukkan
-  monetisasi long-tail masih kecil meski platform besar; discovery quality masih jadi keluhan
-  utama.
+- **Sources**: [poe.com/blog/introducing-creator-monetization-for-poe](https://poe.com/blog/introducing-creator-monetization-for-poe), [creator.poe.com/docs/resources/creator-monetization](https://creator.poe.com/docs/resources/creator-monetization), [perplexityaimagazine.com](https://perplexityaimagazine.com/ai-tools/poe-ai-review-2026/)
+- **Discovery**: broad categories (tutoring, knowledge, therapy, entertainment, assistant, analysis,
+  storytelling, roleplay, media generation). "Distribution is still the hardest problem" — many bots
+  with similar names, thin prompts, and low-quality output make discovery noisy.
+- **Data**: the creator analytics dashboard tracks average earnings from paywalls/subscriptions/
+  messages per time period, updated daily; the monetisation API supports variable pricing based on
+  input/output length and compute complexity.
+- **Activation**: chat immediately, paid per message or via subscription — very low friction.
+- **Real weaknesses**: total creator payouts had only passed $100k by mid-2026 — showing that
+  long-tail monetisation is still small even on a large platform; discovery quality remains the main
+  complaint.
 
-## 10. Catatan pembanding lain yang disinggung juri/tim (tidak diriset ulang di sini)
+## 10. Other comparisons the judges/team mentioned (not re-researched here)
 
-- **8004scan, BNB Agent Studio, Altana, PancakeSwap/TermiX**: sudah diriset mendalam di
+- **8004scan, BNB Agent Studio, Altana, PancakeSwap/TermiX**: already researched in depth in
   `docs/research/01-bnb-agent-studio.md`, `03-altana.md`, `04-8004scan-termix-pancakeswap.md`.
-- **3Commas / Pionex** (grid trading bot, non-agent-marketplace tapi relevan untuk kategori grid
-  trading): platform ini sudah menampilkan **win rate, Sharpe/Sortino ratio, profit factor, max
-  drawdown**, dan marketplace "copy strategy" dengan **riwayat performa terverifikasi** + deploy
-  1-klik. Backtest historis 120 hari. Ini jadi baseline data quality yang harus dilampaui Fugugent
-  untuk kategori grid trading spesifik di DeFi/BSC.
-  Sumber: [3commas.io/blog/ai-trading-bot-performance-analysis](https://3commas.io/blog/ai-trading-bot-performance-analysis), [help.3commas.io grid bots](https://help.3commas.io/en/articles/7932030-grid-bots-main-settings-and-options)
+- **3Commas / Pionex** (grid trading bots, not an agent marketplace but relevant to the grid
+  trading category): these platforms already show **win rate, Sharpe/Sortino ratio, profit factor,
+  max drawdown**, plus a "copy strategy" marketplace with **verified performance history** and
+  1-click deploy. Historical backtests over 120 days. This is the data-quality baseline Fugugent has
+  to beat for the specific grid trading category in DeFi/BSC.
+  Sources: [3commas.io/blog/ai-trading-bot-performance-analysis](https://3commas.io/blog/ai-trading-bot-performance-analysis), [help.3commas.io grid bots](https://help.3commas.io/en/articles/7932030-grid-bots-main-settings-and-options)
 
 ---
 
-## Ringkasan lintas-produk (tabel kasar)
+## Cross-product summary (rough table)
 
-| Produk | Discovery kategori jelas? | Data performa terverifikasi on-chain? | Alur hire ≤3 klik? | Custody non-custodial jelas? | Track record kompetitif (leaderboard)? |
+| Product | Clear category discovery? | Performance data verified on-chain? | Hire flow ≤3 clicks? | Clear non-custodial custody? | Competitive track record (leaderboard)? |
 |---|---|---|---|---|---|
-| Virtuals ACP | Sebagian | Sebagian (rating pasca-job) | Ya | Tidak eksplisit | Tidak |
-| Olas Pearl | Tidak terdokumentasi jelas | Tidak (self-reported) | Ya (setelah install app) | Ya (Safe) | Tidak |
-| Almanak | Ya (strategy marketplace) | Ya (backtest wajib) | Tidak (perlu tanda tangan permission, ditujukan quant) | Ya (Safe+Zodiac) | Tidak |
-| Giza/ARMA | Ya | **Tidak (klaim tanpa verifikasi — lalu bubar)** | Ya | Sebagian | Tidak |
-| Fetch.ai Agentverse | Ya (tag & syntax canggih) | Tidak (rating popularitas saja) | Ya (chat langsung) | N/A (bukan agent finansial) | Tidak |
-| Recall Network | Tidak (arena kompetisi, bukan hire) | **Ya (leaderboard on-chain/tercatat)** | N/A | N/A | **Ya (AgentRank)** |
-| Theoriq | Tidak (swarm, bukan katalog) | Sebagian (baru, evaluator agent) | N/A | Sebagian | Tidak (masih baru) |
-| GPT Store | Ya | Sebagian (rating + jumlah chat) | Ya (1 klik) | N/A | Tidak |
-| Poe | Ya | Sebagian (earning dashboard) | Ya (1 klik) | N/A | Tidak |
+| Virtuals ACP | Partly | Partly (post-job ratings) | Yes | Not explicit | No |
+| Olas Pearl | Not clearly documented | No (self-reported) | Yes (after installing the app) | Yes (Safe) | No |
+| Almanak | Yes (strategy marketplace) | Yes (mandatory backtest) | No (needs a permission signature, aimed at quants) | Yes (Safe+Zodiac) | No |
+| Giza/ARMA | Yes | **No (claims with no verification — then shut down)** | Yes | Partly | No |
+| Fetch.ai Agentverse | Yes (tags & advanced syntax) | No (popularity rating only) | Yes (chat directly) | N/A (not a financial agent) | No |
+| Recall Network | No (competition arena, not hiring) | **Yes (on-chain/recorded leaderboard)** | N/A | N/A | **Yes (AgentRank)** |
+| Theoriq | No (swarm, not a catalogue) | Partly (new, evaluator agents) | N/A | Partly | No (still new) |
+| GPT Store | Yes | Partly (rating + chat count) | Yes (1 click) | N/A | No |
+| Poe | Yes | Partly (earnings dashboard) | Yes (1 click) | N/A | No |
 
-**Kesimpulan pola**: tidak ada satupun produk yang menggabungkan **(a)** discovery per-kategori
-yang jelas untuk orang awam, **(b)** metrik performa yang terverifikasi on-chain secara real-time
-(bukan self-reported), **(c)** custody non-custodial yang transparan dengan revoke 1-klik, **dan**
-**(d)** leaderboard kompetitif lintas-agent dalam satu kategori yang sama. Fugugent bisa menang
-dengan menggabungkan keempatnya sekaligus, terutama untuk 4 kategori DeFi spesifik yang belum
-dilayani mendalam oleh siapa pun di atas.
+**Pattern conclusion**: not a single product combines **(a)** clear per-category discovery for a
+non-expert, **(b)** performance metrics verified on-chain in real time (not self-reported),
+**(c)** transparent non-custodial custody with 1-click revoke, **and** **(d)** a competitive
+cross-agent leaderboard within one category. Fugugent can win by doing all four at once, especially
+for the 4 specific DeFi categories none of the products above serve in depth.
 
 ---
 
-## Peluang Diferensiasi Fugugent
+## Fugugent Differentiation Opportunities
 
-### A. Metrik Data Quality spesifik per kategori + sumber datanya
+### A. Data Quality metrics specific to each category, and where the data comes from
 
-| # | Metrik | Kategori relevan | Cara hitung / sumber data |
+| # | Metric | Relevant category | How it is computed / data source |
 |---|---|---|---|
-| 1 | Realized APR 7d/30d/90d (net, setelah fee) | Yield optimisation, LP | Rekonstruksi dari histori deposit/withdraw + saldo aktual on-chain (event log kontrak vault/strategi), bukan APY iklan protokol. Bandingkan dengan `apyBase`/`apyReward` dari [DefiLlama Yields API](https://github.com/DefiLlama/yield-server) sebagai baseline pasar. |
-| 2 | Max drawdown | Semua 4 kategori | Time-series NAV/nilai posisi agent (snapshot per blok/interval) → hitung peak-to-trough terbesar. |
-| 3 | Sharpe / Sortino ratio | Yield optimisation, grid trading | Return harian dari time-series NAV di atas, dibagi volatilitas (Sortino: hanya downside deviation). Baseline industri: 3Commas/Cryptohopper sudah menampilkan ini untuk bot trading. |
-| 4 | Fee vs profit (net-of-fee return) | Semua | Selisih gross PnL (dari transaksi on-chain) dikurangi total gas + fee protokol + fee platform Fugugent, ditampilkan sebagai breakdown, bukan angka gabungan. |
-| 5 | Gas cost per rebalance/aksi | Rebalancing LP, grid trading | Sum `gasUsed * gasPrice` dari tiap tx eksekusi agent (indexer event log kontrak agent di BSC testnet), dirata-ratakan per aksi. |
-| 6 | Slippage rata-rata per eksekusi | Grid trading, rebalancing | Selisih expected price (quote saat submit) vs execution price aktual dari tx receipt/DEX swap event. |
-| 7 | Time-in-range (%) | Rebalancing LP (concentrated liquidity) | Persentase waktu harga pool berada dalam range posisi LP agent, dihitung dari price oracle/pool tick history — pola sudah dipakai [Revert Finance](https://medium.com/blockchain-biz/why-you-should-use-revert-finance-prior-to-entering-any-lp-on-uniswap-a4779a1a7c49). |
-| 8 | Impermanent loss (IL) real vs fee earned | Rebalancing LP | Bandingkan nilai posisi LP aktual vs hold-equivalent (formula IL standar), dikurangi fee yang sudah diklaim — Revert Finance & DefiLlama Yields sudah punya flag `ilRisk`. |
-| 9 | Jarak ke likuidasi (health factor & % drop harga pemicu) | Health factor monitoring | `HF = (collateral * liq. threshold) / debt` langsung dari kontrak lending (Aave/Venus di BSC) via `getUserAccountData` atau setara; tampilkan juga "butuh harga turun X% untuk liquidation" — pola dari [HF Guard](https://hfguard.app/) dan [Otomato](https://otomato.xyz/protocols/aave). |
-| 10 | Win rate & jumlah trade | Grid trading | % grid order yang closed profit dari total order tereksekusi, dari event log kontrak grid agent. |
-| 11 | Uptime agent (%) | Semua | Heartbeat/ping berkala dari runtime agent ke backend Fugugent, dicatat sebagai time-series; tampilkan 30 hari terakhir, bukan klaim "99.9%" statis. |
-| 12 | Latensi respons agent (deteksi → eksekusi) | Semua, krusial untuk health factor & grid | Selisih timestamp trigger (harga/HF menembus threshold) vs timestamp tx dieksekusi on-chain — bisa dibaca dari block timestamp tx vs waktu event pemicu di indexer sendiri. |
-| 13 | Jumlah user aktif & AUM per agent, dengan link block explorer | Semua | Query langsung dari smart contract Fugugent (jumlah wallet unik yang delegasi + total value under management), bukan angka yang di-hardcode di frontend — tautkan ke BscScan testnet sebagai bukti (menghindari kasus Giza). |
-| 14 | Backtest historis sebelum live (opsional per strategi) | Semua, terutama yield/grid | Simulasi terhadap data harga historis on-chain (subgraph/indexer sendiri), ditampilkan sebagai grafik dengan disclaimer "past performance ≠ future" — pola Almanak (mainnet fork simulation). |
-| 15 | Audit/verifikasi kontrak agent | Semua | Link langsung ke source-verified contract di BscScan + status audit (jika ada) sebagai badge di kartu, bukan hanya teks "audited" tanpa link. |
-| 16 | Skor reputasi lintas-kategori (leaderboard) | Semua | Adaptasi ala Recall AgentRank: agregasi metrik on-chain per kategori jadi ranking yang meluruh (decay) jika agent tidak aktif — beri user "top 3 agent per kategori" langsung di halaman kategori. |
+| 1 | Realized APR 7d/30d/90d (net of fees) | Yield optimisation, LP | Reconstructed from deposit/withdraw history plus actual on-chain balances (vault/strategy contract event logs), not the protocol's advertised APY. Compare against `apyBase`/`apyReward` from the [DefiLlama Yields API](https://github.com/DefiLlama/yield-server) as a market baseline. |
+| 2 | Max drawdown | All 4 categories | A time series of the agent's NAV/position value (snapshot per block/interval) → compute the largest peak-to-trough. |
+| 3 | Sharpe / Sortino ratio | Yield optimisation, grid trading | Daily returns from the NAV time series above, divided by volatility (Sortino: downside deviation only). Industry baseline: 3Commas/Cryptohopper already display these for trading bots. |
+| 4 | Fees vs profit (net-of-fee return) | All | Gross PnL (from on-chain transactions) minus total gas + protocol fees + Fugugent platform fees, shown as a breakdown rather than one combined number. |
+| 5 | Gas cost per rebalance/action | LP rebalancing, grid trading | Sum of `gasUsed * gasPrice` across each agent execution tx (indexing the agent contract's event log on BSC testnet), averaged per action. |
+| 6 | Average slippage per execution | Grid trading, rebalancing | The difference between the expected price (the quote at submit time) and the actual execution price from the tx receipt/DEX swap event. |
+| 7 | Time-in-range (%) | LP rebalancing (concentrated liquidity) | The percentage of time the pool price sits inside the agent's LP position range, computed from a price oracle/pool tick history — a pattern already used by [Revert Finance](https://medium.com/blockchain-biz/why-you-should-use-revert-finance-prior-to-entering-any-lp-on-uniswap-a4779a1a7c49). |
+| 8 | Real impermanent loss (IL) vs fees earned | LP rebalancing | Compare the actual LP position value against the hold-equivalent (standard IL formula), minus the fees already claimed — Revert Finance and DefiLlama Yields already have an `ilRisk` flag. |
+| 9 | Distance to liquidation (health factor and the % price drop that triggers it) | Health factor monitoring | `HF = (collateral * liq. threshold) / debt` read straight from the lending contract (Aave/Venus on BSC) via `getUserAccountData` or its equivalent; also show "the price has to drop X% for liquidation" — a pattern from [HF Guard](https://hfguard.app/) and [Otomato](https://otomato.xyz/protocols/aave). |
+| 10 | Win rate & number of trades | Grid trading | The percentage of grid orders that closed in profit out of all executed orders, from the grid agent contract's event log. |
+| 11 | Agent uptime (%) | All | A periodic heartbeat/ping from the agent runtime to the Fugugent backend, recorded as a time series; show the last 30 days, not a static "99.9%" claim. |
+| 12 | Agent response latency (detection → execution) | All, critical for health factor and grid | The gap between the trigger timestamp (price/HF crossing the threshold) and the timestamp of the executed on-chain tx — readable from the tx block timestamp versus the trigger event time in our own indexer. |
+| 13 | Number of active users & AUM per agent, with a block explorer link | All | Queried directly from the Fugugent smart contracts (number of unique delegating wallets + total value under management), not a number hardcoded in the frontend — link to BscScan testnet as proof (avoiding the Giza case). |
+| 14 | Historical backtest before going live (optional per strategy) | All, especially yield/grid | A simulation against historical on-chain price data (subgraph/our own indexer), displayed as a chart with a "past performance ≠ future" disclaimer — the Almanak pattern (mainnet fork simulation). |
+| 15 | Agent contract audit/verification | All | A direct link to the source-verified contract on BscScan plus audit status (if any) as a badge on the card, not just the word "audited" with no link. |
+| 16 | Cross-category reputation score (leaderboard) | All | An adaptation of Recall's AgentRank: aggregate on-chain metrics per category into a ranking that decays if the agent goes inactive — give the user the "top 3 agents in this category" right on the category page. |
 
-### B. Ide diferensiasi konkret (untuk 3 kriteria juri)
+### B. Concrete differentiation ideas (for the 3 judging criteria)
 
-1. **"Verified on-chain" badge wajib**: setiap angka AUM/PnL/APR di kartu agent harus punya link
-   klik-through ke bukti on-chain (tx hash/block explorer) — langsung menjawab kegagalan Giza
-   (angka tanpa verifikasi).
-2. **Halaman kategori dengan leaderboard, bukan cuma daftar**: 4 kategori masing-masing punya
-   ranking berbasis metrik yang sama (mis. risk-adjusted return), ala Recall AgentRank, supaya
-   user awam langsung tahu "agent mana yang terbaik di kategori ini" tanpa harus baca detail.
-3. **"3-klik hire, revoke 1-klik" sebagai janji UX eksplisit**: tampilkan progress bar aktivasi
-   (pilih agent → set limit sesi → sign) supaya tidak ada dead end, dan tombol revoke selalu
-   terlihat di dashboard (seperti yang direncanakan dengan Altana session key).
-4. **Simulasi "coba dulu" sebelum commit dana nyata**: mode paper-trade/backtest per agent
-   (terinspirasi Almanak & Recall competitions) supaya user nol pengetahuan bisa lihat hasil
-   simulasi dulu sebelum hire dengan dana asli.
-5. **Perbandingan head-to-head antar-agent dalam kategori sama**: tabel bandingkan 2-3 agent
-   berdampingan (APR net, drawdown, fee, uptime) — belum ada satupun kompetitor yang riset ini
-   temukan menyediakan comparison view langsung di marketplace.
-6. **Breakdown fee vs profit transparan**: tunjukkan "kamu dapat $X net setelah gas $Y dan fee
-   platform $Z" — bukan cuma APR headline, mengatasi kekaburan yang jadi masalah di GPT Store
-   (klaim vs realita) dan Giza (APY iklan vs hasil riil).
-7. **Uptime & latensi sebagai metrik kepercayaan first-class**, khusus untuk health factor
-   monitoring (di mana keterlambatan = risiko likuidasi nyata) — tampilkan grafik histori
-   respons, bukan janji SLA tanpa bukti.
-8. **Kurasi kualitas eksplisit untuk kategori berisiko finansial**: karena GPT Store & Virtuals
-   menunjukkan open marketplace gampang penuh proyek "no product no audience", Fugugent bisa
-   punya proses review/sandbox wajib sebelum agent DeFi tayang publik (mirip status
-   graduated/sandbox Virtuals, tapi dengan kriteria data quality eksplisit).
-9. **Reputasi yang meluruh (decay) jika agent tidak aktif** — cegah agent lama dengan track
-   record bagus tapi sudah mati terus nangkring di atas leaderboard (pelajaran dari AgentRank).
-10. **Independent "auditor agent"** yang mengevaluasi/memverifikasi klaim agent lain secara
-    otomatis dan mempublikasikan skor — konsep dari Theoriq (evaluator agent) yang belum ada
-    satupun kompetitor DeFi lain menerapkannya secara konkret ke user-facing marketplace.
-11. **Kategori sama-dalam**: pastikan tiap 4 kategori punya field data yang setara persis
-    (bukan salah satu kategori dapat metrik lengkap dan yang lain minim) — beri health factor
-    monitoring metrik non-trading seperti "distance to liquidation %", bukan dipaksa APR seperti
-    kategori yield.
-12. **Riwayat aksi agent yang bisa di-scroll (activity feed)**, bukan cuma angka agregat —
-    tiap rebalance/grid order/health check ditampilkan sebagai baris log dengan tx hash, mirip
-    job dashboard Virtuals ACP tapi lebih granular untuk konteks DeFi.
-13. **Filter "sudah live berapa lama" dan "jumlah dana yang pernah dikelola"** sebagai proxy
-    maturity, karena rating bintang sendirian (pola GPT Store/Poe) gampang dimanipulasi/kosong
-    di awal.
-14. **Slippage & gas efficiency sebagai pembeda kompetitif antar-agent** dalam kategori grid
-    trading/rebalancing — metrik yang bahkan 3Commas/Pionex (grid bot mapan) tidak secara
-    eksplisit expose ke user per-agent.
-15. **Bahasa & UI zero-jargon di depan, detail teknis di belakang** — tampilkan APR/health factor
-    dengan penjelasan 1-baris ("makin dekat ke 1.0, makin berisiko likuidasi") supaya user nol
-    pengetahuan tidak dead-end di istilah, sambil tetap expose data mentah untuk yang mau
-    verifikasi (mengatasi masalah Fetch.ai Agentverse yang search syntax-nya terlalu teknis
-    untuk pemula).
+1. **A mandatory "Verified on-chain" badge**: every AUM/PnL/APR number on an agent card must have a
+   click-through link to on-chain proof (tx hash/block explorer) — directly answering the Giza
+   failure (numbers with no verification).
+2. **Category pages with a leaderboard, not just a list**: each of the 4 categories gets a ranking
+   based on the same metric (e.g. risk-adjusted return), Recall AgentRank style, so a novice
+   immediately knows "which agent is best in this category" without reading the details.
+3. **"3-click hire, 1-click revoke" as an explicit UX promise**: show an activation progress bar
+   (pick an agent → set session limits → sign) so there is no dead end, and keep the revoke button
+   always visible on the dashboard (as planned with the Altana session key).
+4. **A "try it first" simulation before committing real money**: a paper-trade/backtest mode per
+   agent (inspired by Almanak and the Recall competitions) so a user with zero prior knowledge can
+   see simulated results before hiring with real funds.
+5. **Head-to-head comparison between agents in the same category**: a table comparing 2-3 agents
+   side by side (net APR, drawdown, fees, uptime) — not a single competitor found in this research
+   offers a comparison view directly in the marketplace.
+6. **A transparent fee-versus-profit breakdown**: show "you earned $X net after $Y in gas and $Z in
+   platform fees" — not just a headline APR. This addresses the fuzziness that is a problem at the
+   GPT Store (claims vs reality) and at Giza (advertised APY vs real results).
+7. **Uptime and latency as first-class trust metrics**, especially for health factor monitoring
+   (where a delay means a real liquidation risk) — show a response history chart, not an SLA promise
+   with no evidence.
+8. **Explicit quality curation for financially risky categories**: because the GPT Store and
+   Virtuals show that an open marketplace easily fills up with "no product, no audience" projects,
+   Fugugent can require a review/sandbox process before a DeFi agent goes public (similar to the
+   Virtuals graduated/sandbox status, but with explicit data quality criteria).
+9. **Reputation that decays when an agent is inactive** — prevents an old agent with a good track
+   record but no longer running from sitting permanently at the top of the leaderboard (the AgentRank
+   lesson).
+10. **An independent "auditor agent"** that automatically evaluates/verifies other agents' claims and
+    publishes a score — a concept from Theoriq (evaluator agents) that no other DeFi competitor has
+    concretely applied to a user-facing marketplace.
+11. **Equally deep categories**: make sure each of the 4 categories has exactly equivalent data
+    fields (rather than one category getting full metrics and the others getting scraps) — give
+    health factor monitoring non-trading metrics such as "distance to liquidation %" instead of
+    forcing an APR on it like the yield category.
+12. **A scrollable history of agent actions (activity feed)**, not just aggregate numbers — every
+    rebalance/grid order/health check shown as a log line with a tx hash, similar to the Virtuals ACP
+    job dashboard but more granular for a DeFi context.
+13. **Filters for "how long it has been live" and "how much money it has ever managed"** as a proxy
+    for maturity, because star ratings on their own (the GPT Store/Poe pattern) are easy to
+    manipulate and empty at the start.
+14. **Slippage and gas efficiency as a competitive differentiator between agents** in the grid
+    trading/rebalancing categories — metrics that even 3Commas/Pionex (established grid bots) do not
+    explicitly expose to users per agent.
+15. **Zero-jargon language and UI up front, technical detail behind it** — show APR/health factor
+    with a one-line explanation ("the closer to 1.0, the closer to liquidation") so a novice user
+    does not dead-end on terminology, while still exposing the raw data for anyone who wants to
+    verify it (fixing the Fetch.ai Agentverse problem where the search syntax is too technical for a
+    beginner).
 
 ---
 
-## Sumber yang tidak bisa diakses penuh
+## Sources we could not fully access
 
-- `docs.recall.network/competitions` mengembalikan 404 saat WebFetch — informasi Recall di atas
-  disusun dari cache Google/Messari/artikel sekunder, bukan dokumentasi resmi langsung. Perlu
-  diverifikasi ulang manual di `docs.recall.network` sebelum dikutip sebagai fakta pasti.
-- Detail UI kartu/filter Pearl marketplace (`marketplace.olas.network`) dan Almanak tidak
-  ditemukan dalam bentuk screenshot/dokumentasi rinci publik — deskripsi di atas adalah rekonstruksi
-  dari blog post & docs teks, bukan observasi UI langsung.
+- `docs.recall.network/competitions` returned a 404 in WebFetch — the Recall information above was
+  assembled from Google cache/Messari/secondary articles, not directly from the official docs. It
+  needs to be re-verified manually at `docs.recall.network` before being quoted as settled fact.
+- Details of the Pearl marketplace (`marketplace.olas.network`) and Almanak card/filter UI could not
+  be found as screenshots or detailed public documentation — the descriptions above are
+  reconstructed from blog posts and text docs, not direct UI observation.
