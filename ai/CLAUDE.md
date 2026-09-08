@@ -46,3 +46,23 @@ bag doctor && bag dev
 ```
 
 `.env` berisi `DGRID_API_KEY` — gitignored.
+
+## Status wallet & session (BSC testnet)
+
+| Agent | Wallet admin Altana | Session |
+|---|---|---|
+| `fuguguardian` | `0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0` | aktif, 30 hari, 10 U/hari + 0,02 tBNB/hari, terdaftar di Keystore |
+
+Verifikasi publik tanpa API key apa pun:
+```bash
+cast call --rpc-url https://data-seed-prebsc-1-s1.bnbchain.org:8545 \
+  0x6b8361C29d05D498b1a12B54A37310f94171E94A \
+  'isValidKey(address,bytes32)(bool)' <WALLET_AGENT> <KEY_HASH>
+```
+`KEY_HASH` = `cast keccak <session public key>`. Session public key bisa dilihat dengan
+`bag wallet session status` (jalankan dari `app/agent/`).
+
+Perpanjang session yang kedaluwarsa: `bag wallet session grant --force`, lalu deploy ulang.
+Cabut: `bag wallet session revoke --yes`.
+
+**Jangan pernah** mencetak, menyalin, atau mem-parse bagian `signer` dari file session.
