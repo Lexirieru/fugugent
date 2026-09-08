@@ -78,4 +78,26 @@ contract FuguReputationTest is Test {
     function test_averageOfEmptyListingIsZero() public view {
         assertEq(rep.averageScoreX100(99), 0);
     }
+
+    function test_acceptsBoundaryScores() public {
+        stub.setSubscribed(2, alice, true);
+        stub.setSubscribed(3, bob, true);
+
+        vm.prank(alice);
+        rep.review(2, 1, "");
+
+        vm.prank(bob);
+        rep.review(3, 5, "");
+
+        assertEq(rep.reviewCount(2), 1);
+        assertEq(rep.averageScoreX100(2), 100);
+        assertEq(rep.reviewCount(3), 1);
+        assertEq(rep.averageScoreX100(3), 500);
+    }
+
+    function test_onlyOwnerCanSetSubscriptions() public {
+        vm.prank(address(0xDEAD));
+        vm.expectRevert();
+        rep.setSubscriptions(address(0x1234));
+    }
 }

@@ -9,6 +9,10 @@ import {IFuguSubscription} from "./interfaces/IFuguSubscription.sol";
 /// @title FuguReputation
 /// @notice Review yang hanya bisa ditulis wallet yang terbukti pernah berlangganan.
 ///         Rating anti-sybil — memalsukannya berarti benar-benar harus membayar.
+/// @dev Trust boundary: The anti-sybil gate applies to end users. The contract owner
+///      is a trusted entity who can bypass the gate by calling setSubscriptions() to
+///      point to a malicious subscription contract, or by upgrading the contract logic
+///      via UUPS. Ownership will be transferred to a multisig after hackathon period.
 contract FuguReputation is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     struct Agg {
         uint128 sum;
