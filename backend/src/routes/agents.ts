@@ -37,8 +37,9 @@ import {
   type AgentServicePage,
   type FallbackAttempt,
   type FallbackOutcome,
+  type FirstPartyReport,
 } from "../service/agents.js";
-import { CATEGORIES, type AgentSource, type Category } from "../types.js";
+import { CATEGORIES, type AgentRecord, type AgentSource, type Category } from "../types.js";
 import { parseAgentId, parseCategory, parseLimit, parseOffset, QueryError } from "./query.js";
 
 export interface AgentRoutesDeps {
@@ -84,6 +85,19 @@ export function isUncertain(trail: readonly FallbackAttempt[]): boolean {
   return trail.some((attempt) => UNCERTAIN_OUTCOMES.includes(attempt.outcome));
 }
 
+/**
+ * Census of item origins for one response.
+ *
+ * Derived from the items actually returned rather than accumulated along the
+ * way, so the numbers can never disagree with `items`. The service computes the
+ * same census for single-category pages; a test asserts the two agree.
+ */
+export function censusOf(items: readonly AgentRecord[]): Partial<Record<AgentSource, number>> {
+  const census: Partial<Record<AgentSource, number>> = {};
+  for (const item of items) census[item.source] = (census[item.source] ?? 0) + 1;
+  return census;
+}
+
 /** Pesan kegagalan yang aman untuk klien — disunting, tanpa stack trace. */
 function describe(err: unknown): string {
   if (err instanceof Error) {
@@ -109,6 +123,32 @@ export interface AgentListResponse {
   healthy: boolean;
   reason: string | null;
   fetchedAt: string;
+  /**
+   * How many items on this page came from each source.
+   *
+   * `source` above names the tier that answered the **discovery** query; it is
+   * not a claim about every item, because first-party `FuguRegistry` listings
+   * are merged in on top of discovery on every request. Without this census a
+   * mixed page would be reported under one label that does not cover it, and a
+   * client would have no way to tell — which is exactly the kind of quiet
+   * over-claim this backend exists to avoid.
+   *
+   * Always present on the wire, never `null`: it is derived from the items in
+   * this very response, so it can never contradict them.
+   */
+  itemSources: Partial<Record<AgentSource, number>>;
+  /**
+   * State of the first-party overlay — our own rentable `FuguRegistry` listings.
+   *
+   * `null` means the overlay is **not installed** on this instance (no on-chain
+   * source wired), which is a configuration, not a failure. An object with
+   * `healthy: false` means it is installed and could not be read — the case a
+   * storefront needs in order to say "rentable agents are temporarily
+   * unavailable" instead of silently showing none. The two are deliberately
+   * distinguishable, the same way `unavailable` differs from `unhealthy` in
+   * `trail`.
+   */
+  firstParty: FirstPartyReport | null;
   /** Umur item tertua, detik. `null` bila kosong. */
   ageSeconds: number | null;
   stale: boolean;
@@ -127,6 +167,12 @@ export interface AgentDetailResponse {
   stale: boolean;
   degraded: boolean;
   maxAgeSeconds: number;
+  /**
+   * Same meaning as on the list response. There is no `itemSources` here on
+   * purpose: a single agent already states its own origin in `agent.source`, and
+   * a census of one would only be a second place for the same fact to drift.
+   */
+  firstParty: FirstPartyReport | null;
   trail: FallbackAttempt[];
 }
 
@@ -160,6 +206,8 @@ function toListResponse(page: AgentServicePage, category: Category | null): Agen
     limit: page.limit,
     offset: page.offset,
     category,
+    itemSources: page.itemSources ?? censusOf(page.items),
+    firstParty: page.firstParty ?? null,
     source: page.source,
     healthy: page.healthy,
     reason: page.reason === null ? null : redact(page.reason),
@@ -183,6 +231,7 @@ function toDetailResponse(detail: AgentServiceDetail): AgentDetailResponse {
     stale: detail.stale,
     degraded: detail.degraded,
     maxAgeSeconds: detail.maxAgeSeconds,
+    firstParty: detail.firstParty ?? null,
     trail: detail.trail,
   };
 }
@@ -207,6 +256,8 @@ function failedList(
     limit,
     offset,
     category,
+    itemSources: {},
+    firstParty: null,
     source: "seed",
     healthy: false,
     reason: describe(err),
@@ -254,8 +305,15 @@ function mergePages(
     .map((p) => p.reason)
     .filter((r): r is string => r !== null && r.trim() !== "");
 
+  // Census the slice we actually serve, not the four pages we read: `offset`
+  // and `limit` are applied over the merge, so a census taken before slicing
+  // would count items this response does not contain.
+  const served = merged.slice(offset, offset + limit);
+
   return {
-    items: merged.slice(offset, offset + limit).map(serializeAgentRecord),
+    items: served.map(serializeAgentRecord),
+    itemSources: censusOf(served),
+    firstParty: mergeFirstParty(pages, served),
     /**
      * Jumlah item **berbeda yang benar-benar bisa dijangkau lewat paging ini**,
      * bukan jumlah `total` keempat kategori.
@@ -280,6 +338,53 @@ function mergePages(
     degraded: pages.some((p) => p.degraded),
     maxAgeSeconds: Math.max(...pages.map((p) => p.maxAgeSeconds), DEFAULT_MAX_AGE_SECONDS),
     trail: pages.flatMap((p) => p.trail),
+  };
+}
+
+/**
+ * Fold the four per-category overlay reports into one.
+ *
+ * `count` is recomputed from the items actually served — summing the four
+ * reported counts would over-count an agent listed in two categories and would
+ * ignore slicing. The health flags are folded pessimistically: one category that
+ * could not read the registry makes the whole response say so, because a
+ * storefront that hides a partial overlay failure is back to showing fewer
+ * rentable agents than exist without admitting it.
+ *
+ * Returns `null` only when no category reported an overlay at all — the overlay
+ * is not installed on this instance.
+ */
+function mergeFirstParty(
+  pages: readonly AgentServicePage[],
+  served: readonly AgentRecord[],
+): FirstPartyReport | null {
+  const reports = pages
+    .map((page) => page.firstParty)
+    .filter((report): report is FirstPartyReport => report !== undefined);
+  if (reports.length === 0) return null;
+
+  const ages = reports.map((r) => r.ageSeconds).filter((a): a is number => a !== null);
+  const reasons = reports
+    .map((r) => r.reason)
+    .filter((r): r is string => r !== null && r.trim() !== "");
+
+  // Maxed, not summed. All four category reads share one held registry read, and
+  // each report counts unreadable listings across the whole of it — measured in
+  // a live container: one unreadable listing was reported as 1 by each of the
+  // four categories, so summing showed 4. Left absent when no category reported
+  // it, so "not reported" stays distinguishable from "reported as zero".
+  const unreadable = reports.filter((r) => r.unreadableMetadata !== undefined);
+
+  return {
+    count: served.filter((item) => item.fuguListing !== null).length,
+    healthy: reports.every((r) => r.healthy),
+    reason: reasons.length === 0 ? null : redact([...new Set(reasons)].join("; ")),
+    ageSeconds: ages.length === 0 ? null : Math.max(...ages),
+    ...(unreadable.length === 0
+      ? {}
+      : {
+          unreadableMetadata: Math.max(...unreadable.map((r) => r.unreadableMetadata ?? 0)),
+        }),
   };
 }
 
@@ -352,6 +457,7 @@ export function createAgentRoutes(deps: AgentRoutesDeps): Hono {
         stale: true,
         degraded: true,
         maxAgeSeconds: DEFAULT_MAX_AGE_SECONDS,
+        firstParty: null,
         trail: [],
       } satisfies AgentDetailResponse);
     }
