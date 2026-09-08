@@ -8,6 +8,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { createApp } from "../app.js";
+import { shouldAlarm } from "../health.js";
 import { fakeService, makeHealth, FIXED_NOW } from "./fixtures.js";
 
 async function get(app: ReturnType<typeof createApp>, path: string): Promise<Response> {
@@ -218,6 +219,188 @@ describe("GET /api/health?strict=1", () => {
     expect((await get(app, "/api/health?strict=")).status).toBe(200);
   });
 
+  /**
+   * Regresi utama: **hanya Postgres yang mati**, 8004scan segar.
+   *
+   * Mutu data yang dilihat pengguna memang tidak turun — `degraded: false`,
+   * `healthy: true` — jadi syarat lama (`strict && degraded`) membalas 200 dan
+   * monitor tidak pernah tahu satu sumber benar-benar tumbang. Diukur di
+   * container hidup sebelum perbaikan ini.
+   *
+   * Gagal bila klausa `liveBroken` dicabut dari `shouldAlarm`.
+   */
+  it("503 saat HANYA cache mati walau degraded: false dan healthy: true", async () => {
+    const app = createApp({
+      service: fakeService({
+        health: async () =>
+          makeHealth({
+            healthy: true,
+            degraded: false,
+            sources: [
+              { source: "scan8004", healthy: true, reason: null, checkedAt: FIXED_NOW },
+              {
+                source: "cache",
+                healthy: false,
+                reason: "probe: kueri cache gagal — ECONNREFUSED 127.0.0.1:5432",
+                checkedAt: FIXED_NOW,
+              },
+              { source: "seed", healthy: true, reason: null, checkedAt: FIXED_NOW },
+            ],
+          }),
+      }),
+    });
+
+    const strict = await get(app, "/api/health?strict=1");
+    const lenient = await get(app, "/api/health");
+
+    expect(strict.status).toBe(503);
+    // Mode bawaan tetap 200: pengguna memang belum merasakan apa pun.
+    expect(lenient.status).toBe(200);
+    const body = await json(strict);
+    expect(body.degraded).toBe(false);
+    expect(body.healthy).toBe(true);
+    expect(body.reason).toContain("cache tidak sehat");
+  });
+
+  it("503 saat HANYA on-chain mati", async () => {
+    const app = createApp({
+      service: fakeService({
+        health: async () =>
+          makeHealth({
+            healthy: true,
+            degraded: false,
+            sources: [
+              { source: "scan8004", healthy: true, reason: null, checkedAt: FIXED_NOW },
+              { source: "cache", healthy: true, reason: null, checkedAt: FIXED_NOW },
+              { source: "onchain", healthy: false, reason: "RPC timeout", checkedAt: FIXED_NOW },
+            ],
+          }),
+      }),
+    });
+
+    expect((await get(app, "/api/health?strict=1")).status).toBe(503);
+  });
+
+  /**
+   * "Tidak dipasang" bukan "rusak". Backend tanpa `DATABASE_URL` adalah
+   * konfigurasi yang sah — `index.ts` sengaja mengizinkannya — dan tidak boleh
+   * membuat monitor merah selamanya. `cache` tidak muncul di `sources` sama
+   * sekali pada keadaan itu.
+   */
+  it("200 saat cache tidak dipasang dan sisanya sehat", async () => {
+    const app = createApp({
+      service: fakeService({
+        health: async () =>
+          makeHealth({
+            healthy: true,
+            degraded: false,
+            sources: [
+              { source: "scan8004", healthy: true, reason: null, checkedAt: FIXED_NOW },
+              { source: "seed", healthy: true, reason: null, checkedAt: FIXED_NOW },
+            ],
+          }),
+      }),
+    });
+
+    expect((await get(app, "/api/health?strict=1")).status).toBe(200);
+  });
+
+  /**
+   * `seed` bukan sumber sungguhan: ia berkas di dalam bundel proses ini.
+   * Gagal bila `LIVE_SOURCES` diganti "semua sumber".
+   */
+  it("200 saat hanya seed yang dilaporkan tidak sehat", async () => {
+    const app = createApp({
+      service: fakeService({
+        health: async () =>
+          makeHealth({
+            healthy: true,
+            degraded: false,
+            sources: [
+              { source: "scan8004", healthy: true, reason: null, checkedAt: FIXED_NOW },
+              { source: "cache", healthy: true, reason: null, checkedAt: FIXED_NOW },
+              { source: "seed", healthy: false, reason: "observasi basi", checkedAt: FIXED_NOW },
+            ],
+          }),
+      }),
+    });
+
+    expect((await get(app, "/api/health?strict=1")).status).toBe(200);
+  });
+
+  it("503 saat belum ada satu pun sumber sungguhan yang terkonfirmasi sehat", async () => {
+    const app = createApp({
+      service: fakeService({
+        health: async () =>
+          makeHealth({
+            // Persis keadaan sesaat setelah boot: belum ada observasi apa pun.
+            healthy: false,
+            degraded: true,
+            sources: [{ source: "seed", healthy: true, reason: null, checkedAt: FIXED_NOW }],
+          }),
+      }),
+    });
+
+    expect((await get(app, "/api/health?strict=1")).status).toBe(503);
+  });
+
+  /**
+   * Observasi kedaluwarsa berarti **belum diperiksa ulang**, bukan gagal.
+   * `onchain` hanya tersentuh ketika tingkat 1 dan 2 gagal, jadi observasinya
+   * nyaris selalu melewati TTL; menghitungnya sebagai kerusakan membuat monitor
+   * merah permanen — sama tidak bergunanya dengan monitor yang hijau permanen.
+   * Terukur di container hidup sebelum pengecualian ini dipasang.
+   *
+   * Gagal bila syarat `source.stale !== true` dicabut.
+   */
+  it("200 saat satu-satunya sumber tidak sehat hanyalah observasi yang stale", async () => {
+    const app = createApp({
+      service: fakeService({
+        health: async () =>
+          makeHealth({
+            healthy: true,
+            degraded: false,
+            sources: [
+              { source: "scan8004", healthy: true, reason: null, checkedAt: FIXED_NOW, stale: false },
+              {
+                source: "onchain",
+                healthy: false,
+                reason: "observasi berumur 2061 dtk, melewati ambang 30 dtk — belum diperiksa ulang",
+                checkedAt: FIXED_NOW,
+                stale: true,
+              },
+            ],
+          }),
+      }),
+    });
+
+    expect((await get(app, "/api/health?strict=1")).status).toBe(200);
+  });
+
+  it("503 tetap berbunyi bila sumber yang sama gagal SEGAR, bukan kedaluwarsa", async () => {
+    const app = createApp({
+      service: fakeService({
+        health: async () =>
+          makeHealth({
+            healthy: true,
+            degraded: false,
+            sources: [
+              { source: "scan8004", healthy: true, reason: null, checkedAt: FIXED_NOW, stale: false },
+              {
+                source: "onchain",
+                healthy: false,
+                reason: "RPC timeout",
+                checkedAt: FIXED_NOW,
+                stale: false,
+              },
+            ],
+          }),
+      }),
+    });
+
+    expect((await get(app, "/api/health?strict=1")).status).toBe(503);
+  });
+
   it("ejaan lain ditolak 400, bukan diam-diam dianggap mati", async () => {
     const app = createApp({ service: fakeService({ health: degradedHealth }) });
     const res = await get(app, "/api/health?strict=yes");
@@ -228,5 +411,89 @@ describe("GET /api/health?strict=1", () => {
     const body = await json(res);
     expect(body.error).toBe("invalid_query");
     expect(body.field).toBe("strict");
+  });
+});
+
+/**
+ * Kontrak `shouldAlarm` diuji juga secara langsung, bukan hanya lewat rute.
+ *
+ * Alasannya sama dengan pelajaran C1: rute tidak boleh menggantungkan
+ * kebenarannya pada invariant yang kebetulan berlaku di `service/` hari ini.
+ * Kombinasi `healthy: false` + `degraded: false` misalnya **tidak bisa**
+ * dihasilkan definisi `getHealth()` saat ini (`degraded: false` berarti
+ * 8004scan sehat, dan itu sendiri sudah membuat `healthy: true`). Justru karena
+ * itu ia diuji di sini: bila definisi salah satunya berubah kelak, klausa
+ * ketiga adalah yang menahan monitor tetap berbunyi.
+ */
+describe("shouldAlarm", () => {
+  const ok = { source: "scan8004" as const, healthy: true, reason: null, checkedAt: FIXED_NOW };
+
+  it("berbunyi bila tidak ada sumber sungguhan yang terkonfirmasi sehat, walau degraded: false", () => {
+    expect(shouldAlarm({ healthy: false, degraded: false, sources: [ok] })).toBe(true);
+  });
+
+  it("berbunyi bila ada sumber sungguhan yang rusak", () => {
+    expect(
+      shouldAlarm({
+        healthy: true,
+        degraded: false,
+        sources: [
+          ok,
+          { source: "cache", healthy: false, reason: "ECONNREFUSED", checkedAt: FIXED_NOW },
+        ],
+      }),
+    ).toBe(true);
+  });
+
+  it("berbunyi bila degraded, walau daftar sumbernya kosong", () => {
+    expect(shouldAlarm({ healthy: true, degraded: true, sources: [] })).toBe(true);
+  });
+
+  it("diam bila satu-satunya yang tidak sehat adalah observasi kedaluwarsa", () => {
+    expect(
+      shouldAlarm({
+        healthy: true,
+        degraded: false,
+        sources: [
+          { ...ok, stale: false },
+          {
+            source: "cache",
+            healthy: false,
+            reason: "observasi kedaluwarsa",
+            checkedAt: FIXED_NOW,
+            stale: true,
+          },
+        ],
+      }),
+    ).toBe(false);
+  });
+
+  it("berbunyi bila kegagalannya segar, bukan kedaluwarsa", () => {
+    expect(
+      shouldAlarm({
+        healthy: true,
+        degraded: false,
+        sources: [
+          { ...ok, stale: false },
+          {
+            source: "cache",
+            healthy: false,
+            reason: "ECONNREFUSED",
+            checkedAt: FIXED_NOW,
+            stale: false,
+          },
+        ],
+      }),
+    ).toBe(true);
+  });
+
+  it("diam bila jalur utama sehat dan tidak ada bukti kerusakan", () => {
+    expect(
+      shouldAlarm({
+        healthy: true,
+        degraded: false,
+        sources: [ok, { source: "seed", healthy: true, reason: null, checkedAt: FIXED_NOW }],
+      }),
+    ).toBe(false);
   });
 });
