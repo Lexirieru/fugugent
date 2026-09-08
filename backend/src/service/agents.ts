@@ -172,8 +172,17 @@ export function createDbAgentCache(db: FuguDb): AgentCachePort {
   return {
     getAgents: (filter, now) => getCachedAgents(db, filter, now),
     getAgent: (id, now) => getCachedAgent(db, id, now),
+    // `upsertAgents` sengaja MELEMPAR bila infrastrukturnya gagal (lihat repo.ts):
+    // penulisan yang gagal harus terlihat. Yang membungkusnya adalah `writeThrough`
+    // di bawah, supaya kegagalan menyimpan salinan tidak pernah mengubah apa yang
+    // sudah diterima pemanggil.
     saveAgents: (records) => upsertAgents(db, records),
-    recordHealth: (health) => recordSourceHealth(db, health),
+    // `recordSourceHealth` mengembalikan `boolean` (berhasil atau tidak) dan tidak
+    // melempar. Port ini tidak peduli: mencatat kesehatan adalah efek samping,
+    // bukan bagian dari jawaban yang dilayani.
+    recordHealth: async (health) => {
+      await recordSourceHealth(db, health);
+    },
     latestHealth: () => getLatestSourceHealth(db),
   };
 }
