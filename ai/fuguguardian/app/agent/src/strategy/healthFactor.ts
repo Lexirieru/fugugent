@@ -2,6 +2,9 @@ import { HF_ONE, type Position } from "./types.js";
 
 const BPS = 10_000n;
 
+/** Pembagian bigint yang dibulatkan ke atas (a dan b harus positif). */
+const ceilDiv = (a: bigint, b: bigint): bigint => (a + b - 1n) / b;
+
 /**
  * Health factor gaya Aave v3, basis 1e18.
  * Mengembalikan null bila tidak ada hutang — itu bukan angka besar, melainkan
@@ -17,11 +20,18 @@ export function computeHealthFactor(
   return (collateralBase * liquidationThresholdBps * HF_ONE) / (BPS * debtBase);
 }
 
-/** Berapa basis point harga agunan boleh turun sebelum HF menyentuh 1.0. */
+/**
+ * Berapa basis point harga agunan boleh turun sebelum HF menyentuh 1.0.
+ * Bagian dalam (BPS × HF_ONE / hf) harus dibulatkan ke ATAS: itu adalah bps
+ * yang "tersisa" setelah turun, jadi kalau dibulatkan ke bawah (floor),
+ * hasil pengurangannya (margin turun) membesar dan melebih-lebihkan seberapa
+ * jauh harga boleh jatuh — bisa mendaratkan posisi di bawah HF 1.0 padahal
+ * dilaporkan masih aman. ceilDiv membuat margin ini mengecil, arah yang aman.
+ */
 export function dropToLiquidationBps(hf: bigint | null): bigint | null {
   if (hf === null) return null;
   if (hf <= HF_ONE) return 0n;
-  return BPS - (BPS * HF_ONE) / hf;
+  return BPS - ceilDiv(BPS * HF_ONE, hf);
 }
 
 /** HF seandainya harga agunan turun sebesar `dropBps`. */

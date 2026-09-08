@@ -55,6 +55,16 @@ describe("dropToLiquidationBps", () => {
   it("tanpa hutang, jarak ke likuidasi tidak terdefinisi", () => {
     expect(dropToLiquidationBps(null)).toBeNull();
   });
+
+  it("margin ke likuidasi tidak pernah melebihi batas sebenarnya", () => {
+    // collateral=1300, debt=1000, ltBps=10000 -> HF tepat 1.3e18.
+    const p = pos(1300n, 1000n, 10000n);
+    expect(dropToLiquidationBps(p.healthFactor)).toBe(2307n);
+    // Turun tepat 2307 bps: masih di atas atau tepat di ambang.
+    expect(healthFactorAfterPriceDrop(p, 2307n)! >= HF_ONE).toBe(true);
+    // Satu bps lebih jauh (2308) sudah melewati ambang likuidasi.
+    expect(healthFactorAfterPriceDrop(p, 2308n)! < HF_ONE).toBe(true);
+  });
 });
 
 describe("healthFactorAfterPriceDrop", () => {
@@ -71,6 +81,13 @@ describe("healthFactorAfterPriceDrop", () => {
   it("posisi tanpa hutang tetap aman berapa pun harga turun", () => {
     expect(healthFactorAfterPriceDrop(pos(1000n, 0n), 9000n)).toBeNull();
   });
+
+  it("HF dari angka yang tidak habis dibagi tetap floor-down", () => {
+    // collateral=1000, debt=333, ltBps=7777 -> tidak habis dibagi.
+    // 1000n * 7777n * HF_ONE / (10000n * 333n) dihitung manual dengan bigint:
+    // = 7777000n * HF_ONE / 3330000n = 2_335_435_435_435_435_435n (floor).
+    expect(computeHealthFactor(1000n, 333n, 7777n)).toBe(2_335_435_435_435_435_435n);
+  });
 });
 
 describe("repayToReachTarget", () => {
@@ -86,5 +103,16 @@ describe("repayToReachTarget", () => {
 
   it("posisi tanpa hutang tidak perlu membayar apa pun", () => {
     expect(repayToReachTarget(pos(1000n, 0n), 2n * HF_ONE)).toBe(0n);
+  });
+
+  it("repay yang disarankan tidak pernah kurang dari kebutuhan sebenarnya", () => {
+    // collateral=1000, debt=800, ltBps=8000, target=1.1 -> debtTarget=727
+    // (tidak habis dibagi: nilai kontinu sebenarnya adalah 727.27...).
+    const target = 1_100_000_000_000_000_000n;
+    const p = pos(1000n, 800n, 8000n);
+    const repay = repayToReachTarget(p, target);
+    expect(repay).toBe(73n);
+    const hfAfter = computeHealthFactor(p.collateralBase, p.debtBase - repay, p.liquidationThresholdBps)!;
+    expect(hfAfter >= target).toBe(true);
   });
 });
