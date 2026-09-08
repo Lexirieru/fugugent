@@ -40,6 +40,27 @@ describe("adapter testnet (MockLendingPool, read-only)", () => {
       expect(hf).toBe(
         computeHealthFactor(pos.collateralBase, pos.debtBase, pos.liquidationThresholdBps),
       );
+
+      // Identitas posisi tetap dipaku — dua nilai ini TIDAK berubah oleh repay,
+      // jadi memakukannya tidak mengembalikan kerapuhan yang baru saja dibuang.
+      //
+      //   - `collateralBase`: repay hanya menyentuh sisi hutang. Agunan posisi
+      //     contoh tetap 10 mBNB, dan pada harga feed $750 nilainya $7.500,00.
+      //   - `liquidationThresholdBps`: konfigurasi aset di pool, bukan keadaan
+      //     posisi.
+      //
+      // Tanpa keduanya, test ini lolos terhadap pool mana pun ber-ABI Aave v3
+      // dengan posisi apa pun yang kebetulan konsisten secara internal — alamat
+      // pool yang salah pun tidak akan ketahuan.
+      //
+      // Ketergantungannya jelas dan disengaja: `collateralBase` benar hanya
+      // selama harga mBNB di feed adalah $750. E2E (`scripts/e2e-guardian.ts`)
+      // menurunkan harga itu sementara, lalu SELALU memulihkannya lewat
+      // `finally` — termasuk saat ia gagal di tengah jalan. Kalau test ini
+      // merah di sini, itu sinyal jujur bahwa testnet ditinggalkan dalam
+      // keadaan tidak pulih, bukan sekadar test yang cerewet.
+      expect(pos.collateralBase).toBe(750_000_000_000n); // $7.500,00 @ $750/mBNB
+      expect(pos.liquidationThresholdBps).toBe(7_500n); // 75%
     },
   );
 });

@@ -38,6 +38,7 @@ import {
   DEFAULT_BSC_TESTNET_RPC_URL,
   MOCK_LENDING_POOL_ADDRESS,
 } from "../src/strategy/chain/testnet.js";
+import { decide } from "../src/strategy/decide.js";
 import { runGuardCycle, type ExecuteFn, type Logger } from "../src/strategy/guard.js";
 import {
   executeDecision,
@@ -117,6 +118,24 @@ const POOL_ABI = [
       { name: "liquidationThresholdBps", type: "uint16" },
       { name: "tokenDecimals", type: "uint8" },
       { name: "enabled", type: "bool" },
+    ],
+  },
+  {
+    // Dipakai HANYA untuk bacaan tertambat blok (lihat `posisiPadaBlok`), sebagai
+    // jangkar independen terhadap `readAavePosition`. Tidak ada logika yang
+    // diduplikasi: yang dibaca fungsi view yang sama persis, lalu HASILNYA
+    // dicocokkan dengan apa yang dilaporkan adapter.
+    type: "function",
+    name: "getUserAccountData",
+    stateMutability: "view",
+    inputs: [{ name: "user", type: "address" }],
+    outputs: [
+      { name: "totalCollateralBase", type: "uint256" },
+      { name: "totalDebtBase", type: "uint256" },
+      { name: "availableBorrowsBase", type: "uint256" },
+      { name: "currentLiquidationThreshold", type: "uint256" },
+      { name: "ltv", type: "uint256" },
+      { name: "healthFactor", type: "uint256" },
     ],
   },
   {
@@ -210,12 +229,19 @@ function tautanTx(hash: Hash): string {
   return `${BSCSCAN_TX}${hash}`;
 }
 
+/** Satu transaksi yang sudah final, beserta tinggi blok tempat ia mendarat. */
+interface TxTerkirim {
+  hash: Hash;
+  /** Blok receipt. Ini JANGKAR untuk semua bacaan sesudahnya — lihat `posisiPadaBlok`. */
+  blockNumber: bigint;
+}
+
 /** Mengirim satu transaksi dan menolak keras bila receipt-nya bukan "success". */
 async function kirim(
   publicClient: PublicClient,
   jalankan: () => Promise<Hash>,
   label: string,
-): Promise<Hash> {
+): Promise<TxTerkirim> {
   const hash = await jalankan();
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
   wajib(
@@ -223,9 +249,10 @@ async function kirim(
     `Transaksi ${label} gagal on-chain (status=${receipt.status}, tx=${hash}).`,
   );
   console.log(`  tx ${label.padEnd(10)}: ${hash}`);
+  console.log(`     blok         : ${receipt.blockNumber}`);
   console.log(`     gas terpakai : ${receipt.gasUsed}`);
   console.log(`     ${tautanTx(hash)}`);
-  return hash;
+  return { hash, blockNumber: receipt.blockNumber };
 }
 
 /**
@@ -249,17 +276,67 @@ async function bacaSampai<T>(
   jedaMs = 1_500,
 ): Promise<T> {
   let terakhir: T | undefined;
+  let galatTerakhir: unknown;
   for (let i = 1; i <= maksPercobaan; i++) {
-    terakhir = await baca();
-    if (syarat(terakhir)) {
-      if (i > 1) console.log(`  (bacaan "${label}" konsisten setelah ${i} percobaan)`);
-      return terakhir;
+    try {
+      terakhir = await baca();
+      galatTerakhir = undefined;
+      if (syarat(terakhir)) {
+        if (i > 1) console.log(`  (bacaan "${label}" konsisten setelah ${i} percobaan)`);
+        return terakhir;
+      }
+    } catch (err) {
+      // Bacaan yang DITAMBATKAN ke tinggi blok tertentu ditolak oleh node yang
+      // belum punya blok itu ("header not found") — itu justru sifat yang
+      // diinginkan: node basi mengeluh, bukan diam-diam menjawab dari masa lalu.
+      // Percobaan berikutnya kemungkinan besar mendarat di node lain.
+      galatTerakhir = err;
     }
     await new Promise((r) => setTimeout(r, jedaMs));
   }
+  const jejak =
+    galatTerakhir !== undefined
+      ? `Galat terakhir: ${galatTerakhir instanceof Error ? galatTerakhir.message : String(galatTerakhir)}`
+      : `Nilai terakhir: ${JSON.stringify(terakhir, (_k, v) => (typeof v === "bigint" ? v.toString() : v))}`;
   throw new BuktiGagal(
     `Bacaan on-chain "${label}" tidak pernah memenuhi syarat setelah ${maksPercobaan} percobaan ` +
-      `(~${(maksPercobaan * jedaMs) / 1000}s). Nilai terakhir: ${JSON.stringify(terakhir, (_k, v) => (typeof v === "bigint" ? v.toString() : v))}`,
+      `(~${(maksPercobaan * jedaMs) / 1000}s). ${jejak}`,
+  );
+}
+
+/**
+ * `getUserAccountData` yang DITAMBATKAN ke satu tinggi blok tertentu.
+ *
+ * Ini jangkar struktural untuk seluruh bukti. `bacaSampai` sendiri hanya
+ * mencoba ulang sampai kondisinya konsisten — ia menerima node pertama yang
+ * setuju, dan keamanannya bertumpu pada kebetulan bahwa dalam skenario ini
+ * state hanya bergerak satu arah. `eth_call` dengan `blockNumber` eksplisit
+ * tidak punya celah itu: node yang belum punya blok tersebut MELEMPAR
+ * ("header not found"), bukan diam-diam menjawab dari masa lalu. Jadi nilai
+ * yang kembali dari sini benar-benar nilai pada blok transaksi yang dimaksud.
+ *
+ * Tidak ada logika yang diduplikasi: yang dipanggil fungsi view yang sama
+ * dengan yang dipakai `readAavePosition`, dan hasilnya justru dipakai untuk
+ * MENCOCOKKAN apa yang dilaporkan adapter — kalau keduanya berbeda, skrip
+ * gagal keras.
+ */
+async function tuplePadaBlok(
+  publicClient: PublicClient,
+  akun: `0x${string}`,
+  blok: bigint,
+  label: string,
+): Promise<readonly [bigint, bigint, bigint, bigint, bigint, bigint]> {
+  return bacaSampai(
+    () =>
+      publicClient.readContract({
+        address: MOCK_LENDING_POOL_ADDRESS,
+        abi: POOL_ABI,
+        functionName: "getUserAccountData",
+        args: [akun],
+        blockNumber: blok,
+      }),
+    () => true, // yang ditunggu bukan nilainya, tapi node yang punya blok itu
+    `${label} (tertambat di blok ${blok})`,
   );
 }
 
@@ -267,7 +344,20 @@ async function bacaSampai<T>(
 // Program
 // ---------------------------------------------------------------------------
 
-async function main(): Promise<void> {
+/**
+ * Sarana pemulihan keadaan testnet. Begitu harga mBNB diturunkan, posisi contoh
+ * berada di ~HF 1,15 dan akan TETAP di sana kalau skrip mati di tengah jalan —
+ * itu sudah pernah terjadi (percobaan pertama), dan seorang manusia harus
+ * mereset harga lewat `cast`. Objek ini dipegang pemanggil di luar `main`
+ * supaya `finally` di sana bisa memulihkan harga pada jalur gagal MAUPUN sukses,
+ * tanpa pernah mengubah exit code.
+ */
+interface Pemulihan {
+  perlu: boolean;
+  jalankan?: () => Promise<void>;
+}
+
+async function main(pemulihan: Pemulihan): Promise<void> {
   // --- 0. Rahasia -----------------------------------------------------------
   // Dimuat dari file, tidak pernah dicetak, tidak pernah disalin ke mana pun.
   const here = path.dirname(fileURLToPath(import.meta.url)); // .../app/agent/scripts
@@ -323,7 +413,10 @@ async function main(): Promise<void> {
     abi: PRICE_FEED_ABI,
     functionName: "latestRoundData",
   });
-  wajib(hargaAwalRaw > 0n, `Harga mBNB tidak masuk akal: ${hargaAwalRaw}.`);
+  wajib(
+    hargaAwalRaw > 0n,
+    `Harga mBNB tidak masuk akal: ${formatUsd8(hargaAwalRaw)} (${hargaAwalRaw}).`,
+  );
   const hargaAwal = hargaAwalRaw;
   console.log(`\nHarga mBNB sekarang   : ${formatUsd8(hargaAwal)} (${hargaAwal})`);
 
@@ -340,10 +433,14 @@ async function main(): Promise<void> {
   const hargaSasaran =
     (hargaAwal * TARGET_HF * BPS * posAwal.debtBase) /
     (posAwal.collateralBase * posAwal.liquidationThresholdBps * HF_ONE);
-  wajib(hargaSasaran > 0n, `Harga sasaran terhitung nol atau negatif: ${hargaSasaran}.`);
+  wajib(
+    hargaSasaran > 0n,
+    `Harga sasaran terhitung nol atau negatif: ${formatUsd8(hargaSasaran)} (${hargaSasaran}).`,
+  );
   wajib(
     hargaSasaran < hargaAwal,
-    `Harga sasaran ${hargaSasaran} tidak lebih rendah dari harga sekarang ${hargaAwal}; posisi sudah berisiko?`,
+    `Harga sasaran ${formatUsd8(hargaSasaran)} tidak lebih rendah dari harga sekarang ` +
+      `${formatUsd8(hargaAwal)}; posisi sudah berisiko?`,
   );
 
   // Ramalan lokal SEBELUM membakar gas: kalau perhitungannya salah, gagal di
@@ -361,11 +458,45 @@ async function main(): Promise<void> {
   console.log(`HF ramalan lokal       : ${formatHf(hfRamalan)} (${hfRamalan})`);
   wajib(
     hfRamalan > DEFAULT_THRESHOLDS.deleverage && hfRamalan <= DEFAULT_THRESHOLDS.partialRepay,
-    `Ramalan HF ${hfRamalan} di luar zona PARTIAL_REPAY; transaksi dibatalkan sebelum gas terbakar.`,
+    `Ramalan HF ${formatHf(hfRamalan)} (${hfRamalan}) di luar zona PARTIAL_REPAY; ` +
+      `transaksi dibatalkan sebelum gas terbakar.`,
   );
 
+  // Pemulihan didaftarkan SEBELUM harga diturunkan, supaya tidak ada celah
+  // antara "harga sudah jatuh" dan "ada yang tahu cara mengembalikannya".
+  pemulihan.jalankan = async () => {
+    console.log(`Mengembalikan harga ke ${formatUsd8(hargaAwal)} (${hargaAwal})`);
+    await kirim(
+      publicClient,
+      () =>
+        wallet.writeContract({
+          account,
+          chain: bscTestnet,
+          address: MOCK_PRICE_FEED_BNB,
+          abi: PRICE_FEED_ABI,
+          functionName: "setAnswer",
+          args: [hargaAwal],
+        }),
+      "restore",
+    );
+    const [, hargaPulih] = await bacaSampai(
+      () =>
+        publicClient.readContract({
+          address: MOCK_PRICE_FEED_BNB,
+          abi: PRICE_FEED_ABI,
+          functionName: "latestRoundData",
+        }),
+      ([, jawaban]) => jawaban === hargaAwal,
+      "harga mBNB kembali ke nilai semula",
+    );
+    wajib(
+      hargaPulih === hargaAwal,
+      `Harga gagal dikembalikan: ${formatUsd8(hargaPulih)} != ${formatUsd8(hargaAwal)}.`,
+    );
+  };
+
   console.log("");
-  await kirim(
+  const txTurun = await kirim(
     publicClient,
     () =>
       wallet.writeContract({
@@ -378,12 +509,24 @@ async function main(): Promise<void> {
       }),
     "setAnswer",
   );
+  pemulihan.perlu = true;
+
+  // Jahitan uji untuk jalur pemulihan. Jalur `finally` hanya berguna kalau ia
+  // benar-benar berjalan, dan satu-satunya cara membuktikan itu adalah gagal
+  // dengan sengaja tepat setelah harga diturunkan — persis bentuk kegagalan
+  // yang pernah terjadi sungguhan. Tidak pernah aktif tanpa env var ini.
+  if (process.env.E2E_PAKSA_GAGAL_SETELAH_TURUN === "1") {
+    throw new BuktiGagal(
+      "Kegagalan disengaja (E2E_PAKSA_GAGAL_SETELAH_TURUN=1) untuk menguji jalur pemulihan harga.",
+    );
+  }
 
   // --- 4. Assert dari bacaan on-chain sungguhan -----------------------------
   console.log("");
   const posTertekan = await bacaSampai(
     () => reader.readPosition(account.address),
     (p) =>
+      p.blockNumber >= txTurun.blockNumber &&
       p.healthFactor !== null &&
       p.healthFactor > DEFAULT_THRESHOLDS.deleverage &&
       p.healthFactor <= DEFAULT_THRESHOLDS.partialRepay,
@@ -393,9 +536,35 @@ async function main(): Promise<void> {
   wajib(posTertekan.healthFactor !== null, "HF null setelah harga turun.");
   const hfSebelum = posTertekan.healthFactor;
   wajib(
+    posTertekan.blockNumber >= txTurun.blockNumber,
+    `Bacaan "sebelum" datang dari blok ${posTertekan.blockNumber}, lebih tua daripada blok ` +
+      `transaksi penurunan harga (${txTurun.blockNumber}) — bacaan basi, bukan bukti.`,
+  );
+  wajib(
     hfSebelum > DEFAULT_THRESHOLDS.deleverage && hfSebelum <= DEFAULT_THRESHOLDS.partialRepay,
-    `HF on-chain ${hfSebelum} (${formatHf(hfSebelum)}) TIDAK di zona PARTIAL_REPAY ` +
-      `(${DEFAULT_THRESHOLDS.deleverage} < HF <= ${DEFAULT_THRESHOLDS.partialRepay}).`,
+    `HF on-chain ${formatHf(hfSebelum)} (${hfSebelum}) TIDAK di zona PARTIAL_REPAY ` +
+      `(${formatHf(DEFAULT_THRESHOLDS.deleverage)} < HF <= ${formatHf(DEFAULT_THRESHOLDS.partialRepay)}).`,
+  );
+
+  // Jangkar: nilai yang sama dibaca ulang PADA BLOK transaksi penurunan harga.
+  const [colTambat, debtTambat, , ltTambat, , hfTambat] = await tuplePadaBlok(
+    publicClient,
+    account.address,
+    txTurun.blockNumber,
+    "posisi sebelum intervensi",
+  );
+  console.log(
+    `\nJangkar blok ${txTurun.blockNumber}: agunan ${formatUsd8(colTambat)} · hutang ${formatUsd8(debtTambat)} · lt ${ltTambat} bps · HF ${formatHf(hfTambat)}`,
+  );
+  wajib(
+    colTambat === posTertekan.collateralBase &&
+      debtTambat === posTertekan.debtBase &&
+      ltTambat === posTertekan.liquidationThresholdBps &&
+      hfTambat === hfSebelum,
+    `Bacaan adapter tidak cocok dengan bacaan tertambat di blok ${txTurun.blockNumber}: ` +
+      `adapter (agunan ${posTertekan.collateralBase}, hutang ${posTertekan.debtBase}, lt ` +
+      `${posTertekan.liquidationThresholdBps}, hf ${hfSebelum}) vs tertambat (agunan ${colTambat}, ` +
+      `hutang ${debtTambat}, lt ${ltTambat}, hf ${hfTambat}).`,
   );
   console.log(`\n✔ Terbukti dari bacaan on-chain: HF ${formatHf(hfSebelum)} ada di zona PARTIAL_REPAY.`);
 
@@ -418,12 +587,25 @@ async function main(): Promise<void> {
     abi: PRICE_FEED_ABI,
     functionName: "latestRoundData",
   });
-  wajib(hargaRepayRaw > 0n, `Harga aset repay tidak masuk akal: ${hargaRepayRaw}.`);
+  wajib(
+    hargaRepayRaw > 0n,
+    `Harga aset repay tidak masuk akal: ${formatUsd8(hargaRepayRaw)} (${hargaRepayRaw}).`,
+  );
   const hargaRepay = hargaRepayRaw;
   console.log(`Aset repay: desimal=${desimalRepay}, harga=${formatUsd8(hargaRepay)}, feed=${feedRepay}`);
 
   /** Tx repay yang benar-benar terkirim; dicatat untuk dicocokkan dengan hasil siklus. */
-  const txRepayTercatat: Hash[] = [];
+  const txRepayTercatat: TxTerkirim[] = [];
+
+  /**
+   * Toleransi pembulatan untuk mencocokkan jumlah, dalam satuan basis 8 desimal.
+   * 2 unit = $0,00000002. Diperlukan karena ada DUA pembulatan ke bawah yang
+   * saling bebas: USD8 → unit token di `sendRepay`, dan unit token → USD8 di
+   * `MockLendingPool._valueUsd8`. Masing-masing kehilangan kurang dari satu
+   * unit, jadi selisih maksimum yang sah adalah 2. Lebih besar dari itu berarti
+   * konversinya memang salah, bukan sekadar dibulatkan.
+   */
+  const TOLERANSI_USD8 = 2n;
 
   /**
    * Jembatan ke rantai: menerima jumlah USD basis 8 desimal dari
@@ -435,7 +617,25 @@ async function main(): Promise<void> {
     console.log(
       `\n  sendRepay: ${formatUsd8(amountUsd8)} → ${jumlahToken} unit token (${desimalRepay} desimal)`,
     );
-    wajib(jumlahToken > 0n, `Konversi jumlah repay menghasilkan nol unit token dari ${amountUsd8}.`);
+    wajib(
+      jumlahToken > 0n,
+      `Konversi jumlah repay menghasilkan nol unit token dari ${formatUsd8(amountUsd8)} (${amountUsd8}).`,
+    );
+
+    // Konversi diperiksa BOLAK-BALIK sebelum sepeser pun dikirim. Inilah tempat
+    // kesalahan satu orde bisa masuk tanpa terlihat: kalau `desimalRepay`
+    // terbaca 17, atau `hargaRepay` datang dari feed yang salah, agent membayar
+    // sepersepuluh dari yang dilaporkannya — hutang tetap berkurang, HF tetap
+    // naik, dan tanpa pemeriksaan ini semua assert lain tetap lolos.
+    const balikanUsd8 = (jumlahToken * hargaRepay) / 10n ** BigInt(desimalRepay);
+    const selisihBalikan =
+      balikanUsd8 > amountUsd8 ? balikanUsd8 - amountUsd8 : amountUsd8 - balikanUsd8;
+    wajib(
+      selisihBalikan <= TOLERANSI_USD8,
+      `Konversi USD→token tidak bolak-balik: ${formatUsd8(amountUsd8)} → ${jumlahToken} unit → ` +
+        `${formatUsd8(balikanUsd8)} (selisih ${selisihBalikan} unit basis 8 desimal, ` +
+        `maksimum ${TOLERANSI_USD8}). Desimal atau feed harga aset repay kemungkinan salah.`,
+    );
 
     const saldo = await publicClient.readContract({
       address: asset,
@@ -443,7 +643,10 @@ async function main(): Promise<void> {
       functionName: "balanceOf",
       args: [account.address],
     });
-    wajib(saldo >= jumlahToken, `Saldo token repay kurang: ${saldo} < ${jumlahToken}.`);
+    wajib(
+      saldo >= jumlahToken,
+      `Saldo token repay kurang: ${saldo} unit < ${jumlahToken} unit yang dibutuhkan.`,
+    );
 
     const izin = await publicClient.readContract({
       address: asset,
@@ -467,7 +670,7 @@ async function main(): Promise<void> {
       );
     }
 
-    const hash = await kirim(
+    const tx = await kirim(
       publicClient,
       () =>
         wallet.writeContract({
@@ -480,8 +683,8 @@ async function main(): Promise<void> {
         }),
       "repay",
     );
-    txRepayTercatat.push(hash);
-    return hash;
+    txRepayTercatat.push(tx);
+    return tx.hash;
   };
 
   const sekarang = () => Math.floor(Date.now() / 1000);
@@ -538,10 +741,11 @@ async function main(): Promise<void> {
   wajib(hasil.amountSentUsd8 > 0n, "Jumlah yang dibayar nol.");
   wajib(hasil.txHash !== null, "Tidak ada tx hash — tidak ada bukti on-chain.");
   wajib(
-    txRepayTercatat.length === 1 && hasil.txHash === txRepayTercatat[0],
+    txRepayTercatat.length === 1 && hasil.txHash === txRepayTercatat[0]?.hash,
     `Tx hash dari siklus (${hasil.txHash}) tidak cocok dengan tx repay yang benar-benar dikirim ` +
-      `(${txRepayTercatat.join(", ") || "tidak ada"}).`,
+      `(${txRepayTercatat.map((t) => t.hash).join(", ") || "tidak ada"}).`,
   );
+  const txRepay = txRepayTercatat[0]!;
   wajib(
     outcome.nextExecuteState.spentTodayUsd8 === hasil.amountSentUsd8,
     "Anggaran harian tidak bertambah sebesar jumlah yang dikirim.",
@@ -549,63 +753,109 @@ async function main(): Promise<void> {
 
   // --- 6. HF sesudah, dari bacaan on-chain ---------------------------------
   judul("LANGKAH 5 — Bukti: health factor naik setelah agent bertindak");
+  wajib(
+    txRepay.blockNumber > txTurun.blockNumber,
+    `Urutan blok tidak masuk akal: repay di blok ${txRepay.blockNumber}, penurunan harga di ` +
+      `blok ${txTurun.blockNumber}. "Sebelum" dan "sesudah" harus benar-benar berurutan.`,
+  );
+
   const posSesudah = await bacaSampai(
     () => reader.readPosition(account.address),
-    (p) => p.debtBase < posTertekan.debtBase,
+    (p) => p.blockNumber >= txRepay.blockNumber && p.debtBase < posTertekan.debtBase,
     "hutang berkurang setelah repay",
   );
   cetakPosisi("Posisi setelah repay (dibaca ulang on-chain):", posSesudah);
   wajib(posSesudah.healthFactor !== null, "HF null setelah repay.");
   const hfSesudah = posSesudah.healthFactor;
+  wajib(
+    posSesudah.blockNumber >= txRepay.blockNumber,
+    `Bacaan "sesudah" datang dari blok ${posSesudah.blockNumber}, lebih tua daripada blok ` +
+      `transaksi repay (${txRepay.blockNumber}) — bacaan basi, bukan bukti.`,
+  );
+
+  // Jangkar kedua: nilai yang sama dibaca ulang PADA BLOK transaksi repay.
+  const [colTambat2, debtTambat2, , ltTambat2, , hfTambat2] = await tuplePadaBlok(
+    publicClient,
+    account.address,
+    txRepay.blockNumber,
+    "posisi sesudah intervensi",
+  );
+  console.log(
+    `\nJangkar blok ${txRepay.blockNumber}: agunan ${formatUsd8(colTambat2)} · hutang ${formatUsd8(debtTambat2)} · lt ${ltTambat2} bps · HF ${formatHf(hfTambat2)}`,
+  );
+  wajib(
+    colTambat2 === posSesudah.collateralBase &&
+      debtTambat2 === posSesudah.debtBase &&
+      ltTambat2 === posSesudah.liquidationThresholdBps &&
+      hfTambat2 === hfSesudah,
+    `Bacaan adapter tidak cocok dengan bacaan tertambat di blok ${txRepay.blockNumber}: ` +
+      `adapter (agunan ${posSesudah.collateralBase}, hutang ${posSesudah.debtBase}, lt ` +
+      `${posSesudah.liquidationThresholdBps}, hf ${hfSesudah}) vs tertambat (agunan ${colTambat2}, ` +
+      `hutang ${debtTambat2}, lt ${ltTambat2}, hf ${hfTambat2}).`,
+  );
 
   wajib(
     hfSesudah > hfSebelum,
-    `HF TIDAK naik: sebelum ${hfSebelum}, sesudah ${hfSesudah}. Intervensi agent tidak terbukti.`,
+    `HF TIDAK naik: sebelum ${formatHf(hfSebelum)} (${hfSebelum}), sesudah ` +
+      `${formatHf(hfSesudah)} (${hfSesudah}). Intervensi agent tidak terbukti.`,
   );
   wajib(
     posSesudah.debtBase < posTertekan.debtBase,
-    `Hutang tidak berkurang: ${posTertekan.debtBase} → ${posSesudah.debtBase}.`,
+    `Hutang tidak berkurang: ${formatUsd8(posTertekan.debtBase)} → ${formatUsd8(posSesudah.debtBase)}.`,
+  );
+
+  // Agunan tidak boleh berubah: repay hanya menyentuh sisi hutang. Kalau angka
+  // ini bergeser, ada aktor lain di posisi yang sama dan seluruh perbandingan
+  // "sebelum/sesudah" kehilangan artinya.
+  wajib(
+    posSesudah.collateralBase === posTertekan.collateralBase,
+    `Agunan ikut berubah (${formatUsd8(posTertekan.collateralBase)} → ` +
+      `${formatUsd8(posSesudah.collateralBase)}); ada yang menyentuh posisi selain skrip ini.`,
+  );
+
+  // ————— Klaim yang paling akan dibaca orang: BERAPA yang dibayar. —————
+  // Sampai di sini "$…" masih semata-mata keluaran `executeDecision`. Yang
+  // membuatnya menjadi bukti adalah baris di bawah: selisih hutang yang
+  // BENAR-BENAR terjadi di rantai harus sama dengan jumlah yang diklaim.
+  // Tanpa ini, konversi satuan yang meleset satu orde membuat agent membayar
+  // sepersepuluh dari yang tercetak, sementara semua assert lain tetap lolos.
+  const hutangBerkurang = posTertekan.debtBase - posSesudah.debtBase;
+  const selisihKlaim =
+    hutangBerkurang > hasil.amountSentUsd8
+      ? hutangBerkurang - hasil.amountSentUsd8
+      : hasil.amountSentUsd8 - hutangBerkurang;
+  wajib(
+    selisihKlaim <= TOLERANSI_USD8,
+    `Jumlah yang DIKLAIM dibayar (${formatUsd8(hasil.amountSentUsd8)}) tidak sama dengan ` +
+      `pengurangan hutang yang BENAR-BENAR terjadi di rantai ` +
+      `(${formatUsd8(hutangBerkurang)}); selisih ${selisihKlaim} unit basis 8 desimal, ` +
+      `maksimum yang sah ${TOLERANSI_USD8} (pembulatan ke bawah dua arah).`,
   );
 
   const selisih = hfSesudah - hfSebelum;
+  // Label zona diambil dari `decide` yang sama dengan yang dipakai Guardian,
+  // bukan dari tangga ambang yang ditulis ulang di sini — kalau ambangnya kelak
+  // berubah, cetakan ini ikut berubah dengan sendirinya.
+  const zonaSesudah = decide(posSesudah).action;
   console.log("");
   console.log(`HF sebelum intervensi  : ${formatHf(hfSebelum)}  (${hfSebelum})`);
   console.log(`HF sesudah intervensi  : ${formatHf(hfSesudah)}  (${hfSesudah})`);
   console.log(`Selisih (naik)         : ${formatHf(selisih)}  (${selisih})`);
   console.log(`Hutang                 : ${formatUsd8(posTertekan.debtBase)} → ${formatUsd8(posSesudah.debtBase)}`);
-  console.log(`Zona sekarang          : ${hfSesudah > DEFAULT_THRESHOLDS.warn ? "aman (di atas warn)" : hfSesudah > DEFAULT_THRESHOLDS.partialRepay ? "WARN" : "masih PARTIAL_REPAY"}`);
-  console.log(`\n✔ Terbukti: posisi keluar dari zona PARTIAL_REPAY karena aksi agent.`);
+  console.log(`Hutang berkurang       : ${formatUsd8(hutangBerkurang)}  (${hutangBerkurang} basis 8 desimal)`);
+  console.log(`Diklaim dibayar        : ${formatUsd8(hasil.amountSentUsd8)}  (${hasil.amountSentUsd8} basis 8 desimal)`);
+  console.log(`Selisih klaim vs rantai: ${selisihKlaim} unit (maksimum ${TOLERANSI_USD8})`);
+  console.log(`Keputusan decide() kini: ${zonaSesudah}`);
+  console.log(`\n✔ Terbukti: hutang berkurang persis sebesar yang diklaim, dan posisi keluar dari zona PARTIAL_REPAY karena aksi agent.`);
 
   // --- 7. Kembalikan harga --------------------------------------------------
   // Dilakukan HANYA setelah seluruh bukti di atas terkumpul, supaya keadaan
   // testnet bisa dipakai ulang. Biayanya satu transaksi ~30k gas.
   judul("LANGKAH 6 — Mengembalikan harga mBNB ke nilai semula");
-  console.log(`Mengembalikan harga ke ${formatUsd8(hargaAwal)} (${hargaAwal})`);
-  await kirim(
-    publicClient,
-    () =>
-      wallet.writeContract({
-        account,
-        chain: bscTestnet,
-        address: MOCK_PRICE_FEED_BNB,
-        abi: PRICE_FEED_ABI,
-        functionName: "setAnswer",
-        args: [hargaAwal],
-      }),
-    "restore",
-  );
-
-  const [, hargaAkhir] = await bacaSampai(
-    () =>
-      publicClient.readContract({
-        address: MOCK_PRICE_FEED_BNB,
-        abi: PRICE_FEED_ABI,
-        functionName: "latestRoundData",
-      }),
-    ([, jawaban]) => jawaban === hargaAwal,
-    "harga mBNB kembali ke nilai semula",
-  );
-  wajib(hargaAkhir === hargaAwal, `Harga gagal dikembalikan: ${hargaAkhir} != ${hargaAwal}.`);
+  // Jalur sukses memakai penutup yang SAMA dengan jalur gagal (lihat `finally`
+  // di bawah `main`), supaya keduanya tidak bisa menyimpang satu sama lain.
+  await pemulihan.jalankan!();
+  pemulihan.perlu = false;
 
   const posAkhir = await bacaSampai(
     () => reader.readPosition(account.address),
@@ -629,8 +879,42 @@ async function main(): Promise<void> {
   console.log(`\nSEMUA KLAIM TERBUKTI.`);
 }
 
-main().catch((err: unknown) => {
+// ---------------------------------------------------------------------------
+// Titik masuk
+// ---------------------------------------------------------------------------
+//
+// `finally` di sini ada karena satu kegagalan yang SUDAH terjadi: percobaan
+// pertama skrip ini mati setelah harga mBNB diturunkan, meninggalkan posisi
+// contoh pada ~HF 1,15 sampai seorang manusia meresetnya lewat `cast`. Demo
+// yang mati di tengah jaringan lambat akan menampilkan posisi yang tampak
+// nyaris terlikuidasi kepada siapa pun yang membuka BscScan berikutnya.
+//
+// Pemulihan TIDAK PERNAH mengubah exit code: kegagalannya sendiri hanya
+// dicetak sebagai peringatan lengkap dengan perintah manualnya, dan kegagalan
+// asli tetap yang menentukan nasib proses.
+const pemulihan: Pemulihan = { perlu: false };
+
+try {
+  await main(pemulihan);
+} catch (err: unknown) {
   console.error(`\n✖ E2E GAGAL: ${err instanceof Error ? err.message : String(err)}`);
   if (err instanceof Error && err.stack) console.error(err.stack);
   process.exitCode = 1;
-});
+} finally {
+  if (pemulihan.perlu && pemulihan.jalankan) {
+    judul("PEMULIHAN — skrip berhenti dengan harga mBNB masih diturunkan");
+    try {
+      await pemulihan.jalankan();
+      console.log("✔ Harga mBNB dipulihkan; keadaan testnet aman untuk dilihat.");
+    } catch (errPulih: unknown) {
+      console.error(
+        `⚠ GAGAL memulihkan harga mBNB: ${errPulih instanceof Error ? errPulih.message : String(errPulih)}`,
+      );
+      console.error(
+        `⚠ Posisi contoh TERTINGGAL di zona berisiko. Pulihkan manual:\n` +
+          `   cast send ${MOCK_PRICE_FEED_BNB} "setAnswer(int256)" <harga semula 8 desimal> \\\n` +
+          `     --rpc-url "$BSC_TESTNET_RPC_URL" --private-key "$PRIVATE_KEY"`,
+      );
+    }
+  }
+}

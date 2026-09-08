@@ -36,6 +36,15 @@ const AAVE_POOL_ABI = [
  * `healthFactor` dinormalkan menjadi null bila sentinel 2^256-1 ATAU
  * tidak ada hutang sama sekali — seluruh lapisan strategi memperlakukan
  * null sebagai "tidak ada risiko", bukan angka besar yang harus dibandingkan.
+ *
+ * JANGAN menghitung `healthFactor` sendiri di sini. Ia WAJIB tetap diambil apa
+ * adanya dari tuple `getUserAccountData` (indeks 5), yaitu angka yang dihitung
+ * protokol sendiri. `__tests__/testnet.test.ts` memakai fakta itu sebagai uji
+ * diferensial: HF dari protokol dicocokkan dengan `computeHealthFactor` versi
+ * TypeScript atas bacaan yang sama, dan itulah yang menangkap indeks tuple
+ * tertukar atau satuan yang meleset. Begitu fungsi ini menghitung HF-nya
+ * sendiri, test tersebut berubah menjadi tautologi yang hijau selamanya tanpa
+ * menguji apa pun — dan tidak ada yang akan memperingatkan.
  */
 export async function readAavePosition(
   client: PublicClient,

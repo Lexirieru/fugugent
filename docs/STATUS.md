@@ -34,22 +34,30 @@ gagal keras pada konfigurasi cacat, adapter yang terbukti membaca Aave v3 dari B
 loop pemantauan (`guard.ts`), jalur eksekusi dengan spend cap/cooldown/kill switch
 (`execute.ts`), dan lapisan penjelasan dGrid yang gagal dengan aman.
 
-### Guardian benar-benar menyelamatkan posisi — terbukti on-chain
+### Guardian menaikkan health factor posisi — terbukti on-chain
 Bukan lagi test unit saja. Satu siklus Guardian dijalankan di BSC testnet terhadap posisi
-lending sungguhan: harga agunan diturunkan sampai **HF 1,14** (zona `PARTIAL_REPAY`), agent
-memutuskan sendiri, membayar **$729,16** hutang lewat transaksi nyata, dan **HF naik ke
-1,50** — dibaca ulang dari rantai, bukan dari log.
+di **`MockLendingPool` — protokol lending tiruan milik kami sendiri**, ABI-kompatibel
+`getUserAccountData` Aave v3, dengan harga agunan yang **kami turunkan sendiri** lewat feed
+yang kami miliki. Transaksinya nyata, posisinya nyata, protokolnya bukan. Yang dibuktikan:
+rantai baca → putuskan → eksekusi → HF naik benar-benar bekerja ujung ke ujung.
+
+Harga agunan diturunkan sampai **HF 1,14** (zona `PARTIAL_REPAY`), agent memutuskan sendiri,
+membayar **$559,02** hutang lewat transaksi nyata, dan **HF naik ke 1,50** — dibaca ulang
+dari rantai pada blok transaksinya, bukan dari log.
 
 | | |
 |---|---|
-| Tx repay | [`0x318d4709…`](https://testnet.bscscan.com/tx/0x318d4709a391db889c4f97e82bbd4a1ae57dd42a9434a44c32c1c572f849cf6e) |
+| Tx repay | [`0x6ccb4c5a…`](https://testnet.bscscan.com/tx/0x6ccb4c5a8d9f6ca5201dff73a663992dbc6a3b2efa74406e84a02d93584d5fcc) |
 | HF sebelum → sesudah | 1,14 → 1,50 (**+0,35**) |
-| Hutang | $3.125,00 → $2.395,83 |
+| Hutang | $2.395,83 → $1.836,80 |
+| Pengurangan hutang on-chain vs jumlah yang diklaim | sama persis (selisih 0 unit basis 8 desimal) |
 | Biaya | 0,0000162 tBNB |
 
 Skrip buktinya, `ai/fuguguardian/app/agent/scripts/e2e-guardian.ts`, mengimpor modul
 strategi apa adanya dan **gagal dengan exit code bukan nol** begitu satu klaim tidak
-terbukti terhadap bacaan on-chain. Rinciannya di `docs/e2e/2026-09-08-e2e-testnet.md`.
+terbukti terhadap bacaan on-chain — termasuk klaim *berapa* yang dibayar. Jalur gagalnya
+juga dijalankan sungguhan: exit 1, dan harga testnet tetap dipulihkan. Rinciannya di
+`docs/e2e/2026-09-08-e2e-testnet.md`.
 
 ## Yang BELUM ada — jangan diklaim
 
@@ -66,19 +74,26 @@ terbukti terhadap bacaan on-chain. Rinciannya di `docs/e2e/2026-09-08-e2e-testne
 2. **Baca mainnet, eksekusi testnet — dua dunia berbeda.** Adapter membaca posisi nyata di
    BSC mainnet karena Venus dan Aave hanya ada di sana; eksekusi agent di testnet.
    Keputusan atas posisi mainnet tidak bisa dieksekusi di testnet. Ini batasan, bukan fitur.
-3. **Backtest belum mengukur apa pun.** Yang ada adalah harness plus deret harga sintetis di
+3. **Protokol lending yang dipakai E2E adalah tiruan buatan sendiri.** `MockLendingPool`,
+   `MockTokenUSD`/`MockTokenBNB`, dan `MockPriceFeed*` semuanya kami deploy dan kami
+   kendalikan; harga agunan pada bukti E2E diturunkan oleh kami sendiri lewat `setAnswer`.
+   Guardian belum pernah menyentuh Aave, Venus, atau protokol pihak ketiga mana pun.
+   → Kalimat yang benar: *"rantai baca → putuskan → eksekusi terbukti bekerja terhadap pool
+   ber-ABI Aave v3"*, bukan *"Guardian sudah menyelamatkan posisi di protokol lending
+   nyata"*.
+4. **Backtest belum mengukur apa pun.** Yang ada adalah harness plus deret harga sintetis di
    test. Tidak ada satu pun data harga historis di repo.
    → Kalimat yang benar: *"kami membangun harness dan menjalankannya pada deret sintetis"*.
-4. **`DELEVERAGE` masih dimodelkan salah di backtest** — agunan tidak ikut turun, padahal
+5. **`DELEVERAGE` masih dimodelkan salah di backtest** — agunan tidak ikut turun, padahal
    deleverage sungguhan menjual agunan. Didokumentasikan menonjol di kepala file, tapi belum
    diperbaiki.
-5. **Venus belum terhubung ke mesin keputusan.** Adapternya membaca `liquidity`/`shortfall`,
+6. **Venus belum terhubung ke mesin keputusan.** Adapternya membaca `liquidity`/`shortfall`,
    tapi Venus tidak menyediakan health factor maupun ambang likuidasi agregat, sehingga
    membangun `Position` darinya butuh data per-market yang belum diambil.
-6. **Tiga agent lain belum punya strategi.** Rebalancer, Grid, dan Yield baru sebatas
+7. **Tiga agent lain belum punya strategi.** Rebalancer, Grid, dan Yield baru sebatas
    scaffold dengan session key.
-7. **Backend, frontend, dan landing page kosong.** Belum ada marketplace yang bisa dibuka.
-8. **Kontrak belum diverifikasi di BscScan** — `BSCSCAN_API_KEY` belum tersedia. Perintah
+8. **Backend, frontend, dan landing page kosong.** Belum ada marketplace yang bisa dibuka.
+9. **Kontrak belum diverifikasi di BscScan** — `BSCSCAN_API_KEY` belum tersedia. Perintah
    verifikasinya sudah disiapkan.
 
 ## Batas kepercayaan yang dinyatakan terbuka
