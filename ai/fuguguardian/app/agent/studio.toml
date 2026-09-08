@@ -30,7 +30,8 @@ address = "0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0"
 
 [llm]
 provider = "openai"
-model = "gpt-4o-mini"
+model = "openai/gpt-5.6-luna"
+base_url = "https://api.dgrid.ai/v1"
 
 [payments.erc8183]
 # Read by the Agent: it quotes the FIXED `price`, CLAMPS it to [min,max],
