@@ -391,7 +391,6 @@ contract FuguPriceOracle is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 
     function initialize(address owner_) external initializer {
         __Ownable_init(owner_);
-        __UUPSUpgradeable_init();
     }
 
     function setToken(address token, TokenConfig calldata cfg) external onlyOwner {
@@ -657,7 +656,6 @@ contract FuguRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, IFu
 
     function initialize(address owner_) external initializer {
         __Ownable_init(owner_);
-        __UUPSUpgradeable_init();
     }
 
     modifier onlyListingOwner(uint256 listingId) {
@@ -1101,7 +1099,6 @@ contract FuguSubscription is
         initializer
     {
         __Ownable_init(owner_);
-        __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         if (feeBps_ > 2000) revert FeeTooHigh();
         registry = IFuguRegistry(registry_);
@@ -1430,7 +1427,6 @@ contract FuguReputation is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 
     function initialize(address owner_, address subscriptions_) external initializer {
         __Ownable_init(owner_);
-        __UUPSUpgradeable_init();
         subscriptions = IFuguSubscription(subscriptions_);
     }
 
