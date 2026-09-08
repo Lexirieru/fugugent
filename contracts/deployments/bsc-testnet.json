@@ -1,19 +1,20 @@
 {
   "chainId": 97,
   "network": "bsc-testnet",
-  "deployedAt": "2026-09-08",
+  "deployedAt": "2026-09-08 (redeploy setelah final review)",
   "deployer": "0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E",
   "treasury": "0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E",
   "protocolFeeBps": 500,
-  "FuguPriceOracle": "0xADA0466303441102cb16F8eC1594C744d603f746",
-  "FuguRegistry": "0xD89395Df78aaFdF86b330899d1C6189211e88750",
-  "FuguSubscription": "0xF76DA0ec605CFac82f1DA86080da21316C07d130",
-  "FuguReputation": "0x020744cC10fEaD789dE205de76A2769B9A4945DE",
-  "implementations": {
-    "FuguPriceOracle": "0x29Faf6cAfa4bEa1dc7c232f0A1818D4Da6b724Dd",
-    "FuguRegistry": "0x0d7766158F14aD7bb82D9Fd8A47734E801e3F5B8",
-    "FuguSubscription": "0xb6F57152bc6AC9CdC7862F8Dae0Aac17f6f5D8Ff",
-    "FuguReputation": "0x61a4Ac2678048eD431E362C14D2ec7A0B3191966"
-  },
-  "notes": "Deployed without --verify: BSCSCAN_API_KEY unavailable at deploy time. See task-7-report.md for forge verify-contract commands to run later."
+  "FuguPriceOracle": "0xB5f72a0ab0bA971c8C4F69D4A075cB7fd7859e65",
+  "FuguRegistry": "0xb2f36070E6eae3353E8e755172B477DF213ae248",
+  "FuguSubscription": "0xfdb083371f44Cf53181350389D3217e51B431776",
+  "FuguReputation": "0x279B31B00F64C0ce85BCe2Bd7e377CdcAE58d400",
+  "notes": "Deploy ulang bersih dengan perbaikan hasil review akhir (slippage guard, ambang anti-sybil, keunikan agentId, validasi desimal). Belum diverifikasi di BscScan: BSCSCAN_API_KEY belum tersedia.",
+  "previousDeployment": {
+    "note": "deploy pertama, tanpa slippage guard dan ambang anti-sybil; tidak pernah memegang listing/langganan/dana",
+    "FuguPriceOracle": "0xADA0466303441102cb16F8eC1594C744d603f746",
+    "FuguRegistry": "0xD89395Df78aaFdF86b330899d1C6189211e88750",
+    "FuguSubscription": "0xF76DA0ec605CFac82f1DA86080da21316C07d130",
+    "FuguReputation": "0x020744cC10fEaD789dE205de76A2769B9A4945DE"
+  }
 }

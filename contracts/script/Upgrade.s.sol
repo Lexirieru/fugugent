@@ -56,7 +56,19 @@ contract Upgrade is Script {
         console.log("implementation (new)", newImpl);
 
         vm.startBroadcast(pk);
-        UUPSUpgradeable(proxy).upgradeToAndCall(newImpl, "");
+        // INIT_DATA opsional: calldata yang dijalankan DI DALAM konteks proxy tepat
+        // setelah implementasi berganti. Wajib diisi ketika implementasi baru punya
+        // `reinitializer` yang harus berjalan — misalnya `initializeV2()` pada
+        // FuguSubscription, yang menyetel ambang anti-sybil. Meng-upgrade tanpa itu
+        // membuat ambangnya bernilai nol dan gate-nya mati. Kosongkan hanya bila
+        // implementasi baru memang tidak punya initializer baru.
+        bytes memory initData = vm.envOr("INIT_DATA", bytes(""));
+        if (initData.length == 0) {
+            console.log("INIT_DATA kosong - pastikan implementasi baru tidak punya reinitializer");
+        } else {
+            console.log("INIT_DATA panjang:", initData.length);
+        }
+        UUPSUpgradeable(proxy).upgradeToAndCall(newImpl, initData);
         vm.stopBroadcast();
 
         address confirmedImpl = address(uint160(uint256(vm.load(proxy, IMPLEMENTATION_SLOT))));

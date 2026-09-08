@@ -14,9 +14,16 @@ import {IFuguSubscription} from "./interfaces/IFuguSubscription.sol";
 ///      dari harga satu periode penuh (default 50%, lihat
 ///      `FuguSubscription.minPaidBpsOfPeriod`). Ini ambang ekonomi, bukan bukti
 ///      identitas: sybil tetap mungkin bagi siapa pun yang bersedia membayar setengah
-///      periode untuk tiap wallet. Yang dijamin hanyalah bahwa setiap review punya biaya
-///      nyata yang tidak bisa ditekan mendekati nol, sehingga membanjiri rating jadi
-///      mahal dan uangnya jatuh ke agent yang direview.
+///      periode untuk tiap wallet, dan uangnya jatuh ke agent yang direview.
+///      **Batas penting yang harus diketahui pembaca rating:** penyebut ambang adalah
+///      harga satu periode listing itu sendiri, yang ditentukan pemilik listing sebelum
+///      terkunci pada langganan pertama tiap wallet. Pemilik listing yang ingin
+///      mengembang-kan rating listing MILIKNYA SENDIRI dapat menurunkan harga ke nilai
+///      debu, membiarkan wallet-wallet miliknya berlangganan, lalu menaikkan harga lagi —
+///      biaya bersihnya hanya fee protokol dan gas. Gate ini karena itu mahal bagi pihak
+///      luar yang menyerang rating agent ORANG LAIN, tetapi tidak mencegah pemilik
+///      memoles rating sendiri. Kurasi dan verifikasi kepemilikan ERC-8004 adalah lapisan
+///      yang menutup celah itu, dan keduanya belum lengkap.
 /// @dev Trust boundary: The anti-sybil gate applies to end users. The contract owner
 ///      is a trusted entity who can bypass the gate by calling setSubscriptions() to
 ///      point to a malicious subscription contract, or by upgrading the contract logic
