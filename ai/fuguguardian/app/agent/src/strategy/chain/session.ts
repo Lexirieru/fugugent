@@ -78,6 +78,20 @@ export class SessionPermissionError extends Error {
  * Allowlist minimum yang dibutuhkan Guardian: `repay` di pool dan `approve`
  * di token hutang. Tidak lebih. Dipakai baik saat grant sesi maupun saat
  * memeriksanya kembali sebelum eksekusi, supaya keduanya tidak bisa berbeda.
+ *
+ * **Batas izin Altana berhenti di kontrak + selector; ia tidak mengikat nilai
+ * argumen.** Sesi ini karena itu secara teknis boleh memanggil
+ * `mUSD.approve(<siapa pun>, <berapa pun>)` dan `pool.repay(<aset apa pun>, …)`.
+ * Yang menahannya ada tiga, dan hanya dua yang milik kita:
+ *   1. spend cap per token pada sesi (ditegakkan akun Altana);
+ *   2. `createSessionSendRepay` yang hanya pernah menyusun `approve` untuk pool
+ *      dan `repay` untuk aset yang di-allowlist — tetapi ini kode kita sendiri,
+ *      jadi ia hilang begitu prosesnya dibajak;
+ *   3. guarded executor Porto yang menolkan allowance ERC-20 di akhir userOp —
+ *      perilaku pihak ketiga yang kami temukan **secara empiris** di task ini,
+ *      bukan yang dijamin kontrak kita, dan bukan yang boleh diandalkan diam-diam.
+ * Kalau pengikatan argumen kelak dibutuhkan, tempatnya adalah kontrak perantara
+ * yang di-allowlist, bukan modul ini.
  */
 export function requiredSessionCalls(
   pool: `0x${string}`,
@@ -191,6 +205,76 @@ export function assertNativeSpendCap(permissions: SessionPermissions): void {
       `Cap native sesi ${native.limit} bukan angka positif; sesi tidak akan bisa membayar relay.`,
     );
   }
+}
+
+/**
+ * Custom error kontrak akun Altana untuk panggilan di luar allowlist sesi.
+ *
+ * Ini SATU-SATUNYA bentuk galat yang boleh dihitung sebagai "batas sesi
+ * bekerja". Sebuah `try/catch` yang menerima exception apa pun akan mencetak
+ * "ditolak" untuk relay yang membalas HTTP 502, receipt yang timeout, atau
+ * nonce race — dan dengan begitu melaporkan bukti yang tidak pernah diuji.
+ * Bukti terpenting produk ini tidak boleh bergantung pada kebetulan bahwa
+ * sesuatu, entah apa, gagal.
+ *
+ * Stringnya tidak ada di mana pun dalam kode kita maupun di `node_modules`:
+ * ia datang ter-decode dari kontrak akun lewat relay, lengkap dengan `keyHash`,
+ * `target`, dan `data` panggilan yang ditolak.
+ */
+export const SESSION_DENIAL_PATTERN = /UnauthorizedCall/;
+
+/** Pesan galat apa adanya, apa pun bentuk nilai yang dilempar. */
+export function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+/**
+ * Apakah `error` benar-benar penolakan izin sesi terhadap `target`?
+ *
+ * Dua syarat, dan keduanya wajib:
+ *   1. galatnya `UnauthorizedCall` — bukan galat jaringan, timeout, atau revert
+ *      kontrak tujuan;
+ *   2. galat itu menyebut kontrak yang memang kita coba panggil, sehingga
+ *      penolakan atas panggilan lain tidak bisa dipinjam sebagai bukti.
+ *
+ * Argumen panggilan tidak diperiksa: model izin Altana mengikat kontrak dan
+ * selector, tidak pernah nilai argumen (lihat catatan di `requiredSessionCalls`).
+ */
+export function isSessionDenial(error: unknown, target: `0x${string}`): boolean {
+  const message = errorMessage(error);
+  return (
+    SESSION_DENIAL_PATTERN.test(message) &&
+    message.toLowerCase().includes(target.toLowerCase())
+  );
+}
+
+/**
+ * Menuntut `error` adalah penolakan izin sesi terhadap `target`, dan
+ * mengembalikan pesannya untuk dicetak. Bentuk galat lain dilempar ulang
+ * sebagai KEGAGALAN, bukan diterima sebagai bukti.
+ */
+export function assertSessionDenial(
+  error: unknown,
+  target: `0x${string}`,
+  label: string,
+): string {
+  const message = errorMessage(error);
+  if (!SESSION_DENIAL_PATTERN.test(message)) {
+    throw new SessionPermissionError(
+      `Panggilan "${label}" memang gagal, tetapi BUKAN karena batas sesi: galatnya tidak ` +
+        `memuat UnauthorizedCall. Relay bisa saja balas 502, receipt timeout, atau terjadi ` +
+        `nonce race — tidak satu pun membuktikan apa pun soal izin. Galat apa adanya:\n${message}`,
+    );
+  }
+  if (!message.toLowerCase().includes(target.toLowerCase())) {
+    throw new SessionPermissionError(
+      `Penolakan UnauthorizedCall untuk "${label}" tidak menyebut kontrak ${target} yang ` +
+        `kita coba panggil; penolakan atas panggilan lain tidak bisa dipakai sebagai bukti. ` +
+        `Galat apa adanya:\n${message}`,
+    );
+  }
+  return message;
 }
 
 /** Satu panggilan kontrak di dalam batch sesi. */

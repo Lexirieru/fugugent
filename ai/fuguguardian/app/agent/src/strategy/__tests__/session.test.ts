@@ -5,7 +5,9 @@ import {
   SessionPermissionError,
   assertBoundedAllowlist,
   assertNativeSpendCap,
+  assertSessionDenial,
   createSessionSendRepay,
+  isSessionDenial,
   requiredSessionCalls,
   type SessionCall,
   type SessionPermissions,
@@ -241,5 +243,59 @@ describe("createSessionSendRepay", () => {
       }),
     );
     await expect(sendRepay(MUSD, 100_000_000n)).rejects.toThrow(/tidak sukses di rantai/);
+  });
+});
+
+/**
+ * Galat penolakan yang BENAR-BENAR dikembalikan relay Altana pada jalan
+ * 2026-09-08 (disalin verbatim dari keluaran `probe-session-boundary.ts`).
+ * Dipakai apa adanya supaya test ini menguji bentuk yang nyata, bukan bentuk
+ * yang kita bayangkan.
+ */
+const GALAT_UNAUTHORIZED = `An error occurred while executing calls.
+
+Reason: UnauthorizedCall
+
+Details: UnauthorizedCall(UnauthorizedCall { keyHash: 0x80c191a288a3bdce4585bc1cf3288b3bdecfa1cb237599a36b6c8faa023e558b, target: 0x932e82632e80b06318ca969e33f99a54f1a04b10, data: 0xa9059cbb00000000000000000000000056a2950dde6b1040d1dcc4b4c4fc314bd56efb0e0000000000000000000000000000000000000000000000000000000000000001 })`;
+
+describe("assertSessionDenial", () => {
+  it("menerima penolakan UnauthorizedCall yang menyebut kontrak yang dicoba", () => {
+    expect(isSessionDenial(new Error(GALAT_UNAUTHORIZED), MUSD)).toBe(true);
+    expect(() => assertSessionDenial(new Error(GALAT_UNAUTHORIZED), MUSD, "transfer")).not.toThrow();
+  });
+
+  it("MENOLAK kegagalan jaringan sebagai bukti batas sesi", () => {
+    const http502 = new Error("HTTP request failed. Status: 502 Bad Gateway URL: https://testnet-relay.altana.network");
+    expect(isSessionDenial(http502, MUSD)).toBe(false);
+    expect(() => assertSessionDenial(http502, MUSD, "transfer")).toThrow(/BUKAN karena batas sesi/);
+  });
+
+  it("MENOLAK timeout receipt sebagai bukti batas sesi", () => {
+    const timeout = new Error("Timed out while waiting for transaction to be confirmed.");
+    expect(() => assertSessionDenial(timeout, MUSD, "transfer")).toThrow(/BUKAN karena batas sesi/);
+  });
+
+  it("MENOLAK revert kontrak tujuan sebagai bukti batas sesi", () => {
+    const revert = new Error("ERC20InsufficientAllowance(spender: 0xb3e1f06a…, allowance: 0)");
+    expect(() => assertSessionDenial(revert, MUSD, "transfer")).toThrow(/BUKAN karena batas sesi/);
+  });
+
+  it("MENOLAK UnauthorizedCall atas kontrak LAIN — penolakan orang lain bukan bukti kita", () => {
+    const lain = "0xF380E8B6803aD065EF0567dd20C894a55050737c" as const;
+    expect(isSessionDenial(new Error(GALAT_UNAUTHORIZED), lain)).toBe(false);
+    expect(() => assertSessionDenial(new Error(GALAT_UNAUTHORIZED), lain, "approve")).toThrow(
+      /tidak menyebut kontrak/,
+    );
+  });
+
+  it("menangani nilai yang dilempar bukan Error", () => {
+    expect(isSessionDenial("boom", MUSD)).toBe(false);
+    expect(() => assertSessionDenial(null, MUSD, "transfer")).toThrow(SessionPermissionError);
+  });
+
+  it("mengembalikan pesan apa adanya untuk dicetak sebagai bukti", () => {
+    expect(assertSessionDenial(new Error(GALAT_UNAUTHORIZED), MUSD, "transfer")).toBe(
+      GALAT_UNAUTHORIZED,
+    );
   });
 });

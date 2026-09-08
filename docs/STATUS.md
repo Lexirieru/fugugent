@@ -67,7 +67,7 @@ juga dijalankan sungguhan: exit 1, dan harga testnet tetap dipulihkan. Rincianny
 ### Repay dieksekusi lewat session key Altana ber-batas — terbukti on-chain
 Sejak 2026-09-08 repay **tidak lagi** ditandatangani EOA deployer. Ia ditandatangani session
 key Altana atas wallet `0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0`, yang batasnya ditegakkan
-kontrak akun Altana di rantai — bukan oleh kode kami.
+kontrak akun Altana — bukan oleh kode kami.
 
 Sesi itu hanya boleh memanggil **dua** hal: `MockLendingPool.repay(address,uint256)` dan
 `mUSD.approve(address,uint256)`. Cap belanja 0,02 tBNB + 100 mUSD per hari, kedaluwarsa
@@ -76,22 +76,32 @@ Sesi itu hanya boleh memanggil **dua** hal: `MockLendingPool.repay(address,uint2
 
 | | |
 |---|---|
-| Tx repay lewat sesi (`approve` + `repay`, satu userOp) | [`0xd5b7ebbd…`](https://testnet.bscscan.com/tx/0xd5b7ebbd78522460d439852240c296a8db926f3ba377142f4734e16447b52481) |
+| Tx repay lewat sesi (`approve` + `repay`, satu userOp) | [`0x3ec2818c…`](https://testnet.bscscan.com/tx/0x3ec2818c148cf761f0fcaee4ad05ed9cbaeffd0a3ec6a6efcc1e1e47d7989a07) |
 | `Repay.user` pada receipt | `0xbdc69c2d…` (wallet Altana) — **bukan** `0x56A2950d…` (EOA deployer) |
 | HF sebelum → sesudah | 1,14 → 1,50 |
-| Hutang | $38,33 → $29,38 (dibayar $8,94; selisih klaim vs rantai 0 unit) |
+| Hutang | $29,38 → $22,53 (dibayar $6,85; selisih klaim vs rantai 0 unit) |
 | Tx grant sesi | [`0x15e67a21…`](https://testnet.bscscan.com/tx/0x15e67a21e5ec25f8459ac2e83798033ca9afe5a14b41143aeb28fe2a47b64b52) |
 
 **Bukti yang lebih penting: batasnya nyata.** Sesi yang sama, sesaat setelah berhasil membayar,
-mencoba `mUSD.transfer(EOA deployer, 1 wei)` dan **ditolak** dengan `UnauthorizedCall` — dari
-validator akun Altana, sebelum transaksinya disiarkan (nol gas, saldo tidak bergerak).
-`mBNB.approve` juga ditolak, membuktikan pengikatan berlaku pada tingkat kontrak **dan**
-selector. Rinciannya, termasuk galat verbatim, di `docs/e2e/2026-09-08-e2e-testnet.md`.
+mencoba `mUSD.transfer(EOA deployer, 1 wei)` dan **ditolak** dengan `UnauthorizedCall` — custom
+error kontrak akun Altana, yang muncul saat relay mensimulasikan userOp, jadi transaksinya
+tidak pernah disiarkan (nol gas, saldo tidak bergerak, dan **tidak ada blok yang bisa dibuka
+untuk penolakan itu**). `mBNB.approve` juga ditolak, membuktikan pengikatan berlaku pada
+tingkat kontrak **dan** selector. Uji itu menuntut galatnya benar-benar `UnauthorizedCall` dan
+menyebut kontrak yang dicoba; kegagalan jaringan dilempar ulang sebagai kegagalan uji, bukan
+diterima sebagai bukti. Rinciannya, termasuk galat verbatim, di
+`docs/e2e/2026-09-08-e2e-testnet.md`.
 
-Batas yang **tidak** dibuktikan receipt: ia tidak membedakan kunci admin dari kunci sesi
-(keduanya bertindak sebagai wallet yang sama, dan Orchestrator tidak mencatat keyHash
-penandatangan). Yang menutup celah itu adalah skrip yang hanya pernah memuat file sesi, plus
-penolakan di atas — kunci admin tidak akan pernah ditolak.
+Tiga hal yang **tidak** dibuktikan, dinyatakan supaya tidak disimpulkan lebih: receipt tidak
+membedakan kunci admin dari kunci sesi (yang menutupnya: skrip hanya memuat file sesi, plus
+penolakan di atas — kunci admin tidak akan pernah ditolak); penolakan tidak punya jejak
+on-chain; dan izin Altana mengikat kontrak + selector, **bukan nilai argumen** — `approve`
+bebas-spender hanya dinetralkan spend cap dan oleh perilaku Porto yang menolkan allowance di
+akhir userOp, perilaku pihak ketiga yang kami temukan secara empiris.
+
+Batas kode (`execute.ts`: $2.000/hari) dan batas kriptografis (sesi: 100 mUSD/hari) belum
+disamakan. Yang mengikat adalah yang lebih ketat — cap sesi — dan itu arah yang benar, tetapi
+permintaan di atas cap akan gagal di relay sebagai error, bukan ditolak rapi oleh `execute.ts`.
 
 ## Yang BELUM ada — jangan diklaim
 

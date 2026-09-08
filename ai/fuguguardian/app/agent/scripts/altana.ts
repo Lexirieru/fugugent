@@ -52,9 +52,20 @@ export const GUARDIAN_SESSION_FILE = path.join(KEYSTORE_DIR, "altana-session-gua
  * Konfigurasi jaringan Altana untuk BSC testnet, dengan `publicRpcUrl`
  * DI-OVERRIDE. Alamat Keystore/Controller/relay diambil apa adanya dari preset
  * SDK supaya tidak ada salinan alamat yang bisa menyimpang.
+ *
+ * `ALTANA_RELAY_URL` boleh menimpa endpoint relay. Gunanya bukan sekadar
+ * konfigurasi: mengarahkannya ke endpoint mati adalah cara MEMBUKTIKAN bahwa
+ * uji penolakan tidak menerima kegagalan jaringan sebagai "batas sesi bekerja"
+ * — skrip probe harus mati dengan galat "BUKAN karena batas sesi", bukan
+ * mencetak tanda centang.
  */
 export function altanaTestnetNetwork(rpcUrl: string): AltanaNetworkConfig {
-  return { ...BNB_TESTNET, publicRpcUrl: rpcUrl } as AltanaNetworkConfig;
+  const relayUrl = process.env.ALTANA_RELAY_URL;
+  return {
+    ...BNB_TESTNET,
+    publicRpcUrl: rpcUrl,
+    ...(relayUrl ? { relayUrl } : {}),
+  } as AltanaNetworkConfig;
 }
 
 /**

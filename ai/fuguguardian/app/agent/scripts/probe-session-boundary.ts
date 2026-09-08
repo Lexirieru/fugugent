@@ -37,7 +37,12 @@ import {
   MOCK_LENDING_POOL_ADDRESS,
 } from "../src/strategy/chain/testnet.js";
 import { REPAY_ASSET_ADDRESS } from "../src/strategy/execute.js";
-import { requiredSessionCalls, assertBoundedAllowlist } from "../src/strategy/chain/session.js";
+import {
+  assertBoundedAllowlist,
+  assertNativeSpendCap,
+  assertSessionDenial,
+  requiredSessionCalls,
+} from "../src/strategy/chain/session.js";
 
 const MBNB = "0xF380E8B6803aD065EF0567dd20C894a55050737c" as const;
 const EOA_DEPLOYER = "0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E" as const;
@@ -97,6 +102,7 @@ async function main(): Promise<void> {
     session.permissions,
     requiredSessionCalls(MOCK_LENDING_POOL_ADDRESS, REPAY_ASSET_ADDRESS),
   );
+  assertNativeSpendCap(session.permissions);
 
   const wallet = session.walletAddress;
   const kirim = relaySender(sessionProvider(session, rpcUrl), publicClient);
@@ -159,8 +165,13 @@ async function main(): Promise<void> {
           "Batas sesi TIDAK ditegakkan.",
       );
     } catch (err: unknown) {
-      const pesan = err instanceof Error ? err.message : String(err);
-      console.log(`  ✔ DITOLAK. Galat apa adanya:`);
+      // "Ada exception" BUKAN bukti. Relay yang balas 502, receipt yang timeout,
+      // atau nonce race juga melempar — dan tidak satu pun menguji batas sesi.
+      // `assertSessionDenial` menuntut galatnya benar-benar `UnauthorizedCall`
+      // DAN menyebut kontrak yang kita coba panggil; bentuk lain dilempar ulang
+      // sebagai kegagalan uji, bukan diterima sebagai bukti.
+      const pesan = assertSessionDenial(err, probe.call.address, probe.label);
+      console.log(`  ✔ DITOLAK oleh validator akun Altana (UnauthorizedCall). Galat apa adanya:`);
       for (const baris of pesan.split("\n")) console.log(`    | ${baris}`);
     }
   }

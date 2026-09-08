@@ -67,6 +67,9 @@ import {
   type RelayResult,
 } from "./altana.js";
 import {
+  assertBoundedAllowlist,
+  assertNativeSpendCap,
+  assertSessionDenial,
   createSessionSendRepay,
   requiredSessionCalls,
   type SessionPermissions,
@@ -110,6 +113,14 @@ const TARGET_HF = (DEFAULT_THRESHOLDS.partialRepay + DEFAULT_THRESHOLDS.delevera
  * Batas belanja yang dipakai `executeDecision`. Sengaja lebih longgar daripada
  * pembayaran yang diperlukan sekali ini supaya yang diuji adalah rantai
  * eksekusinya, bukan pemotongannya (pemotongan sudah punya test unit sendiri).
+ *
+ * Perhatikan bahwa angka ini BUKAN batas yang sebenarnya mengikat. Batas kode
+ * di sini $2.000/hari; cap kriptografis pada sesi 100 mUSD/hari. Yang menang
+ * adalah yang lebih ketat, dan itu cap sesi — bahkan bila `LIMITS` diubah,
+ * dihapus, atau prosesnya dibajak. Konsekuensi yang harus diketahui: permintaan
+ * di atas cap sesi tidak ditolak rapi oleh `execute.ts`, melainkan gagal di
+ * relay sebagai error. Untuk demo satu repay ($8–12) jarak keduanya tidak
+ * pernah tersentuh; untuk produksi keduanya harus disamakan.
  */
 const LIMITS: ExecuteLimits = {
   maxPerActionUsd8: 100_000_000_000n, // $1.000,00
@@ -463,9 +474,23 @@ async function main(pemulihan: Pemulihan): Promise<void> {
   console.log(`  file sesi     : ${GUARDIAN_SESSION_FILE}`);
   console.log(`  publicKey     : ${session.publicKey}`);
   console.log(`  expiry        : ${session.expiry} (${new Date(session.expiry * 1000).toISOString()})`);
-  for (const izin of requiredSessionCalls(MOCK_LENDING_POOL_ADDRESS, REPAY_ASSET_ADDRESS)) {
-    console.log(`  allowlist     : ${izin.to}  ${izin.signature}`);
+  for (const izin of izinSesi.calls ?? []) {
+    const to = "to" in izin ? izin.to : "(kontrak apa pun)";
+    const signature = "signature" in izin ? izin.signature : "(metode apa pun)";
+    console.log(`  allowlist     : ${to}  ${signature}`);
   }
+  for (const cap of izinSesi.spend ?? []) {
+    console.log(`  spend cap     : ${cap.limit} / ${cap.period}  ${cap.token ?? "(native)"}`);
+  }
+
+  // Izin sesi diperiksa DI SINI, sebelum satu transaksi pun dikirim — termasuk
+  // sebelum `setAnswer` LANGKAH 2. Sesi yang terlalu longgar harus menghentikan
+  // skrip selagi keadaan testnet masih utuh, bukan setelah harga diturunkan.
+  // `createSessionSendRepay` memeriksa hal yang sama lagi saat dikonstruksi;
+  // pengulangan itu disengaja dan murah.
+  assertBoundedAllowlist(izinSesi, requiredSessionCalls(MOCK_LENDING_POOL_ADDRESS, REPAY_ASSET_ADDRESS));
+  assertNativeSpendCap(izinSesi);
+  console.log("  ✔ izin sesi diperiksa: persis repay + approve, dengan cap native — belum ada tx dikirim.");
   console.log(`Penandatangan harga : ${account.address}  (EOA deployer, pemilik feed)`);
   console.log(`MockLendingPool : ${MOCK_LENDING_POOL_ADDRESS}`);
   console.log(`MockPriceFeedBNB: ${MOCK_PRICE_FEED_BNB}`);
@@ -935,8 +960,11 @@ async function main(pemulihan: Pemulihan): Promise<void> {
     );
     console.error(`  ✖ LOLOS — tx ${lolos.transactionHash}`);
   } catch (err: unknown) {
+    // Menuntut alasan penolakannya, bukan sekadar keberadaan exception: relay
+    // 502, receipt timeout, dan nonce race juga melempar, dan tidak satu pun
+    // membuktikan batas sesi. Bentuk lain dilempar ulang dan mematikan E2E.
+    const pesan = assertSessionDenial(err, REPAY_ASSET_ADDRESS, "kontrol negatif transfer");
     probeDitolak = true;
-    const pesan = err instanceof Error ? err.message : String(err);
     for (const baris of pesan.split("\n")) console.log(`    | ${baris}`);
   }
   const mUsdSesudahProbe = await publicClient.readContract({
