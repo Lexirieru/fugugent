@@ -9,7 +9,10 @@
   },
   "scripts": {
     "dev": "tsx src/dualMain.ts",
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@a2a-js/sdk": ">=0.3.14 <1.0",
@@ -27,6 +30,7 @@
     "@types/express": "^5.0.6",
     "@types/node": "^22.0.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "vitest": "^5.0.0"
   }
 }
