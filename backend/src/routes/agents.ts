@@ -36,6 +36,7 @@ import {
   type AgentServiceDetail,
   type AgentServicePage,
   type FallbackAttempt,
+  type FallbackOutcome,
 } from "../service/agents.js";
 import { CATEGORIES, type AgentSource, type Category } from "../types.js";
 import { parseAgentId, parseCategory, parseLimit, parseOffset, QueryError } from "./query.js";
@@ -63,6 +64,24 @@ function worstSource(sources: readonly AgentSource[]): AgentSource {
     if (SOURCE_ORDER.indexOf(source) > SOURCE_ORDER.indexOf(worst)) worst = source;
   }
   return worst;
+}
+
+/**
+ * Tingkat fallback yang **tidak sempat menjawab** — bukan yang menjawab "tidak ada".
+ *
+ * `empty` sengaja TIDAK termasuk: sumber sehat yang berkata "tidak ketemu"
+ * adalah jawaban, bukan ketidaktahuan. Ketiga sisanya berarti ada tempat yang
+ * belum bisa kita tanyai.
+ */
+export const UNCERTAIN_OUTCOMES: readonly FallbackOutcome[] = [
+  "threw",
+  "unhealthy",
+  "unavailable",
+];
+
+/** `true` bila ada tingkat yang tidak bisa dimintai jawaban. */
+export function isUncertain(trail: readonly FallbackAttempt[]): boolean {
+  return trail.some((attempt) => UNCERTAIN_OUTCOMES.includes(attempt.outcome));
 }
 
 /** Pesan kegagalan yang aman untuk klien — disunting, tanpa stack trace. */
@@ -237,7 +256,18 @@ function mergePages(
 
   return {
     items: merged.slice(offset, offset + limit).map(serializeAgentRecord),
-    total: pages.reduce((sum, p) => sum + p.total, 0),
+    /**
+     * Jumlah item **berbeda yang benar-benar bisa dijangkau lewat paging ini**,
+     * bukan jumlah `total` keempat kategori.
+     *
+     * Tiap kategori dibaca paling banyak {@link MAX_PAGE_LIMIT} item, jadi
+     * jendela gabungan ini punya batas keras. Melaporkan jumlah keempat `total`
+     * (yang bisa ribuan) akan menjanjikan halaman yang tidak pernah ada:
+     * klien membangun pagination dari angka itu, lalu menerima halaman kosong
+     * ber-`healthy: true` begitu melewati jendelanya. Angka per kategori tetap
+     * bisa diperiksa lewat `/api/categories` dan lewat `trail`.
+     */
+    total: merged.length,
     limit,
     offset,
     category: null,
@@ -326,10 +356,22 @@ export function createAgentRoutes(deps: AgentRoutesDeps): Hono {
       } satisfies AgentDetailResponse);
     }
 
-    // 404 hanya bila kita benar-benar tahu jawabannya: sumber sehat dan tetap
-    // tidak menemukannya. Sumber yang tumbang menghasilkan 200 + `healthy: false`,
-    // karena "tidak bisa dipastikan" bukan hal yang sama dengan "tidak ada".
-    if (detail.agent === null && detail.healthy) return c.json(detail, 404);
+    // 404 hanya bila kita benar-benar tahu jawabannya. `healthy` saja TIDAK
+    // cukup untuk menyimpulkan itu: tingkat 4 (seed) melaporkan `healthy: true`
+    // untuk id apa pun yang bukan salah satu agent kurasi, tanpa melihat apa
+    // yang terjadi di tingkat 1–3. Jadi `{agent: null, healthy: true}` juga
+    // dihasilkan oleh keadaan "8004scan mati, cache tidak dipasang, on-chain
+    // tidak memuatnya" — keadaan di mana agent-nya sangat mungkin ADA.
+    //
+    // Membalas 404 di situ berarti marketplace menghapus agent yang nyata
+    // persis ketika sumber primernya tumbang. Karena itu `trail` yang memutus:
+    // satu saja tingkat yang `threw`, `unhealthy`, atau `unavailable` berarti
+    // ada tempat yang belum sempat kita tanyai, dan "tidak tahu" bukan
+    // "tidak ada". `unavailable` ikut dihitung: cache yang tidak dipasang
+    // adalah tempat memastikan yang tidak kita punya.
+    if (detail.agent === null && detail.healthy && !isUncertain(detail.trail)) {
+      return c.json(detail, 404);
+    }
     return c.json(detail);
   });
 

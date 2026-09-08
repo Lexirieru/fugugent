@@ -8,7 +8,7 @@
  */
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import type { AgentService } from "../service/agents.js";
+import { redact, type AgentService } from "../service/agents.js";
 import { createAgentRoutes } from "./agents.js";
 import { createHealthRoutes } from "./health.js";
 
@@ -37,9 +37,15 @@ export function createApp(deps: ApiDeps): Hono {
 
   app.onError((err, c) => {
     // Kegagalan upstream sudah ditangani di tiap handler; sampai di sini berarti
-    // cacat di kode kita sendiri. Tetap tanpa stack trace dan tanpa kredensial.
+    // cacat di kode kita sendiri — mis. galat dari middleware, atau dari
+    // serialisasi respons, yang berada DI LUAR `try/catch` handler.
+    //
+    // `redact` wajib justru di sini: pesan yang sampai ke jalur ini tidak
+    // pernah melewati penyuntingan mana pun, dan pesan galat klien HTTP
+    // pernah membawa URL beserta kredensialnya. "API key tidak pernah muncul
+    // di respons" tidak boleh punya pengecualian yang kebetulan.
     const message = err instanceof Error ? err.message.split("\n")[0] : String(err);
-    return c.json({ error: "internal_error", message }, 500);
+    return c.json({ error: "internal_error", message: redact(message) }, 500);
   });
 
   return app;

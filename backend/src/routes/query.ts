@@ -57,7 +57,17 @@ export function parseLimit(raw: string | undefined, fallback: number): number {
   return parsed;
 }
 
-/** `offset` — bilangan bulat >= 0. `-1` ditolak, tidak dijadikan 0. */
+/**
+ * Batas atas `offset`.
+ *
+ * Tanpa ini `offset=9007199254740991` diteruskan apa adanya dan menjadi
+ * `OFFSET 9007199254740991` di Postgres — permintaan tanpa autentikasi yang
+ * tidak pernah bisa menghasilkan sesuatu yang berguna. 10.000 jauh di atas
+ * apa pun yang bisa dijangkau UI hari ini.
+ */
+export const MAX_OFFSET = 10_000;
+
+/** `offset` — bilangan bulat 0..{@link MAX_OFFSET}. `-1` ditolak, tidak dijadikan 0. */
 export function parseOffset(raw: string | undefined): number {
   if (blank(raw)) return 0;
   const value = raw as string;
@@ -68,8 +78,8 @@ export function parseOffset(raw: string | undefined): number {
     );
   }
   const parsed = Number(value);
-  if (!Number.isSafeInteger(parsed)) {
-    throw new QueryError("offset", `offset di luar jangkauan: ${value}`);
+  if (!Number.isSafeInteger(parsed) || parsed > MAX_OFFSET) {
+    throw new QueryError("offset", `offset harus <= ${MAX_OFFSET}, bukan ${value}`);
   }
   return parsed;
 }

@@ -29,7 +29,7 @@ import { bscTestnet } from "viem/chains";
 import { loadConfig } from "./config.js";
 import { connectDb, ensureSchema, type DbHandle } from "./db/client.js";
 import { createHttpClient } from "./http/client.js";
-import { createAgentService, createDbAgentCache } from "./service/agents.js";
+import { createAgentService, createDbAgentCache, redact } from "./service/agents.js";
 import { createOnchainSource } from "./sources/onchain.js";
 import { createScan8004Source } from "./sources/scan8004.js";
 import { createApp } from "./routes/app.js";
@@ -39,9 +39,21 @@ export type { ApiDeps } from "./routes/app.js";
 
 export const DEFAULT_PORT = 8787;
 
-function describe(err: unknown): string {
-  return err instanceof Error ? `${err.name}: ${err.message.split("\n")[0]}` : String(err);
+/**
+ * Pesan galat yang aman untuk klien.
+ *
+ * `redact` bukan hiasan: jaring terakhir di bawah menangkap galat yang tidak
+ * pernah melewati penyuntingan mana pun, dan pesan galat klien HTTP pernah
+ * membawa URL beserta kredensialnya. Aturan "API key tidak pernah muncul di
+ * respons" tidak boleh punya pengecualian yang kebetulan.
+ */
+export function describeFailure(err: unknown): string {
+  return redact(
+    err instanceof Error ? `${err.name}: ${err.message.split("\n")[0]}` : String(err),
+  );
 }
+
+const describe = describeFailure;
 
 export interface BuiltServer {
   app: ReturnType<typeof createApp>;
@@ -96,9 +108,24 @@ export function buildServer(env: NodeJS.ProcessEnv = process.env): BuiltServer {
 // Jembatan node:http ke Fetch API
 // ---------------------------------------------------------------------------
 
-function toRequest(req: IncomingMessage): Request {
+/**
+ * `IncomingMessage` → `Request`, atau alasan kenapa permintaannya tidak sah.
+ *
+ * `Host` yang cacat (`Host: bad host`) membuat `new URL` melempar. Itu
+ * kesalahan **klien**, bisa dipicu siapa saja tanpa autentikasi, dan
+ * membiarkannya jatuh ke jaring terakhir berarti 500 — mengotori metrik 5xx
+ * dengan permintaan yang tidak pernah salah di sisi kita. Karena itu ia
+ * dibedakan di sini dan dijawab 400.
+ */
+export function toRequest(req: IncomingMessage): { request: Request } | { badRequest: string } {
   const host = req.headers.host ?? "localhost";
-  const url = new URL(req.url ?? "/", `http://${host}`);
+  let url: URL;
+  try {
+    url = new URL(req.url ?? "/", `http://${host}`);
+  } catch {
+    return { badRequest: "header Host atau target permintaan tidak sah" };
+  }
+
   const headers = new Headers();
   for (const [key, value] of Object.entries(req.headers)) {
     if (value === undefined) continue;
@@ -106,32 +133,50 @@ function toRequest(req: IncomingMessage): Request {
     else headers.set(key, value);
   }
   // Backend ini hanya membaca; tidak ada rute yang punya badan permintaan.
-  return new Request(url, { method: req.method ?? "GET", headers });
+  return { request: new Request(url, { method: req.method ?? "GET", headers }) };
 }
 
-async function writeResponse(res: ServerResponse, response: Response): Promise<void> {
+export async function writeResponse(res: ServerResponse, response: Response): Promise<void> {
   const headers: Record<string, string | string[]> = {};
   response.headers.forEach((value, key) => {
-    headers[key] = key === "set-cookie" ? [value] : value;
+    // `Set-Cookie` adalah satu-satunya header yang tidak boleh digabung dengan
+    // koma, dan `forEach` menyajikannya sudah tergabung. `getSetCookie()`
+    // mengembalikan tiap nilai utuh; tanpa itu hanya yang terakhir yang lolos.
+    if (key.toLowerCase() === "set-cookie") return;
+    headers[key] = value;
   });
+  const cookies = response.headers.getSetCookie();
+  if (cookies.length > 0) headers["set-cookie"] = cookies;
+
   res.writeHead(response.status, headers);
   res.end(response.body === null ? undefined : Buffer.from(await response.arrayBuffer()));
+}
+
+/** Handler `node:http` untuk sebuah aplikasi Fetch. Diekspor supaya bisa diuji. */
+export function createRequestListener(app: { fetch: (request: Request) => Response | Promise<Response> }) {
+  return (req: IncomingMessage, res: ServerResponse): void => {
+    void (async () => {
+      try {
+        const converted = toRequest(req);
+        if ("badRequest" in converted) {
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "bad_request", message: converted.badRequest }));
+          return;
+        }
+        await writeResponse(res, await app.fetch(converted.request));
+      } catch (err) {
+        // Jaring terakhir. Tetap JSON: klien ini tidak bisa membaca apa pun lain.
+        if (!res.headersSent) res.writeHead(500, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: "internal_error", message: describeFailure(err) }));
+      }
+    })();
+  };
 }
 
 export function startServer(port = Number(process.env.PORT ?? DEFAULT_PORT)) {
   const built = buildServer();
 
-  const server = createServer((req, res) => {
-    void (async () => {
-      try {
-        await writeResponse(res, await built.app.fetch(toRequest(req)));
-      } catch (err) {
-        // Jaring terakhir. Tetap JSON: klien ini tidak bisa membaca apa pun lain.
-        if (!res.headersSent) res.writeHead(500, { "content-type": "application/json" });
-        res.end(JSON.stringify({ error: "internal_error", message: describe(err) }));
-      }
-    })();
-  });
+  const server = createServer(createRequestListener(built.app));
 
   server.listen(port, () => {
     console.log(

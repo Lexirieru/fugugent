@@ -155,3 +155,78 @@ describe("GET /api/health", () => {
     expect((await json(res)).healthy).toBe(false);
   });
 });
+
+/**
+ * Temuan I2. Tanpa mode ini tidak ada satu jalur otomatis pun — status code
+ * maupun badan — yang bisa dipakai uptime monitor, liveness probe, atau
+ * `curl -f` untuk tahu kami sedang berjalan dari jaring pengaman: `healthy`
+ * tingkat atas praktis konstan `true` karena `seed` selalu disisipkan sehat
+ * di `service/agents.ts`. `?strict=1` memberi mereka satu bit yang jujur
+ * tanpa mengubah apa yang dilihat pembaca badan respons.
+ *
+ * Seluruh test di bawah gagal bila cabang `strict && degraded` dicabut.
+ */
+describe("GET /api/health?strict=1", () => {
+  const degradedHealth = async () =>
+    makeHealth({
+      healthy: true,
+      degraded: true,
+      sources: [
+        { source: "scan8004", healthy: false, reason: "500 DATABASE_ERROR", checkedAt: FIXED_NOW },
+        { source: "seed", healthy: true, reason: null, checkedAt: FIXED_NOW },
+      ],
+    });
+
+  it("503 saat degraded, dengan badan yang persis sama", async () => {
+    const app = createApp({ service: fakeService({ health: degradedHealth }) });
+
+    const lenient = await get(app, "/api/health");
+    const strict = await get(app, "/api/health?strict=1");
+
+    expect(lenient.status).toBe(200);
+    expect(strict.status).toBe(503);
+    // Badannya identik: yang berbeda hanya bit yang bisa dibaca monitor.
+    expect(await json(strict)).toEqual(await json(lenient));
+  });
+
+  it("200 saat tidak degraded", async () => {
+    const app = createApp({ service: fakeService() });
+    const res = await get(app, "/api/health?strict=1");
+
+    expect(res.status).toBe(200);
+    expect((await json(res)).degraded).toBe(false);
+  });
+
+  it("503 juga saat getHealth sendiri melempar", async () => {
+    const app = createApp({
+      service: fakeService({
+        health: async () => {
+          throw new Error("connect ECONNREFUSED 127.0.0.1:5432");
+        },
+      }),
+    });
+    const res = await get(app, "/api/health?strict=1");
+
+    expect(res.status).toBe(503);
+    expect((await json(res)).reason).toContain("ECONNREFUSED");
+  });
+
+  it("strict=0 dan strict kosong berarti mode bawaan", async () => {
+    const app = createApp({ service: fakeService({ health: degradedHealth }) });
+
+    expect((await get(app, "/api/health?strict=0")).status).toBe(200);
+    expect((await get(app, "/api/health?strict=")).status).toBe(200);
+  });
+
+  it("ejaan lain ditolak 400, bukan diam-diam dianggap mati", async () => {
+    const app = createApp({ service: fakeService({ health: degradedHealth }) });
+    const res = await get(app, "/api/health?strict=yes");
+
+    // `?strict=yes` yang diam-diam berarti mati akan membuat monitor melapor
+    // hijau selamanya tanpa pernah memberi tahu ia tidak memeriksa apa pun.
+    expect(res.status).toBe(400);
+    const body = await json(res);
+    expect(body.error).toBe("invalid_query");
+    expect(body.field).toBe("strict");
+  });
+});

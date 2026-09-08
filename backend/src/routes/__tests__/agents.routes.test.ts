@@ -95,6 +95,44 @@ describe("GET /api/agents", () => {
     expect(body.category).toBeNull();
   });
 
+  /**
+   * Temuan I4. Tiap kategori dibaca paling banyak `MAX_PAGE_LIMIT` item, jadi
+   * jendela gabungan punya batas keras. Melaporkan jumlah keempat `total`
+   * (ribuan) akan menjanjikan halaman yang tidak pernah ada: klien membangun
+   * pagination dari angka itu lalu menerima halaman kosong `healthy: true`.
+   * Gagal bila `total` dikembalikan menjadi penjumlahan.
+   */
+  it("total gabungan adalah item unik yang bisa dijangkau, bukan jumlah keempat total", async () => {
+    const app = createApp({
+      service: fakeService({
+        list: async (category) =>
+          makePage({
+            items: [
+              makeRecord({ id: `97:${category}-a`, tokenId: `${category}-a` }),
+              makeRecord({ id: `97:${category}-b`, tokenId: `${category}-b` }),
+            ],
+            total: 1000,
+          }),
+      }),
+    });
+    const body = await json(await get(app, "/api/agents?limit=100"));
+
+    expect(body.items).toHaveLength(8);
+    expect(body.total).toBe(8);
+  });
+
+  it("item yang muncul di dua kategori hanya dihitung sekali", async () => {
+    const app = createApp({
+      service: fakeService({
+        list: async () => makePage({ items: [makeRecord({ id: "97:kembar" })], total: 50 }),
+      }),
+    });
+    const body = await json(await get(app, "/api/agents"));
+
+    expect(body.items).toHaveLength(1);
+    expect(body.total).toBe(1);
+  });
+
   it("halaman kosong yang sah tetap 200 dan tetap sehat", async () => {
     const app = createApp({ service: fakeService({ list: async () => emptyPageFor("seed") }) });
     const res = await get(app, "/api/agents?category=GRID");
@@ -119,6 +157,8 @@ describe("GET /api/agents — parameter cacat", () => {
     ["limit=101", "limit"],
     ["offset=-1", "offset"],
     ["offset=abc", "offset"],
+    ["offset=10001", "offset"],
+    ["offset=9007199254740991", "offset"],
     ["category=BUKANKATEGORI", "category"],
     ["category=grid", "category"],
   ])("menolak %s dengan 400 dan menyebut field-nya", async (query, field) => {
@@ -206,7 +246,7 @@ describe("GET /api/agents/:id", () => {
     expect(service.detailCalls).toEqual(["97:seed-fugugrid"]);
   });
 
-  it("404 bila agent memang tidak ada, dengan amplop utuh", async () => {
+  it("404 bila SETIAP tingkat menjawab dan tetap tidak menemukannya", async () => {
     const app = createApp({
       service: fakeService({
         detail: async () =>
@@ -217,6 +257,14 @@ describe("GET /api/agents/:id", () => {
             reason: "agent 97:99 tidak ada di seed terkurasi",
             ageSeconds: null,
             degraded: true,
+            // Keempat tingkat benar-benar dimintai jawaban; semuanya menjawab
+            // "tidak ada". Barulah "tidak ada" boleh diucapkan.
+            trail: [
+              { source: "scan8004", outcome: "empty", reason: null, items: 0 },
+              { source: "cache", outcome: "empty", reason: null, items: 0 },
+              { source: "onchain", outcome: "empty", reason: null, items: 0 },
+              { source: "seed", outcome: "empty", reason: null, items: 0 },
+            ],
           }),
       }),
     });
@@ -229,11 +277,61 @@ describe("GET /api/agents/:id", () => {
     expect(body.reason).toContain("tidak ada");
   });
 
-  it("200 — bukan 404 — bila kita tidak bisa memastikan agent-nya ada", async () => {
+  /**
+   * Inti temuan C1. `service/agents.ts` tingkat 4 meng-hardcode `healthy: true`
+   * dan `service/seed.ts` selalu membalas `agent: null` untuk id yang bukan
+   * agent kurasi — jadi amplop di bawah ini adalah persis yang dihasilkan
+   * wiring produksi ketika 8004scan mati, `DATABASE_URL` kosong, dan on-chain
+   * tidak memuat agent itu. Membalas 404 di situ berarti marketplace menghapus
+   * agent yang nyata tepat saat sumber primernya tumbang.
+   *
+   * Ketiga kasus di bawah gagal bila syarat `!isUncertain(trail)` dicabut.
+   */
+  it.each([
+    ["threw", "8004scan mati"],
+    ["unhealthy", "8004scan membalas 500 DATABASE_ERROR"],
+    ["unavailable", "cache tidak dipasang"],
+  ] as const)(
+    "200 — bukan 404 — bila ada tingkat ber-outcome %s, walau healthy: true",
+    async (outcome, reason) => {
+      const app = createApp({
+        service: fakeService({
+          detail: async () =>
+            makeDetail({
+              agent: null,
+              source: "seed",
+              // Persis yang dilaporkan service hari ini: seed selalu sehat.
+              healthy: true,
+              reason: "agent 97:41 tidak ada di seed terkurasi",
+              ageSeconds: null,
+              degraded: true,
+              trail: [
+                { source: "scan8004", outcome, reason, items: 0 },
+                { source: "seed", outcome: "empty", reason: null, items: 0 },
+              ],
+            }),
+        }),
+      });
+      const res = await get(app, "/api/agents/97:41");
+
+      expect(res.status).toBe(200);
+      const body = await json(res);
+      expect(body.agent).toBeNull();
+      // Jejaknya ikut, supaya klien bisa membedakan sendiri kalau ia mau.
+      expect(body.trail.some((a: { outcome: string }) => a.outcome === outcome)).toBe(true);
+    },
+  );
+
+  it("200 — bukan 404 — bila layanan sendiri melaporkan tidak sehat", async () => {
     const app = createApp({
       service: fakeService({
         detail: async () =>
-          makeDetail({ agent: null, healthy: false, reason: "keempat tingkat gagal" }),
+          makeDetail({
+            agent: null,
+            healthy: false,
+            reason: "keempat tingkat gagal",
+            trail: [{ source: "seed", outcome: "empty", reason: null, items: 0 }],
+          }),
       }),
     });
     const res = await get(app, "/api/agents/97:41");
