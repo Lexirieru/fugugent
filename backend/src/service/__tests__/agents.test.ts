@@ -891,9 +891,7 @@ describe("getHealth", () => {
 
   it("tidak melempar walau cache mati, dan tidak mengaku sehat karenanya", async () => {
     const h = harness();
-    h.cache.latestHealth = async () => {
-      throw new Error("mati");
-    };
+    h.cache.throws = new Error("mati");
     const health = await h.service.getHealth();
     expect(health.sources.length).toBeGreaterThan(0);
     expect(health.sources.find((s) => s.source === "cache")?.healthy).toBe(false);
@@ -1953,5 +1951,111 @@ describe("getHealth — polling berulang saat Postgres mati", () => {
     const health = await h.service.getHealth();
     expect(health.healthy).toBe(false);
     expect(health.degraded).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Probe harus membaca NILAI BALIK, bukan ada-tidaknya exception
+// ---------------------------------------------------------------------------
+
+describe("getHealth — probe cache membaca hasil, bukan absennya exception", () => {
+  /**
+   * Bentuk persis yang dikembalikan `db/repo.ts` saat Postgres tak terjangkau.
+   * Kedua fungsi bacanya **tidak melempar** — itu kontraknya — melainkan
+   * menyatakan kegagalan di dalam nilai balik. Fake ini meniru itu apa adanya,
+   * karena di situlah bug-nya bersembunyi.
+   */
+  function deadPostgresCache(): FakeCache {
+    const cache = new FakeCache();
+    cache.latestHealth = async () => [
+      {
+        source: "cache",
+        healthy: false,
+        reason: "cache Postgres gagal: connect ECONNREFUSED 172.18.0.2:5432",
+        checkedAt: NOW.toISOString(),
+      },
+    ];
+    cache.getAgents = async () => ({
+      ...page([], {
+        source: "cache",
+        healthy: false,
+        reason: "cache Postgres gagal: connect ECONNREFUSED 172.18.0.2:5432",
+      }),
+      ageSeconds: null,
+      stale: false,
+    });
+    return cache;
+  }
+
+  it("Postgres mati yang TIDAK melempar tetap dilaporkan mati", async () => {
+    // Reproduksi galat produksi: `docker stop fugugent-postgres`, tunggu 8 dtk,
+    // GET /api/health. Dulu jawabannya `cache: true, age: 0` dengan alasan
+    // "probe: pembacaan source_health berhasil" — pembacaan segar yang salah,
+    // karena "tidak melempar" disimpulkan sebagai "berhasil".
+    const cache = deadPostgresCache();
+    const service = createAgentService({
+      scan8004: new FakeScan(),
+      cache,
+      chainId: CHAIN_ID,
+      now,
+    });
+
+    for (let poll = 0; poll < 3; poll++) {
+      const health = await service.getHealth();
+      const row = health.sources.find((s) => s.source === "cache");
+      expect(row?.healthy).toBe(false);
+      expect(row?.reason).toContain("ECONNREFUSED");
+      expect(health.healthy).toBe(false);
+      // `degraded` juga true, karena 8004scan belum pernah terbukti sehat —
+      // inilah yang membuat `?strict=1` membalas 503.
+      expect(health.degraded).toBe(true);
+    }
+  });
+
+  it("probe yang berhasil tetap dilaporkan sehat, dengan alasan yang jujur", async () => {
+    const h = harness();
+    const health = await h.service.getHealth();
+    const row = health.sources.find((s) => s.source === "cache");
+    expect(row?.healthy).toBe(true);
+    expect(row?.reason).toContain("kueri cache berhasil");
+    expect(health.healthy).toBe(true);
+  });
+
+  it("probe cache berbatas waktu — /api/health tidak ikut menggantung", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    try {
+      const h = harness({ localBudgetMs: 2_000 });
+      h.cache.getAgents = () => new Promise<never>(() => undefined);
+
+      const pending = h.service.getHealth();
+      await vi.advanceTimersByTimeAsync(2_000);
+      const health = await pending;
+
+      expect(health.sources.find((s) => s.source === "cache")?.healthy).toBe(false);
+      expect(health.healthy).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("seed tidak punya keadaan `belum diobservasi`, juga pada boot yang masih bersih", async () => {
+    // Baris `seed` yang tersimpan dari boot sebelumnya dulu ikut menua dan
+    // akhirnya dilaporkan `healthy: false` — membingungkan untuk sumber yang
+    // menurut penjelasan kita sendiri tidak bisa mati.
+    const h = harness();
+    h.cache.latest = [
+      {
+        source: "seed",
+        healthy: true,
+        reason: null,
+        checkedAt: "2026-09-01T00:00:00.000Z", // boot minggu lalu
+      },
+    ];
+    const health = await h.service.getHealth();
+    const seed = health.sources.find((s) => s.source === "seed");
+    expect(seed?.healthy).toBe(true);
+    expect(seed?.stale).toBe(false);
+    expect(seed?.ageSeconds).toBe(0);
   });
 });

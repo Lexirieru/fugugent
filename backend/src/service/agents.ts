@@ -1115,21 +1115,56 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
     const merged = new Map<AgentSource, SourceHealth>();
 
     // 1. Riwayat DB — paling tua, jadi paling dulu.
-    //
-    //    Membaca riwayat itu sendiri **adalah probe Postgres**: kalau kueri ini
-    //    berhasil, cache hidup DETIK INI, dan kalau ia gagal, cache mati DETIK
-    //    INI. Itu observasi paling segar yang bisa didapat tanpa biaya jaringan
-    //    tambahan, dan karena itu ia menang atas apa pun yang ada di ingatan.
     let probe: SourceHealth | undefined;
     if (deps.cache !== undefined) {
       try {
         for (const health of await deps.cache.latestHealth()) merged.set(health.source, health);
-        probe = {
+      } catch (err) {
+        merged.set("cache", {
           source: "cache",
-          healthy: true,
-          reason: "probe: pembacaan source_health berhasil",
+          healthy: false,
+          reason: describeThrow(err),
           checkedAt,
-        };
+        });
+      }
+
+      // 1b. **Probe Postgres yang sesungguhnya.**
+      //
+      //     Versi sebelumnya menyimpulkan "cache sehat" dari fakta bahwa
+      //     `latestHealth()` tidak melempar. Itu salah, dan salahnya mahal:
+      //     `getLatestSourceHealth` di `db/repo.ts` memang **tidak pernah
+      //     melempar** — sesuai kontraknya, ia mengembalikan baris sintetis
+      //     `{ source: "cache", healthy: false, reason }` saat Postgres tak
+      //     terjangkau. Jadi tidak-melempar bukan bukti apa pun, dan probe
+      //     optimistis itu justru MENIMPA jawaban jujur yang baru saja
+      //     diberikan repo. Hasilnya: Postgres mati 8 detik, `/api/health`
+      //     tetap berkata `cache: healthy, age: 0` — pembacaan segar yang salah,
+      //     lebih buruk daripada catatan basi.
+      //
+      //     Sekarang probenya adalah kueri sungguhan yang **melaporkan
+      //     kesehatannya di dalam nilai balik** (`CachedPage.healthy`), bukan
+      //     lewat ada-tidaknya exception. `limit: 1` supaya semurah mungkin,
+      //     dan tetap berbatas waktu supaya endpoint kesehatan tidak ikut
+      //     menggantung bersama Postgres yang menggantung.
+      try {
+        const page = await withDeadline(
+          deps.cache.getAgents({ chainId, limit: 1, offset: 0 }, at),
+          localBudgetMs,
+          "cache",
+        );
+        probe = page.healthy
+          ? {
+              source: "cache",
+              healthy: true,
+              reason: "probe: kueri cache berhasil",
+              checkedAt,
+            }
+          : {
+              source: "cache",
+              healthy: false,
+              reason: redact(page.reason ?? "probe: kueri cache gagal tanpa alasan"),
+              checkedAt,
+            };
       } catch (err) {
         probe = { source: "cache", healthy: false, reason: describeThrow(err), checkedAt };
       }
@@ -1140,25 +1175,32 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
 
     // 3. Probe barusan — lebih baru daripada ingatan.
     //
-    //    Urutan ini yang memperbaiki jendela bohong yang ditemukan di compose:
-    //    beberapa detik setelah Postgres dimatikan, panggilan PERTAMA ke
-    //    `/api/health` dulu masih berkata `cache: healthy` karena ingatan
-    //    menimpa hasil probe. Sekarang probe yang menang, jadi endpoint ini
-    //    jujur pada panggilan pertama — persis saat juri menatap layar setelah
-    //    menekan tombol mati.
+    //    Urutan ini yang menutup jendela bohong: setelah Postgres dimatikan,
+    //    panggilan PERTAMA ke `/api/health` sudah jujur, tanpa perlu ditolong
+    //    permintaan lain yang kebetulan menabrak cache dan gagal.
     if (probe !== undefined) merged.set("cache", probe);
 
-    // Seed tidak punya bagian yang bisa mati sendiri: ia berkas dalam bundel,
-    // jadi observasinya selalu dibuat sekarang dan tidak pernah kedaluwarsa.
-    // Ia tetap TIDAK ikut menentukan `healthy` — lihat `ServiceHealth.healthy`.
-    if (!merged.has("seed")) {
-      merged.set("seed", {
+    // Seed tidak punya bagian yang bisa mati sendiri: ia berkas di dalam bundel
+    // yang sama dengan proses ini. Karena itu ia **tidak punya keadaan
+    // "belum diobservasi"**: kalau prosesnya hidup, seed-nya ada.
+    //
+    // Yang diperbaiki di sini: baris `seed` yang tersimpan di `source_health`
+    // dari boot sebelumnya dulu ikut menua dan akhirnya dilaporkan
+    // `healthy: false` — membingungkan pembaca yang baru saja diberi tahu bahwa
+    // seed tak bisa mati. Baris DB untuk seed karena itu diabaikan; hanya
+    // observasi dari PROSES INI (mis. seed yang benar-benar melempar) yang
+    // dipertahankan. Seed tetap TIDAK ikut menentukan `healthy` — lihat
+    // catatan di `ServiceHealth.healthy`.
+    const observedSeed = lastSeen.get("seed");
+    merged.set(
+      "seed",
+      observedSeed ?? {
         source: "seed",
         healthy: true,
         reason: "seed terkurasi selalu tersedia",
         checkedAt,
-      });
-    }
+      },
+    );
 
     const order: AgentSource[] = ["scan8004", "cache", "onchain", "seed"];
     const sources = order
