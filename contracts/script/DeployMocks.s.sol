@@ -11,6 +11,12 @@ import {MockLendingPool} from "../src/mocks/MockLendingPool.sol";
 ///         likuiditas mUSD, dan buat satu posisi contoh (agunan mBNB, hutang mUSD)
 ///         dengan health factor sekitar 1.8 — untuk nanti diselamatkan agent.
 /// @dev Skrip uji, bukan bagian produk. Tidak menyentuh kontrak Fugu* yang sudah ada.
+///      PERINGATAN: skrip ini SELALU men-deploy set mock (token+feed+pool) yang
+///      benar-benar baru setiap kali dijalankan — tidak ada guard idempotency.
+///      Menjalankannya berulang kali di testnet yang sama akan menumpuk banyak set
+///      mock yang tidak terpakai (masing-masing dengan alamat berbeda). Jalankan
+///      hanya sekali per kebutuhan, dan catat alamat hasilnya di
+///      `deployments/bsc-testnet.json`.
 contract DeployMocks is Script {
     uint16 internal constant USD_LTV_BPS = 8000; // 80%
     uint16 internal constant USD_LT_BPS = 8500; // 85%
@@ -28,8 +34,11 @@ contract DeployMocks is Script {
     // Posisi contoh: 10 mBNB agunan (= $7,500 @ LT 75% => daya likuidasi $5,625).
     uint256 internal constant SAMPLE_COLLATERAL_BNB = 10 ether;
 
-    // Borrow mUSD supaya HF ~1.8 (lihat perhitungan di komentar `_openSamplePosition`).
-    uint256 internal constant SAMPLE_BORROW_USD = 3_125 ether;
+    // Target health factor posisi contoh dan toleransi pemeriksaan runtime-nya.
+    // Jumlah pinjaman DITURUNKAN dari sini (lihat `_computeSampleBorrowAmount`),
+    // bukan angka tetap — supaya tidak diam-diam melenceng kalau harga/LT berubah.
+    uint256 internal constant TARGET_HF = 1.8e18;
+    uint256 internal constant HF_TOLERANCE = 0.01e18;
 
     // Gas bekal untuk alamat LP terpisah (lihat catatan di `_seedLiquidity`), dalam wei.
     uint256 internal constant LP_GAS_STIPEND = 0.002 ether;
@@ -49,6 +58,7 @@ contract DeployMocks is Script {
         Deployed memory d = _deployAndConfigure(pk, deployer);
         _seedLiquidity(pk, d);
         _openSamplePosition(pk, d);
+        _verifySampleHealthFactor(d, deployer);
         _logResult(d, deployer);
     }
 
@@ -101,20 +111,64 @@ contract DeployMocks is Script {
     }
 
     /// @dev Posisi contoh di alamat deployer: supply mBNB sebagai agunan, lalu
-    ///      borrow mUSD sehingga HF berada di sekitar 1.8.
+    ///      borrow jumlah mUSD yang DIHITUNG dari `TARGET_HF`, bukan angka tetap,
+    ///      memakai rumus yang sama persis dengan `MockLendingPool.getUserAccountData`:
     ///
-    ///      HF = (collateralUsd * LTbps) / (10000 * debtUsd) * 1e18
-    ///      collateralUsd = 10 * $750 = $7,500 ; LTbps = 7500 (75%)
-    ///      Target HF = 1.8e18
-    ///      debtUsd = (collateralUsd * LTbps) / (10000 * 1.8)
-    ///              = (7500 * 7500) / 18000 = 3,125 USD
-    ///      => borrow 3,125 mUSD (harga mUSD = $1.00, jadi 3125 token = $3,125)
+    ///      healthFactor = (totalCollateralBase * currentLiquidationThreshold * 1e18)
+    ///                     / (10000 * totalDebtBase)
+    ///
+    ///      Dibalik untuk debt (kalikan dulu, baru bagi, supaya presisi terjaga):
+    ///
+    ///      totalDebtBase = (collateralUsd8 * ltBps * 1e18) / (10000 * TARGET_HF)
+    ///
+    ///      Posisi ini hanya punya SATU aset agunan (mBNB), jadi
+    ///      `currentLiquidationThreshold` = `BNB_LT_BPS` persis (rata-rata tertimbang
+    ///      atas satu aset = aset itu sendiri).
     function _openSamplePosition(uint256 pk, Deployed memory d) internal {
+        uint256 borrowAmount = _computeSampleBorrowAmount();
+
         vm.startBroadcast(pk);
         d.mBNB.approve(address(d.pool), SAMPLE_COLLATERAL_BNB);
         d.pool.supply(address(d.mBNB), SAMPLE_COLLATERAL_BNB);
-        d.pool.borrow(address(d.mUSD), SAMPLE_BORROW_USD);
+        d.pool.borrow(address(d.mUSD), borrowAmount);
         vm.stopBroadcast();
+    }
+
+    /// @dev Turunkan jumlah pinjaman mUSD (18 desimal) dari `TARGET_HF` dan
+    ///      parameter posisi contoh (`SAMPLE_COLLATERAL_BNB`, `BNB_PRICE_8DP`,
+    ///      `BNB_LT_BPS`, `USD_PRICE_8DP`) — bukan angka tetap.
+    function _computeSampleBorrowAmount() internal pure returns (uint256 borrowAmount) {
+        // collateralUsd8 = jumlah mBNB (18dp) * harga mBNB (8dp) / 1e18
+        uint256 collateralUsd8 = (SAMPLE_COLLATERAL_BNB * uint256(BNB_PRICE_8DP)) / 1e18;
+
+        // totalDebtBase (usd8) = (collateralUsd8 * ltBps * 1e18) / (10000 * TARGET_HF)
+        // — kalikan dulu, bagi belakangan, sama seperti rumus healthFactor di kontrak.
+        uint256 targetDebtUsd8 = (collateralUsd8 * BNB_LT_BPS * 1e18) / (10_000 * TARGET_HF);
+
+        // borrowAmount (mUSD, 18dp) = targetDebtUsd8 (8dp) * 1e18 / harga mUSD (8dp)
+        borrowAmount = (targetDebtUsd8 * 1e18) / uint256(USD_PRICE_8DP);
+    }
+
+    /// @dev Pemeriksaan runtime SEBELUM mencetak hasil: gagal keras (bukan sekadar
+    ///      mencetak angka yang salah) kalau HF posisi contoh meleset dari
+    ///      `TARGET_HF` di luar `HF_TOLERANCE` — mis. karena parameter di atas
+    ///      diubah tanpa menyesuaikan yang lain.
+    function _verifySampleHealthFactor(Deployed memory d, address deployer) internal view {
+        (,,,,, uint256 healthFactor) = d.pool.getUserAccountData(deployer);
+
+        uint256 diff = healthFactor > TARGET_HF ? healthFactor - TARGET_HF : TARGET_HF - healthFactor;
+
+        require(
+            diff <= HF_TOLERANCE,
+            string.concat(
+                "HF posisi contoh meleset dari target: got=",
+                vm.toString(healthFactor),
+                " expected~=",
+                vm.toString(TARGET_HF),
+                " tolerance=",
+                vm.toString(HF_TOLERANCE)
+            )
+        );
     }
 
     function _logResult(Deployed memory d, address deployer) internal view {
@@ -128,7 +182,7 @@ contract DeployMocks is Script {
 
         console.log("=== Posisi contoh ===");
         console.log("Supply mBNB (wei)     ", SAMPLE_COLLATERAL_BNB);
-        console.log("Borrow mUSD (wei)     ", SAMPLE_BORROW_USD);
+        console.log("Borrow mUSD (wei)     ", _computeSampleBorrowAmount());
 
         (
             uint256 totalCollateralBase,
