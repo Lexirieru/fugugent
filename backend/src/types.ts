@@ -181,10 +181,17 @@ export interface AgentListPage {
   source: AgentSource;
   /**
    * `false` bila sumber gagal ATAU membalas bentuk yang tidak dikenali.
-   * Daftar kosong yang sah tetap `healthy: true`.
+   * Daftar kosong yang sah tetap `healthy: true`, begitu juga jawaban
+   * "tidak ditemukan" — agent yang memang tidak ada bukan tanda upstream sakit.
    */
   healthy: boolean;
-  /** Alasan tidak sehat. `null` saat sehat. Tidak pernah memuat kredensial. */
+  /**
+   * Keterangan keadaan sumber. Tidak pernah memuat kredensial.
+   *
+   * Boleh terisi meski `healthy: true` — mis. `readFuguListings` yang melewati
+   * satu listing yang revert, atau detail yang tidak ditemukan. `healthy` adalah
+   * penentu; `reason` hanya menjelaskan.
+   */
   reason: string | null;
   /** ISO 8601 UTC — kapan halaman ini diambil. */
   fetchedAt: string;

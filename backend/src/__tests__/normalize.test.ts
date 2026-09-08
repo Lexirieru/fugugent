@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  MAX_ENVELOPE_DEPTH,
   normalizeAgent,
   normalizeAgentDetailBody,
   normalizeAgentListBody,
@@ -75,6 +76,41 @@ describe("unwrapEnvelope — tiga bentuk respons 8004scan yang terverifikasi", (
       expect(() => unwrapEnvelope(body)).not.toThrow();
       expect(unwrapEnvelope(body).kind).toBe("unknown");
     }
+  });
+
+  it("mengupas pembungkus bersarang sampai batas MAX_ENVELOPE_DEPTH", () => {
+    // Satu lapis dan dua lapis masih dikupas.
+    expect(unwrapEnvelope({ success: true, data: { items: [] } }).kind).toBe("list");
+    expect(
+      unwrapEnvelope({ success: true, data: { success: true, data: { items: [] } } }).kind,
+    ).toBe("list");
+    expect(MAX_ENVELOPE_DEPTH).toBe(2);
+  });
+
+  it("bersarang lebih dalam dari batas menjadi `unknown`, BUKAN lemparan", () => {
+    const overLimit = { success: true, data: { success: true, data: { success: true, data: { items: [] } } } };
+    const env = unwrapEnvelope(overLimit);
+    expect(env.kind).toBe("unknown");
+    if (env.kind !== "unknown") throw new Error("bentuk salah");
+    expect(env.message).toContain("bersarang");
+  });
+
+  it("20.000 lapis bersarang tidak menghabiskan call stack", () => {
+    // Regresi Important 2.4: sebelum ada penghitung kedalaman, bentuk ini
+    // melempar RangeError — melanggar aturan "bentuk tak dikenal tidak melempar".
+    let body: unknown = { items: [] };
+    for (let i = 0; i < 20_000; i++) body = { success: true, data: body };
+
+    expect(() => unwrapEnvelope(body)).not.toThrow();
+    expect(unwrapEnvelope(body).kind).toBe("unknown");
+
+    // Dan lewat jalur normalizer, tanpa jaring `try` milik pemanggil mana pun.
+    let page!: ReturnType<typeof normalizeAgentListBody>;
+    expect(() => {
+      page = normalizeAgentListBody(body, ctx);
+    }).not.toThrow();
+    expect(page.items).toEqual([]);
+    expect(page.healthy).toBe(false);
   });
 });
 
@@ -171,6 +207,28 @@ describe("normalizeAgent", () => {
     expect(normalizeAgent("bukan objek", ctx)).toBeNull();
   });
 
+  it("menolak token_id yang bukan bilangan bulat desimal — `id` adalah kunci primer", () => {
+    // Regresi Minor 2.5: nilai-nilai ini dulu lolos jadi `id` seperti "97:1.5"
+    // dan "97:1e+21", lalu menyebar ke kunci cache dan URL detail.
+    for (const tokenId of [1.5, 1e21, -3, Number.NaN, "1e21", "12.0", " ", "0x1f", "abc"]) {
+      expect(normalizeAgent({ token_id: tokenId, chain_id: 97 }, ctx)).toBeNull();
+    }
+  });
+
+  it("menerima token_id desimal sebagai string maupun angka bulat", () => {
+    expect(normalizeAgent({ token_id: "49637", chain_id: 56 }, ctx)!.id).toBe("56:49637");
+    expect(normalizeAgent({ token_id: 4242, chain_id: 97 }, ctx)!.id).toBe("97:4242");
+    expect(normalizeAgent({ token_id: 0, chain_id: 97 }, ctx)!.id).toBe("97:0");
+  });
+
+  it("jatuh ke agent_id komposit bila token_id ada tapi tidak sah", () => {
+    const rec = normalizeAgent(
+      { token_id: 1.5, agent_id: "97:0x8004A818BFB912233c491871b3d84c89A494BD9e:1675" },
+      ctx,
+    );
+    expect(rec!.tokenId).toBe("1675");
+  });
+
   it("tidak melempar saat tipe field upstream berubah jadi sampah", () => {
     let rec: ReturnType<typeof normalizeAgent>;
     expect(() => {
@@ -230,11 +288,39 @@ describe("normalizeAgentDetailBody", () => {
 
   it("bentuk error menghasilkan agent null dan sumber tidak sehat", () => {
     const res = normalizeAgentDetailBody(
-      { success: false, error: { code: "NOT_FOUND", message: "no such agent" } },
+      { success: false, error: { code: "DATABASE_ERROR", message: "transient" } },
       ctx,
     );
     expect(res.agent).toBeNull();
     expect(res.healthy).toBe(false);
+    expect(res.reason).toContain("DATABASE_ERROR");
+  });
+
+  it("daftar kosong yang sah berarti TIDAK DITEMUKAN, bukan sumber sakit", () => {
+    // Regresi Minor 2.6: agent yang memang tidak ada bukan tanda 8004scan
+    // tumbang. Menandainya `healthy:false` menyalakan lampu merah /api/health
+    // untuk pengguna yang sekadar salah ketik token id.
+    for (const body of [{ items: [] }, [], { success: true, data: { items: [] } }]) {
+      const res = normalizeAgentDetailBody(body, ctx);
+      expect(res.agent).toBeNull();
+      expect(res.healthy).toBe(true);
+      expect(res.reason).toContain("tidak ditemukan");
+    }
+  });
+
+  it("error NOT_FOUND dari upstream juga bukan tanda sumber sakit", () => {
+    const res = normalizeAgentDetailBody(
+      { success: false, error: { code: "NOT_FOUND", message: "no such agent" } },
+      ctx,
+    );
+    expect(res.agent).toBeNull();
+    expect(res.healthy).toBe(true);
     expect(res.reason).toContain("NOT_FOUND");
+  });
+
+  it("objek yang bukan agent tetap dianggap bentuk tak dikenal", () => {
+    const res = normalizeAgentDetailBody({ foo: "bar" }, ctx);
+    expect(res.agent).toBeNull();
+    expect(res.healthy).toBe(false);
   });
 });

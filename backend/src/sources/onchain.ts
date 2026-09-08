@@ -270,7 +270,12 @@ export function createOnchainSource(options: OnchainSourceOptions): OnchainSourc
         return unhealthyPage("onchain", describeFailure(err), fetchedAt, limit, offset);
       }
 
-      const total = Number(count);
+      // `listingCount()` adalah `uint256`. Di atas 2^53 `Number()` melenceng
+      // diam-diam, jadi angkanya dijepit alih-alih dibiarkan berbohong pelan.
+      // Realistis tidak akan tercapai; ini menjaga agar kalau kontraknya suatu
+      // saat berubah, yang muncul adalah angka yang jelas mustahil.
+      const total =
+        count > BigInt(Number.MAX_SAFE_INTEGER) ? Number.MAX_SAFE_INTEGER : Number(count);
       const base = {
         total,
         limit,

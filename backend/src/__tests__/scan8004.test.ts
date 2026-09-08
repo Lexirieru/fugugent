@@ -184,7 +184,10 @@ describe("createScan8004Source.getAgent", () => {
     expect(res.healthy).toBe(true);
   });
 
-  it("404 menghasilkan agent null tanpa melempar", async () => {
+  it("404 menghasilkan agent null TANPA menandai sumber sakit", async () => {
+    // Regresi Minor 2.6: agent yang memang tidak ada berarti upstream MENJAWAB
+    // dengan benar. Menandainya tidak sehat mendorong seluruh sistem ke
+    // fallback padahal 8004scan baik-baik saja.
     const { http } = fakeHttp(() => {
       throw new UpstreamError("upstream membalas status 404", 404, 1);
     });
@@ -192,7 +195,19 @@ describe("createScan8004Source.getAgent", () => {
 
     const res = await source.getAgent(97, 1675n);
     expect(res.agent).toBeNull();
+    expect(res.healthy).toBe(true);
+    expect(res.reason).toContain("tidak ditemukan");
+  });
+
+  it("500 tetap menandai sumber sakit", async () => {
+    const { http } = fakeHttp(() => {
+      throw new UpstreamError("upstream membalas status 500", 500, 3);
+    });
+    const source = createScan8004Source({ http, config: configWithoutKey(), now });
+
+    const res = await source.getAgent(97, "1675");
+    expect(res.agent).toBeNull();
     expect(res.healthy).toBe(false);
-    expect(res.reason).toContain("404");
+    expect(res.reason).toContain("500");
   });
 });

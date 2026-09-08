@@ -108,6 +108,17 @@ function asPublisherTier(value: unknown): PublisherTier | null {
     : null;
 }
 
+/**
+ * Batas kedalaman pengupasan pembungkus `{success,data}`.
+ *
+ * Bentuk nyata yang pernah dilihat hanya satu lapis. Batasnya dua supaya masih
+ * ada ruang bila upstream menambah satu pembungkus, tanpa memberi rekursi ini
+ * kedalaman tak terbatas: tanpa penghitung, `{success,data}` bersarang 20.000
+ * lapis melempar `RangeError` — melanggar aturan bahwa bentuk tak dikenal tidak
+ * boleh melempar. Batas ini **ditegakkan oleh `depth`**, bukan diasumsikan.
+ */
+export const MAX_ENVELOPE_DEPTH = 2;
+
 function describeShape(body: unknown): string {
   if (body === null) return "null";
   if (Array.isArray(body)) return "array";
@@ -125,8 +136,11 @@ function describeShape(body: unknown): string {
  * - `{ success: true, data }` → dikupas satu lapis lalu diproses ulang
  * - objek biasa (mis. respons detail agent) → `object`
  * - selain itu → `unknown`
+ *
+ * `depth` adalah parameter internal; pemanggil tidak perlu mengisinya.
+ * Bersarang melewati `MAX_ENVELOPE_DEPTH` menjadi `unknown`, bukan lemparan.
  */
-export function unwrapEnvelope(body: unknown): UpstreamEnvelope {
+export function unwrapEnvelope(body: unknown, depth = 0): UpstreamEnvelope {
   if (Array.isArray(body)) {
     return { kind: "list", items: body, total: body.length, limit: null, offset: null };
   }
@@ -165,15 +179,48 @@ export function unwrapEnvelope(body: unknown): UpstreamEnvelope {
     if (body.data === undefined) {
       return { kind: "unknown", message: "bentuk respons tak dikenal: success=true tanpa data" };
     }
-    // Satu lapis saja — `{success,data:{success,data}}` tidak pernah terjadi
-    // dan rekursi tanpa batas bukan hal yang ingin kita undang dari upstream.
-    const inner = unwrapEnvelope(body.data);
+    if (depth >= MAX_ENVELOPE_DEPTH) {
+      // Bukan lemparan: pembungkus yang bersarang terlalu dalam adalah
+      // "bentuk tak dikenal" seperti bentuk aneh lainnya, dan diperlakukan sama.
+      return {
+        kind: "unknown",
+        message: `pembungkus {success,data} bersarang lebih dari ${MAX_ENVELOPE_DEPTH} lapis`,
+      };
+    }
+    const inner = unwrapEnvelope(body.data, depth + 1);
     return inner.kind === "unknown"
-      ? { kind: "unknown", message: `bentuk respons tak dikenal di dalam data: ${describeShape(body.data)}` }
+      ? { kind: "unknown", message: `di dalam {success,data}: ${inner.message}` }
       : inner;
   }
 
   return { kind: "object", value: body };
+}
+
+/** Bilangan bulat desimal non-negatif — bentuk satu-satunya yang sah untuk `tokenId`. */
+const DECIMAL_UINT = /^\d+$/;
+
+/**
+ * Validasi `token_id` menjadi string desimal.
+ *
+ * Ini bukan kerapian: `tokenId` masuk ke `id` yang menjadi kunci primer cache
+ * dan potongan URL halaman detail. Nilai seperti `1.5` atau `1e21` dulu lolos
+ * dan menghasilkan `"97:1.5"` / `"97:1e+21"` — bentuk rusak yang menyebar ke DB
+ * dan ke URL. Lebih baik agent itu dilewati daripada kunci primernya cacat.
+ */
+function asTokenId(value: unknown): string | null {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return DECIMAL_UINT.test(trimmed) ? trimmed : null;
+  }
+  if (typeof value === "number") {
+    // `Number.isSafeInteger` menolak 1e21 dan 1.5 sekaligus; `String()` atas
+    // angka di luar rentang aman menghasilkan notasi eksponen.
+    return Number.isSafeInteger(value) && value >= 0 ? String(value) : null;
+  }
+  if (typeof value === "bigint") {
+    return value >= 0n ? value.toString() : null;
+  }
+  return null;
 }
 
 /** Ambil `token_id` dari id komposit 8004scan `"56:0x8004…:49637"`. */
@@ -185,6 +232,21 @@ function parseCompositeAgentId(agentId: string): { chainId: number | null; token
   return { chainId: asFiniteNumber(parts[0]), tokenId };
 }
 
+/**
+ * Kumpulkan OASF skill/domain dari beberapa lokasi yang mungkin.
+ *
+ * **Apa yang sudah diketahui (panggilan live oleh implementer Task 4):**
+ * `oasf_skills`/`oasf_domains` ada di OpenAPI bertipe `string[] | null`, tapi
+ * **hanya di skema `MCPAgentDetail`** — bukan di body `GET /agents` maupun di
+ * body detail `GET /agents/{chain}/{token}`. Artinya jalur yang benar-benar
+ * berbuah pada respons yang kita pakai adalah
+ * `raw_metadata.offchain_content.skills`, dan **daftar tidak membawa OASF sama
+ * sekali**. Task 4 karena itu tidak boleh menggantungkan lapis OASF pada hasil
+ * `listAgents()`.
+ *
+ * Nama-nama lain tetap disapu: murah, dan menutup kemungkinan upstream mulai
+ * mengirimkannya di endpoint yang kita pakai.
+ */
 function collectOasf(raw: Record<string, unknown>, keys: string[]): string[] {
   const out: string[] = [];
   for (const key of keys) out.push(...asStringList(raw[key]));
@@ -209,11 +271,7 @@ export function normalizeAgent(raw: unknown, ctx: NormalizeContext): AgentRecord
   const agentId = asNonEmptyString(raw.agent_id);
   const composite = agentId !== null ? parseCompositeAgentId(agentId) : null;
 
-  let tokenId = asNonEmptyString(raw.token_id);
-  if (tokenId === null && typeof raw.token_id === "number" && Number.isFinite(raw.token_id)) {
-    tokenId = String(raw.token_id);
-  }
-  tokenId ??= composite?.tokenId ?? null;
+  const tokenId = asTokenId(raw.token_id) ?? composite?.tokenId ?? null;
   if (tokenId === null) return null;
 
   const chainId = asFiniteNumber(raw.chain_id) ?? composite?.chainId ?? ctx.chainId;
@@ -326,17 +384,37 @@ export function normalizeAgentListBody(body: unknown, ctx: NormalizeContext): Ag
   };
 }
 
+/**
+ * Kode error upstream yang berarti "agent itu memang tidak ada", bukan
+ * "upstream sedang sakit". Membedakan keduanya penting: `healthy:false` mengalir
+ * ke `recordSourceHealth` dan menyalakan lampu merah `/api/health` — dan
+ * mendorong Task 5 turun ke fallback — padahal 8004scan menjawab dengan benar.
+ */
+const NOT_FOUND_CODES: readonly string[] = ["NOT_FOUND", "AGENT_NOT_FOUND", "NOT_FOUND_ERROR"];
+
 /** Ubah body respons detail menjadi `AgentDetailResult`. **Tidak pernah melempar.** */
 export function normalizeAgentDetailBody(body: unknown, ctx: NormalizeContext): AgentDetailResult {
   const base = { source: ctx.source, fetchedAt: ctx.fetchedAt };
   const envelope = unwrapEnvelope(body);
 
   if (envelope.kind === "error") {
-    return { ...base, agent: null, healthy: false, reason: `${envelope.code}: ${envelope.message}` };
+    const notFound = NOT_FOUND_CODES.includes(envelope.code.toUpperCase());
+    return {
+      ...base,
+      agent: null,
+      // "tidak ditemukan" adalah jawaban yang sah, jadi sumbernya tetap sehat.
+      healthy: notFound,
+      reason: `${envelope.code}: ${envelope.message}`,
+    };
   }
 
   if (envelope.kind === "unknown") {
     return { ...base, agent: null, healthy: false, reason: envelope.message };
+  }
+
+  // Daftar kosong yang sah dari endpoint detail = agent tidak ada. Bukan cacat.
+  if (envelope.kind === "list" && envelope.items.length === 0) {
+    return { ...base, agent: null, healthy: true, reason: "agent tidak ditemukan" };
   }
 
   const candidate = envelope.kind === "object" ? envelope.value : envelope.items[0];

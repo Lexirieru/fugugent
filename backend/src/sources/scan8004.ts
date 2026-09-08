@@ -24,7 +24,12 @@
  */
 
 import type { FugugentConfig } from "../config.js";
-import { withApiKey, type HttpClient, type HttpGetOptions } from "../http/client.js";
+import {
+  UpstreamError,
+  withApiKey,
+  type HttpClient,
+  type HttpGetOptions,
+} from "../http/client.js";
 import {
   unhealthyPage,
   type AgentDetailResult,
@@ -317,11 +322,17 @@ export function createScan8004Source(options: Scan8004SourceOptions): Scan8004So
         const result = await http.get<unknown>(url, requestOptions());
         return normalizeAgentDetailBody(result.data, ctx);
       } catch (err) {
+        // HTTP 404 berarti upstream MENJAWAB dengan benar: agent itu tidak ada.
+        // Menandainya tidak sehat akan menyalakan lampu merah `/api/health` dan
+        // mendorong seluruh sistem ke fallback hanya karena seseorang salah
+        // mengetik token id. Kegagalan sungguhan (5xx, timeout, breaker) tetap
+        // ditandai tidak sehat.
+        const notFound = err instanceof UpstreamError && err.status === 404;
         return {
           agent: null,
           source: "scan8004",
-          healthy: false,
-          reason: describeFailure(err),
+          healthy: notFound,
+          reason: notFound ? `agent tidak ditemukan (HTTP 404)` : describeFailure(err),
           fetchedAt: ctx.fetchedAt,
         };
       }
