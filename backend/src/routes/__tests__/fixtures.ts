@@ -11,6 +11,7 @@ import type {
   GetAgentsOptions,
   ServiceHealth,
 } from "../../service/agents.js";
+import type { ListedAgentRecord } from "../../service/metadata.js";
 import type { AgentRecord, AgentSource, Category } from "../../types.js";
 
 export const FIXED_NOW = "2026-09-08T12:00:00.000Z";
@@ -19,7 +20,7 @@ export const FIXED_NOW = "2026-09-08T12:00:00.000Z";
  * Satu `AgentRecord` lengkap — **dengan `fuguListing` berisi `bigint`**.
  * Justru bagian itu yang harus dibuktikan tidak pernah bocor mentah ke kawat.
  */
-export function makeRecord(overrides: Partial<AgentRecord> = {}): AgentRecord {
+export function makeRecord(overrides: Partial<ListedAgentRecord> = {}): ListedAgentRecord {
   return {
     id: "97:41",
     chainId: 97,

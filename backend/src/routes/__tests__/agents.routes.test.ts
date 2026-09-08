@@ -367,6 +367,141 @@ describe("GET /api/agents — provenansi campuran", () => {
   });
 });
 
+/**
+ * `onchainExecution` — the only field that separates an agent which has actually
+ * executed on chain from three that have a decision engine and a backtest.
+ *
+ * Getting this wrong is not cosmetic. Four cards that look equivalent, $0.05
+ * paid, and then an agent that cannot act is exactly the surprise this product
+ * argues it does not inflict. So the wire must carry three states and must never
+ * let the third one be mistaken for `false`.
+ */
+describe("onchainExecution — three states, and the third is not false", () => {
+  function pageWith(record: ReturnType<typeof makeRecord>) {
+    return createApp({
+      service: fakeService({ list: async () => makePage({ items: [record] }) }),
+    });
+  }
+
+  it("forwards true for an agent that has acted on chain", async () => {
+    const app = pageWith(makeRecord({ name: "Fugu Guardian", onchainExecution: true }));
+    const body = await json(await get(app, "/api/agents?category=HEALTH_FACTOR"));
+
+    expect(body.items[0].onchainExecution).toBe(true);
+  });
+
+  it("forwards false — an explicit denial, never dropped", async () => {
+    const app = pageWith(makeRecord({ name: "Fugu Grid", onchainExecution: false }));
+    const body = await json(await get(app, "/api/agents?category=GRID"));
+
+    expect(body.items[0].onchainExecution).toBe(false);
+    // Not absent: a missing key is what a client would coerce to false, which
+    // would make an unknown look like a declared "does not act on chain".
+    expect("onchainExecution" in body.items[0]).toBe(true);
+  });
+
+  it("reports unknown as null, not as false, when metadata was unreadable", async () => {
+    // The service promotes `onchainExecution` only when the metadata declared it,
+    // so an unreadable document leaves the property `undefined` — which vanishes
+    // from JSON entirely unless it is normalised here.
+    const app = createApp({
+      service: fakeService({
+        list: async () =>
+          makePage({
+            items: [makeRecord({ name: "Agent #8006" })],
+            firstParty: {
+              count: 1,
+              healthy: true,
+              reason: "1 listing(s) with unreadable metadata",
+              ageSeconds: 4,
+              unreadableMetadata: 1,
+            },
+          }),
+      }),
+    });
+    const body = await json(await get(app, "/api/agents?category=GRID"));
+
+    expect(body.items[0].onchainExecution).toBeNull();
+    expect(body.items[0].onchainExecution).not.toBe(false);
+    expect("onchainExecution" in body.items[0]).toBe(true);
+    // And the count of unreadable documents is right there to explain why.
+    expect(body.firstParty.unreadableMetadata).toBe(1);
+  });
+
+  /**
+   * The merged path builds its own slice, so it needs its own proof — including
+   * the unknown state, which is the only one that can silently disappear.
+   */
+  it("survives the merged path too, unknown included", async () => {
+    const app = createApp({
+      service: fakeService({
+        list: async (category) =>
+          makePage({
+            items: [
+              makeRecord({
+                id: `97:${category}`,
+                tokenId: category,
+                // YIELD stands in for a listing whose metadata could not be read.
+                ...(category === "YIELD"
+                  ? {}
+                  : { onchainExecution: category === "HEALTH_FACTOR" }),
+              }),
+            ],
+          }),
+      }),
+    });
+    const body = await json(await get(app, "/api/agents?limit=10"));
+
+    const states = Object.fromEntries(
+      body.items.map((i: { tokenId: string; onchainExecution: boolean | null }) => [
+        i.tokenId,
+        i.onchainExecution,
+      ]),
+    );
+    expect(states).toEqual({
+      REBALANCING: false,
+      GRID: false,
+      YIELD: null,
+      HEALTH_FACTOR: true,
+    });
+    // Every item states it, none leaves it to be inferred.
+    for (const item of body.items) expect("onchainExecution" in item).toBe(true);
+    for (const item of body.items) expect("listingMetadata" in item).toBe(true);
+  });
+
+  it("forwards listingMetadata, and null when there is none", async () => {
+    const metadata = {
+      name: "Fugu Guardian",
+      description: "repays debt before liquidation",
+      onchainExecution: true,
+      limits: "testnet only",
+      verify: "cast call ...",
+      declaredAgentWallet: null,
+      agentWalletMatchesListing: null,
+    };
+    const withMeta = pageWith(
+      makeRecord({ onchainExecution: true, listingMetadata: metadata }),
+    );
+    const withoutMeta = pageWith(makeRecord({}));
+
+    expect((await json(await get(withMeta, "/api/agents?category=GRID"))).items[0].listingMetadata)
+      .toEqual(metadata);
+    expect(
+      (await json(await get(withoutMeta, "/api/agents?category=GRID"))).items[0].listingMetadata,
+    ).toBeNull();
+  });
+
+  it("money is still serialised through the one conversion point", async () => {
+    const app = pageWith(makeRecord({ onchainExecution: true }));
+    const body = await json(await get(app, "/api/agents?category=GRID"));
+
+    expect(body.items[0].fuguListing.priceUsd8PerPeriod).toBe("12345678");
+    // It is NOT copied into the on-chain struct: `fuguListing` mirrors what the
+    // chain asserts, and this claim comes from the metadata document instead.
+    expect("onchainExecution" in body.items[0].fuguListing).toBe(false);
+  });
+});
+
 describe("GET /api/agents — parameter cacat", () => {
   const app = createApp({ service: fakeService() });
 
@@ -459,6 +594,27 @@ describe("GET /api/agents/:id", () => {
     expect(body.agent.fuguListing.priceUsd8PerPeriod).toBe("12345678");
     expect(body.source).toBe("scan8004");
     expect(body.ageSeconds).toBe(60);
+  });
+
+  it.each([
+    ["true", true, true],
+    ["false", false, false],
+    ["tidak diketahui", undefined, null],
+  ] as const)("detail meneruskan onchainExecution %s", async (_label, promoted, expected) => {
+    const app = createApp({
+      service: fakeService({
+        detail: async () =>
+          makeDetail({
+            agent: makeRecord(
+              promoted === undefined ? {} : { onchainExecution: promoted },
+            ),
+          }),
+      }),
+    });
+    const body = await json(await get(app, "/api/agents/97:41"));
+
+    expect(body.agent.onchainExecution).toBe(expected);
+    expect("onchainExecution" in body.agent).toBe(true);
   });
 
   it("meneruskan firstParty pada detail", async () => {

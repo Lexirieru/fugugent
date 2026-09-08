@@ -39,6 +39,7 @@ import {
   type FallbackOutcome,
   type FirstPartyReport,
 } from "../service/agents.js";
+import type { ListedAgentRecord, ListingMetadata } from "../service/metadata.js";
 import { CATEGORIES, type AgentRecord, type AgentSource, type Category } from "../types.js";
 import { parseAgentId, parseCategory, parseLimit, parseOffset, QueryError } from "./query.js";
 
@@ -98,6 +99,22 @@ export function censusOf(items: readonly AgentRecord[]): Partial<Record<AgentSou
   return census;
 }
 
+/**
+ * `AgentRecord` to its wire form.
+ *
+ * Money still goes through `serializeAgentRecord` — the single conversion point
+ * — and this only pins down the two metadata fields the service attaches as
+ * optional properties, so neither can vanish from JSON and be read as a fact.
+ */
+export function toWireRecord(record: AgentRecord): AgentRecordWire {
+  const listed = record as ListedAgentRecord;
+  return {
+    ...serializeAgentRecord(record),
+    onchainExecution: listed.onchainExecution ?? null,
+    listingMetadata: listed.listingMetadata ?? null,
+  };
+}
+
 /** Pesan kegagalan yang aman untuk klien — disunting, tanpa stack trace. */
 function describe(err: unknown): string {
   if (err instanceof Error) {
@@ -111,9 +128,45 @@ function describe(err: unknown): string {
 // Bentuk kawat
 // ---------------------------------------------------------------------------
 
+/**
+ * One agent on the wire.
+ *
+ * `serializeAgentRecord` is still the only place money is converted. This adds
+ * the one field the storefront cannot be allowed to miss, in a shape that has no
+ * silent third meaning.
+ */
+export interface AgentRecordWire extends AgentRecordJson {
+  /**
+   * Whether this agent has ever actually acted on chain — **three states, and
+   * the third is not `false`**.
+   *
+   * - `true`  — it has executed on chain through its session key.
+   * - `false` — the listing metadata explicitly says it has not. Three of our
+   *   four agents are deterministic decision engines that have never sent a
+   *   transaction, and this is the field that admits it.
+   * - `null`  — **unknown**: the listing's metadata could not be read at all
+   *   (counted by `firstParty.unreadableMetadata`) or declared nothing.
+   *
+   * The service promotes it as an *optional* property, so an unknown value
+   * arrives as `undefined` and disappears from JSON entirely — and a client that
+   * reads a missing key as falsy would show "does not act on chain" as a fact we
+   * never established. Normalising to an explicit `null` here is the same rule
+   * this backend already enforces for 404 versus "cannot be sure": absence of
+   * evidence is not evidence, and it must be spelled out rather than implied.
+   *
+   * It lives on the record, not inside `fuguListing`: `fuguListing` mirrors the
+   * on-chain `Listing` struct, while this comes from the metadata document that
+   * struct's `metadataURI` points at. Copying it into the listing would claim the
+   * chain asserts something it does not.
+   */
+  onchainExecution: boolean | null;
+  /** Everything the listing metadata declared. `null` when there was none. */
+  listingMetadata: ListingMetadata | null;
+}
+
 /** Amplop daftar. Sama dengan `AgentServicePage`, `items` sudah terserialisasi. */
 export interface AgentListResponse {
-  items: AgentRecordJson[];
+  items: AgentRecordWire[];
   total: number;
   limit: number;
   offset: number;
@@ -158,7 +211,7 @@ export interface AgentListResponse {
 }
 
 export interface AgentDetailResponse {
-  agent: AgentRecordJson | null;
+  agent: AgentRecordWire | null;
   source: AgentSource;
   healthy: boolean;
   reason: string | null;
@@ -201,7 +254,7 @@ export interface CategoryListResponse {
 
 function toListResponse(page: AgentServicePage, category: Category | null): AgentListResponse {
   return {
-    items: page.items.map(serializeAgentRecord),
+    items: page.items.map(toWireRecord),
     total: page.total,
     limit: page.limit,
     offset: page.offset,
@@ -222,7 +275,7 @@ function toListResponse(page: AgentServicePage, category: Category | null): Agen
 
 function toDetailResponse(detail: AgentServiceDetail): AgentDetailResponse {
   return {
-    agent: detail.agent === null ? null : serializeAgentRecord(detail.agent),
+    agent: detail.agent === null ? null : toWireRecord(detail.agent),
     source: detail.source,
     healthy: detail.healthy,
     reason: detail.reason === null ? null : redact(detail.reason),
@@ -311,7 +364,7 @@ function mergePages(
   const served = merged.slice(offset, offset + limit);
 
   return {
-    items: served.map(serializeAgentRecord),
+    items: served.map(toWireRecord),
     itemSources: censusOf(served),
     firstParty: mergeFirstParty(pages, served),
     /**
