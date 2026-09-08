@@ -182,7 +182,8 @@ export interface ServiceHealth {
   healthy: boolean;
   /** 8004scan diketahui tidak sehat — marketplace berjalan dari jaring pengaman. */
   degraded: boolean;
-  sources: SourceHealth[];
+  /** Tiap baris membawa umur observasinya; lihat {@link ObservedSourceHealth}. */
+  sources: ObservedSourceHealth[];
   checkedAt: string;
 }
 
@@ -191,6 +192,71 @@ export interface ServiceHealth {
  * menentukan `ServiceHealth.healthy`. Seed sengaja tidak termasuk.
  */
 export const LIVE_SOURCES: readonly AgentSource[] = ["scan8004", "cache", "onchain"];
+
+/**
+ * Satu observasi kesehatan, **beserta umurnya**.
+ *
+ * Field umur sengaja opsional agar `SourceHealth` polos tetap bisa dipakai di
+ * mana pun `ServiceHealth` dibentuk (mis. fixture rute). Layanan ini selalu
+ * mengisi keduanya, dan `reason` juga mengeja umurnya dalam kalimat — supaya
+ * pembaca yang mengabaikan field opsional pun tidak bisa salah membaca.
+ */
+export interface ObservedSourceHealth extends SourceHealth {
+  /** Umur observasi dalam detik saat `/api/health` dipanggil. */
+  ageSeconds?: number | null;
+  /** `true` bila observasinya melewati {@link DEFAULT_HEALTH_TTL_SECONDS}. */
+  stale?: boolean;
+}
+
+/**
+ * Berapa lama sebuah observasi kesehatan masih boleh dipercaya.
+ *
+ * 30 detik: cukup panjang agar halaman yang ramai tidak terus-menerus
+ * melaporkan "belum diperiksa", cukup pendek agar jendela antara sebuah sumber
+ * mati dan `/api/health` mengakuinya tidak pernah selebar satu tarikan napas
+ * juri. 8004scan dan pembacaan on-chain sengaja TIDAK diprobe di endpoint ini —
+ * probe jaringan di jalur `/api/health` adalah cara paling pasti membuat
+ * endpoint kesehatan ikut menggantung saat upstream menggantung. Untuk keduanya
+ * kita memakai kedaluwarsa; untuk cache kita punya probe gratis.
+ */
+export const DEFAULT_HEALTH_TTL_SECONDS = 30;
+
+/**
+ * Beri umur pada sebuah observasi, dan **cabut klaim sehatnya bila kedaluwarsa**.
+ *
+ * Observasi basi yang tetap berkata "sehat" adalah bentuk kebohongan yang paling
+ * halus di endpoint ini: ia benar pada saat dicatat dan salah pada saat dibaca.
+ * Yang dilaporkan setelah kedaluwarsa bukan "rusak" melainkan "belum diperiksa
+ * ulang" — dan status terakhir yang diketahui tetap disebutkan, supaya tidak ada
+ * informasi yang hilang.
+ */
+export function observe(
+  health: SourceHealth,
+  at: Date,
+  ttlSeconds: number,
+): ObservedSourceHealth {
+  const parsed = Date.parse(health.checkedAt);
+  if (Number.isNaN(parsed)) {
+    return { ...health, ageSeconds: null, stale: true };
+  }
+  const ageSeconds = Math.max(0, Math.floor((at.getTime() - parsed) / 1000));
+  if (ageSeconds <= ttlSeconds) return { ...health, ageSeconds, stale: false };
+
+  const last = health.healthy ? "sehat" : "tidak sehat";
+  return {
+    source: health.source,
+    // Kedaluwarsa tidak boleh mengklaim sehat. Tidak adanya pemeriksaan baru
+    // bukan bukti bahwa sumbernya masih hidup.
+    healthy: false,
+    reason:
+      `observasi berumur ${ageSeconds} dtk, melewati ambang ${ttlSeconds} dtk — ` +
+      `belum diperiksa ulang (status terakhir: ${last}` +
+      `${health.reason ? `, ${health.reason}` : ""})`,
+    checkedAt: health.checkedAt,
+    ageSeconds,
+    stale: true,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Port
@@ -267,6 +333,61 @@ export const CATEGORY_SEMANTIC_QUERIES: Readonly<Record<Category, string>> = {
     "health factor monitor that protects lending positions from liquidation by repaying debt",
 };
 
+/**
+ * Anggaran waktu untuk tingkat 1–3 pada satu permintaan.
+ *
+ * Ini menjawab temuan compose: `/api/agents` memakan **31 detik** saat upstream
+ * menggantung (timeout 10 dtk x 3 percobaan x 4 kategori). Produk yang menjual
+ * "marketplace tidak pernah kosong" tidak boleh berarti "tidak pernah kosong,
+ * setelah tiga puluh satu detik" — juri menutup tab sebelum buktinya muncul.
+ *
+ * 6 detik dipilih dengan dua batas: **di atas** balasan 8004scan yang sehat
+ * walau lambat (upstream yang bekerja tidak boleh ditinggalkan), dan **di bawah**
+ * satu timeout percobaan klien HTTP (10 dtk), sehingga rantai retry tidak pernah
+ * sempat dibayar oleh pengguna. Yang menunggu bukan lagi pengguna melainkan
+ * jaring pengaman, yang sudah siap.
+ *
+ * Anggaran ini berlaku **hanya untuk tingkat 1**. Anggaran bersama untuk keempat
+ * tingkat sempat dicoba dan salah arah: tingkat 1 yang menggantung menghabiskan
+ * seluruh jatah, lalu cache dan on-chain ditolak sebelum sempat menjawab — jaring
+ * pengaman kelaparan justru pada saat ia paling dibutuhkan. Tingkat 2 dan 3 punya
+ * anggarannya sendiri, jauh lebih kecil karena keduanya lokal.
+ *
+ * Catatan jujur: permintaan yang ditinggalkan **tidak dibatalkan** — sumber di
+ * `src/sources/` tidak menerima `AbortSignal`. Ia tetap berjalan di latar dan
+ * kegagalannya nanti justru berguna: ia memberi makan circuit breaker klien HTTP.
+ */
+export const DEFAULT_BUDGET_MS = 6_000;
+
+/**
+ * Berapa lama tingkat 1 dilewati setelah ia gagal sekali.
+ *
+ * Tanpa ini, satu tampilan halaman marketplace (empat kategori) membayar
+ * anggaran waktu **empat kali**. Circuit breaker klien HTTP tidak menolong di
+ * sini: ambangnya 5 panggilan `get()` gagal berturut-turut, sementara satu
+ * render hanya melakukan empat — ia baru membuka setelah pengguna terlanjur
+ * menunggu. Breaker klien itu melindungi *upstream* dari kita; gerbang di sini
+ * melindungi *pengguna* dari menunggu, dan hanya lapisan ini yang tahu bahwa
+ * jawaban pengganti sudah tersedia. Karena itu ambangnya satu kegagalan, bukan
+ * lima: begitu kita tahu ada jaring, mencoba lagi tiga kali hanya membakar waktu
+ * orang lain.
+ *
+ * Setelah cooldown lewat, **satu** permintaan berikutnya boleh mengintai
+ * upstream lagi (half-open), sama seperti pola klien HTTP.
+ */
+export const DEFAULT_UPSTREAM_COOLDOWN_MS = 30_000;
+
+/**
+ * Anggaran waktu untuk tingkat 2 (Postgres) dan tingkat 3 (RPC), masing-masing.
+ *
+ * Jauh lebih kecil daripada anggaran upstream karena keduanya seharusnya
+ * menjawab dalam milidetik: Postgres satu kueri terindeks, RPC beberapa
+ * `eth_call`. Kalau salah satunya butuh lebih dari 2 detik, ia sedang bermasalah
+ * dan menunggunya lebih lama tidak akan mengubah itu — sementara tingkat di
+ * bawahnya siap menjawab seketika.
+ */
+export const DEFAULT_LOCAL_BUDGET_MS = 2_000;
+
 export const DEFAULT_PAGE_LIMIT = 20;
 export const MAX_PAGE_LIMIT = 100;
 /** Panjang maksimum sebuah `reason`. Log bukan tempat menumpuk stack trace viem. */
@@ -292,6 +413,38 @@ export function redact(message: string): string {
   let out = message;
   for (const [pattern, replacement] of SECRET_PATTERNS) out = out.replace(pattern, replacement);
   return out.length > MAX_REASON_LENGTH ? `${out.slice(0, MAX_REASON_LENGTH - 3)}...` : out;
+}
+
+/** Ditolak karena anggaran waktu permintaan habis, bukan karena sumbernya menjawab salah. */
+export class BudgetExceeded extends Error {
+  readonly waitedMs: number;
+  constructor(source: AgentSource, waitedMs: number) {
+    super(`${source} melewati anggaran waktu ${waitedMs} ms`);
+    this.name = "BudgetExceeded";
+    this.waitedMs = waitedMs;
+  }
+}
+
+/**
+ * Jalankan sebuah tingkat dengan batas waktu.
+ *
+ * Bila batasnya lewat, yang dikembalikan adalah penolakan — **bukan pembatalan**:
+ * `work` tetap berjalan di latar karena sumber di `src/sources/` tidak menerima
+ * `AbortSignal`. Itu disengaja dan tidak disembunyikan: yang ingin kita bebaskan
+ * adalah pengguna dari menunggu, dan kegagalan permintaan latar itu nanti justru
+ * memberi makan circuit breaker klien HTTP.
+ */
+function withDeadline<T>(work: Promise<T>, ms: number, source: AgentSource): Promise<T> {
+  if (ms <= 0) return Promise.reject(new BudgetExceeded(source, 0));
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expiry = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new BudgetExceeded(source, ms)), ms);
+  });
+  // `work` yang menolak setelah race selesai tidak boleh jadi unhandled rejection.
+  work.catch(() => undefined);
+  return Promise.race([work, expiry]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer);
+  }) as Promise<T>;
 }
 
 /** Pesan kegagalan yang aman untuk `reason` — juga saat yang dilempar bukan `Error`. */
@@ -328,6 +481,14 @@ export interface AgentServiceDeps {
   onchainScanLimit?: number;
   /** Tulis hasil tiap tingkat ke tabel `source_health`. Bawaan `true`. */
   persistHealth?: boolean;
+  /** Umur maksimum observasi kesehatan yang masih boleh mengklaim sehat. */
+  healthTtlSeconds?: number;
+  /** Anggaran waktu tingkat 1 (upstream). Seed tidak pernah dibatasi. */
+  budgetMs?: number;
+  /** Anggaran waktu tingkat 2 dan 3, masing-masing. */
+  localBudgetMs?: number;
+  /** Lama tingkat 1 dilewati setelah gagal. */
+  upstreamCooldownMs?: number;
 }
 
 export interface AgentService {
@@ -391,6 +552,39 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
   const seed = deps.seed ?? createSeedSource({ now });
   const onchainScanLimit = deps.onchainScanLimit ?? ONCHAIN_DEFAULT_LIMIT;
   const persistHealth = deps.persistHealth ?? true;
+  const healthTtlSeconds = deps.healthTtlSeconds ?? DEFAULT_HEALTH_TTL_SECONDS;
+  const budgetMs = deps.budgetMs ?? DEFAULT_BUDGET_MS;
+  const localBudgetMs = deps.localBudgetMs ?? DEFAULT_LOCAL_BUDGET_MS;
+  const upstreamCooldownMs = deps.upstreamCooldownMs ?? DEFAULT_UPSTREAM_COOLDOWN_MS;
+
+  /**
+   * Sampai kapan tingkat 1 dilewati. `0` berarti tidak sedang dilewati.
+   * State ini hidup di instance layanan, jadi ia dibagi oleh keempat kategori
+   * dalam satu render halaman — itulah yang membuat 31 detik jadi satu anggaran.
+   */
+  let upstreamBlockedUntil = 0;
+
+  /**
+   * Buka atau tutup gerbang tingkat 1 berdasarkan hasilnya.
+   *
+   * `empty` dihitung sebagai **berhasil**: upstream menjawab, kebetulan tidak
+   * ada isinya (kasus `DEFAULT_SPAM_FILTERS` di chain 97). Memperlakukannya
+   * sebagai kegagalan akan menutup gerbang terhadap sumber yang sebenarnya
+   * bekerja — dan di testnet, di mana kosong adalah jawaban yang lazim, itu
+   * berarti marketplace praktis berhenti bertanya pada 8004scan sama sekali.
+   *
+   * Catatan jujur soal cabang pertama: saat kode ini berjalan, gerbangnya sudah
+   * pasti terbuka (kalau tertutup, tingkat 1 dilewati dan fungsi ini tidak
+   * dipanggil), jadi menyetel ulang ke `0` merapikan state tanpa mengubah
+   * perilaku yang bisa diamati. Yang benar-benar menggigit adalah cabang kedua.
+   */
+  function gateUpstream(outcome: FallbackOutcome, at: Date): void {
+    if (outcome === "ok" || outcome === "empty") {
+      upstreamBlockedUntil = 0;
+    } else if (outcome === "unhealthy" || outcome === "threw") {
+      upstreamBlockedUntil = at.getTime() + upstreamCooldownMs;
+    }
+  }
 
   /**
    * Status terakhir tiap sumber **di proses ini**. Selalu lebih baru daripada
@@ -452,6 +646,24 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       return attempt;
     }
 
+    /** `step` untuk tingkat 1, yang sekalian membuka/menutup gerbang upstream. */
+    function stepUpstream(attempt: FallbackAttempt): void {
+      step(attempt);
+      gateUpstream(attempt.outcome, at);
+    }
+
+    /** Bedakan "anggaran waktu habis" dari "sumbernya menjawab salah". */
+    function failure(source: AgentSource, err: unknown): FallbackAttempt {
+      return err instanceof BudgetExceeded
+        ? {
+            source,
+            outcome: "unhealthy",
+            reason: `melewati anggaran waktu ${err.waitedMs} ms — turun ke tingkat berikutnya`,
+            items: 0,
+          }
+        : { source, outcome: "threw", reason: describeThrow(err), items: 0 };
+    }
+
     function finish(
       source: AgentSource,
       items: AgentRecord[],
@@ -484,15 +696,32 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
     }
 
     // --- Tingkat 1: 8004scan -------------------------------------------------
-    try {
-      const page = await deps.scan8004.semanticSearch(CATEGORY_SEMANTIC_QUERIES[category], {
-        chainId,
-        limit,
-        offset,
+    if (at.getTime() < upstreamBlockedUntil) {
+      // Gerbang tingkat layanan: 8004scan baru saja gagal, dan jaring pengaman
+      // sudah siap. Mencoba lagi hanya membakar waktu pengguna — inilah yang
+      // mengubah 4 x anggaran (satu per kategori) jadi satu anggaran per render.
+      step({
+        source: "scan8004",
+        outcome: "unhealthy",
+        reason:
+          `dilewati: 8004scan gagal barusan, gerbang tertutup ` +
+          `${Math.ceil((upstreamBlockedUntil - at.getTime()) / 1000)} dtk lagi`,
+        items: 0,
       });
+    } else
+    try {
+      const page = await withDeadline(
+        deps.scan8004.semanticSearch(CATEGORY_SEMANTIC_QUERIES[category], {
+          chainId,
+          limit,
+          offset,
+        }),
+        budgetMs,
+        "scan8004",
+      );
 
       if (!page.healthy) {
-        step({
+        stepUpstream({
           source: "scan8004",
           outcome: "unhealthy",
           reason: redact(page.reason ?? "8004scan tidak sehat tanpa alasan"),
@@ -511,7 +740,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
         if (matching.length === 0) {
           // Termasuk kasus `DEFAULT_SPAM_FILTERS` mengosongkan chain 97:
           // jawaban sah dari upstream sehat, dan justru sebab tingkat 3 & 4 ada.
-          step({
+          stepUpstream({
             source: "scan8004",
             outcome: "empty",
             reason: null,
@@ -519,7 +748,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
             upstreamTotal: page.total,
           });
         } else {
-          step({
+          stepUpstream({
             source: "scan8004",
             outcome: "ok",
             reason: null,
@@ -539,7 +768,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       }
     } catch (err) {
       // Sumbernya berjanji tidak melempar. Kita tetap tidak bertaruh pada janji itu.
-      step({ source: "scan8004", outcome: "threw", reason: describeThrow(err), items: 0 });
+      stepUpstream(failure("scan8004", err));
     }
 
     // --- Tingkat 2: cache Postgres ------------------------------------------
@@ -548,7 +777,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
     } else {
       try {
         const filter: CachedAgentFilter = { chainId, category, limit, offset, maxAgeSeconds };
-        const page = await deps.cache.getAgents(filter, at);
+        const page = await withDeadline(deps.cache.getAgents(filter, at), localBudgetMs, "cache");
         if (!page.healthy) {
           step({
             source: "cache",
@@ -563,7 +792,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
           return finish("cache", page.items, page.total, true, null);
         }
       } catch (err) {
-        step({ source: "cache", outcome: "threw", reason: describeThrow(err), items: 0 });
+        step(failure("cache", err));
       }
     }
 
@@ -578,10 +807,14 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
         // membuat halaman 6 marketplace jatuh ke seed sementara halaman 1
         // dilayani on-chain — provenance-nya tetap jujur, tapi sumbernya
         // melompat tanpa sebab yang bisa dijelaskan ke pengguna.
-        const page = await deps.onchain.readFuguListings({
-          limit: Math.min(Math.max(onchainScanLimit, offset + limit), ONCHAIN_MAX_LIMIT),
-          offset: 0,
-        });
+        const page = await withDeadline(
+          deps.onchain.readFuguListings({
+            limit: Math.min(Math.max(onchainScanLimit, offset + limit), ONCHAIN_MAX_LIMIT),
+            offset: 0,
+          }),
+          localBudgetMs,
+          "onchain",
+        );
         if (!page.healthy) {
           step({
             source: "onchain",
@@ -604,11 +837,14 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
           }
         }
       } catch (err) {
-        step({ source: "onchain", outcome: "threw", reason: describeThrow(err), items: 0 });
+        step(failure("onchain", err));
       }
     }
 
     // --- Tingkat 4: seed terkurasi ------------------------------------------
+    // TIDAK dibatasi anggaran waktu: ini jaring terakhir, dan membiarkannya
+    // kehabisan waktu berarti marketplace kosong — hal yang seluruh berkas ini
+    // ada untuk mencegah. Ia juga tidak menyentuh jaringan maupun disk.
     try {
       const page = await seed.listAgents(category, { limit, offset });
       // Halaman kosong wajib membawa penjelasannya di `reason`, bukan hanya di
@@ -665,6 +901,23 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       noteHealth(attempt, fetchedAt);
     }
 
+    /** `step` untuk tingkat 1, yang sekalian membuka/menutup gerbang upstream. */
+    function stepUpstream(attempt: FallbackAttempt): void {
+      step(attempt);
+      gateUpstream(attempt.outcome, at);
+    }
+
+    function failure(source: AgentSource, err: unknown): FallbackAttempt {
+      return err instanceof BudgetExceeded
+        ? {
+            source,
+            outcome: "unhealthy",
+            reason: `melewati anggaran waktu ${err.waitedMs} ms — turun ke tingkat berikutnya`,
+            items: 0,
+          }
+        : { source, outcome: "threw", reason: describeThrow(err), items: 0 };
+    }
+
     function finish(
       source: AgentSource,
       agent: AgentRecord | null,
@@ -713,29 +966,42 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
     // --- Tingkat 1: 8004scan -------------------------------------------------
     if (target === null) {
       step({ source: "scan8004", outcome: "unavailable", reason: targetReason, items: 0 });
+    } else if (at.getTime() < upstreamBlockedUntil) {
+      step({
+        source: "scan8004",
+        outcome: "unhealthy",
+        reason:
+          `dilewati: 8004scan gagal barusan, gerbang tertutup ` +
+          `${Math.ceil((upstreamBlockedUntil - at.getTime()) / 1000)} dtk lagi`,
+        items: 0,
+      });
     } else {
       try {
-        const detail = await deps.scan8004.getAgent(target.chainId, target.tokenId);
+        const detail = await withDeadline(
+          deps.scan8004.getAgent(target.chainId, target.tokenId),
+          budgetMs,
+          "scan8004",
+        );
         if (!detail.healthy) {
-          step({
+          stepUpstream({
             source: "scan8004",
             outcome: "unhealthy",
             reason: redact(detail.reason ?? "8004scan tidak sehat tanpa alasan"),
             items: 0,
           });
         } else if (detail.agent === null) {
-          step({ source: "scan8004", outcome: "empty", reason: null, items: 0 });
+          stepUpstream({ source: "scan8004", outcome: "empty", reason: null, items: 0 });
         } else {
           const agent =
             detail.agent.classification === null
               ? { ...detail.agent, classification: classify(detail.agent) }
               : detail.agent;
-          step({ source: "scan8004", outcome: "ok", reason: null, items: 1 });
+          stepUpstream({ source: "scan8004", outcome: "ok", reason: null, items: 1 });
           await writeThrough([agent]);
           return finish("scan8004", agent, true, null);
         }
       } catch (err) {
-        step({ source: "scan8004", outcome: "threw", reason: describeThrow(err), items: 0 });
+        stepUpstream(failure("scan8004", err));
       }
     }
 
@@ -744,7 +1010,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       step({ source: "cache", outcome: "unavailable", reason: "cache tidak dipasang", items: 0 });
     } else {
       try {
-        const cached = await deps.cache.getAgent(id, at);
+        const cached = await withDeadline(deps.cache.getAgent(id, at), localBudgetMs, "cache");
         if (!cached.healthy) {
           step({
             source: "cache",
@@ -759,7 +1025,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
           return finish("cache", cached.agent, true, null);
         }
       } catch (err) {
-        step({ source: "cache", outcome: "threw", reason: describeThrow(err), items: 0 });
+        step(failure("cache", err));
       }
     }
 
@@ -777,7 +1043,11 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
         // dan `OnchainSource` tidak mengekspos `listingByAgentId`. Karena itu
         // listing dibaca lalu dicari di sini — jaring pengaman boleh sedikit
         // lebih mahal, yang tidak boleh adalah ia tidak ada.
-        const page = await deps.onchain.readFuguListings({ limit: onchainScanLimit, offset: 0 });
+        const page = await withDeadline(
+          deps.onchain.readFuguListings({ limit: onchainScanLimit, offset: 0 }),
+          localBudgetMs,
+          "onchain",
+        );
         if (!page.healthy) {
           step({
             source: "onchain",
@@ -799,7 +1069,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
           }
         }
       } catch (err) {
-        step({ source: "onchain", outcome: "threw", reason: describeThrow(err), items: 0 });
+        step(failure("onchain", err));
       }
     }
 
@@ -839,29 +1109,48 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
   // -------------------------------------------------------------------------
 
   async function getHealth(): Promise<ServiceHealth> {
-    const checkedAt = now().toISOString();
+    const at = now();
+    const checkedAt = at.toISOString();
 
-    // Riwayat DB dulu, lalu ditimpa status dalam proses ini — yang terakhir
-    // selalu lebih baru. Kegagalan membaca riwayat bukan alasan `/api/health`
-    // ikut mati; ia justru saat endpoint ini paling dibutuhkan.
     const merged = new Map<AgentSource, SourceHealth>();
+
+    // 1. Riwayat DB — paling tua, jadi paling dulu.
+    //
+    //    Membaca riwayat itu sendiri **adalah probe Postgres**: kalau kueri ini
+    //    berhasil, cache hidup DETIK INI, dan kalau ia gagal, cache mati DETIK
+    //    INI. Itu observasi paling segar yang bisa didapat tanpa biaya jaringan
+    //    tambahan, dan karena itu ia menang atas apa pun yang ada di ingatan.
+    let probe: SourceHealth | undefined;
     if (deps.cache !== undefined) {
       try {
         for (const health of await deps.cache.latestHealth()) merged.set(health.source, health);
-      } catch (err) {
-        merged.set("cache", {
+        probe = {
           source: "cache",
-          healthy: false,
-          reason: describeThrow(err),
+          healthy: true,
+          reason: "probe: pembacaan source_health berhasil",
           checkedAt,
-        });
+        };
+      } catch (err) {
+        probe = { source: "cache", healthy: false, reason: describeThrow(err), checkedAt };
       }
     }
+
+    // 2. Status dalam proses ini — lebih baru daripada riwayat DB.
     for (const [source, health] of lastSeen) merged.set(source, health);
 
-    // Seed tidak punya bagian yang bisa mati sendiri: ia berkas dalam bundel.
-    // Selama tidak pernah tercatat melempar, ia sehat — dan itu yang membuat
-    // `healthy` di bawah tidak pernah false.
+    // 3. Probe barusan — lebih baru daripada ingatan.
+    //
+    //    Urutan ini yang memperbaiki jendela bohong yang ditemukan di compose:
+    //    beberapa detik setelah Postgres dimatikan, panggilan PERTAMA ke
+    //    `/api/health` dulu masih berkata `cache: healthy` karena ingatan
+    //    menimpa hasil probe. Sekarang probe yang menang, jadi endpoint ini
+    //    jujur pada panggilan pertama — persis saat juri menatap layar setelah
+    //    menekan tombol mati.
+    if (probe !== undefined) merged.set("cache", probe);
+
+    // Seed tidak punya bagian yang bisa mati sendiri: ia berkas dalam bundel,
+    // jadi observasinya selalu dibuat sekarang dan tidak pernah kedaluwarsa.
+    // Ia tetap TIDAK ikut menentukan `healthy` — lihat `ServiceHealth.healthy`.
     if (!merged.has("seed")) {
       merged.set("seed", {
         source: "seed",
@@ -874,15 +1163,18 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
     const order: AgentSource[] = ["scan8004", "cache", "onchain", "seed"];
     const sources = order
       .map((source) => merged.get(source))
-      .filter((health): health is SourceHealth => health !== undefined);
+      .filter((health): health is SourceHealth => health !== undefined)
+      .map((health) => observe(health, at, healthTtlSeconds));
 
     return {
       // Hanya sumber sungguhan yang boleh menyalakan lampu hijau — lihat
-      // catatan panjang di `ServiceHealth.healthy`.
+      // catatan panjang di `ServiceHealth.healthy`. `observe()` sudah mencabut
+      // klaim sehat dari observasi yang kedaluwarsa, jadi baris ini tidak perlu
+      // tahu soal umur.
       healthy: sources.some(
         (health) => health.healthy && LIVE_SOURCES.includes(health.source),
       ),
-      degraded: merged.get("scan8004")?.healthy !== true,
+      degraded: sources.find((h) => h.source === "scan8004")?.healthy !== true,
       sources,
       checkedAt,
     };

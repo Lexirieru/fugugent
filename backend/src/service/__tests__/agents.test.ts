@@ -16,7 +16,7 @@
  * 4. `DEFAULT_SPAM_FILTERS` yang mengosongkan chain 97 adalah kasus normal,
  *    bukan kegagalan.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OnchainSource, ReadFuguListingsOptions } from "../../sources/onchain.js";
 import type { Scan8004Source } from "../../sources/scan8004.js";
 import {
@@ -195,6 +195,10 @@ class FakeCache implements AgentCachePort {
   }
 
   async latestHealth(): Promise<SourceHealth[]> {
+    // Postgres yang mati mematikan pembacaan ini juga. Fake yang membiarkannya
+    // berhasil sementara `getAgents` gagal menggambarkan dunia yang tidak ada,
+    // dan justru menyembunyikan bahwa pembacaan ini adalah probe Postgres.
+    if (this.throws) throw this.throws;
     return this.latest;
   }
 }
@@ -495,7 +499,9 @@ describe("getAgentsByCategory — tingkat 4: seed terkurasi", () => {
 
 describe("keempat tingkat dipicu berurutan", () => {
   it("menurun satu tingkat setiap kali tingkat di atasnya berhenti menjawab", async () => {
-    const h = harness();
+    // Gerbang upstream dimatikan di sini: test ini menguji URUTAN tingkat,
+    // bukan gerbang latensi. Keduanya punya test sendiri-sendiri.
+    const h = harness({ upstreamCooldownMs: 0 });
 
     // Tingkat 1.
     h.scan.page = page([record({ tokenId: "1" })]);
@@ -862,7 +868,13 @@ describe("getHealth", () => {
     ];
     const health = await h.service.getHealth();
     const onchain = health.sources.find((s) => s.source === "onchain");
-    expect(onchain).toMatchObject({ healthy: false, reason: "RPC timeout" });
+    expect(onchain?.healthy).toBe(false);
+    // Observasi berumur 1 jam: statusnya tetap dilaporkan, tapi sebagai
+    // "belum diperiksa ulang", lengkap dengan umurnya.
+    expect(onchain?.stale).toBe(true);
+    expect(onchain?.ageSeconds).toBe(3600);
+    expect(onchain?.reason).toContain("RPC timeout");
+    expect(onchain?.reason).toContain("belum diperiksa ulang");
   });
 
   it("status dalam proses ini menang atas riwayat DB yang lebih tua", async () => {
@@ -944,7 +956,7 @@ describe("riwayat kesehatan sumber", () => {
   });
 
   it("hanya PERUBAHAN status yang ditulis — tabelnya riwayat, bukan log akses", async () => {
-    const h = harness();
+    const h = harness({ upstreamCooldownMs: 0 });
     h.scan.page = page([], { healthy: false, reason: "500 DATABASE_ERROR" });
     h.cache.items = [record({ tokenId: "7", source: "cache" })];
 
@@ -1490,9 +1502,11 @@ describe("getHealth — seed tidak boleh menyalakan lampu hijau", () => {
     expect(health.degraded).toBe(false);
   });
 
-  it("tanpa observasi apa pun tidak mengaku sehat — belum tahu bukan berarti sehat", async () => {
-    const h = harness();
-    const health = await h.service.getHealth();
+  it("tanpa sumber sungguhan yang bisa diperiksa, tidak mengaku sehat", async () => {
+    // Hanya 8004scan yang dipasang, dan ia belum pernah dipanggil: tidak ada
+    // satu pun bukti bahwa sesuatu bekerja. Belum tahu bukan berarti sehat.
+    const service = createAgentService({ scan8004: new FakeScan(), chainId: CHAIN_ID, now });
+    const health = await service.getHealth();
     expect(health.healthy).toBe(false);
     expect(health.degraded).toBe(true);
     expect(health.sources.find((s) => s.source === "seed")?.healthy).toBe(true);
@@ -1512,12 +1526,432 @@ describe("getHealth — seed tidak boleh menyalakan lampu hijau", () => {
     expect(health.healthy).toBe(true);
   });
 
-  it("riwayat DB yang HANYA memuat seed tidak cukup untuk hijau", async () => {
+  it("observasi seed — dari DB maupun dari ingatan — tidak pernah cukup untuk hijau", async () => {
+    const scan = new FakeScan();
+    scan.page = page([], { healthy: false, reason: "500 DATABASE_ERROR" });
+    const service = createAgentService({ scan8004: scan, chainId: CHAIN_ID, now });
+    // Layani satu permintaan sampai seed, sehingga seed benar-benar tercatat sehat.
+    const served = await service.getAgentsByCategory("GRID");
+    expect(served.source).toBe("seed");
+
+    const health = await service.getHealth();
+    expect(health.sources.find((s) => s.source === "seed")?.healthy).toBe(true);
+    expect(health.healthy).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// /api/health tidak boleh melapor dari ingatan yang sudah basi
+// ---------------------------------------------------------------------------
+
+describe("getHealth — pembacaan basi menandai dirinya", () => {
+  it("Postgres yang baru mati ketahuan pada panggilan PERTAMA", async () => {
+    // Inilah jendela bohong yang ditemukan di compose: cache tercatat sehat
+    // beberapa detik lalu, lalu Postgres dimatikan. Panggilan pertama ke
+    // /api/health dulu masih berkata `cache: healthy` karena ingatan menimpa
+    // hasil probe. Sekarang probe yang menang.
     const h = harness();
+    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.cache.items = [record({ tokenId: "7", source: "cache" })];
+    await h.service.getAgentsByCategory("GRID");
+    expect((await h.service.getHealth()).sources.find((s) => s.source === "cache")?.healthy).toBe(
+      true,
+    );
+
+    // Postgres mati. Tidak ada permintaan lain yang lewat — langsung /api/health.
+    h.cache.throws = new Error("connection refused");
+    const health = await h.service.getHealth();
+
+    expect(health.sources.find((s) => s.source === "cache")?.healthy).toBe(false);
+    expect(health.sources.find((s) => s.source === "cache")?.reason).toContain(
+      "connection refused",
+    );
+    expect(health.healthy).toBe(false);
+  });
+
+  it("probe yang berhasil menang atas ingatan yang berkata cache mati", async () => {
+    const h = harness();
+    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.cache.throws = new Error("connection refused");
+    await h.service.getAgentsByCategory("GRID"); // ingatan: cache mati
+
+    h.cache.throws = null; // Postgres hidup lagi
+    const health = await h.service.getHealth();
+    expect(health.sources.find((s) => s.source === "cache")?.healthy).toBe(true);
+    expect(health.sources.find((s) => s.source === "cache")?.stale).toBe(false);
+    expect(health.healthy).toBe(true);
+  });
+
+  it("observasi yang melewati ambang umur berhenti mengklaim sehat", async () => {
+    const h = harness({ healthTtlSeconds: 30 });
     h.cache.latest = [
-      { source: "seed", healthy: true, reason: null, checkedAt: "2026-09-10T11:00:00.000Z" },
+      // 8004scan tercatat SEHAT satu jam lalu. Umur itu membuat klaimnya tak
+      // bisa dipakai lagi — `healthy: true` yang basi persis jenis kebohongan
+      // yang endpoint ini ada untuk mencegah.
+      { source: "scan8004", healthy: true, reason: null, checkedAt: "2026-09-10T11:00:00.000Z" },
+    ];
+
+    const health = await h.service.getHealth();
+    const scan = health.sources.find((s) => s.source === "scan8004");
+    expect(scan?.healthy).toBe(false);
+    expect(scan?.stale).toBe(true);
+    expect(scan?.ageSeconds).toBe(3600);
+    expect(scan?.reason).toContain("3600");
+    expect(scan?.reason).toContain("belum diperiksa ulang");
+    expect(scan?.reason).toContain("status terakhir: sehat");
+    // `checkedAt` tetap waktu observasi aslinya, bukan disegarkan diam-diam.
+    expect(scan?.checkedAt).toBe("2026-09-10T11:00:00.000Z");
+    expect(health.degraded).toBe(true);
+  });
+
+  it("observasi yang masih dalam ambang tetap dipercaya dan ditandai segar", async () => {
+    const h = harness({ healthTtlSeconds: 30 });
+    h.cache.latest = [
+      { source: "scan8004", healthy: true, reason: null, checkedAt: "2026-09-10T11:59:50.000Z" },
     ];
     const health = await h.service.getHealth();
+    const scan = health.sources.find((s) => s.source === "scan8004");
+    expect(scan?.healthy).toBe(true);
+    expect(scan?.stale).toBe(false);
+    expect(scan?.ageSeconds).toBe(10);
+    expect(health.degraded).toBe(false);
+  });
+
+  it("seed tidak pernah kedaluwarsa — observasinya selalu dibuat sekarang", async () => {
+    const h = harness({ healthTtlSeconds: 1 });
+    const health = await h.service.getHealth();
+    const seed = health.sources.find((s) => s.source === "seed");
+    expect(seed?.healthy).toBe(true);
+    expect(seed?.stale).toBe(false);
+    expect(seed?.ageSeconds).toBe(0);
+  });
+
+  it("setiap baris membawa umurnya, supaya tidak bisa salah dibaca", async () => {
+    const h = harness();
+    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.cache.items = [record({ tokenId: "7", source: "cache" })];
+    await h.service.getAgentsByCategory("GRID");
+
+    const health = await h.service.getHealth();
+    expect(health.sources.length).toBeGreaterThan(0);
+    for (const source of health.sources) {
+      expect(typeof source.ageSeconds === "number" || source.ageSeconds === null).toBe(true);
+      expect(typeof source.stale).toBe("boolean");
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Anggaran waktu — 31 detik tidak boleh terulang
+// ---------------------------------------------------------------------------
+
+/** Sumber yang menggantung selamanya — persis upstream yang tidak menutup koneksi. */
+function hangs(): Promise<never> {
+  return new Promise<never>(() => undefined);
+}
+
+describe("anggaran waktu per tingkat", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("tingkat 1 yang menggantung ditinggalkan setelah anggaran habis, bukan ditunggu", async () => {
+    const h = harness({ budgetMs: 6_000 });
+    h.scan.semanticSearch = () => hangs();
+    h.cache.items = [record({ tokenId: "7", source: "cache" })];
+
+    const pending = h.service.getAgentsByCategory("GRID");
+    await vi.advanceTimersByTimeAsync(6_000);
+    const result = await pending;
+
+    expect(result.source).toBe("cache");
+    expect(result.trail[0]).toMatchObject({ source: "scan8004", outcome: "unhealthy" });
+    expect(result.trail[0]!.reason).toContain("anggaran waktu");
+  });
+
+  it("anggaran tingkat 1 yang habis TIDAK ikut melaparkan jaring pengaman", async () => {
+    // Anggaran bersama untuk keempat tingkat pernah dicoba dan salah arah:
+    // tingkat 1 menghabiskan seluruh jatah, lalu cache ditolak sebelum sempat
+    // menjawab. Tingkat 2 dan 3 punya anggarannya sendiri.
+    const h = harness({ budgetMs: 6_000, localBudgetMs: 2_000 });
+    h.scan.semanticSearch = () => hangs();
+    h.cache.items = [record({ tokenId: "7", source: "cache" })];
+
+    const pending = h.service.getAgentsByCategory("GRID");
+    await vi.advanceTimersByTimeAsync(6_000);
+    const result = await pending;
+
+    expect(result.source).toBe("cache");
+    expect(result.items).toHaveLength(1);
+  });
+
+  it("cache yang menggantung juga tidak menyandera permintaan", async () => {
+    const h = harness({ budgetMs: 6_000, localBudgetMs: 2_000 });
+    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.cache.getAgents = () => hangs();
+    h.onchain.page = page([onchainRecord("500", "GRID")], { source: "onchain" });
+
+    const pending = h.service.getAgentsByCategory("GRID");
+    await vi.advanceTimersByTimeAsync(2_000);
+    const result = await pending;
+
+    expect(result.source).toBe("onchain");
+    expect(result.trail[1]!.reason).toContain("anggaran waktu");
+  });
+
+  it("on-chain yang menggantung turun ke seed", async () => {
+    const h = harness({ localBudgetMs: 2_000 });
+    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.onchain.readFuguListings = () => hangs();
+
+    const pending = h.service.getAgentsByCategory("GRID");
+    await vi.advanceTimersByTimeAsync(2_000);
+    const result = await pending;
+
+    expect(result.source).toBe("seed");
+    expect(result.trail[2]!.reason).toContain("anggaran waktu");
+  });
+
+  it("seed tidak pernah dibatasi anggaran — ia jaring terakhir", async () => {
+    const h = harness({ budgetMs: 1_000, localBudgetMs: 1_000 });
+    h.scan.semanticSearch = () => hangs();
+    h.cache.getAgents = () => hangs();
+    h.onchain.readFuguListings = () => hangs();
+
+    const pending = h.service.getAgentsByCategory("GRID");
+    await vi.advanceTimersByTimeAsync(3_000);
+    const result = await pending;
+
+    expect(result.source).toBe("seed");
+    expect(result.items).toHaveLength(1);
+  });
+
+  it("upstream yang sehat walau lambat tidak pernah ditinggalkan", async () => {
+    const h = harness({ budgetMs: 6_000 });
+    h.scan.semanticSearch = async () => {
+      await new Promise((resolve) => setTimeout(resolve, 2_000));
+      return page([record({ tokenId: "1" })]);
+    };
+
+    const pending = h.service.getAgentsByCategory("GRID");
+    await vi.advanceTimersByTimeAsync(2_000);
+    const result = await pending;
+
+    expect(result.source).toBe("scan8004");
+    expect(result.items).toHaveLength(1);
+  });
+
+  it("jalur detail juga berbatas waktu", async () => {
+    const h = harness({ budgetMs: 6_000 });
+    h.scan.getAgent = () => hangs();
+    h.cache.items = [record({ tokenId: "42", source: "cache" })];
+
+    const pending = h.service.getAgentDetail("97:42");
+    await vi.advanceTimersByTimeAsync(6_000);
+    const result = await pending;
+
+    expect(result.source).toBe("cache");
+    expect(result.trail[0]!.reason).toContain("anggaran waktu");
+  });
+});
+
+describe("gerbang upstream — satu anggaran per render, bukan empat", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("empat kategori berturut-turut hanya membayar anggaran SEKALI", async () => {
+    // Temuan compose: 31 detik = 10 dtk timeout x 3 percobaan x 4 kategori.
+    // Setelah kategori pertama gagal, jaring pengaman sudah terbukti siap;
+    // membiarkan tiga kategori berikutnya mengulang penantian yang sama hanya
+    // membakar waktu pengguna.
+    const h = harness({ budgetMs: 6_000, upstreamCooldownMs: 30_000, now: () => new Date() });
+    let attempts = 0;
+    h.scan.semanticSearch = () => {
+      attempts++;
+      return hangs();
+    };
+
+    const first = h.service.getAgentsByCategory("REBALANCING");
+    await vi.advanceTimersByTimeAsync(6_000);
+    const results = [await first];
+
+    // Tiga kategori berikutnya diselesaikan TANPA memajukan jam sama sekali.
+    // Kalau gerbangnya tidak ada, ketiganya menggantung di sini dan test ini
+    // mati kehabisan waktu — itulah buktinya, bukan sekadar hitungan panggilan.
+    for (const category of ["GRID", "YIELD", "HEALTH_FACTOR"] as Category[]) {
+      results.push(await h.service.getAgentsByCategory(category));
+    }
+
+    expect(attempts).toBe(1);
+    for (const result of results) {
+      expect(result.source).toBe("seed");
+      expect(result.items.length).toBeGreaterThan(0);
+    }
+    for (const result of results.slice(1)) {
+      expect(result.trail[0]).toMatchObject({ source: "scan8004", outcome: "unhealthy" });
+      expect(result.trail[0]!.reason).toContain("gerbang tertutup");
+    }
+  });
+
+  it("gerbang membuka lagi setelah cooldown lewat", async () => {
+    const h = harness({ upstreamCooldownMs: 30_000, now: () => new Date() });
+    h.scan.page = page([], { healthy: false, reason: "500 DATABASE_ERROR" });
+
+    await h.service.getAgentsByCategory("GRID");
+    expect(h.scan.queries).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(29_000);
+    await h.service.getAgentsByCategory("GRID");
+    expect(h.scan.queries).toHaveLength(1); // masih dalam cooldown
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    h.scan.page = page([record({ tokenId: "1" })]);
+    const recovered = await h.service.getAgentsByCategory("GRID");
+    expect(h.scan.queries).toHaveLength(2);
+    expect(recovered.source).toBe("scan8004");
+  });
+
+  it("upstream yang sehat tidak pernah menutup gerbang", async () => {
+    const h = harness({ upstreamCooldownMs: 30_000, now: () => new Date() });
+    h.scan.page = page([record({ tokenId: "1" })]);
+    await h.service.getAgentsByCategory("GRID");
+    await h.service.getAgentsByCategory("YIELD");
+    expect(h.scan.queries).toHaveLength(2);
+  });
+
+  it("upstream sehat-tapi-kosong TIDAK menutup gerbang", async () => {
+    // `DEFAULT_SPAM_FILTERS` yang mengosongkan chain 97 adalah jawaban sah dari
+    // upstream yang sehat. Menutup gerbang karenanya akan membuat marketplace
+    // berhenti bertanya pada sumber yang sebenarnya bekerja.
+    const h = harness({ upstreamCooldownMs: 30_000, now: () => new Date() });
+    h.scan.page = page([], { healthy: true, total: 0 });
+    await h.service.getAgentsByCategory("GRID");
+    await h.service.getAgentsByCategory("YIELD");
+    expect(h.scan.queries).toHaveLength(2);
+  });
+
+  it("jalur detail berbagi gerbang yang sama dengan jalur daftar", async () => {
+    const h = harness({ upstreamCooldownMs: 30_000, now: () => new Date() });
+    h.scan.page = page([], { healthy: false, reason: "500 DATABASE_ERROR" });
+    await h.service.getAgentsByCategory("GRID");
+
+    trace = [];
+    const detail = await h.service.getAgentDetail("97:42");
+    expect(trace).not.toContain("scan8004.getAgent");
+    expect(detail.trail[0]!.reason).toContain("gerbang tertutup");
+  });
+});
+
+describe("gerbang upstream — pemulihan", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("balasan sehat-tapi-kosong setelah pulih tidak menutup gerbang lagi", async () => {
+    // Upstream pulih tapi kebetulan tidak punya isi untuk kategori itu —
+    // kasus `DEFAULT_SPAM_FILTERS` di chain 97. Kalau kosong diperlakukan
+    // sebagai kegagalan, gerbang langsung tertutup lagi dan marketplace
+    // berhenti bertanya pada sumber yang sebenarnya sudah bekerja.
+    const h = harness({ upstreamCooldownMs: 30_000, now: () => new Date() });
+    h.scan.page = page([], { healthy: false, reason: "500 DATABASE_ERROR" });
+    await h.service.getAgentsByCategory("GRID");
+    expect(h.scan.queries).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(31_000);
+    h.scan.page = page([], { healthy: true, total: 0 }); // pulih, tapi kosong
+    await h.service.getAgentsByCategory("GRID");
+    expect(h.scan.queries).toHaveLength(2);
+
+    // Gerbang harus sudah terbuka: kategori berikutnya bertanya lagi TANPA
+    // menunggu cooldown kedua.
+    await h.service.getAgentsByCategory("YIELD");
+    expect(h.scan.queries).toHaveLength(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Polling berulang harus jujur SENDIRI, tanpa ditolong lalu lintas lain
+// ---------------------------------------------------------------------------
+
+describe("getHealth — polling berulang saat Postgres mati", () => {
+  it("12 polling berturut-turut jujur tanpa satu pun permintaan lain menolong", async () => {
+    // Persis yang diukur di compose: dengan Postgres mati, 12 polling ke
+    // /api/health tetap melaporkan `cache.healthy = true` dengan umur merangkak
+    // 100 → 101 detik, dan baru jujur bila kebetulan ada permintaan lain yang
+    // menabrak cache dan gagal. Jendela itu tidak boleh ada.
+    let clock = new Date("2026-09-10T12:00:00.000Z");
+    const h = harness({ now: () => clock });
+
+    // Satu permintaan sukses lebih dulu, supaya ingatan benar-benar berisi
+    // "cache sehat" — tanpa ini tidak ada yang bisa menimpa hasil probe.
+    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.cache.items = [record({ tokenId: "7", source: "cache" })];
+    const served = await h.service.getAgentsByCategory("GRID");
+    expect(served.source).toBe("cache");
+
+    // Postgres mati. Mulai sekarang TIDAK ada permintaan lain sama sekali.
+    h.cache.throws = new Error("connection refused");
+
+    for (let poll = 0; poll < 12; poll++) {
+      clock = new Date(clock.getTime() + 10_000); // polling tiap 10 detik
+      const health = await h.service.getHealth();
+      const cache = health.sources.find((s) => s.source === "cache");
+      expect(cache?.healthy).toBe(false);
+      expect(cache?.reason).toContain("connection refused");
+      // Dan umur observasinya tidak merangkak: tiap polling adalah probe baru.
+      expect(cache?.ageSeconds).toBe(0);
+      expect(cache?.stale).toBe(false);
+      expect(health.healthy).toBe(false);
+    }
+  });
+
+  it("catatan 8004scan yang sehat tapi menua akhirnya membuat degraded true", async () => {
+    // Ini yang membuat `?strict=1` bisa membalas 503: `degraded` dihitung dari
+    // status 8004scan, dan catatan sehat berumur 100 detik tidak lagi boleh
+    // menahannya di `false`.
+    let clock = new Date("2026-09-10T12:00:00.000Z");
+    const h = harness({ now: () => clock, healthTtlSeconds: 30 });
+    h.scan.page = page([record({ tokenId: "1" })]);
+    await h.service.getAgentsByCategory("GRID");
+
+    expect((await h.service.getHealth()).degraded).toBe(false);
+
+    // 100 detik berlalu tanpa satu pun permintaan baru.
+    clock = new Date(clock.getTime() + 100_000);
+    const health = await h.service.getHealth();
+    const scan = health.sources.find((s) => s.source === "scan8004");
+    expect(scan?.stale).toBe(true);
+    expect(scan?.ageSeconds).toBe(100);
+    expect(scan?.healthy).toBe(false);
+    expect(health.degraded).toBe(true);
+  });
+
+  it("Postgres mati + catatan 8004scan kedaluwarsa → healthy false DAN degraded true", async () => {
+    // Keadaan yang diukur di compose. Keduanya harus benar supaya rute
+    // `?strict=1` (yang mengaitkan 503 pada `degraded`) berhenti membalas 200.
+    let clock = new Date("2026-09-10T12:00:00.000Z");
+    const h = harness({ now: () => clock, healthTtlSeconds: 30 });
+    h.scan.page = page([record({ tokenId: "1" })]);
+    await h.service.getAgentsByCategory("GRID");
+
+    h.cache.throws = new Error("connection refused");
+    clock = new Date(clock.getTime() + 100_000);
+
+    const health = await h.service.getHealth();
     expect(health.healthy).toBe(false);
+    expect(health.degraded).toBe(true);
   });
 });
