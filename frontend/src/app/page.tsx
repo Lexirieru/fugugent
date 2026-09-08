@@ -1,6 +1,6 @@
 import { AgentCard } from "@/components/agent-card";
 import { CategoryTabs } from "@/components/category-tabs";
-import { DataNotice } from "@/components/data-notice";
+import { DataProvenance } from "@/components/data-provenance";
 import { ProofList } from "@/components/proof";
 import { RiskLegend } from "@/components/risk-legend";
 import { ButtonLink, EmptyState, Eyebrow, Section } from "@/components/ui";
@@ -35,12 +35,7 @@ export default async function MarketplacePage({ searchParams }: PageProps<"/">) 
         </p>
 
         <div className="mt-8">
-          <DataNotice
-            source={page.source}
-            healthy={page.healthy}
-            reason={page.reason}
-            origin={src.origin}
-          />
+          <DataProvenance provenance={page.provenance} origin={src.origin} />
         </div>
 
         <div className="mt-8">
@@ -69,7 +64,7 @@ export default async function MarketplacePage({ searchParams }: PageProps<"/">) 
                 </li>
               ))}
             </ul>
-          ) : page.healthy ? (
+          ) : page.provenance.healthy ? (
             <EmptyState
               title={`Nothing in ${meta ? meta.label : "this filter"} yet`}
               body={

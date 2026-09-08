@@ -1,23 +1,24 @@
 /**
  * Implementasi `MarketplaceSource` di atas backend sungguhan.
  *
- * Endpoint yang disepakati (`docs/plans/`, `backend/src/types.ts`):
+ * Endpoint yang disepakati (`backend/src/routes/agents.ts`):
  *   GET /api/agents?category=&limit=&offset=
  *   GET /api/agents/:id
  *   GET /api/categories
  *   GET /api/health
  *
- * Hari ini tidak ada yang menjawabnya. Berkas ini tetap ditulis lengkap supaya
- * menukar sumber nanti berarti mengisi satu variabel lingkungan, bukan menyentuh
- * satu pun komponen.
- *
  * **Tidak pernah melempar.** Setiap kegagalan — jaringan mati, JSON asing, bentuk
  * yang tidak dikenali — menjadi `healthy: false` dengan alasan yang bisa dibaca.
  * Halaman yang gagal tetap punya bentuk, dan pengguna diberi tahu apa yang terjadi
  * alih-alih melihat daftar kosong yang menyamar sebagai "belum ada agent".
+ *
+ * Amplop backend membawa `source`, `ageSeconds`, `stale`, `degraded`, dan `trail`.
+ * Kelimanya diteruskan apa adanya ke `Provenance` dan **tidak** dihitung ulang:
+ * backend yang tahu tangga mana yang benar-benar ditempuh, dan hanya ia yang
+ * boleh menyatakan sebuah jawaban tidak bisa dipastikan segar.
  */
 
-import type { SourceHealth } from "@/lib/agent-types";
+import type { AgentSource, SourceHealth } from "@/lib/agent-types";
 import { isCategory } from "@/lib/agents";
 import type {
   AgentDetailView,
@@ -29,12 +30,65 @@ import type {
   MarketplaceSource,
 } from "@/lib/data/types";
 import { parseAgentRecord } from "@/lib/data/wire";
+import type { Provenance, TrailStep } from "@/lib/provenance";
 
 const TIMEOUT_MS = 8_000;
+
+const SOURCES: AgentSource[] = ["scan8004", "cache", "onchain", "seed"];
 
 function reasonOf(err: unknown): string {
   if (err instanceof Error) return err.message;
   return "unknown error";
+}
+
+function asSource(v: unknown, fallback: AgentSource): AgentSource {
+  return SOURCES.includes(v as AgentSource) ? (v as AgentSource) : fallback;
+}
+
+function numberOrNull(v: unknown): number | null {
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+function parseTrail(v: unknown): TrailStep[] {
+  if (!Array.isArray(v)) return [];
+  return v.map((row) => {
+    const o = (row ?? {}) as Record<string, unknown>;
+    return {
+      source: asSource(o.source, "cache"),
+      outcome: typeof o.outcome === "string" ? o.outcome : "unknown",
+      reason: typeof o.reason === "string" ? o.reason : null,
+      items: numberOrNull(o.items),
+    };
+  });
+}
+
+/** Amplop -> `Provenance`. Satu tempat, dipakai daftar, detail, dan kategori. */
+function parseProvenance(o: Record<string, unknown>, now: string): Provenance {
+  return {
+    source: asSource(o.source, "cache"),
+    healthy: o.healthy !== false,
+    reason: typeof o.reason === "string" ? o.reason : null,
+    fetchedAt: typeof o.fetchedAt === "string" ? o.fetchedAt : now,
+    ageSeconds: numberOrNull(o.ageSeconds),
+    stale: o.stale === true,
+    degraded: o.degraded === true,
+    maxAgeSeconds: numberOrNull(o.maxAgeSeconds),
+    trail: parseTrail(o.trail),
+  };
+}
+
+function failedProvenance(reason: string, now: string): Provenance {
+  return {
+    source: "cache",
+    healthy: false,
+    reason,
+    fetchedAt: now,
+    ageSeconds: null,
+    stale: true,
+    degraded: true,
+    maxAgeSeconds: null,
+    trail: [],
+  };
 }
 
 /**
@@ -80,10 +134,7 @@ export function createHttpSource(baseUrl: string): MarketplaceSource {
           total: typeof o.total === "number" ? o.total : o.items.length,
           limit,
           offset,
-          source: (o.source as MarketplacePage["source"]) ?? "cache",
-          healthy: o.healthy !== false,
-          reason: typeof o.reason === "string" ? o.reason : null,
-          fetchedAt: typeof o.fetchedAt === "string" ? o.fetchedAt : now,
+          provenance: parseProvenance(o, now),
         };
       } catch (err) {
         return {
@@ -91,10 +142,7 @@ export function createHttpSource(baseUrl: string): MarketplaceSource {
           total: 0,
           limit,
           offset,
-          source: "cache",
-          healthy: false,
-          reason: reasonOf(err),
-          fetchedAt: now,
+          provenance: failedProvenance(reasonOf(err), now),
         };
       }
     },
@@ -107,35 +155,32 @@ export function createHttpSource(baseUrl: string): MarketplaceSource {
         const raw = "agent" in o ? o.agent : o;
         return {
           agent: raw == null ? null : toView(parseAgentRecord(raw)),
-          source: (o.source as AgentDetailView["source"]) ?? "cache",
-          healthy: o.healthy !== false,
-          reason: typeof o.reason === "string" ? o.reason : null,
-          fetchedAt: typeof o.fetchedAt === "string" ? o.fetchedAt : now,
+          provenance: parseProvenance(o, now),
         };
       } catch (err) {
-        return { agent: null, source: "cache", healthy: false, reason: reasonOf(err), fetchedAt: now };
+        return { agent: null, provenance: failedProvenance(reasonOf(err), now) };
       }
     },
 
     async listCategories(): Promise<CategoryListResult> {
+      const now = new Date().toISOString();
       try {
         const body = await getJson(`${base}/api/categories`);
-        const rows = Array.isArray(body)
-          ? body
-          : ((body as Record<string, unknown>).categories as unknown[]) ?? [];
+        const o = (Array.isArray(body) ? {} : body) as Record<string, unknown>;
+        const rows = Array.isArray(body) ? body : ((o.categories as unknown[]) ?? []);
         const categories: CategoryCount[] = [];
         for (const row of rows) {
-          const o = row as Record<string, unknown>;
-          if (isCategory(o.category as string)) {
+          const r = row as Record<string, unknown>;
+          if (isCategory(r.category as string)) {
             categories.push({
-              category: o.category as CategoryCount["category"],
-              count: typeof o.count === "number" ? o.count : 0,
+              category: r.category as CategoryCount["category"],
+              count: typeof r.count === "number" ? r.count : 0,
             });
           }
         }
-        return { categories, healthy: true, reason: null };
+        return { categories, provenance: parseProvenance(o, now) };
       } catch (err) {
-        return { categories: [], healthy: false, reason: reasonOf(err) };
+        return { categories: [], provenance: failedProvenance(reasonOf(err), now) };
       }
     },
 
@@ -144,7 +189,7 @@ export function createHttpSource(baseUrl: string): MarketplaceSource {
       try {
         const body = (await getJson(`${base}/api/health`)) as Record<string, unknown>;
         return {
-          source: (body.source as SourceHealth["source"]) ?? "cache",
+          source: asSource(body.source, "cache"),
           healthy: body.healthy !== false,
           reason: typeof body.reason === "string" ? body.reason : null,
           checkedAt,

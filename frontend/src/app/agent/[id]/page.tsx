@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CopyButton } from "@/components/copy-button";
+import { DataProvenance } from "@/components/data-provenance";
 import { Fugu } from "@/components/fugu";
 import { HirePanel } from "@/components/hire-panel";
 import { HiredBadge } from "@/components/hired-badge";
@@ -13,6 +14,7 @@ import { addressUrl, shorten, txUrl } from "@/lib/chain";
 import { source } from "@/lib/data";
 import type { AgentView } from "@/lib/data/types";
 import { formatPeriod, formatPricePerPeriod } from "@/lib/money";
+import { SOURCE_LABEL, formatUtc, type Provenance } from "@/lib/provenance";
 import { BLOAT, riskAriaLabel } from "@/lib/risk";
 
 export async function generateMetadata({
@@ -33,14 +35,15 @@ export async function generateMetadata({
 
 export default async function AgentPage({ params }: PageProps<"/agent/[id]">) {
   const { id } = await params;
-  const result = await source().getAgent(decodeURIComponent(id));
+  const src = source();
+  const result = await src.getAgent(decodeURIComponent(id));
 
-  if (!result.healthy) {
+  if (!result.provenance.healthy) {
     return (
       <Section className="pt-12">
         <EmptyState
           title="We could not read this agent"
-          body={`The catalogue replied: ${result.reason ?? "no reason given"}. We are not showing a cached copy dressed up as live data.`}
+          body={`The catalogue replied: ${result.provenance.reason ?? "no reason given"}. We are not showing a cached copy dressed up as live data.`}
           actions={
             <>
               <ButtonLink href="/">Back to all agents</ButtonLink>
@@ -56,16 +59,28 @@ export default async function AgentPage({ params }: PageProps<"/agent/[id]">) {
 
   if (!result.agent) notFound();
 
-  return <AgentDetail view={result.agent} />;
+  return <AgentDetail view={result.agent} provenance={result.provenance} origin={src.origin} />;
 }
 
-function AgentDetail({ view }: { view: AgentView }) {
+function AgentDetail({
+  view,
+  provenance,
+  origin,
+}: {
+  view: AgentView;
+  provenance: Provenance;
+  origin: string;
+}) {
   const { record, risk, session, proofs, outcomes, notShipped } = view;
   const kind = fuguKindFor(record);
   const category = categoryOf(record);
   const meta = category ? CATEGORY_META[category] : null;
   const listing = record.fuguListing;
   const spec = risk ? BLOAT[risk.level] : null;
+  // Asal record itu sendiri bisa berbeda dari asal amplop: satu halaman bisa
+  // dilayani dari cache sementara isinya berasal dari 8004scan, atau sebaliknya.
+  // Umur relatifnya sudah ada di spanduk (dihitung backend); yang ini menyebut waktunya.
+  const recordFetchedAt = formatUtc(record.fetchedAt);
 
   return (
     <>
@@ -73,6 +88,9 @@ function AgentDetail({ view }: { view: AgentView }) {
         <Link href="/" className="text-sm text-muted transition hover:text-fg">
           ← All agents
         </Link>
+        <div className="mt-4">
+          <DataProvenance provenance={provenance} origin={origin} />
+        </div>
       </Section>
 
       {/* Kepala halaman */}
@@ -109,6 +127,11 @@ function AgentDetail({ view }: { view: AgentView }) {
                 ))}
               </p>
             ) : null}
+            <p className="mt-4 text-xs text-faint">
+              This record came from {SOURCE_LABEL[record.source]}
+              {recordFetchedAt ? ` · read ${recordFetchedAt}` : ""} · key{" "}
+              <span className="font-mono">{record.id}</span>
+            </p>
           </div>
         </div>
       </Section>

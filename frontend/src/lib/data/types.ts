@@ -15,8 +15,9 @@
  *    ditampilkan otomatis, bukan diingat-ingat manusia.
  */
 
-import type { AgentRecord, AgentSource, Category, SourceHealth } from "@/lib/agent-types";
+import type { AgentRecord, Category, SourceHealth } from "@/lib/agent-types";
 import type { Proof } from "@/lib/chain";
+import type { Provenance } from "@/lib/provenance";
 import type { RiskReading } from "@/lib/risk";
 
 /**
@@ -63,24 +64,22 @@ export interface AgentView {
   outcomes: string[];
 }
 
-/** Amplopnya sama dengan `AgentListPage`; `items` diganti `agents`. */
+/**
+ * Amplopnya sama dengan `AgentListPage`; `items` diganti `agents`, dan kolom
+ * asal-data dikumpulkan ke satu objek `provenance` supaya tidak ada halaman yang
+ * bisa menampilkan sumbernya tanpa sekalian menampilkan umurnya.
+ */
 export interface MarketplacePage {
   agents: AgentView[];
   total: number;
   limit: number;
   offset: number;
-  source: AgentSource;
-  healthy: boolean;
-  reason: string | null;
-  fetchedAt: string;
+  provenance: Provenance;
 }
 
 export interface AgentDetailView {
   agent: AgentView | null;
-  source: AgentSource;
-  healthy: boolean;
-  reason: string | null;
-  fetchedAt: string;
+  provenance: Provenance;
 }
 
 export interface CategoryCount {
@@ -90,8 +89,7 @@ export interface CategoryCount {
 
 export interface CategoryListResult {
   categories: CategoryCount[];
-  healthy: boolean;
-  reason: string | null;
+  provenance: Provenance;
 }
 
 export interface ListQuery {

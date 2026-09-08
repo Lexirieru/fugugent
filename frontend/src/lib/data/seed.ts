@@ -1,7 +1,13 @@
 /**
  * Implementasi `MarketplaceSource` di atas data contoh yang dibundel.
- * Tidak pernah gagal, dan selalu mengaku `source: "seed"` supaya UI bisa
- * memasang spanduk kejujuran tanpa ada yang perlu mengingatnya.
+ *
+ * Tidak pernah gagal, dan selalu mengaku apa adanya: `source: "seed"` dengan
+ * `degraded: true`, karena seed memang tingkat paling bawah tangga jatuh —
+ * lantai terakhir sebelum halaman kosong, bukan sumber utama yang sehat.
+ *
+ * `ageSeconds: null` bukan kelalaian. Data ini ikut ke dalam bundel saat build,
+ * jadi umurnya adalah umur build, bukan umur pembacaan; melaporkan angka detik
+ * di sini justru akan mengarang kesegaran yang tidak ada.
  */
 
 import type { SourceHealth } from "@/lib/agent-types";
@@ -14,6 +20,19 @@ import type {
   MarketplacePage,
   MarketplaceSource,
 } from "@/lib/data/types";
+import type { Provenance } from "@/lib/provenance";
+
+const SEED_PROVENANCE: Provenance = {
+  source: "seed",
+  healthy: true,
+  reason: "bundled with this build; no marketplace API is configured",
+  fetchedAt: SEED_FETCHED_AT,
+  ageSeconds: null,
+  stale: false,
+  degraded: true,
+  maxAgeSeconds: null,
+  trail: [{ source: "seed", outcome: "ok", reason: null, items: SEED_AGENTS.length }],
+};
 
 export const seedSource: MarketplaceSource = {
   kind: "seed",
@@ -30,10 +49,7 @@ export const seedSource: MarketplaceSource = {
       total: matching.length,
       limit,
       offset,
-      source: "seed",
-      healthy: true,
-      reason: null,
-      fetchedAt: SEED_FETCHED_AT,
+      provenance: { ...SEED_PROVENANCE, trail: [{ ...SEED_PROVENANCE.trail[0], items: matching.length }] },
     };
   },
 
@@ -41,10 +57,7 @@ export const seedSource: MarketplaceSource = {
     const agent = SEED_AGENTS.find((a) => a.record.id === id) ?? null;
     return {
       agent,
-      source: "seed",
-      healthy: true,
-      reason: null,
-      fetchedAt: SEED_FETCHED_AT,
+      provenance: { ...SEED_PROVENANCE, trail: [{ ...SEED_PROVENANCE.trail[0], items: agent ? 1 : 0 }] },
     };
   },
 
@@ -54,17 +67,11 @@ export const seedSource: MarketplaceSource = {
         category,
         count: SEED_AGENTS.filter((a) => categoryOf(a.record) === category).length,
       })),
-      healthy: true,
-      reason: null,
+      provenance: SEED_PROVENANCE,
     };
   },
 
   async health(): Promise<SourceHealth> {
-    return {
-      source: "seed",
-      healthy: true,
-      reason: null,
-      checkedAt: SEED_FETCHED_AT,
-    };
+    return { source: "seed", healthy: true, reason: null, checkedAt: SEED_FETCHED_AT };
   },
 };
