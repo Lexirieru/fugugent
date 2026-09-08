@@ -13,6 +13,24 @@
  *      on-chain sungguhan, dan skrip mati dengan exit code bukan nol begitu
  *      satu saja klaim tidak terbukti.
  *
+ * ## Dua penanda tangan, dan itulah intinya
+ *
+ * `setAnswer` (menurunkan lalu memulihkan harga) ditandatangani **EOA deployer**
+ * — ia pemilik feed, dan menurunkan harga memang peran "pasar", bukan peran
+ * agent. `approve` + `repay` ditandatangani **session key Altana ber-batas**
+ * atas wallet `0xbdc69c2d…`, lewat `createSessionSendRepay`. Session key itu
+ * hanya boleh memanggil dua selector di dua kontrak, dengan spend cap dan
+ * expiry yang ditegakkan kontrak akun Altana di rantai — bukan oleh kode ini.
+ * Buktinya diperiksa di LANGKAH 5, dan ada dua bagian: (a) `Repay.user` pada
+ * receipt harus wallet Altana dan pengirim transaksinya bukan EOA deployer,
+ * dan (b) **kontrol negatif** — objek sesi YANG SAMA, sesaat setelah berhasil
+ * membayar, mencoba `mUSD.transfer` dan wajib ditolak validator Altana. Tanpa
+ * (b), "ber-batas" hanya kata.
+ *
+ * Posisi contoh karena itu dimiliki **wallet Altana**, bukan deployer:
+ * `MockLendingPool.repay` tidak punya `onBehalfOf`, jadi hanya pemilik hutang
+ * yang bisa membayarnya. Siapkan sekali dengan `scripts/setup-altana-position.ts`.
+ *
  * Skenario:
  *   baca posisi contoh → turunkan harga mBNB lewat `MockPriceFeed.setAnswer`
  *   sampai HF jatuh ke zona PARTIAL_REPAY → jalankan SATU siklus Guardian →
@@ -29,10 +47,30 @@
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { loadEnv } from "@bnbagent/studio-runtime/config";
-import { createWalletClient, http, type Hash, type PublicClient, type WalletClient } from "viem";
+import {
+  createWalletClient,
+  decodeEventLog,
+  http,
+  type Hash,
+  type PublicClient,
+  type WalletClient,
+} from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { bscTestnet } from "viem/chains";
 
+import {
+  GUARDIAN_SESSION_FILE,
+  armAltanaSdk,
+  loadGuardianSession,
+  relaySender,
+  sessionProvider,
+  type RelayResult,
+} from "./altana.js";
+import {
+  createSessionSendRepay,
+  requiredSessionCalls,
+  type SessionPermissions,
+} from "../src/strategy/chain/session.js";
 import {
   createTestnetReader,
   DEFAULT_BSC_TESTNET_RPC_URL,
@@ -150,6 +188,19 @@ const POOL_ABI = [
   },
 ] as const;
 
+/** Event `Repay` pool — sumber tunggal untuk membuktikan SIAPA yang membayar. */
+const POOL_EVENT_ABI = [
+  {
+    type: "event",
+    name: "Repay",
+    inputs: [
+      { name: "user", type: "address", indexed: true },
+      { name: "asset", type: "address", indexed: true },
+      { name: "amount", type: "uint256", indexed: false },
+    ],
+  },
+] as const;
+
 const ERC20_ABI = [
   {
     type: "function",
@@ -174,6 +225,18 @@ const ERC20_ABI = [
     stateMutability: "nonpayable",
     inputs: [
       { name: "spender", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    // HANYA dipakai kontrol negatif di LANGKAH 5: selector ini sengaja TIDAK
+    // ada di allowlist sesi, dan panggilannya wajib ditolak validator Altana.
+    type: "function",
+    name: "transfer",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "to", type: "address" },
       { name: "amount", type: "uint256" },
     ],
     outputs: [{ name: "", type: "bool" }],
@@ -384,9 +447,26 @@ async function main(pemulihan: Pemulihan): Promise<void> {
     transport: http(rpcUrl),
   });
 
+  // Sesi Altana ber-batas. `deserializeSession` sendiri yang memverifikasi
+  // bahwa kunci di dalam file menurunkan `publicKey` yang tercatat; bagian
+  // `signer`-nya tidak pernah dibaca, dicetak, atau disalin di skrip ini.
+  armAltanaSdk();
+  const session = await loadGuardianSession();
+  const posisiAkun = session.walletAddress;
+  const izinSesi = session.permissions as SessionPermissions;
+  const kirimSesi = relaySender(sessionProvider(session, rpcUrl), publicClient);
+
   judul("FUGU GUARDIAN — E2E di BSC testnet (chainId 97)");
   console.log(`RPC             : ${rpcUrl}`);
-  console.log(`Akun            : ${account.address}`);
+  console.log(`Pemilik posisi  : ${posisiAkun}  (wallet Altana)`);
+  console.log(`Penandatangan repay : session key Altana ber-batas`);
+  console.log(`  file sesi     : ${GUARDIAN_SESSION_FILE}`);
+  console.log(`  publicKey     : ${session.publicKey}`);
+  console.log(`  expiry        : ${session.expiry} (${new Date(session.expiry * 1000).toISOString()})`);
+  for (const izin of requiredSessionCalls(MOCK_LENDING_POOL_ADDRESS, REPAY_ASSET_ADDRESS)) {
+    console.log(`  allowlist     : ${izin.to}  ${izin.signature}`);
+  }
+  console.log(`Penandatangan harga : ${account.address}  (EOA deployer, pemilik feed)`);
   console.log(`MockLendingPool : ${MOCK_LENDING_POOL_ADDRESS}`);
   console.log(`MockPriceFeedBNB: ${MOCK_PRICE_FEED_BNB}`);
   console.log(`Aset repay      : ${REPAY_ASSET_ADDRESS} (mUSD)`);
@@ -396,13 +476,20 @@ async function main(pemulihan: Pemulihan): Promise<void> {
 
   const chainId = await publicClient.getChainId();
   wajib(chainId === 97, `Chain salah: ${chainId}, harus 97 (BSC testnet).`);
+  wajib(
+    posisiAkun.toLowerCase() !== account.address.toLowerCase(),
+    `Wallet sesi dan EOA deployer adalah alamat yang sama (${posisiAkun}); ` +
+      "bukti 'bukan EOA deployer' tidak akan berarti apa-apa.",
+  );
 
-  const tbnbAwal = await publicClient.getBalance({ address: account.address });
-  console.log(`Saldo tBNB awal : ${tbnbAwal} wei`);
+  const tbnbAwal = await publicClient.getBalance({ address: posisiAkun });
+  const tbnbDeployerAwal = await publicClient.getBalance({ address: account.address });
+  console.log(`Saldo tBNB wallet Altana : ${tbnbAwal} wei`);
+  console.log(`Saldo tBNB EOA deployer  : ${tbnbDeployerAwal} wei`);
 
   // --- 2. Posisi awal -------------------------------------------------------
   judul("LANGKAH 1 — Posisi contoh sebelum apa pun disentuh");
-  const posAwal = await reader.readPosition(account.address);
+  const posAwal = await reader.readPosition(posisiAkun);
   cetakPosisi("Posisi awal (dibaca lewat readAavePosition apa adanya):", posAwal);
   wajib(posAwal.healthFactor !== null, "Posisi contoh tidak punya hutang; tidak ada yang bisa dibuktikan.");
   wajib(posAwal.collateralBase > 0n, "Posisi contoh tidak punya agunan.");
@@ -524,7 +611,7 @@ async function main(pemulihan: Pemulihan): Promise<void> {
   // --- 4. Assert dari bacaan on-chain sungguhan -----------------------------
   console.log("");
   const posTertekan = await bacaSampai(
-    () => reader.readPosition(account.address),
+    () => reader.readPosition(posisiAkun),
     (p) =>
       p.blockNumber >= txTurun.blockNumber &&
       p.healthFactor !== null &&
@@ -549,7 +636,7 @@ async function main(pemulihan: Pemulihan): Promise<void> {
   // Jangkar: nilai yang sama dibaca ulang PADA BLOK transaksi penurunan harga.
   const [colTambat, debtTambat, , ltTambat, , hfTambat] = await tuplePadaBlok(
     publicClient,
-    account.address,
+    posisiAkun,
     txTurun.blockNumber,
     "posisi sebelum intervensi",
   );
@@ -607,12 +694,16 @@ async function main(pemulihan: Pemulihan): Promise<void> {
    */
   const TOLERANSI_USD8 = 2n;
 
+  /** Receipt transaksi `repay` yang benar-benar mendarat; dipakai membuktikan pengirimnya. */
+  let receiptRepay: RelayResult["receipt"] = null;
+
   /**
-   * Jembatan ke rantai: menerima jumlah USD basis 8 desimal dari
-   * `executeDecision` dan mengirim `repay` sungguhan. Tidak ada keputusan di
-   * sini — hanya konversi satuan, approve bila perlu, dan kirim.
+   * Konversi satuan — SATU-SATUNYA bagian "jembatan" yang tetap tinggal di
+   * skrip ini. `createSessionSendRepay` sengaja tidak mengurusnya: modul itu
+   * hanya menandatangani dan mengirim, sementara desimal token, harga feed,
+   * dan pemeriksaan bolak-balik adalah urusan skenario ini.
    */
-  const sendRepay = async (asset: `0x${string}`, amountUsd8: bigint): Promise<`0x${string}`> => {
+  const toTokenUnits = async (asset: `0x${string}`, amountUsd8: bigint): Promise<bigint> => {
     const jumlahToken = (amountUsd8 * 10n ** BigInt(desimalRepay)) / hargaRepay;
     console.log(
       `\n  sendRepay: ${formatUsd8(amountUsd8)} → ${jumlahToken} unit token (${desimalRepay} desimal)`,
@@ -641,51 +732,64 @@ async function main(pemulihan: Pemulihan): Promise<void> {
       address: asset,
       abi: ERC20_ABI,
       functionName: "balanceOf",
-      args: [account.address],
+      args: [posisiAkun],
     });
     wajib(
       saldo >= jumlahToken,
       `Saldo token repay kurang: ${saldo} unit < ${jumlahToken} unit yang dibutuhkan.`,
     );
 
-    const izin = await publicClient.readContract({
-      address: asset,
-      abi: ERC20_ABI,
-      functionName: "allowance",
-      args: [account.address, MOCK_LENDING_POOL_ADDRESS],
-    });
-    if (izin < jumlahToken) {
-      await kirim(
-        publicClient,
-        () =>
-          wallet.writeContract({
-            account,
-            chain: bscTestnet,
-            address: asset,
-            abi: ERC20_ABI,
-            functionName: "approve",
-            args: [MOCK_LENDING_POOL_ADDRESS, jumlahToken],
-          }),
-        "approve",
-      );
-    }
-
-    const tx = await kirim(
-      publicClient,
-      () =>
-        wallet.writeContract({
-          account,
-          chain: bscTestnet,
-          address: MOCK_LENDING_POOL_ADDRESS,
-          abi: POOL_ABI,
-          functionName: "repay",
-          args: [asset, jumlahToken],
-        }),
-      "repay",
-    );
-    txRepayTercatat.push(tx);
-    return tx.hash;
+    return jumlahToken;
   };
+
+  /**
+   * Penanda tangan repay: **session key Altana ber-batas**, bukan EOA deployer.
+   * `createSessionSendRepay` memeriksa allowlist sesi lebih dulu dan menolak
+   * berjalan sama sekali kalau `calls`-nya kosong/hilang (= izin tanpa batas
+   * di Altana) atau lebih luas daripada `repay` + `approve`.
+   */
+  const sendRepay = createSessionSendRepay({
+    walletAddress: posisiAkun,
+    pool: MOCK_LENDING_POOL_ADDRESS,
+    repayAsset: REPAY_ASSET_ADDRESS,
+    permissions: izinSesi,
+    toTokenUnits,
+    readAllowance: (asset, owner, spender) =>
+      publicClient.readContract({
+        address: asset,
+        abi: ERC20_ABI,
+        functionName: "allowance",
+        args: [owner, spender],
+      }),
+    sendCalls: async (calls, description) => {
+      const hasil = await kirimSesi(
+        calls.map((call) => ({
+          address: call.address,
+          abi: call.abi,
+          functionName: call.functionName,
+          args: call.args,
+        })),
+        description,
+      );
+      const receipt = hasil.receipt;
+      wajib(
+        receipt !== null,
+        `Relay Altana tidak mengembalikan receipt untuk ${description} (${hasil.transactionHash}).`,
+      );
+      console.log(`  tx sesi      : ${hasil.transactionHash}`);
+      console.log(`     isi batch    : ${calls.map((c) => c.functionName).join(" + ")}`);
+      console.log(`     blok         : ${receipt.blockNumber}`);
+      console.log(`     gas terpakai : ${receipt.gasUsed}`);
+      console.log(`     pengirim tx  : ${receipt.from}  (relay Altana; wallet membayar fee-nya)`);
+      console.log(`     ${tautanTx(hasil.transactionHash)}`);
+      if (calls.some((c) => c.functionName === "repay")) {
+        txRepayTercatat.push({ hash: hasil.transactionHash, blockNumber: receipt.blockNumber });
+        receiptRepay = receipt;
+      }
+      return { transactionHash: hasil.transactionHash, status: hasil.status };
+    },
+    log: (pesan) => console.log(`  ${pesan}`),
+  });
 
   const sekarang = () => Math.floor(Date.now() / 1000);
   const stateAwal: ExecuteState = {
@@ -708,7 +812,7 @@ async function main(pemulihan: Pemulihan): Promise<void> {
   const t0 = Date.now();
   const outcome = await runGuardCycle(
     {
-      account: account.address,
+      account: posisiAkun,
       readPosition: reader.readPosition,
       executeDecision: execFn,
       explainDecision,
@@ -751,8 +855,111 @@ async function main(pemulihan: Pemulihan): Promise<void> {
     "Anggaran harian tidak bertambah sebesar jumlah yang dikirim.",
   );
 
+  // --- 5b. Siapa yang sebenarnya membayar ----------------------------------
+  // Ini klaim inti task ini, dan ia dibuktikan dari RECEIPT, bukan dari niat
+  // kode. `MockLendingPool.repay` hanya mengurangi hutang `msg.sender`, dan
+  // `Repay(address indexed user, ...)` mencatat `msg.sender` itu. Jadi kalau
+  // `user` pada event adalah wallet Altana, maka yang memanggil pool memang
+  // wallet Altana — lewat session key ber-batas, bukan EOA deployer.
+  judul("LANGKAH 5 — Bukti: yang membayar adalah wallet Altana lewat session key");
+  const receipt = receiptRepay as RelayResult["receipt"];
+  wajib(receipt !== null, "Tidak ada receipt repay yang tercatat.");
+  const logRepay = receipt.logs
+    .filter((l) => l.address.toLowerCase() === MOCK_LENDING_POOL_ADDRESS.toLowerCase())
+    .map((l) => {
+      try {
+        return decodeEventLog({
+          abi: POOL_EVENT_ABI,
+          topics: [...l.topics] as [signature: `0x${string}`, ...args: `0x${string}`[]],
+          data: l.data,
+        });
+      } catch {
+        return null;
+      }
+    })
+    .find((e): e is NonNullable<typeof e> => e !== null && e.eventName === "Repay");
+  wajib(
+    logRepay !== undefined,
+    `Receipt ${txRepay.hash} tidak memuat event Repay dari ${MOCK_LENDING_POOL_ADDRESS}; ` +
+      "tidak ada yang bisa membuktikan siapa pemanggilnya.",
+  );
+  const pembayar = logRepay.args.user;
+  console.log(`Tx repay              : ${txRepay.hash}`);
+  console.log(`Pengirim transaksi    : ${receipt.from}  (relay Altana, bukan penanda tangan intent)`);
+  console.log(`Repay.user (msg.sender di pool) : ${pembayar}`);
+  console.log(`Wallet Altana         : ${posisiAkun}`);
+  console.log(`EOA deployer          : ${account.address}`);
+  wajib(
+    pembayar.toLowerCase() === posisiAkun.toLowerCase(),
+    `Repay.user pada receipt adalah ${pembayar}, bukan wallet Altana ${posisiAkun}.`,
+  );
+  wajib(
+    pembayar.toLowerCase() !== account.address.toLowerCase(),
+    `Repay.user pada receipt adalah EOA deployer ${account.address} — persis yang task ini hendak hindari.`,
+  );
+  wajib(
+    receipt.from.toLowerCase() !== account.address.toLowerCase(),
+    `Transaksi repay dikirim oleh EOA deployer ${account.address}; ` +
+      "seharusnya oleh relay Altana atas nama wallet lewat session key.",
+  );
+  console.log(
+    `\n✔ Terbukti dari receipt: hutang yang berkurang adalah hutang wallet Altana, ` +
+      `dan panggilan repay datang dari wallet itu lewat session key ber-batas — bukan dari EOA deployer.`,
+  );
+
+  // Kontrol negatif, dengan OBJEK SESI YANG SAMA yang baru saja membayar.
+  // Tanpa ini, "ber-batas" hanya kata: sesi yang bisa repay harus terbukti
+  // TIDAK bisa melakukan apa pun di luar allowlist-nya. `mUSD.transfer` dipilih
+  // karena kontraknya justru ADA di allowlist (untuk `approve`) — jadi yang
+  // diuji adalah pengikatan pada tingkat selector, bukan sekadar kontrak.
+  // Penolakan datang dari validator akun Altana, bukan dari kode kita.
+  console.log("\nKontrol negatif — sesi yang sama mencoba mUSD.transfer(EOA deployer, 1 wei):");
+  const mUsdSebelumProbe = await publicClient.readContract({
+    address: REPAY_ASSET_ADDRESS,
+    abi: ERC20_ABI,
+    functionName: "balanceOf",
+    args: [posisiAkun],
+  });
+  let probeDitolak = false;
+  try {
+    const lolos = await kirimSesi(
+      [
+        {
+          address: REPAY_ASSET_ADDRESS,
+          abi: ERC20_ABI,
+          functionName: "transfer",
+          args: [account.address, 1n],
+        },
+      ],
+      "kontrol negatif: transfer di luar allowlist",
+    );
+    console.error(`  ✖ LOLOS — tx ${lolos.transactionHash}`);
+  } catch (err: unknown) {
+    probeDitolak = true;
+    const pesan = err instanceof Error ? err.message : String(err);
+    for (const baris of pesan.split("\n")) console.log(`    | ${baris}`);
+  }
+  const mUsdSesudahProbe = await publicClient.readContract({
+    address: REPAY_ASSET_ADDRESS,
+    abi: ERC20_ABI,
+    functionName: "balanceOf",
+    args: [posisiAkun],
+  });
+  wajib(
+    probeDitolak,
+    "Sesi yang sama BERHASIL mengirim mUSD.transfer di luar allowlist; batasnya tidak nyata.",
+  );
+  wajib(
+    mUsdSesudahProbe === mUsdSebelumProbe,
+    `Saldo mUSD berubah (${mUsdSebelumProbe} → ${mUsdSesudahProbe}) padahal panggilannya ditolak.`,
+  );
+  console.log(
+    `  ✔ Ditolak, dan saldo mUSD tidak bergerak (${mUsdSesudahProbe}). ` +
+      `Sesi yang sama bisa repay, tidak bisa transfer.`,
+  );
+
   // --- 6. HF sesudah, dari bacaan on-chain ---------------------------------
-  judul("LANGKAH 5 — Bukti: health factor naik setelah agent bertindak");
+  judul("LANGKAH 6 — Bukti: health factor naik setelah agent bertindak");
   wajib(
     txRepay.blockNumber > txTurun.blockNumber,
     `Urutan blok tidak masuk akal: repay di blok ${txRepay.blockNumber}, penurunan harga di ` +
@@ -760,7 +967,7 @@ async function main(pemulihan: Pemulihan): Promise<void> {
   );
 
   const posSesudah = await bacaSampai(
-    () => reader.readPosition(account.address),
+    () => reader.readPosition(posisiAkun),
     (p) => p.blockNumber >= txRepay.blockNumber && p.debtBase < posTertekan.debtBase,
     "hutang berkurang setelah repay",
   );
@@ -776,7 +983,7 @@ async function main(pemulihan: Pemulihan): Promise<void> {
   // Jangkar kedua: nilai yang sama dibaca ulang PADA BLOK transaksi repay.
   const [colTambat2, debtTambat2, , ltTambat2, , hfTambat2] = await tuplePadaBlok(
     publicClient,
-    account.address,
+    posisiAkun,
     txRepay.blockNumber,
     "posisi sesudah intervensi",
   );
@@ -851,20 +1058,21 @@ async function main(pemulihan: Pemulihan): Promise<void> {
   // --- 7. Kembalikan harga --------------------------------------------------
   // Dilakukan HANYA setelah seluruh bukti di atas terkumpul, supaya keadaan
   // testnet bisa dipakai ulang. Biayanya satu transaksi ~30k gas.
-  judul("LANGKAH 6 — Mengembalikan harga mBNB ke nilai semula");
+  judul("LANGKAH 7 — Mengembalikan harga mBNB ke nilai semula");
   // Jalur sukses memakai penutup yang SAMA dengan jalur gagal (lihat `finally`
   // di bawah `main`), supaya keduanya tidak bisa menyimpang satu sama lain.
   await pemulihan.jalankan!();
   pemulihan.perlu = false;
 
   const posAkhir = await bacaSampai(
-    () => reader.readPosition(account.address),
+    () => reader.readPosition(posisiAkun),
     (p) => p.collateralBase === posAwal.collateralBase,
     "agunan kembali ke nilai harga semula",
   );
   cetakPosisi("\nPosisi akhir (harga sudah pulih):", posAkhir);
 
-  const tbnbAkhir = await publicClient.getBalance({ address: account.address });
+  const tbnbAkhir = await publicClient.getBalance({ address: posisiAkun });
+  const tbnbDeployerAkhir = await publicClient.getBalance({ address: account.address });
   judul("RINGKASAN");
   console.log(`HF awal ($${formatUsd8(hargaAwal).slice(1)}/mBNB)      : ${formatHf(hfAwal)}`);
   console.log(`HF setelah harga turun          : ${formatHf(hfSebelum)}`);
@@ -873,9 +1081,9 @@ async function main(pemulihan: Pemulihan): Promise<void> {
   console.log(`Dibayar agent                   : ${formatUsd8(hasil.amountSentUsd8)}`);
   console.log(`Tx repay                        : ${hasil.txHash}`);
   console.log(`                                  ${hasil.txHash ? tautanTx(hasil.txHash) : "-"}`);
-  console.log(`tBNB awal                       : ${tbnbAwal} wei`);
-  console.log(`tBNB akhir                      : ${tbnbAkhir} wei`);
-  console.log(`Biaya seluruh skenario          : ${tbnbAwal - tbnbAkhir} wei`);
+  console.log(`Penanda tangan repay            : session key ${session.publicKey.slice(0, 18)}… atas ${posisiAkun}`);
+  console.log(`tBNB wallet Altana awal→akhir   : ${tbnbAwal} → ${tbnbAkhir} wei (selisih ${tbnbAwal - tbnbAkhir})`);
+  console.log(`tBNB EOA deployer awal→akhir    : ${tbnbDeployerAwal} → ${tbnbDeployerAkhir} wei (selisih ${tbnbDeployerAwal - tbnbDeployerAkhir})`);
   console.log(`\nSEMUA KLAIM TERBUKTI.`);
 }
 

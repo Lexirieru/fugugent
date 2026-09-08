@@ -62,6 +62,21 @@ dengan `isValidKey` → `true` dan lolos `bag doctor` 14 PASS / 0 FAIL.
 
 Semua session: **10 U/hari + 0,02 tBNB/hari, expiry 30 hari (8 Okt 2026)**, `register=true`.
 
+`fuguguardian` punya **session kedua** khusus DeFi, terpisah dari session komersial di atas:
+file `.studio/wallets/altana-session-guardian.json`, allowlist hanya
+`MockLendingPool.repay(address,uint256)` + `mUSD.approve(address,uint256)`, cap 0,02 tBNB +
+100 mUSD/hari, keyHash `0x7a467115cdf6d03f85f0f059733843b43cbe291d9f4489e3bf27d45e5148b377`.
+Di-grant lewat `app/agent/scripts/grant-session-guardian.ts`, bukan `bag wallet session grant`
+(CLI itu tidak punya opsi allowlist). Session ini **tidak** bisa dimuat lewat
+`ensureAltanaSessionLoaded()`/`getWallet()`: studio-runtime menolak sesi yang `permissions.calls`
+-nya bukan salinan persis `defaultAgentPermissions()`. Muat lewat `deserializeSession` +
+`AltanaWalletProvider` (lihat `app/agent/scripts/altana.ts`).
+
+**Perangkap Porto yang sudah memakan satu jalan:** kunci sesi ber-spend-cap dijalankan lewat
+guarded executor yang **mengembalikan allowance ERC-20 ke nol di akhir userOp yang sama**.
+`approve` di transaksi terpisah karena itu sia-sia — `approve` dan pemakaiannya wajib satu
+userOp (`client.execute({ session, calls: [...] })`).
+
 **Temuan:** grant session **tidak** memerlukan saldo U di wallet — U hanya dipakai untuk
 allowance Commerce. `bag doctor` akan WARN soal saldo U, tapi session tetap sah dan
 terdaftar. Berguna karena faucet U dibatasi 10 U per 30 menit.
