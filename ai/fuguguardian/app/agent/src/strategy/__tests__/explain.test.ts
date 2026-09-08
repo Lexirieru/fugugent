@@ -13,61 +13,61 @@ const pos: Position = {
   blockNumber: 1n,
 };
 
-const keputusan: Decision = {
+const decision: Decision = {
   action: "WARN",
   healthFactor: 1_600_000_000_000_000_000n,
   dropToLiquidationBps: 3750n,
-  reason: "Health factor 1,60. Agunan boleh turun 37,5% sebelum likuidasi.",
+  reason: "Health factor 1.60. The collateral may fall 37.5% before liquidation.",
   suggestedRepayBase: 0n,
 };
 
 describe("explainDecision", () => {
-  it("memakai keluaran model bila pemanggilan berhasil", async () => {
-    const teks = await explainDecision(pos, keputusan, {
-      generate: async () => "Posisi Anda masih aman.",
+  it("uses the model's output when the call succeeds", async () => {
+    const text = await explainDecision(pos, decision, {
+      generate: async () => "Your position is still safe.",
     });
-    expect(teks).toBe("Posisi Anda masih aman.");
+    expect(text).toBe("Your position is still safe.");
   });
 
-  it("jatuh kembali ke alasan deterministik bila model gagal", async () => {
-    const teks = await explainDecision(pos, keputusan, {
+  it("falls back to the deterministic reason when the model fails", async () => {
+    const text = await explainDecision(pos, decision, {
       generate: async () => {
-        throw new Error("dGrid mati");
+        throw new Error("dGrid is down");
       },
     });
-    expect(teks).toBe(keputusan.reason);
+    expect(text).toBe(decision.reason);
   });
 
-  it("jatuh kembali ke alasan deterministik bila model mengembalikan teks kosong", async () => {
-    const teks = await explainDecision(pos, keputusan, { generate: async () => "   " });
-    expect(teks).toBe(keputusan.reason);
+  it("falls back to the deterministic reason when the model returns empty text", async () => {
+    const text = await explainDecision(pos, decision, { generate: async () => "   " });
+    expect(text).toBe(decision.reason);
   });
 
-  it("tidak pernah mengubah keputusan yang diterimanya", async () => {
-    const salinan = { ...keputusan };
-    await explainDecision(pos, keputusan, { generate: async () => "apa pun" });
-    expect(keputusan).toEqual(salinan);
+  it("never modifies the decision it was given", async () => {
+    const copy = { ...decision };
+    await explainDecision(pos, decision, { generate: async () => "anything" });
+    expect(decision).toEqual(copy);
   });
 
-  it("prompt memuat angka health factor dan melarang mengarang", async () => {
-    let promptTertangkap = "";
-    await explainDecision(pos, keputusan, {
+  it("the prompt carries the health factor number and forbids inventing figures", async () => {
+    let capturedPrompt = "";
+    await explainDecision(pos, decision, {
       generate: async (p) => {
-        promptTertangkap = p;
+        capturedPrompt = p;
         return "ok";
       },
     });
-    expect(promptTertangkap).toContain("1,60");
-    expect(promptTertangkap.toLowerCase()).toContain("jangan");
+    expect(capturedPrompt).toContain("1.60");
+    expect(capturedPrompt.toLowerCase()).toContain("never invent numbers");
   });
 
-  it("timer dibersihkan setelah generate berhasil", async () => {
+  it("clears the timer once generate succeeds", async () => {
     vi.useFakeTimers();
     try {
-      const teks = await explainDecision(pos, keputusan, {
-        generate: async () => "Selesai lebih dulu daripada timeout.",
+      const text = await explainDecision(pos, decision, {
+        generate: async () => "Finished before the timeout.",
       });
-      expect(teks).toBe("Selesai lebih dulu daripada timeout.");
+      expect(text).toBe("Finished before the timeout.");
       // If the 20-second timeout timer is not cleared once generate wins, it stays
       // registered here even though its result is no longer used.
       expect(vi.getTimerCount()).toBe(0);
@@ -76,29 +76,29 @@ describe("explainDecision", () => {
     }
   });
 
-  it("jumlah repay muncul sebagai dolar terbaca, bukan angka basis mentah", async () => {
+  it("the repay amount appears as readable dollars, not a raw basis number", async () => {
     // 12345678 on the 8-decimal basis = $0.12. Before the fix this raw number went into
     // the prompt as-is and could be read back to the user as tens of millions of dollars.
-    const keputusanRepay: Decision = {
+    const repayDecision: Decision = {
       action: "PARTIAL_REPAY",
       healthFactor: 1_150_000_000_000_000_000n,
       dropToLiquidationBps: 1304n,
-      reason: "Health factor 1,15.",
+      reason: "Health factor 1.15.",
       suggestedRepayBase: 12_345_678n,
     };
-    let promptTertangkap = "";
-    await explainDecision(pos, keputusanRepay, {
+    let capturedPrompt = "";
+    await explainDecision(pos, repayDecision, {
       generate: async (p) => {
-        promptTertangkap = p;
+        capturedPrompt = p;
         return "ok";
       },
     });
-    expect(promptTertangkap).toContain("$0,12");
-    expect(promptTertangkap).not.toContain("12345678");
-    expect(promptTertangkap.toLowerCase()).toContain("dolar as");
+    expect(capturedPrompt).toContain("$0.12");
+    expect(capturedPrompt).not.toContain("12345678");
+    expect(capturedPrompt.toLowerCase()).toContain("us dollars");
   });
 
-  it("angka di prompt identik dengan angka di reason deterministik", async () => {
+  it("the numbers in the prompt are identical to the numbers in the deterministic reason", async () => {
     // Both sides use the single formatting source (src/strategy/format.ts), so the user
     // cannot possibly see two versions of the same number.
     const p: Position = {
@@ -111,16 +111,16 @@ describe("explainDecision", () => {
       blockNumber: 1n,
     };
     const d = decide(p);
-    let promptTertangkap = "";
+    let capturedPrompt = "";
     await explainDecision(p, d, {
-      generate: async (teks) => {
-        promptTertangkap = teks;
+      generate: async (text) => {
+        capturedPrompt = text;
         return "ok";
       },
     });
-    expect(d.reason).toContain("1,25");
-    expect(promptTertangkap).toContain("1,25");
-    expect(d.reason).toContain("20,0%");
-    expect(promptTertangkap).toContain("20,0%");
+    expect(d.reason).toContain("1.25");
+    expect(capturedPrompt).toContain("1.25");
+    expect(d.reason).toContain("20.0%");
+    expect(capturedPrompt).toContain("20.0%");
   });
 });

@@ -3,15 +3,15 @@ import { createTestnetReader } from "../chain/testnet.js";
 import { computeHealthFactor } from "../healthFactor.js";
 
 /** The owner of the sample position in MockLendingPool on BSC testnet. */
-const AKUN_CONTOH = "0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E" as const;
+const SAMPLE_ACCOUNT = "0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E" as const;
 
-describe("adapter testnet (MockLendingPool, read-only)", () => {
+describe("the testnet adapter (MockLendingPool, read-only)", () => {
   it(
-    "membaca posisi contoh dari mock lending pool testnet",
+    "reads the sample position from the testnet mock lending pool",
     { timeout: 30_000 },
     async () => {
       const r = createTestnetReader();
-      const pos = await r.readPosition(AKUN_CONTOH);
+      const pos = await r.readPosition(SAMPLE_ACCOUNT);
 
       expect(pos.healthFactor).not.toBeNull();
       expect(pos.collateralBase).toBeGreaterThan(0n);

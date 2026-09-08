@@ -79,7 +79,7 @@ const ERC20_ABI = [
 
 interface Probe {
   readonly label: string;
-  readonly kenapa: string;
+  readonly why: string;
   readonly call: RelayCall;
 }
 
@@ -92,7 +92,7 @@ async function main(): Promise<void> {
     transport: http(rpcUrl),
   }) as PublicClient;
   const chainId = await publicClient.getChainId();
-  if (chainId !== 97) throw new Error(`Chain salah: ${chainId}, harus 97.`);
+  if (chainId !== 97) throw new Error(`Wrong chain: ${chainId}, must be 97.`);
 
   armAltanaSdk();
   const session = await loadGuardianSession();
@@ -105,19 +105,19 @@ async function main(): Promise<void> {
   assertNativeSpendCap(session.permissions);
 
   const wallet = session.walletAddress;
-  const kirim = relaySender(sessionProvider(session, rpcUrl), publicClient);
+  const send = relaySender(sessionProvider(session, rpcUrl), publicClient);
 
-  console.log("UJI BATAS SESSION KEY — panggilan di luar allowlist wajib ditolak");
+  console.log("SESSION KEY BOUNDARY TEST — calls outside the allowlist must be refused");
   console.log(`  RPC          : ${rpcUrl}`);
   console.log(`  Wallet       : ${wallet}`);
-  console.log(`  File sesi    : ${GUARDIAN_SESSION_FILE}`);
+  console.log(`  Session file : ${GUARDIAN_SESSION_FILE}`);
   console.log(`  publicKey    : ${session.publicKey}`);
-  console.log("  Allowlist sesi (satu-satunya yang diizinkan):");
+  console.log("  Session allowlist (the only calls permitted):");
   for (const c of requiredSessionCalls(MOCK_LENDING_POOL_ADDRESS, REPAY_ASSET_ADDRESS)) {
     console.log(`    - ${c.to}  ${c.signature}`);
   }
 
-  const saldo = async (token: `0x${string}`) =>
+  const balanceOf = async (token: `0x${string}`) =>
     publicClient.readContract({
       address: token,
       abi: ERC20_ABI,
@@ -125,14 +125,14 @@ async function main(): Promise<void> {
       args: [wallet],
     });
 
-  const mUsdSebelum = await saldo(REPAY_ASSET_ADDRESS);
-  const mBnbSebelum = await saldo(MBNB);
-  console.log(`\nSaldo sebelum: mUSD ${mUsdSebelum} · mBNB ${mBnbSebelum}`);
+  const mUsdBefore = await balanceOf(REPAY_ASSET_ADDRESS);
+  const mBnbBefore = await balanceOf(MBNB);
+  console.log(`\nBalances before: mUSD ${mUsdBefore} · mBNB ${mBnbBefore}`);
 
   const probes: readonly Probe[] = [
     {
       label: "mUSD.transfer(EOA deployer, 1 wei)",
-      kenapa: "kontrak di-allowlist untuk approve, tetapi selector transfer TIDAK",
+      why: "the contract is allowlisted for approve, but the transfer selector is NOT",
       call: {
         address: REPAY_ASSET_ADDRESS,
         abi: ERC20_ABI,
@@ -142,7 +142,7 @@ async function main(): Promise<void> {
     },
     {
       label: "mBNB.approve(pool, 1 wei)",
-      kenapa: "selector approve di-allowlist untuk mUSD, tetapi kontrak mBNB TIDAK",
+      why: "the approve selector is allowlisted for mUSD, but the mBNB contract is NOT",
       call: {
         address: MBNB,
         abi: ERC20_ABI,
@@ -152,17 +152,17 @@ async function main(): Promise<void> {
     },
   ];
 
-  let lolos = 0;
+  let gotThrough = 0;
   for (const probe of probes) {
     console.log(`\n${"-".repeat(72)}`);
-    console.log(`Mencoba lewat sesi: ${probe.label}`);
-    console.log(`  Kenapa ini di luar batas: ${probe.kenapa}`);
+    console.log(`Attempting through the session: ${probe.label}`);
+    console.log(`  Why this is out of bounds: ${probe.why}`);
     try {
-      const result = await kirim([probe.call], probe.label);
-      lolos += 1;
+      const result = await send([probe.call], probe.label);
+      gotThrough += 1;
       console.error(
-        `  ✖ LOLOS — sesi berhasil mengirimnya (tx ${result.transactionHash}, status ${result.status}). ` +
-          "Batas sesi TIDAK ditegakkan.",
+        `  ✖ GOT THROUGH — the session managed to send it (tx ${result.transactionHash}, status ${result.status}). ` +
+          "The session boundary is NOT enforced.",
       );
     } catch (err: unknown) {
       // "An exception happened" is NOT proof. A relay answering 502, a timed-out receipt, or
@@ -170,35 +170,35 @@ async function main(): Promise<void> {
       // `assertSessionDenial` demands the error really is `UnauthorizedCall` AND names the
       // contract we tried to call; any other shape is rethrown as a test failure rather than
       // accepted as evidence.
-      const pesan = assertSessionDenial(err, probe.call.address, probe.label);
-      console.log(`  ✔ DITOLAK oleh validator akun Altana (UnauthorizedCall). Galat apa adanya:`);
-      for (const baris of pesan.split("\n")) console.log(`    | ${baris}`);
+      const message = assertSessionDenial(err, probe.call.address, probe.label);
+      console.log(`  ✔ REFUSED by the Altana account validator (UnauthorizedCall). The error as-is:`);
+      for (const line of message.split("\n")) console.log(`    | ${line}`);
     }
   }
 
-  const mUsdSesudah = await saldo(REPAY_ASSET_ADDRESS);
-  const mBnbSesudah = await saldo(MBNB);
+  const mUsdAfter = await balanceOf(REPAY_ASSET_ADDRESS);
+  const mBnbAfter = await balanceOf(MBNB);
   console.log(`\n${"=".repeat(72)}`);
-  console.log(`Saldo sesudah: mUSD ${mUsdSesudah} · mBNB ${mBnbSesudah}`);
-  if (mUsdSesudah !== mUsdSebelum || mBnbSesudah !== mBnbSebelum) {
-    lolos += 1;
-    console.error("✖ Saldo token BERUBAH; sesuatu benar-benar terkirim.");
+  console.log(`Balances after: mUSD ${mUsdAfter} · mBNB ${mBnbAfter}`);
+  if (mUsdAfter !== mUsdBefore || mBnbAfter !== mBnbBefore) {
+    gotThrough += 1;
+    console.error("✖ The token balances CHANGED; something really was sent.");
   } else {
-    console.log("✔ Saldo token tidak berubah sama sekali — tidak ada yang terkirim.");
+    console.log("✔ The token balances did not change at all — nothing was sent.");
   }
 
-  const sisa = await publicClient.getBalance({ address: wallet });
-  console.log(`Saldo tBNB wallet: ${sisa} wei`);
+  const remaining = await publicClient.getBalance({ address: wallet });
+  console.log(`Wallet tBNB balance: ${remaining} wei`);
 
-  if (lolos > 0) {
-    throw new Error(`${lolos} panggilan di luar allowlist TIDAK ditolak; batas sesi tidak terbukti.`);
+  if (gotThrough > 0) {
+    throw new Error(`${gotThrough} calls outside the allowlist were NOT refused; the session boundary is not proven.`);
   }
-  console.log("\n✔ SEMUA panggilan di luar allowlist ditolak. Batas sesi terbukti nyata.");
+  console.log("\n✔ EVERY call outside the allowlist was refused. The session boundary is proven real.");
 }
 
 try {
   await main();
 } catch (err: unknown) {
-  console.error(`\n✖ GAGAL: ${err instanceof Error ? err.message : String(err)}`);
+  console.error(`\n✖ FAILED: ${err instanceof Error ? err.message : String(err)}`);
   process.exitCode = 1;
 }

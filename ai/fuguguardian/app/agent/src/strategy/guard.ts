@@ -196,7 +196,7 @@ export async function runGuardCycle(
   } catch (err) {
     // A failing `now()` is a small dependency failure, not a reason to stop protecting
     // the position — use a fallback timestamp and carry on.
-    logError(deps.logger, "guard: now() gagal, memakai timestamp fallback", {
+    logError(deps.logger, "guard: now() failed, using a fallback timestamp", {
       account: deps.account,
       error: toMessage(err),
     });
@@ -208,7 +208,7 @@ export async function runGuardCycle(
     pos = await deps.readPosition(deps.account);
   } catch (err) {
     const error = toMessage(err);
-    logError(deps.logger, "guard: gagal membaca posisi, siklus dilewati", {
+    logError(deps.logger, "guard: failed to read the position, cycle skipped", {
       account: deps.account,
       error,
     });
@@ -223,7 +223,7 @@ export async function runGuardCycle(
     decision = decide(pos, deps.thresholds);
   } catch (err) {
     const error = toMessage(err);
-    logError(deps.logger, "guard: decide gagal, siklus dilewati", {
+    logError(deps.logger, "guard: decide failed, cycle skipped", {
       account: deps.account,
       error,
     });
@@ -251,20 +251,20 @@ export async function runGuardCycle(
       // and recorded the repay as pending; passing it along is the only thing that stops
       // the next cycle from paying a second time. Returning the old `executeState` here is
       // bug C2.
-      logError(deps.logger, "guard: pengiriman repay gagal SETELAH mungkin terkirim", {
+      logError(deps.logger, "guard: the repay send failed AFTER it may have been sent", {
         account: deps.account,
         action: decision.action,
         error,
-        catatan:
-          "anggaran dan cooldown tetap dipotong; repay dicatat menggantung sampai " +
-          "rantai menunjukkan hutang berkurang",
+        note:
+          "the budget and cooldown are still charged; the repay is recorded as pending until " +
+          "the chain shows the debt reduced",
       });
       return {
         result: { ok: false, timestamp, account: deps.account, error },
         nextExecuteState: kegagalanSetelahKirim.stateAfterSend,
       };
     }
-    logError(deps.logger, "guard: eksekusi gagal, siklus dilewati", {
+    logError(deps.logger, "guard: execution failed, cycle skipped", {
       account: deps.account,
       action: decision.action,
       error,
@@ -290,7 +290,7 @@ export async function runGuardCycle(
     try {
       explanation = await deps.explainDecision(pos, decision);
     } catch (err) {
-      logError(deps.logger, "guard: penjelasan gagal, memakai alasan mentah", {
+      logError(deps.logger, "guard: the explanation failed, using the raw reason", {
         account: deps.account,
         error: toMessage(err),
       });
@@ -321,7 +321,7 @@ export async function runGuardCycle(
 /** Writes one cycle's record to the logger, with USD/HF values already formatted (never the raw basis). */
 function logCycleResult(logger: Logger, result: CycleResult): void {
   if (!result.ok) {
-    logError(logger, "guard: siklus gagal", {
+    logError(logger, "guard: cycle failed", {
       account: result.account,
       timestamp: result.timestamp,
       error: result.error,
@@ -329,11 +329,11 @@ function logCycleResult(logger: Logger, result: CycleResult): void {
     return;
   }
 
-  logInfo(logger, "guard: siklus selesai", {
+  logInfo(logger, "guard: cycle finished", {
     account: result.account,
     timestamp: result.timestamp,
     action: result.action,
-    healthFactor: result.healthFactor === null ? "tidak ada hutang" : formatHf(result.healthFactor),
+    healthFactor: result.healthFactor === null ? "no debt" : formatHf(result.healthFactor),
     sent: result.sent,
     amountSentUsd8: formatUsd8(result.amountSentUsd8),
     cappedPerAction: result.cappedPerAction,
@@ -411,7 +411,7 @@ export function startGuardLoop(
 ): GuardLoopHandle {
   if (!Number.isFinite(intervalMs) || intervalMs <= 0) {
     throw new Error(
-      `guard: intervalMs harus bilangan positif dan hingga, diterima ${intervalMs}.`,
+      `guard: intervalMs must be a positive, finite number, received ${intervalMs}.`,
     );
   }
 
@@ -432,7 +432,7 @@ export function startGuardLoop(
     try {
       await options.saveExecuteState(state);
     } catch (err) {
-      logError(deps.logger, "guard: gagal menyimpan state eksekusi, loop tetap berjalan", {
+      logError(deps.logger, "guard: failed to save the execution state, the loop keeps running", {
         account: deps.account,
         error: toMessage(err),
       });
@@ -486,7 +486,7 @@ export function startGuardLoop(
     kill: () => {
       killLatched = true;
       currentExecuteState = withKillLatch(currentExecuteState);
-      logInfo(deps.logger, "guard: kill switch ditarik, tidak ada transaksi baru yang dikirim", {
+      logInfo(deps.logger, "guard: kill switch pulled, no new transaction is sent", {
         account: deps.account,
       });
       // Persisted in the background: `kill()` must take effect in memory immediately, and

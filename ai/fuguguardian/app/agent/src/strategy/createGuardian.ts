@@ -189,7 +189,7 @@ export interface Guardian {
 
 function requireHexAddress(value: unknown, label: string): `0x${string}` {
   if (typeof value !== "string" || !/^0x[0-9a-fA-F]{40}$/.test(value)) {
-    throw new GuardianConfigError(`${label} bukan alamat yang sah: ${String(value)}`);
+    throw new GuardianConfigError(`${label} is not a valid address: ${String(value)}`);
   }
   return value as `0x${string}`;
 }
@@ -218,10 +218,10 @@ export async function createGuardian(config: GuardianConfig): Promise<Guardian> 
 
   if (!enabled) {
     throw new GuardianConfigError(
-      `Aset repay ${config.repayAsset} tidak aktif di pool ${config.pool}; tidak ada yang bisa dibayar.`,
+      `Repay asset ${config.repayAsset} is not enabled in pool ${config.pool}; there is nothing to repay.`,
     );
   }
-  const feed = requireHexAddress(feedRaw, `Feed harga aset ${config.repayAsset}`);
+  const feed = requireHexAddress(feedRaw, `The price feed for repay asset ${config.repayAsset}`);
 
   // Two independent sources for the token's decimals, plus a feed that must be 8 decimals.
   // This replaces the tautological "round-trip check" that used to be in the E2E script —
@@ -253,7 +253,7 @@ export async function createGuardian(config: GuardianConfig): Promise<Guardian> 
     })) as readonly [bigint, bigint, bigint, bigint, bigint];
     if (answer <= 0n) {
       throw new GuardianConfigError(
-        `Feed ${feed} melaporkan harga ${answer} untuk aset repay; konversi ditolak.`,
+        `Feed ${feed} reports a price of ${answer} for the repay asset; the conversion is refused.`,
       );
     }
     return answer;
@@ -266,19 +266,19 @@ export async function createGuardian(config: GuardianConfig): Promise<Guardian> 
   const toTokenUnits: SessionRepayDeps["toTokenUnits"] = async (asset, amountUsd8) => {
     const priceUsd8 = await readRepayPriceUsd8();
     const units = usd8ToTokenUnits(amountUsd8, tokenDecimals, priceUsd8);
-    log(`satuan: ${amountUsd8} (USD basis 8) -> ${units} unit token (${tokenDecimals} desimal)`);
+    log(`units: ${amountUsd8} (USD on the 8-decimal basis) -> ${units} token units (${tokenDecimals} decimals)`);
 
-    const saldo = (await config.client.readContract({
+    const balance = (await config.client.readContract({
       address: asset,
       abi: ERC20_ABI,
       functionName: "balanceOf",
       args: [config.account],
     })) as bigint;
-    if (saldo < units) {
+    if (balance < units) {
       // Fail BEFORE sending, rather than letting the transaction revert on chain and burn
       // gas for something one read could already have told us.
       throw new GuardianConfigError(
-        `Saldo token repay kurang: ${saldo} unit < ${units} unit yang dibutuhkan.`,
+        `Insufficient repay token balance: ${balance} units < the ${units} units required.`,
       );
     }
     return units;
@@ -306,18 +306,18 @@ export async function createGuardian(config: GuardianConfig): Promise<Guardian> 
   });
 
   // --- State: loaded from the store, NOT reset on every start ---------------
-  const tersimpan = await store.load();
-  let currentState: ExecuteState = tersimpan ?? initialExecuteState(now());
-  if (tersimpan === null) {
-    logInfo(config.logger, "guardian: tidak ada state tersimpan, memulai dari anggaran kosong", {
+  const stored = await store.load();
+  let currentState: ExecuteState = stored ?? initialExecuteState(now());
+  if (stored === null) {
+    logInfo(config.logger, "guardian: no stored state, starting from an empty budget", {
       account: config.account,
     });
   } else {
-    logInfo(config.logger, "guardian: state eksekusi dimuat dari store", {
+    logInfo(config.logger, "guardian: execution state loaded from the store", {
       account: config.account,
-      spentTodayUsd8: tersimpan.spentTodayUsd8.toString(),
-      killed: tersimpan.killed,
-      pendingRepay: tersimpan.pendingRepay !== null,
+      spentTodayUsd8: stored.spentTodayUsd8.toString(),
+      killed: stored.killed,
+      pendingRepay: stored.pendingRepay !== null,
     });
   }
 
@@ -364,7 +364,7 @@ export async function createGuardian(config: GuardianConfig): Promise<Guardian> 
         // protecting the position. Via `logError`, which swallows logger exceptions — a
         // logger that threw inside this `catch` would make `runOnce()` throw after the state
         // had already advanced.
-        logError(config.logger, "guardian: gagal menyimpan state eksekusi", {
+        logError(config.logger, "guardian: failed to save the execution state", {
           account: config.account,
           error: err instanceof Error ? err.message : String(err),
         });

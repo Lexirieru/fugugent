@@ -114,43 +114,43 @@ function config(overrides: Partial<GuardianConfig> = {}): GuardianConfig {
   };
 }
 
-describe("createGuardian — pemeriksaan saat konstruksi", () => {
-  it("menolak aset yang tidak aktif di pool sebelum satu siklus pun berjalan", async () => {
+describe("createGuardian — checks at construction", () => {
+  it("refuses an asset that is not enabled in the pool before a single cycle runs", async () => {
     const { client } = fakeClient({ enabled: false });
     await expect(createGuardian(config({ client }))).rejects.toThrow(GuardianConfigError);
   });
 
-  it("menolak desimal yang tidak disepakati pool dan kontrak token", async () => {
+  it("refuses decimals the pool and the token contract do not agree on", async () => {
     // Exactly the mistake the old round-trip check claimed to catch, and which in fact
     // slipped straight past it.
     const { client } = fakeClient({ tokenDecimalsPool: 17, tokenDecimalsToken: 18 });
     await expect(createGuardian(config({ client }))).rejects.toThrow(UnitConversionError);
   });
 
-  it("menolak feed harga yang bukan 8 desimal", async () => {
+  it("refuses a price feed that is not 8 decimals", async () => {
     const { client } = fakeClient({ feedDecimals: 18 });
     await expect(createGuardian(config({ client }))).rejects.toThrow(UnitConversionError);
   });
 
-  it("menolak harga nol atau negatif", async () => {
+  it("refuses a zero or negative price", async () => {
     const { client } = fakeClient({ hargaUsd8: 0n });
     await expect(createGuardian(config({ client }))).rejects.toThrow(GuardianConfigError);
   });
 
-  it("menolak izin sesi tanpa allowlist (calls kosong = izin tanpa batas di Altana)", async () => {
+  it("refuses session permissions with no allowlist (an empty calls = unlimited permission in Altana)", async () => {
     await expect(
       createGuardian(config({ permissions: { calls: [], spend: [{ limit: 1n, period: "day" }] } })),
     ).rejects.toThrow(SessionPermissionError);
   });
 
-  it("melaporkan konfigurasi aset yang DIBACA dari rantai, bukan yang diasumsikan", async () => {
+  it("reports the asset configuration READ from the chain, not one that was assumed", async () => {
     const g = await createGuardian(config());
     expect(g.repayAsset).toEqual({ asset: MUSD, feed: FEED, tokenDecimals: 18 });
   });
 });
 
-describe("createGuardian — satu siklus utuh tanpa jaringan", () => {
-  it("baca posisi -> decide -> execute -> kirim batch approve+repay lewat sesi", async () => {
+describe("createGuardian — one whole cycle with no network", () => {
+  it("read the position -> decide -> execute -> send an approve+repay batch through the session", async () => {
     const sendCalls = fakeSendCalls();
     const g = await createGuardian(config({ sendCalls }));
 
@@ -177,7 +177,7 @@ describe("createGuardian — satu siklus utuh tanpa jaringan", () => {
     expect(nextExecuteState.pendingRepay).toBeNull();
   });
 
-  it("saldo token kurang -> tidak ada batch yang dikirim sama sekali", async () => {
+  it("an insufficient token balance -> no batch is sent at all", async () => {
     const sendCalls = fakeSendCalls();
     const { client } = fakeClient({ saldo: 1n });
     const g = await createGuardian(config({ client, sendCalls }));
@@ -188,7 +188,7 @@ describe("createGuardian — satu siklus utuh tanpa jaringan", () => {
     expect(sendCalls).not.toHaveBeenCalled();
   });
 
-  it("allowance sudah cukup -> batch hanya berisi repay", async () => {
+  it("an allowance that is already enough -> the batch carries only the repay", async () => {
     const sendCalls = fakeSendCalls();
     const { client } = fakeClient({ allowance: 10n ** 30n });
     const g = await createGuardian(config({ client, sendCalls }));
@@ -199,7 +199,7 @@ describe("createGuardian — satu siklus utuh tanpa jaringan", () => {
     expect(batch.map((c) => c.functionName)).toEqual(["repay"]);
   });
 
-  it("posisi dibaca ditambatkan ke satu blok, dan bloknya ikut ke Position", async () => {
+  it("the position is read anchored to a single block, and that block travels into Position", async () => {
     const { client } = fakeClient({ blockNumber: 129_912_345n });
     const g = await createGuardian(config({ client }));
     const pos = await g.readPosition();
@@ -209,7 +209,7 @@ describe("createGuardian — satu siklus utuh tanpa jaringan", () => {
 });
 
 describe("createGuardian — state persisten (C3)", () => {
-  it("memuat state tersimpan alih-alih memulai dari anggaran kosong", async () => {
+  it("loads the stored state instead of starting from an empty budget", async () => {
     const tersimpan: ExecuteState = {
       ...initialExecuteState(1_700_000_000),
       spentTodayUsd8: 199_000_000_000n, // only $10 left of the $2,000 cap
@@ -229,7 +229,7 @@ describe("createGuardian — state persisten (C3)", () => {
     expect(result.cappedPerDay).toBe(true);
   });
 
-  it("state disimpan setelah siklus, sehingga proses berikutnya mewarisi anggaran", async () => {
+  it("the state is saved after the cycle, so the next process inherits the budget", async () => {
     const store = createMemoryStateStore();
     const g1 = await createGuardian(config({ stateStore: store }));
     const { result } = await g1.runOnce();
@@ -243,7 +243,7 @@ describe("createGuardian — state persisten (C3)", () => {
     expect(g2.getExecuteState().spentTodayUsd8).toBe(tersimpan?.spentTodayUsd8);
   });
 
-  it("state tersimpan dengan killed:true menolak mengirim setelah restart", async () => {
+  it("a stored state with killed:true refuses to send after a restart", async () => {
     const sendCalls = fakeSendCalls();
     const store = createMemoryStateStore({ ...initialExecuteState(1_700_000_000), killed: true });
     const g = await createGuardian(config({ stateStore: store, sendCalls }));
@@ -255,7 +255,7 @@ describe("createGuardian — state persisten (C3)", () => {
     expect(sendCalls).not.toHaveBeenCalled();
   });
 
-  it("kill() lewat handle loop menghentikan pengiriman dan tersimpan ke store", async () => {
+  it("kill() via the loop handle stops sending and is persisted to the store", async () => {
     vi.useFakeTimers();
     try {
       const sendCalls = fakeSendCalls();
@@ -284,7 +284,7 @@ describe("createGuardian — state persisten (C3)", () => {
 });
 
 describe("createGuardian — C2 lewat rantai lengkap", () => {
-  it("sendCalls melempar setelah tx mendarat: siklus berikutnya TIDAK mengirim ulang", async () => {
+  it("sendCalls throws after the tx landed: the next cycle does NOT resend", async () => {
     vi.useFakeTimers();
     try {
       // The chain does not show the debt falling (a lost receipt, a stale node), so
@@ -314,7 +314,7 @@ describe("createGuardian — C2 lewat rantai lengkap", () => {
   });
 });
 
-describe("createGuardian — store berkas sungguhan melewati 'kematian proses'", () => {
+describe("createGuardian — a real file store surviving a 'process death'", () => {
   let dir: string;
 
   beforeEach(async () => {
@@ -325,7 +325,7 @@ describe("createGuardian — store berkas sungguhan melewati 'kematian proses'",
     await rm(dir, { recursive: true, force: true });
   });
 
-  it("catatan menggantung sudah ada di BERKAS pada detik batch dikirim, bukan setelah siklus", async () => {
+  it("the pending record is already IN THE FILE the moment the batch is sent, not after the cycle", async () => {
     // `waitForTransactionReceipt` waits up to 180 seconds. A process that dies inside that
     // window never finishes its cycle, so anything saved "after the cycle" is never saved at
     // all. That is exactly what is tested here: the cycle DELIBERATELY never completes.
@@ -350,7 +350,7 @@ describe("createGuardian — store berkas sungguhan melewati 'kematian proses'",
     expect(isi?.spentTodayUsd8).toBeGreaterThan(0n);
   });
 
-  it("restart setelah kegagalan tunggu-receipt TIDAK membayar lagi", async () => {
+  it("a restart after a receipt-wait failure does NOT pay again", async () => {
     const file = path.join(dir, "state.json");
 
     // The first process: the batch fails with a receipt timeout.
@@ -375,11 +375,11 @@ describe("createGuardian — store berkas sungguhan melewati 'kematian proses'",
     expect(sendCalls2).not.toHaveBeenCalled();
     expect(kedua.result.ok).toBe(true);
     expect(kedua.result.ok === true ? kedua.result.executeReason : "").toMatch(
-      /belum terbukti selesai/i,
+      /has not yet been proven complete/i,
     );
   });
 
-  it("restart membebaskan diri sendiri begitu rantai menunjukkan hutang turun sebesar yang dibayar", async () => {
+  it("a restart frees itself once the chain shows the debt fell by what was paid", async () => {
     const file = path.join(dir, "state.json");
     const sendCalls1 = fakeSendCalls(async () => {
       throw new Error("waitForTransactionReceipt timeout setelah 180s");

@@ -33,9 +33,9 @@ export function buildModel(): LanguageModel {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error(
-      "OPENAI_API_KEY belum diisi di .studio/.env.local. " +
-        "Isi dengan API key dGrid — nama variabelnya mengikuti konvensi provider 'openai' " +
-        "di studio.toml, tetapi endpoint-nya diarahkan ke dGrid.",
+      "OPENAI_API_KEY is not set in .studio/.env.local. " +
+        "Set it to the dGrid API key — the variable name follows the 'openai' provider convention " +
+        "in studio.toml, but the endpoint is pointed at dGrid.",
     );
   }
 

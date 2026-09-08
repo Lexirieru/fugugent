@@ -78,7 +78,7 @@ function deps(overrides: Partial<ExecuteDeps> = {}): ExecuteDeps {
 }
 
 describe("executeDecision", () => {
-  it("aturan 1: kill switch mutlak, tidak pernah mengirim", async () => {
+  it("rule 1: the kill switch is absolute, it never sends", async () => {
     const d = decisionWith("EMERGENCY", 50_000_000_000n);
     const s = state({ killed: true });
     const dep = deps();
@@ -88,7 +88,7 @@ describe("executeDecision", () => {
     expect(dep.sendRepay).not.toHaveBeenCalled();
   });
 
-  it("aturan 1: kill switch mengalahkan segalanya, bahkan saat semua batas lain longgar", async () => {
+  it("rule 1: the kill switch beats everything, even when every other limit is loose", async () => {
     const d = decisionWith("PARTIAL_REPAY", 1_000n);
     const s = state({ killed: true, lastActionAt: 1_000_000 });
     const dep = deps({ now: () => 1_000_000 + 999_999 });
@@ -98,7 +98,7 @@ describe("executeDecision", () => {
     expect(dep.sendRepay).not.toHaveBeenCalled();
   });
 
-  it.each(["NONE", "WARN"] as const)("aturan 2: aksi %s tidak pernah mengirim", async (action) => {
+  it.each(["NONE", "WARN"] as const)("rule 2: a %s action never sends", async (action) => {
     const d = decisionWith(action, 0n);
     const dep = deps();
     const result = await executeDecision(d, POS, limits(), state(), dep);
@@ -107,8 +107,8 @@ describe("executeDecision", () => {
     expect(dep.sendRepay).not.toHaveBeenCalled();
   });
 
-  it("aturan 3: jumlah melebihi batas per-aksi dipotong, bukan ditolak", async () => {
-    const d = decisionWith("PARTIAL_REPAY", 200_000_000_000n); // $2000, batas $1000
+  it("rule 3: an amount above the per-action cap is capped, not rejected", async () => {
+    const d = decisionWith("PARTIAL_REPAY", 200_000_000_000n); // $2000, cap $1000
     const dep = deps();
     const result = await executeDecision(d, POS, limits(), state(), dep);
 
@@ -118,7 +118,7 @@ describe("executeDecision", () => {
     expect(dep.sendRepay).toHaveBeenCalledWith(expect.anything(), 100_000_000_000n);
   });
 
-  it("tidak memotong bila jumlah masih di bawah batas per-aksi", async () => {
+  it("does not cap when the amount is still below the per-action limit", async () => {
     const d = decisionWith("PARTIAL_REPAY", 50_000_000_000n); // $500
     const dep = deps();
     const result = await executeDecision(d, POS, limits(), state(), dep);
@@ -128,7 +128,7 @@ describe("executeDecision", () => {
     expect(result.amountSentUsd8).toBe(50_000_000_000n);
   });
 
-  it("aturan 4: jumlah melebihi sisa anggaran harian dipotong ke sisa", async () => {
+  it("rule 4: an amount above the remaining daily budget is capped to what is left", async () => {
     const d = decisionWith("PARTIAL_REPAY", 80_000_000_000n); // $800, below the per-action cap
     const s = state({ spentTodayUsd8: 450_000_000_000n }); // left of $5000: $500
     const dep = deps();
@@ -140,7 +140,7 @@ describe("executeDecision", () => {
     expect(dep.sendRepay).toHaveBeenCalledWith(expect.anything(), 50_000_000_000n);
   });
 
-  it("pemotongan per-aksi dan harian berlaku bersamaan", async () => {
+  it("the per-action and daily caps apply together", async () => {
     // suggestedRepayBase ($2000) > maxPerActionUsd8 ($1000) > the daily remainder ($300)
     const d = decisionWith("PARTIAL_REPAY", 200_000_000_000n);
     const s = state({ spentTodayUsd8: 470_000_000_000n }); // left of $5000: $300
@@ -156,7 +156,7 @@ describe("executeDecision", () => {
     expect(dep.sendRepay).toHaveBeenCalledWith(expect.anything(), 30_000_000_000n);
   });
 
-  it("aturan 4: sisa anggaran harian nol -> tidak mengirim", async () => {
+  it("rule 4: a zero remaining daily budget -> does not send", async () => {
     const d = decisionWith("PARTIAL_REPAY", 10_000_000_000n);
     const s = state({ spentTodayUsd8: 500_000_000_000n }); // already exhausted
     const dep = deps();
@@ -166,7 +166,7 @@ describe("executeDecision", () => {
     expect(dep.sendRepay).not.toHaveBeenCalled();
   });
 
-  it("aturan 5: cooldown menolak sebelum minIntervalSeconds terlewati", async () => {
+  it("rule 5: the cooldown refuses before minIntervalSeconds has passed", async () => {
     const d = decisionWith("PARTIAL_REPAY", 10_000_000_000n);
     const s = state({ lastActionAt: 1_000_000 });
     const dep = deps({ now: () => 1_000_000 + 299 }); // minIntervalSeconds default 300
@@ -176,7 +176,7 @@ describe("executeDecision", () => {
     expect(dep.sendRepay).not.toHaveBeenCalled();
   });
 
-  it("aturan 5: cooldown mengizinkan tepat setelah minIntervalSeconds terlewati", async () => {
+  it("rule 5: the cooldown allows exactly once minIntervalSeconds has passed", async () => {
     const d = decisionWith("PARTIAL_REPAY", 10_000_000_000n);
     const s = state({ lastActionAt: 1_000_000 });
     const dep = deps({ now: () => 1_000_000 + 300 });
@@ -186,7 +186,7 @@ describe("executeDecision", () => {
     expect(dep.sendRepay).toHaveBeenCalledOnce();
   });
 
-  it("aturan 6: setelah kirim berhasil, spentTodayUsd8 dan lastActionAt diperbarui", async () => {
+  it("rule 6: after a successful send, spentTodayUsd8 and lastActionAt are updated", async () => {
     const d = decisionWith("PARTIAL_REPAY", 10_000_000_000n);
     const s = state({ spentTodayUsd8: 5_000_000_000n, dayStartedAt: 1_000_000, lastActionAt: 0 });
     const dep = deps({ now: () => 1_000_500 });
@@ -198,7 +198,7 @@ describe("executeDecision", () => {
     expect(result.state.dayStartedAt).toBe(1_000_000);
   });
 
-  it("aturan 6: anggaran harian direset bila sudah lewat 24 jam", async () => {
+  it("rule 6: the daily budget resets once 24 hours have passed", async () => {
     const d = decisionWith("PARTIAL_REPAY", 10_000_000_000n);
     const s = state({ spentTodayUsd8: 499_000_000_000n, dayStartedAt: 1_000_000, lastActionAt: 0 });
     const dep = deps({ now: () => 1_000_000 + 86_401 });
@@ -211,7 +211,7 @@ describe("executeDecision", () => {
     expect(result.state.dayStartedAt).toBe(1_000_000 + 86_401);
   });
 
-  it("tidak mengirim apa pun ke jaringan sungguhan — sendRepay selalu dependency yang disuntikkan", async () => {
+  it("sends nothing to a real network — sendRepay is always an injected dependency", async () => {
     const d = decisionWith("EMERGENCY", 10_000_000_000n);
     const dep = deps();
     await executeDecision(d, POS, limits(), state(), dep);
@@ -228,14 +228,14 @@ describe("executeDecision", () => {
   // replaced, not quietly deleted.
   // ————————————————————————————————————————————————————————————————
 
-  it("kegagalan kirim yang tidak bertanda TETAP memotong anggaran dan mencatat repay menggantung", async () => {
+  it("an unmarked send failure STILL charges the budget and records a pending repay", async () => {
     const d = decisionWith("PARTIAL_REPAY", 10_000_000_000n);
     const s = state({ spentTodayUsd8: 5_000_000_000n, dayStartedAt: 1_000_000, lastActionAt: 0 });
     const dep = deps({
       sendRepay: vi.fn(async () => {
         // The failure shape that is the whole reason this rule exists: the transaction landed,
         // only reading its receipt failed.
-        throw new Error("waitForTransactionReceipt timeout setelah 180s");
+        throw new Error("waitForTransactionReceipt timed out after 180s");
       }),
       now: () => 1_000_500,
     });
@@ -245,7 +245,7 @@ describe("executeDecision", () => {
     expect(err).toBeInstanceOf(RepaySendError);
     const sendErr = err as RepaySendError;
     // The original error must not be lost: the caller still has to be able to read it.
-    expect(sendErr.message).toContain("waitForTransactionReceipt timeout");
+    expect(sendErr.message).toContain("waitForTransactionReceipt timed out");
     expect(sendErr.cause).toBeInstanceOf(Error);
 
     // The budget AND the cooldown have both moved, because the money may already be gone.
@@ -268,43 +268,43 @@ describe("executeDecision", () => {
     expect(s.pendingRepay).toBeNull();
   });
 
-  it("galat yang menyatakan dirinya belum menyentuh jaringan dilempar apa adanya, anggaran utuh", async () => {
+  it("an error declaring it never touched the network is rethrown as-is, the budget intact", async () => {
     const d = decisionWith("PARTIAL_REPAY", 10_000_000_000n);
-    const asli = new NeverSentError("aset repay bukan yang di-allowlist; menolak mengirim apa pun");
-    const dep = deps({ sendRepay: vi.fn(async () => { throw asli; }) });
+    const original = new NeverSentError("the repay asset is not the allowlisted one; refusing to send anything");
+    const dep = deps({ sendRepay: vi.fn(async () => { throw original; }) });
 
     const err = await executeDecision(d, POS, limits(), state(), dep).catch((e: unknown) => e);
 
     // Not a RepaySendError: no budget is deducted and nothing is left pending.
-    expect(err).toBe(asli);
+    expect(err).toBe(original);
     expect(err).not.toBeInstanceOf(RepaySendError);
   });
 
-  it("galat berbentuk objek biasa dengan neverSent:true juga dihormati (bukan lewat instanceof)", async () => {
+  it("a plain object error with neverSent:true is honored too (not via instanceof)", async () => {
     const d = decisionWith("PARTIAL_REPAY", 10_000_000_000n);
     // `chain/session.ts` marks its own errors via a property so it does not have to inherit
     // a class from execute.ts.
-    const asli = Object.assign(new Error("konversi menghasilkan nol unit token"), {
+    const original = Object.assign(new Error("the conversion yields zero token units"), {
       neverSent: true as const,
     });
-    const dep = deps({ sendRepay: vi.fn(async () => { throw asli; }) });
+    const dep = deps({ sendRepay: vi.fn(async () => { throw original; }) });
 
-    await expect(executeDecision(d, POS, limits(), state(), dep)).rejects.toBe(asli);
+    await expect(executeDecision(d, POS, limits(), state(), dep)).rejects.toBe(original);
   });
 
-  it("aturan 2: repay menggantung menahan SEMUA pengiriman baru, bahkan saat batas lain longgar", async () => {
+  it("rule 2: a pending repay holds back EVERY new send, even when the other limits are loose", async () => {
     const d = decisionWith("EMERGENCY", 10_000_000_000n);
     const s = state({ pendingRepay: pending() });
-    const dep = deps({ now: () => 9_999_999 }); // cooldown pasti terlewati
+    const dep = deps({ now: () => 9_999_999 }); // the cooldown has definitely passed
 
     const result = await executeDecision(d, POS, limits({ minIntervalSeconds: 0 }), s, dep);
 
     expect(result.sent).toBe(false);
-    expect(result.reason).toMatch(/belum terbukti selesai/i);
+    expect(result.reason).toMatch(/has not yet been proven complete/i);
     expect(dep.sendRepay).not.toHaveBeenCalled();
   });
 
-  it("kirim berhasil tidak meninggalkan apa pun menggantung", async () => {
+  it("a successful send leaves nothing pending", async () => {
     const d = decisionWith("PARTIAL_REPAY", 10_000_000_000n);
     const result = await executeDecision(d, POS, limits(), state(), deps());
 
@@ -314,65 +314,65 @@ describe("executeDecision", () => {
 });
 
 describe("reconcilePendingRepay", () => {
-  it("hutang berkurang PERSIS sebesar yang kita bayar, di blok lebih baru = terbukti mendarat", () => {
+  it("the debt fell by EXACTLY what we paid, at a newer block = proven to have landed", () => {
     const s = state({ spentTodayUsd8: 10_000_000_000n, pendingRepay: pending() });
-    const sesudah = reconcilePendingRepay(s, {
+    const after = reconcilePendingRepay(s, {
       ...POS,
       blockNumber: POS.blockNumber + 1n,
       debtBase: POS.debtBase - 10_000_000_000n, // = pending().amountUsd8
     });
 
-    expect(sesudah.pendingRepay).toBeNull();
+    expect(after.pendingRepay).toBeNull();
     // The budget already deducted is NOT refunded: the transaction did go through.
-    expect(sesudah.spentTodayUsd8).toBe(10_000_000_000n);
+    expect(after.spentTodayUsd8).toBe(10_000_000_000n);
   });
 
   it.each([
-    ["user membayar sendiri $1 selagi tx kita tersangkut", 100_000_000n],
-    ["likuidasi parsial pihak ketiga jauh lebih besar", 50_000_000_000n],
-    ["hanya berkurang satu unit (sisa pembulatan, bukan pembayaran kita)", 1n],
+    ["the user repaid $1 themselves while our tx was stuck", 100_000_000n],
+    ["a third-party partial liquidation, far larger", 50_000_000_000n],
+    ["a fall of only one unit (a rounding remainder, not our payment)", 1n],
   ])(
-    "hutang berkurang oleh SEBAB LAIN (%s) TIDAK dianggap bukti repay kita mendarat",
-    (_label, turun) => {
+    "a debt that fell for ANOTHER REASON (%s) is NOT taken as proof our repay landed",
+    (_label, drop) => {
       // This is what separates "the debt fell" from "the debt fell by exactly what we paid".
       // Without that distinction our record is cleared too early, Guardian is free to act,
       // and then the first tx lands -> two payments.
       const s = state({ pendingRepay: pending() });
-      const sesudah = reconcilePendingRepay(s, {
+      const after = reconcilePendingRepay(s, {
         ...POS,
         blockNumber: POS.blockNumber + 10n,
-        debtBase: POS.debtBase - (turun as bigint),
+        debtBase: POS.debtBase - (drop as bigint),
       });
-      expect(sesudah.pendingRepay).toEqual(pending());
+      expect(after.pendingRepay).toEqual(pending());
     },
   );
 
   it.each([-2n, -1n, 0n, 1n, 2n])(
-    "selisih pembulatan %s unit masih diterima (dua floor yang saling bebas)",
-    (geser) => {
+    "a rounding difference of %s units is still accepted (two independent floors)",
+    (shift) => {
       const s = state({ pendingRepay: pending() });
-      const sesudah = reconcilePendingRepay(s, {
+      const after = reconcilePendingRepay(s, {
         ...POS,
         blockNumber: POS.blockNumber + 1n,
-        debtBase: POS.debtBase - (10_000_000_000n + (geser as bigint)),
+        debtBase: POS.debtBase - (10_000_000_000n + (shift as bigint)),
       });
-      expect(sesudah.pendingRepay).toBeNull();
+      expect(after.pendingRepay).toBeNull();
     },
   );
 
-  it("selisih 3 unit sudah di luar toleransi dan ditolak", () => {
+  it("a 3-unit difference is already outside the tolerance and is refused", () => {
     const s = state({ pendingRepay: pending() });
-    const sesudah = reconcilePendingRepay(s, {
+    const after = reconcilePendingRepay(s, {
       ...POS,
       blockNumber: POS.blockNumber + 1n,
       debtBase: POS.debtBase - (10_000_000_000n + 3n),
     });
-    expect(sesudah.pendingRepay).toEqual(pending());
+    expect(after.pendingRepay).toEqual(pending());
   });
 
-  it("hutang belum berkurang = belum terbukti -> catatan DIBIARKAN, walau blok sudah maju jauh", () => {
+  it("the debt has not fallen = not yet proven -> the record is LEFT IN PLACE, even far ahead in blocks", () => {
     const s = state({ pendingRepay: pending() });
-    const sesudah = reconcilePendingRepay(s, {
+    const after = reconcilePendingRepay(s, {
       ...POS,
       blockNumber: POS.blockNumber + 10_000n,
       debtBase: POS.debtBase,
@@ -380,36 +380,36 @@ describe("reconcilePendingRepay", () => {
 
     // A transaction still in the mempool can land at any moment; "not seen yet" never means
     // "will not happen".
-    expect(sesudah.pendingRepay).toEqual(pending());
+    expect(after.pendingRepay).toEqual(pending());
   });
 
-  it("hutang berkurang tapi bacaan dari blok yang sama/lebih tua tidak dianggap bukti", () => {
+  it("a fallen debt read from the same or an older block is not taken as proof", () => {
     const s = state({ pendingRepay: pending() });
-    const sesudah = reconcilePendingRepay(s, {
+    const after = reconcilePendingRepay(s, {
       ...POS,
       blockNumber: POS.blockNumber,
       debtBase: POS.debtBase - 10_000_000_000n,
     });
 
-    expect(sesudah.pendingRepay).toEqual(pending());
+    expect(after.pendingRepay).toEqual(pending());
   });
 
-  it("tanpa catatan menggantung, state dikembalikan apa adanya", () => {
+  it("with no pending record, the state is returned as-is", () => {
     const s = state();
     expect(reconcilePendingRepay(s, POS)).toBe(s);
   });
 
-  it("executeDecision merekonsiliasi sendiri sebelum aturan apa pun, lalu boleh mengirim lagi", async () => {
+  it("executeDecision reconciles by itself before any rule, and may then send again", async () => {
     const d = decisionWith("PARTIAL_REPAY", 10_000_000_000n);
     const s = state({ pendingRepay: pending(), lastActionAt: 0 });
-    const posBaru: Position = {
+    const newPos: Position = {
       ...POS,
       blockNumber: POS.blockNumber + 1n,
       debtBase: POS.debtBase - 10_000_000_000n, // = pending().amountUsd8
     };
     const dep = deps();
 
-    const result = await executeDecision(d, posBaru, limits(), s, dep);
+    const result = await executeDecision(d, newPos, limits(), s, dep);
 
     expect(result.sent).toBe(true);
     expect(result.state.pendingRepay).toBeNull();
@@ -418,30 +418,30 @@ describe("reconcilePendingRepay", () => {
 });
 
 describe("clearPendingRepay", () => {
-  it("jalan keluar operator: catatan dibuang, anggaran yang sudah terpotong tidak dikembalikan", () => {
+  it("the operator's way out: the record is dropped, the budget already charged is not refunded", () => {
     const s = state({ spentTodayUsd8: 10_000_000_000n, pendingRepay: pending() });
-    const sesudah = clearPendingRepay(s);
+    const after = clearPendingRepay(s);
 
-    expect(sesudah.pendingRepay).toBeNull();
-    expect(sesudah.spentTodayUsd8).toBe(10_000_000_000n);
+    expect(after.pendingRepay).toBeNull();
+    expect(after.spentTodayUsd8).toBe(10_000_000_000n);
   });
 });
 
-describe("persistBeforeSend — catatan menggantung menyentuh disk SEBELUM tx berangkat", () => {
-  it("saat sendRepay dipanggil, state yang sudah tersimpan SUDAH memuat pendingRepay", async () => {
+describe("persistBeforeSend — the pending record touches disk BEFORE the tx leaves", () => {
+  it("by the time sendRepay is called, the saved state ALREADY carries pendingRepay", async () => {
     // This simulates the process dying inside the 180-second receipt wait: whatever is saved
     // at the MOMENT sendRepay is called is exactly what a restart will find. If
     // `persistBeforeSend` is not called before sending, what shows up here is `null` — and
     // the restart pays again.
-    const tersimpan: ExecuteState[] = [];
-    let terlihatSaatKirim: ExecuteState | undefined;
+    const saved: ExecuteState[] = [];
+    let seenAtSendTime: ExecuteState | undefined;
     const d = decisionWith("PARTIAL_REPAY", 10_000_000_000n);
     const dep = deps({
       persistBeforeSend: (s) => {
-        tersimpan.push(s);
+        saved.push(s);
       },
       sendRepay: vi.fn(async () => {
-        terlihatSaatKirim = tersimpan.at(-1);
+        seenAtSendTime = saved.at(-1);
         return "0xdeadbeef" as `0x${string}`;
       }),
       now: () => 1_000_500,
@@ -449,21 +449,21 @@ describe("persistBeforeSend — catatan menggantung menyentuh disk SEBELUM tx be
 
     await executeDecision(d, POS, limits(), state(), dep);
 
-    expect(terlihatSaatKirim).toBeDefined();
-    expect(terlihatSaatKirim?.pendingRepay).not.toBeNull();
-    expect(terlihatSaatKirim?.pendingRepay?.amountUsd8).toBe(10_000_000_000n);
-    expect(terlihatSaatKirim?.spentTodayUsd8).toBe(10_000_000_000n);
-    expect(terlihatSaatKirim?.lastActionAt).toBe(1_000_500);
+    expect(seenAtSendTime).toBeDefined();
+    expect(seenAtSendTime?.pendingRepay).not.toBeNull();
+    expect(seenAtSendTime?.pendingRepay?.amountUsd8).toBe(10_000_000_000n);
+    expect(seenAtSendTime?.spentTodayUsd8).toBe(10_000_000_000n);
+    expect(seenAtSendTime?.lastActionAt).toBe(1_000_500);
   });
 
-  it("penyimpanan gagal -> TIDAK mengirim apa pun, dan galatnya bertanda neverSent", async () => {
+  it("a failed save -> sends NOTHING, and its error is marked neverSent", async () => {
     // Fail closed: sending with no trace that could hold back a second payment is worse than
     // not sending at all.
     const d = decisionWith("PARTIAL_REPAY", 10_000_000_000n);
     const sendRepay = vi.fn(async () => "0xdeadbeef" as `0x${string}`);
     const dep = deps({
       persistBeforeSend: () => {
-        throw new Error("disk penuh");
+        throw new Error("the disk is full");
       },
       sendRepay,
     });
@@ -472,20 +472,20 @@ describe("persistBeforeSend — catatan menggantung menyentuh disk SEBELUM tx be
 
     expect(sendRepay).not.toHaveBeenCalled();
     expect(err).toBeInstanceOf(NeverSentError);
-    expect((err as NeverSentError).message).toContain("disk penuh");
+    expect((err as NeverSentError).message).toContain("the disk is full");
     expect(err).not.toBeInstanceOf(RepaySendError);
   });
 
-  it("tanpa persistBeforeSend, pengiriman tetap jalan (kait ini opsional)", async () => {
+  it("without persistBeforeSend, sending still works (the hook is optional)", async () => {
     const d = decisionWith("PARTIAL_REPAY", 10_000_000_000n);
     const dep = deps();
-    const hasil = await executeDecision(d, POS, limits(), state(), dep);
-    expect(hasil.sent).toBe(true);
+    const result = await executeDecision(d, POS, limits(), state(), dep);
+    expect(result.sent).toBe(true);
   });
 });
 
-describe("asRepaySendFailure — pengenalan duck-typed, bukan instanceof", () => {
-  const contohState: ExecuteState = {
+describe("asRepaySendFailure — duck-typed recognition, not instanceof", () => {
+  const sampleState: ExecuteState = {
     spentTodayUsd8: 10_000_000_000n,
     dayStartedAt: 1_000_000,
     lastActionAt: 1_000_500,
@@ -500,43 +500,43 @@ describe("asRepaySendFailure — pengenalan duck-typed, bukan instanceof", () =>
     },
   };
 
-  it("mengenali RepaySendError yang asli", () => {
-    const err = new RepaySendError("gagal", contohState);
-    expect(asRepaySendFailure(err)?.stateAfterSend).toEqual(contohState);
+  it("recognizes a genuine RepaySendError", () => {
+    const err = new RepaySendError("failed", sampleState);
+    expect(asRepaySendFailure(err)?.stateAfterSend).toEqual(sampleState);
   });
 
-  it("mengenali galat yang BUKAN instanceof tetapi membawa penanda yang sama", () => {
+  it("recognizes an error that is NOT instanceof but carries the same marker", () => {
     // Two copies of the `execute.js` module in the dependency tree produce exactly this: the
     // shape is right, the class is not the same one. `instanceof` would miss it.
-    const asing = Object.assign(new Error("dari salinan modul lain"), {
+    const foreign = Object.assign(new Error("from another copy of the module"), {
       repaySendFailure: true,
-      stateAfterSend: contohState,
+      stateAfterSend: sampleState,
     });
-    expect(asing instanceof RepaySendError).toBe(false);
-    expect(asRepaySendFailure(asing)?.stateAfterSend).toEqual(contohState);
+    expect(foreign instanceof RepaySendError).toBe(false);
+    expect(asRepaySendFailure(foreign)?.stateAfterSend).toEqual(sampleState);
   });
 
-  it("menelusuri rantai cause — pembungkus backend tidak menghilangkan state", () => {
-    const asli = new RepaySendError("gagal", contohState);
-    const dibungkus = new Error("gagal menjalankan siklus (telemetri)", { cause: asli });
-    expect(dibungkus instanceof RepaySendError).toBe(false);
-    expect(asRepaySendFailure(dibungkus)?.stateAfterSend).toEqual(contohState);
+  it("walks the cause chain — a backend wrapper does not lose the state", () => {
+    const original = new RepaySendError("failed", sampleState);
+    const wrapped = new Error("failed to run the cycle (telemetry)", { cause: original });
+    expect(wrapped instanceof RepaySendError).toBe(false);
+    expect(asRepaySendFailure(wrapped)?.stateAfterSend).toEqual(sampleState);
   });
 
   it.each([
-    ["galat biasa", new Error("RPC 502")],
+    ["an ordinary error", new Error("RPC 502")],
     ["null", null],
-    ["string", "gagal"],
-    ["penanda tanpa state", Object.assign(new Error("x"), { repaySendFailure: true })],
+    ["a string", "failed"],
+    ["a marker with no state", Object.assign(new Error("x"), { repaySendFailure: true })],
     [
-      "penanda dengan state palsu",
+      "a marker with a bogus state",
       Object.assign(new Error("x"), { repaySendFailure: true, stateAfterSend: { spentTodayUsd8: "10" } }),
     ],
-  ])("mengembalikan null untuk %s — state lama yang berlaku", (_l, err) => {
+  ])("returns null for %s — the old state stands", (_l, err) => {
     expect(asRepaySendFailure(err)).toBeNull();
   });
 
-  it("rantai cause melingkar tidak membuatnya berputar selamanya", () => {
+  it("a circular cause chain does not make it loop forever", () => {
     const a: { cause?: unknown } = new Error("a");
     const b: { cause?: unknown } = new Error("b", { cause: a });
     a.cause = b;

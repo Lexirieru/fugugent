@@ -49,7 +49,7 @@ export class UnitConversionError extends Error {
 function assertDecimals(tokenDecimals: number): void {
   if (!Number.isInteger(tokenDecimals) || tokenDecimals < 0 || tokenDecimals > MAX_TOKEN_DECIMALS) {
     throw new UnitConversionError(
-      `Desimal token ${tokenDecimals} tidak masuk akal (harus bilangan bulat 0..${MAX_TOKEN_DECIMALS}).`,
+      `Token decimals ${tokenDecimals} make no sense (must be an integer in 0..${MAX_TOKEN_DECIMALS}).`,
     );
   }
 }
@@ -57,7 +57,7 @@ function assertDecimals(tokenDecimals: number): void {
 function assertPrice(priceUsd8: bigint): void {
   if (priceUsd8 <= 0n) {
     throw new UnitConversionError(
-      `Harga ${priceUsd8} (USD basis 8 desimal) bukan angka positif; konversi ditolak.`,
+      `Price ${priceUsd8} (USD on the 8-decimal basis) is not a positive number; the conversion is refused.`,
     );
   }
 }
@@ -76,7 +76,7 @@ export function usd8ToTokenUnits(
   assertDecimals(tokenDecimals);
   assertPrice(priceUsd8);
   if (amountUsd8 < 0n) {
-    throw new UnitConversionError(`Jumlah ${amountUsd8} negatif; konversi ditolak.`);
+    throw new UnitConversionError(`Amount ${amountUsd8} is negative; the conversion is refused.`);
   }
   return (amountUsd8 * 10n ** BigInt(tokenDecimals)) / priceUsd8;
 }
@@ -94,7 +94,7 @@ export function tokenUnitsToUsd8(
   assertDecimals(tokenDecimals);
   assertPrice(priceUsd8);
   if (units < 0n) {
-    throw new UnitConversionError(`Jumlah unit ${units} negatif; konversi ditolak.`);
+    throw new UnitConversionError(`Unit amount ${units} is negative; the conversion is refused.`);
   }
   return (units * priceUsd8) / 10n ** BigInt(tokenDecimals);
 }
@@ -114,10 +114,10 @@ export function assertTokenDecimalsAgree(
   assertDecimals(fromTokenContract);
   if (fromPoolConfig !== fromTokenContract) {
     throw new UnitConversionError(
-      `Desimal aset ${asset} tidak konsisten: konfigurasi pool menyebut ${fromPoolConfig}, ` +
-        `kontrak tokennya sendiri menyebut ${fromTokenContract}. Salah satunya salah, dan ` +
-        `memakai yang keliru membuat jumlah yang dikirim meleset ` +
-        `10^${Math.abs(fromPoolConfig - fromTokenContract)} kali lipat.`,
+      `The decimals for asset ${asset} are inconsistent: the pool configuration says ${fromPoolConfig}, ` +
+        `while the token contract itself says ${fromTokenContract}. One of them is wrong, and ` +
+        `using the wrong one makes the amount sent miss by ` +
+        `a factor of 10^${Math.abs(fromPoolConfig - fromTokenContract)}.`,
     );
   }
 }
@@ -131,9 +131,9 @@ export function assertTokenDecimalsAgree(
 export function assertFeedIsUsd8(feedDecimals: number, asset: `0x${string}`): void {
   if (!Number.isInteger(feedDecimals) || feedDecimals !== FEED_DECIMALS_USD8) {
     throw new UnitConversionError(
-      `Feed harga untuk aset ${asset} melaporkan ${feedDecimals} desimal, bukan ` +
-        `${FEED_DECIMALS_USD8}. Seluruh lapisan ini membaca jawabannya sebagai USD basis 8 ` +
-        `desimal; memakainya apa adanya akan meleset 10^${Math.abs(feedDecimals - FEED_DECIMALS_USD8)} kali lipat.`,
+      `The price feed for asset ${asset} reports ${feedDecimals} decimals, not ` +
+        `${FEED_DECIMALS_USD8}. This whole layer reads its answer as USD on the 8-decimal ` +
+        `basis; using it as-is would miss by a factor of 10^${Math.abs(feedDecimals - FEED_DECIMALS_USD8)}.`,
     );
   }
 }

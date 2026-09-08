@@ -73,7 +73,7 @@ export function armAltanaSdk(): void {
   const entry = resolveProjectAltanaSdkEntry(AGENT_ROOT);
   if (entry === null) {
     throw new Error(
-      `@altananetwork/sdk tidak ditemukan dari ${AGENT_ROOT}; jalankan pnpm install di app/agent.`,
+      `@altananetwork/sdk was not found from ${AGENT_ROOT}; run pnpm install in app/agent.`,
     );
   }
   setAltanaSdkImporter(() => import(entry));
@@ -156,7 +156,7 @@ export function relaySender(
   client: PublicClient,
 ): (calls: readonly RelayCall[], description: string) => Promise<RelayResult> {
   return async (calls, description) => {
-    if (calls.length === 0) throw new Error(`Batch "${description}" kosong.`);
+    if (calls.length === 0) throw new Error(`The "${description}" batch is empty.`);
 
     const encoded = calls.map((call) => ({
       to: call.address,
@@ -170,19 +170,19 @@ export function relaySender(
 
     const result = await provider._relayExecute(encoded, description);
     if (result.status === "FAILED") {
-      throw new Error(`Relay Altana melapor FAILED untuk ${description} (callsId ${result.callsId}).`);
+      throw new Error(`The Altana relay reported FAILED for ${description} (callsId ${result.callsId}).`);
     }
     const hash = result.transactionHash;
     if (!hash) {
       throw new Error(
-        `Relay Altana melapor ${result.status} tanpa transactionHash untuk ${description} ` +
-          `(callsId ${result.callsId}); inklusi on-chain tidak bisa dipastikan.`,
+        `The Altana relay reported ${result.status} with no transactionHash for ${description} ` +
+          `(callsId ${result.callsId}); on-chain inclusion cannot be established.`,
       );
     }
 
     const receipt = await client.waitForTransactionReceipt({ hash, timeout: 180_000 });
     if (receipt.status !== "success") {
-      throw new Error(`Transaksi ${description} revert on-chain (${hash}).`);
+      throw new Error(`The ${description} transaction reverted on chain (${hash}).`);
     }
     return { transactionHash: hash, status: 1, receipt: receipt as unknown as RelayResult["receipt"] };
   };

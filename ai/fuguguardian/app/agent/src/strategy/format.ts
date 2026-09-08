@@ -22,35 +22,35 @@ import { HF_ONE } from "./types.js";
 import { USD8_ONE } from "./units.js";
 
 /**
- * Formats a health factor (1e18 basis) into a two-decimal string with a comma, e.g.
- * 1_300_000_000_000_000_000n -> "1,30". Truncated (floored), not rounded: an HF of 1,299
- * shows as "1,29", not "1,30" — the safe direction, because a position never looks
+ * Formats a health factor (1e18 basis) into a two-decimal string, e.g.
+ * 1_300_000_000_000_000_000n -> "1.30". Truncated (floored), not rounded: an HF of 1.299
+ * shows as "1.29", not "1.30" — the safe direction, because a position never looks
  * healthier than it really is.
  */
 export function formatHf(hf: bigint): string {
-  const bulat = hf / HF_ONE;
-  const sisa = hf % HF_ONE;
-  const desimal = (sisa * 100n) / HF_ONE;
-  return `${bulat},${desimal.toString().padStart(2, "0")}`;
+  const whole = hf / HF_ONE;
+  const remainder = hf % HF_ONE;
+  const decimals = (remainder * 100n) / HF_ONE;
+  return `${whole}.${decimals.toString().padStart(2, "0")}`;
 }
 
 /**
- * Formats basis points (10_000 = 100%) into a percentage with one decimal and a comma,
- * e.g. 2000n -> "20,0".
+ * Formats basis points (10_000 = 100%) into a percentage with one decimal, e.g.
+ * 2000n -> "20.0".
  */
 export function formatPercentFromBps(bps: bigint): string {
-  const persepuluhPersen = bps / 10n; // bps/10 = the percentage times 10
-  const bulat = persepuluhPersen / 10n;
-  const desimal = persepuluhPersen % 10n;
-  return `${bulat},${desimal}`;
+  const tenthsOfPercent = bps / 10n; // bps/10 = the percentage times 10
+  const whole = tenthsOfPercent / 10n;
+  const decimals = tenthsOfPercent % 10n;
+  return `${whole}.${decimals}`;
 }
 
-/** Insert Indonesian-style thousands separators: 1234567n -> "1.234.567". */
-function grupRibuan(n: bigint): string {
+/** Insert English-style thousands separators: 1234567n -> "1,234,567". */
+function groupThousands(n: bigint): string {
   const s = n.toString();
   let out = "";
   for (let i = 0; i < s.length; i++) {
-    if (i > 0 && (s.length - i) % 3 === 0) out += ".";
+    if (i > 0 && (s.length - i) % 3 === 0) out += ",";
     out += s[i];
   }
   return out;
@@ -59,20 +59,20 @@ function grupRibuan(n: bigint): string {
 /**
  * Formats a money value on Aave's 8-decimal basis (every `*Base` field on `Position`,
  * plus `Decision.suggestedRepayBase`) into a readable US dollar string:
- * 12_345_678n -> "$0,12" and 100_000_000n -> "$1,00".
+ * 12_345_678n -> "$0.12" and 100_000_000n -> "$1.00".
  *
  * This is NOT cosmetic. The raw value 12345678 reads to a human as "twelve million" when
  * it means twelve cents — a factor of 10^8 on the number a user relies on to decide
  * whether to repay a debt. Every time a `*Base` value goes out to a human (an LLM prompt,
  * the UI, a log a person reads), it must pass through this function.
  *
- * Fractions of a cent are truncated, not rounded, and the decimal separator is a comma,
- * following the Indonesian convention used by `formatHf`/`formatPercentFromBps`.
+ * Fractions of a cent are truncated, not rounded, and the decimal separator is a period,
+ * following the English convention used by `formatHf`/`formatPercentFromBps`.
  */
 export function formatUsd8(v: bigint): string {
-  const negatif = v < 0n;
-  const abs = negatif ? -v : v;
-  const dolar = abs / USD8_ONE;
-  const sen = ((abs % USD8_ONE) * 100n) / USD8_ONE;
-  return `${negatif ? "-" : ""}$${grupRibuan(dolar)},${sen.toString().padStart(2, "0")}`;
+  const negative = v < 0n;
+  const abs = negative ? -v : v;
+  const dollars = abs / USD8_ONE;
+  const cents = ((abs % USD8_ONE) * 100n) / USD8_ONE;
+  return `${negative ? "-" : ""}$${groupThousands(dollars)}.${cents.toString().padStart(2, "0")}`;
 }

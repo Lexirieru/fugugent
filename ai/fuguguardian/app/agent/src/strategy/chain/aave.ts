@@ -56,7 +56,7 @@ export async function readAavePosition(
   poolAddress: `0x${string}` = AAVE_V3_POOL_ADDRESS,
 ): Promise<Position> {
   if (!client.chain) {
-    throw new PositionError("Client viem tidak memiliki konfigurasi chain.");
+    throw new PositionError("The viem client has no chain configuration.");
   }
 
   // The block is fetched FIRST, then the read is anchored to that block.

@@ -17,7 +17,7 @@ import {
  */
 function buildReason(action: Action, hf: bigint | null, dropBps: bigint | null): string {
   if (hf === null) {
-    return "Tidak ada hutang sehingga tidak ada risiko likuidasi.";
+    return "There is no debt, so there is no liquidation risk.";
   }
 
   // `dropBps` here is NEVER null: `dropToLiquidationBps` returns null only for
@@ -27,25 +27,25 @@ function buildReason(action: Action, hf: bigint | null, dropBps: bigint | null):
   // visibly.
   if (dropBps === null) {
     throw new PositionError(
-      `Invariant dilanggar: dropToLiquidationBps null padahal health factor ${hf} bukan null.`,
+      `Invariant violated: dropToLiquidationBps is null while the health factor ${hf} is not null.`,
     );
   }
 
   const hfStr = formatHf(hf);
-  const jarak = `Agunan boleh turun ${formatPercentFromBps(dropBps)}% sebelum likuidasi.`;
+  const room = `The collateral may fall ${formatPercentFromBps(dropBps)}% before liquidation.`;
 
   switch (action) {
     case "EMERGENCY":
-      return `Health factor ${hfStr} sudah di titik likuidasi. ${jarak} Tindakan darurat diperlukan sekarang.`;
+      return `Health factor ${hfStr} is already at the liquidation point. ${room} Emergency action is required now.`;
     case "DELEVERAGE":
-      return `Health factor ${hfStr} berada di zona berisiko tinggi. ${jarak} Perlu mengurangi leverage segera.`;
+      return `Health factor ${hfStr} is in the high-risk zone. ${room} Leverage needs to be reduced immediately.`;
     case "PARTIAL_REPAY":
-      return `Health factor ${hfStr}. ${jarak} Disarankan membayar sebagian hutang agar kembali ke zona aman.`;
+      return `Health factor ${hfStr}. ${room} Repaying part of the debt is recommended to return to the safe zone.`;
     case "WARN":
-      return `Health factor ${hfStr} mendekati ambang peringatan. ${jarak}`;
+      return `Health factor ${hfStr} is approaching the warning threshold. ${room}`;
     case "NONE":
     default:
-      return `Health factor ${hfStr}, posisi masih aman. ${jarak}`;
+      return `Health factor ${hfStr}, the position is still safe. ${room}`;
   }
 }
 
@@ -59,8 +59,8 @@ function buildReason(action: Action, hf: bigint | null, dropBps: bigint | null):
 function validateThresholds(t: Thresholds): void {
   if (t.warn <= t.partialRepay || t.partialRepay <= t.deleverage || t.deleverage <= HF_ONE) {
     throw new PositionError(
-      `Ambang tidak valid: warn=${t.warn}, partialRepay=${t.partialRepay}, deleverage=${t.deleverage}. ` +
-        `Urutan yang benar adalah warn > partialRepay > deleverage > HF_ONE (${HF_ONE}).`,
+      `Invalid thresholds: warn=${t.warn}, partialRepay=${t.partialRepay}, deleverage=${t.deleverage}. ` +
+        `The correct ordering is warn > partialRepay > deleverage > HF_ONE (${HF_ONE}).`,
     );
   }
 }
@@ -81,13 +81,13 @@ function validateThresholds(t: Thresholds): void {
 function validatePosition(pos: Position): void {
   if (pos.liquidationThresholdBps <= 0n || pos.liquidationThresholdBps > 10_000n) {
     throw new PositionError(
-      `Ambang likuidasi tidak masuk akal: ${pos.liquidationThresholdBps} bps. ` +
-        `Nilai valid adalah 0 < bps <= 10000.`,
+      `The liquidation threshold makes no sense: ${pos.liquidationThresholdBps} bps. ` +
+        `A valid value is 0 < bps <= 10000.`,
     );
   }
   if (pos.collateralBase < 0n || pos.debtBase < 0n) {
     throw new PositionError(
-      `Nilai posisi negatif tidak mungkin: collateralBase=${pos.collateralBase}, ` +
+      `A negative position value is impossible: collateralBase=${pos.collateralBase}, ` +
         `debtBase=${pos.debtBase}.`,
     );
   }

@@ -92,7 +92,7 @@ function bigintField(obj: Record<string, unknown>, key: string): bigint {
   const raw = obj[key];
   if (typeof raw !== "string" || !/^-?\d+$/.test(raw)) {
     throw new StateStoreError(
-      `Field "${key}" harus string desimal bigint, ditemukan ${JSON.stringify(raw)}.`,
+      `Field "${key}" must be a decimal bigint string, found ${JSON.stringify(raw)}.`,
     );
   }
   return BigInt(raw);
@@ -102,7 +102,7 @@ function intField(obj: Record<string, unknown>, key: string): number {
   const raw = obj[key];
   if (typeof raw !== "number" || !Number.isInteger(raw)) {
     throw new StateStoreError(
-      `Field "${key}" harus bilangan bulat, ditemukan ${JSON.stringify(raw)}.`,
+      `Field "${key}" must be an integer, found ${JSON.stringify(raw)}.`,
     );
   }
   return raw;
@@ -111,7 +111,7 @@ function intField(obj: Record<string, unknown>, key: string): number {
 function boolField(obj: Record<string, unknown>, key: string): boolean {
   const raw = obj[key];
   if (typeof raw !== "boolean") {
-    throw new StateStoreError(`Field "${key}" harus boolean, ditemukan ${JSON.stringify(raw)}.`);
+    throw new StateStoreError(`Field "${key}" must be a boolean, found ${JSON.stringify(raw)}.`);
   }
   return raw;
 }
@@ -120,7 +120,7 @@ function hexField(obj: Record<string, unknown>, key: string): `0x${string}` {
   const raw = obj[key];
   if (typeof raw !== "string" || !raw.startsWith("0x")) {
     throw new StateStoreError(
-      `Field "${key}" harus string heksadesimal 0x…, ditemukan ${JSON.stringify(raw)}.`,
+      `Field "${key}" must be a 0x… hexadecimal string, found ${JSON.stringify(raw)}.`,
     );
   }
   return raw as `0x${string}`;
@@ -129,13 +129,13 @@ function hexField(obj: Record<string, unknown>, key: string): `0x${string}` {
 function parsePendingRepay(raw: unknown): PendingRepay | null {
   if (raw === null || raw === undefined) return null;
   if (typeof raw !== "object") {
-    throw new StateStoreError(`Field "pendingRepay" harus objek atau null.`);
+    throw new StateStoreError(`Field "pendingRepay" must be an object or null.`);
   }
   const obj = raw as Record<string, unknown>;
   const txHash = obj.txHash;
   if (txHash !== null && (typeof txHash !== "string" || !txHash.startsWith("0x"))) {
     throw new StateStoreError(
-      `Field "pendingRepay.txHash" harus null atau 0x…, ditemukan ${JSON.stringify(txHash)}.`,
+      `Field "pendingRepay.txHash" must be null or 0x…, found ${JSON.stringify(txHash)}.`,
     );
   }
   return {
@@ -154,18 +154,18 @@ export function parseExecuteState(raw: string): ExecuteState {
     parsed = JSON.parse(raw);
   } catch (err) {
     throw new StateStoreError(
-      `Isi state bukan JSON yang sah: ${err instanceof Error ? err.message : String(err)}`,
+      `The state contents are not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
       { cause: err },
     );
   }
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new StateStoreError("Isi state bukan objek JSON.");
+    throw new StateStoreError("The state contents are not a JSON object.");
   }
   const obj = parsed as Record<string, unknown>;
   const version = obj.version;
   if (version !== FORMAT_VERSION) {
     throw new StateStoreError(
-      `Versi format state ${JSON.stringify(version)} tidak dikenal (yang didukung ${FORMAT_VERSION}).`,
+      `State format version ${JSON.stringify(version)} is unknown (the supported version is ${FORMAT_VERSION}).`,
     );
   }
   return {
@@ -207,7 +207,7 @@ export function createFileStateStore(filePath: string): ExecuteStateStore {
       } catch (err) {
         if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
         throw new StateStoreError(
-          `Gagal membaca state dari ${filePath}: ${err instanceof Error ? err.message : String(err)}`,
+          `Failed to read the state from ${filePath}: ${err instanceof Error ? err.message : String(err)}`,
           { cause: err },
         );
       }

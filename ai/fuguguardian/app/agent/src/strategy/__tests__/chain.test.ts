@@ -4,8 +4,8 @@ import { readVenusLiquidity } from "../chain/venus.js";
 
 const AKUN_KOSONG = "0x0000000000000000000000000000000000000001" as const;
 
-describe("adapter Aave v3 (BSC mainnet, read-only)", () => {
-  it("membaca posisi akun kosong tanpa melempar", { timeout: 30_000 }, async () => {
+describe("the Aave v3 adapter (BSC mainnet, read-only)", () => {
+  it("reads an empty account's position without throwing", { timeout: 30_000 }, async () => {
     const r = createReader();
     const pos = await r.readAavePosition(AKUN_KOSONG);
     expect(pos.protocol).toBe("aave");
@@ -13,7 +13,7 @@ describe("adapter Aave v3 (BSC mainnet, read-only)", () => {
     expect(pos.blockNumber).toBeGreaterThan(0n);
   });
 
-  it("menormalkan healthFactor tak terhingga menjadi null", { timeout: 30_000 }, async () => {
+  it("normalizes an infinite healthFactor to null", { timeout: 30_000 }, async () => {
     const r = createReader();
     const pos = await r.readAavePosition(AKUN_KOSONG);
     // an account with no debt: Aave returns 2^256-1
@@ -22,8 +22,8 @@ describe("adapter Aave v3 (BSC mainnet, read-only)", () => {
   });
 });
 
-describe("adapter Venus (BSC mainnet, read-only)", () => {
-  it("membaca likuiditas akun tanpa melempar", { timeout: 30_000 }, async () => {
+describe("the Venus adapter (BSC mainnet, read-only)", () => {
+  it("reads an account's liquidity without throwing", { timeout: 30_000 }, async () => {
     const r = createReader();
     const v = await readVenusLiquidity(r.client, AKUN_KOSONG);
     // The field names state their own scale (1e18), unlike Position's `*Base` fields, which

@@ -116,8 +116,8 @@ function callKey(to: string, signature: string): string {
 }
 
 function describeCall(call: SessionCallPermission): string {
-  const to = "to" in call ? call.to : "(kontrak apa pun)";
-  const signature = "signature" in call ? call.signature : "(metode apa pun)";
+  const to = "to" in call ? call.to : "(any contract)";
+  const signature = "signature" in call ? call.signature : "(any method)";
   return `${to} ${signature}`;
 }
 
@@ -137,21 +137,21 @@ export function assertBoundedAllowlist(
 ): void {
   if (required.length === 0) {
     throw new SessionPermissionError(
-      "Daftar panggilan yang dibutuhkan kosong; tidak ada yang bisa diizinkan secara eksplisit.",
+      "The list of required calls is empty; there is nothing to allow explicitly.",
     );
   }
 
   const calls = permissions.calls;
   if (calls === undefined || calls === null) {
     throw new SessionPermissionError(
-      "Sesi tidak memuat `permissions.calls` sama sekali. Di Altana itu berarti izin " +
-        "TANPA BATAS: sesi boleh memanggil kontrak apa pun. Grant ulang dengan allowlist eksplisit.",
+      "The session carries no `permissions.calls` at all. In Altana that means UNLIMITED " +
+        "permission: the session may call any contract. Re-grant it with an explicit allowlist.",
     );
   }
   if (calls.length === 0) {
     throw new SessionPermissionError(
-      "`permissions.calls` kosong. Di Altana `calls: []` berarti izin TANPA BATAS, " +
-        "bukan 'tidak boleh apa-apa'. Grant ulang dengan allowlist eksplisit.",
+      "`permissions.calls` is empty. In Altana `calls: []` means UNLIMITED permission, " +
+        "not 'nothing is allowed'. Re-grant it with an explicit allowlist.",
     );
   }
 
@@ -163,15 +163,15 @@ export function assertBoundedAllowlist(
     const signature = "signature" in call ? call.signature : undefined;
     if (!to || !signature) {
       throw new SessionPermissionError(
-        `Entri allowlist "${describeCall(call)}" hanya mengikat satu sisi. ` +
-          "Setiap entri wajib menyebut kontrak (`to`) DAN selector (`signature`) sekaligus.",
+        `Allowlist entry "${describeCall(call)}" binds only one side. ` +
+          "Every entry must name both the contract (`to`) AND the selector (`signature`).",
       );
     }
     const key = callKey(to, signature);
     if (!requiredKeys.has(key)) {
       throw new SessionPermissionError(
-        `Entri allowlist ${to} ${signature} berada di luar yang dibutuhkan agent ini. ` +
-          `Yang boleh hanya: ${required.map((c) => `${c.to} ${c.signature}`).join(", ")}.`,
+        `Allowlist entry ${to} ${signature} is outside what this agent needs. ` +
+          `The only permitted entries are: ${required.map((c) => `${c.to} ${c.signature}`).join(", ")}.`,
       );
     }
     seen.add(key);
@@ -180,8 +180,8 @@ export function assertBoundedAllowlist(
   for (const call of required) {
     if (!seen.has(callKey(call.to, call.signature))) {
       throw new SessionPermissionError(
-        `Allowlist sesi tidak memuat ${call.to} ${call.signature}; ` +
-          "sesi ini tidak akan bisa menjalankan repay. Grant ulang dengan allowlist yang benar.",
+        `The session allowlist does not carry ${call.to} ${call.signature}; ` +
+          "this session will not be able to run a repay. Re-grant it with the correct allowlist.",
       );
     }
   }
@@ -197,20 +197,20 @@ export function assertNativeSpendCap(permissions: SessionPermissions): void {
   const spend = permissions.spend;
   if (spend === undefined || spend === null || spend.length === 0) {
     throw new SessionPermissionError(
-      "Sesi tidak punya `permissions.spend` sama sekali; tanpa cap native, ongkos relay " +
-        "tidak punya sumber dan setiap eksekusi gagal sebelum inklusi.",
+      "The session has no `permissions.spend` at all; without a native cap the relay cost " +
+        "has no source and every execution fails before inclusion.",
     );
   }
   const native = spend.find((entry) => entry.token === undefined || entry.token === null);
   if (native === undefined) {
     throw new SessionPermissionError(
-      "Sesi tidak punya cap token native (entri `spend` tanpa `token`). Cap native juga " +
-        "membayar ongkos relay; tanpanya eksekusi gagal sebelum inklusi.",
+      "The session has no native token cap (a `spend` entry with no `token`). The native cap " +
+        "also pays the relay cost; without it execution fails before inclusion.",
     );
   }
   if (native.limit <= 0n) {
     throw new SessionPermissionError(
-      `Cap native sesi ${native.limit} bukan angka positif; sesi tidak akan bisa membayar relay.`,
+      `The session's native cap ${native.limit} is not a positive number; the session will not be able to pay the relay.`,
     );
   }
 }
@@ -268,16 +268,17 @@ export function assertSessionDenial(
   const message = errorMessage(error);
   if (!SESSION_DENIAL_PATTERN.test(message)) {
     throw new SessionPermissionError(
-      `Panggilan "${label}" memang gagal, tetapi BUKAN karena batas sesi: galatnya tidak ` +
-        `memuat UnauthorizedCall. Relay bisa saja balas 502, receipt timeout, atau terjadi ` +
-        `nonce race — tidak satu pun membuktikan apa pun soal izin. Galat apa adanya:\n${message}`,
+      `The call "${label}" did fail, but NOT because of the session boundary: the error does ` +
+        `not carry UnauthorizedCall. The relay could have answered 502, the receipt could have ` +
+        `timed out, or a nonce race could have happened — none of those prove anything about ` +
+        `permissions. The error as-is:\n${message}`,
     );
   }
   if (!message.toLowerCase().includes(target.toLowerCase())) {
     throw new SessionPermissionError(
-      `Penolakan UnauthorizedCall untuk "${label}" tidak menyebut kontrak ${target} yang ` +
-        `kita coba panggil; penolakan atas panggilan lain tidak bisa dipakai sebagai bukti. ` +
-        `Galat apa adanya:\n${message}`,
+      `The UnauthorizedCall denial for "${label}" does not name the contract ${target} we ` +
+        `actually tried to call; a denial of some other call cannot be used as evidence. ` +
+        `The error as-is:\n${message}`,
     );
   }
   return message;
@@ -370,13 +371,13 @@ const ERC20_APPROVE_ABI = [
  * touched the network". Only reads and conversions are wrapped here; once `sendCalls` is
  * called, nothing may claim that certainty any more.
  */
-async function tandaiBelumTerkirim<T>(jalankan: () => Promise<T> | T, label: string): Promise<T> {
+async function markNeverSent<T>(run: () => Promise<T> | T, label: string): Promise<T> {
   try {
-    return await jalankan();
+    return await run();
   } catch (err) {
     if (err instanceof SessionPermissionError && err.neverSent) throw err;
     throw new SessionPermissionError(
-      `${label} gagal sebelum satu pun panggilan dikirim: ` +
+      `${label} failed before a single call was sent: ` +
         `${err instanceof Error ? err.message : String(err)}`,
       { neverSent: true },
     );
@@ -390,7 +391,7 @@ function assertConfirmed(result: SessionSendResult, label: string): void {
     // from a stale node — and the second ends with the transaction landing anyway.
     // `execute.ts` has to treat it as "may have happened", not "did not happen".
     throw new SessionPermissionError(
-      `Batch ${label} lewat sesi tidak sukses di rantai (status=${result.status}, ` +
+      `The ${label} batch through the session did not succeed on chain (status=${result.status}, ` +
         `tx=${result.transactionHash}).`,
     );
   }
@@ -413,39 +414,39 @@ export function createSessionSendRepay(deps: SessionRepayDeps): ExecuteDeps["sen
   return async (asset: `0x${string}`, amountUsd8: bigint): Promise<`0x${string}`> => {
     if (asset.toLowerCase() !== deps.repayAsset.toLowerCase()) {
       throw new SessionPermissionError(
-        `Aset repay ${asset} bukan aset yang di-allowlist sesi ini (${deps.repayAsset}); ` +
-          "menolak mengirim apa pun.",
+        `Repay asset ${asset} is not the asset allowlisted for this session (${deps.repayAsset}); ` +
+          "refusing to send anything.",
         { neverSent: true },
       );
     }
     if (amountUsd8 <= 0n) {
       throw new SessionPermissionError(
-        `Jumlah repay ${amountUsd8} bukan angka positif; menolak mengirim apa pun.`,
+        `Repay amount ${amountUsd8} is not a positive number; refusing to send anything.`,
         { neverSent: true },
       );
     }
 
-    const amountUnits = await tandaiBelumTerkirim(
+    const amountUnits = await markNeverSent(
       () => deps.toTokenUnits(asset, amountUsd8),
-      "konversi USD basis 8 desimal ke unit token",
+      "the conversion from USD on the 8-decimal basis to token units",
     );
     if (amountUnits <= 0n) {
       throw new SessionPermissionError(
-        `Konversi ${amountUsd8} (USD basis 8 desimal) menghasilkan ${amountUnits} unit token; ` +
-          "tidak ada yang bisa dibayar.",
+        `Converting ${amountUsd8} (USD on the 8-decimal basis) yields ${amountUnits} token units; ` +
+          "there is nothing to repay.",
         { neverSent: true },
       );
     }
 
-    const allowance = await tandaiBelumTerkirim(
+    const allowance = await markNeverSent(
       () => deps.readAllowance(asset, deps.walletAddress, deps.pool),
-      "pembacaan allowance",
+      "the allowance read",
     );
     const calls: SessionCall[] = [];
     if (allowance < amountUnits) {
       log(
-        `sesi: allowance ${allowance} < ${amountUnits}, approve ikut dalam batch yang sama ` +
-          `(guarded executor mengembalikannya ke nol di akhir userOp)`,
+        `session: allowance ${allowance} < ${amountUnits}, approve rides in the same batch ` +
+          `(the guarded executor returns it to zero at the end of the userOp)`,
       );
       calls.push({
         address: asset,
@@ -463,12 +464,12 @@ export function createSessionSendRepay(deps: SessionRepayDeps): ExecuteDeps["sen
 
     const label =
       calls.length === 2
-        ? `approve + repay ${amountUnits} unit token ke ${deps.pool}`
-        : `repay ${amountUnits} unit token ke ${deps.pool}`;
-    const hasil = await deps.sendCalls(calls, label);
-    assertConfirmed(hasil, label);
-    log(`sesi: repay terkirim ${hasil.transactionHash}`);
+        ? `approve + repay ${amountUnits} token units to ${deps.pool}`
+        : `repay ${amountUnits} token units to ${deps.pool}`;
+    const result = await deps.sendCalls(calls, label);
+    assertConfirmed(result, label);
+    log(`session: repay sent ${result.transactionHash}`);
 
-    return hasil.transactionHash;
+    return result.transactionHash;
   };
 }

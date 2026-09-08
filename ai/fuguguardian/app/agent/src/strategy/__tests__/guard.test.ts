@@ -72,7 +72,7 @@ function execState(overrides: Partial<ExecuteState> = {}): ExecuteState {
 function canned(overrides: Partial<ExecuteResult> = {}): ExecuteResult {
   return {
     sent: false,
-    reason: "test: tidak mengirim",
+    reason: "test: not sending",
     amountSentUsd8: 0n,
     cappedPerAction: false,
     cappedPerDay: false,
@@ -87,7 +87,7 @@ function baseDeps(overrides: Partial<GuardCycleDeps> = {}): GuardCycleDeps {
     account: ACCOUNT,
     readPosition: vi.fn(async () => SAFE_POSITION),
     executeDecision: vi.fn(async (): Promise<ExecuteResult> => canned()),
-    explainDecision: vi.fn(async () => "Penjelasan ramah dari LLM."),
+    explainDecision: vi.fn(async () => "A friendly explanation from the LLM."),
     now: () => 1_700_000_000,
     logger: silentLogger(),
     ...overrides,
@@ -103,7 +103,7 @@ function expectFail(result: CycleResult): asserts result is CycleResult & { ok: 
 }
 
 describe("runGuardCycle", () => {
-  it("siklus normal menghasilkan catatan lengkap", async () => {
+  it("a normal cycle produces a complete record", async () => {
     // RISKY_POSITION (action != NONE) is used here on purpose rather than SAFE_POSITION, so
     // that `explainDecision` really is called and the record carries the mock's explanation
     // instead of the `decision.reason` fallback (see rule #2 at the top of the module: NONE
@@ -122,12 +122,12 @@ describe("runGuardCycle", () => {
     expect(typeof result.reason).toBe("string");
     expect(result.reason.length).toBeGreaterThan(0);
     expect(typeof result.executeReason).toBe("string");
-    expect(result.explanation).toBe("Penjelasan ramah dari LLM.");
+    expect(result.explanation).toBe("A friendly explanation from the LLM.");
     // There is no real execution in this cycle -> the execution state does not change.
     expect(nextExecuteState).toEqual(execState());
   });
 
-  it("kegagalan pembacaan posisi tidak melempar, tercatat sebagai siklus gagal, dan tidak memanggil eksekusi", async () => {
+  it("a failed position read does not throw, is recorded as a failed cycle, and does not call execution", async () => {
     const readPosition = vi.fn(async () => {
       throw new Error("RPC mati");
     });
@@ -150,9 +150,9 @@ describe("runGuardCycle", () => {
     expect(nextExecuteState).toEqual(execState());
   });
 
-  it("kegagalan eksekusi (mis. ditolak) tidak melempar dan tercatat sebagai siklus gagal, state tidak berubah", async () => {
+  it("an execution failure (e.g. refused) does not throw and is recorded as a failed cycle, the state unchanged", async () => {
     const executeDecisionSpy = vi.fn(async () => {
-      throw new Error("eksekusi ditolak oleh session key");
+      throw new Error("execution refused by the session key");
     });
     const explainDecisionSpy = vi.fn();
     const startingState = execState({ spentTodayUsd8: 7_000_000n, lastActionAt: 42 });
@@ -164,7 +164,7 @@ describe("runGuardCycle", () => {
     const { result, nextExecuteState } = await runGuardCycle(deps, startingState);
 
     expectFail(result);
-    expect(result.error).toContain("eksekusi ditolak");
+    expect(result.error).toContain("execution refused");
     expect(explainDecisionSpy).not.toHaveBeenCalled();
     // The execute.ts contract: state only changes AFTER a send succeeds. If executeDecision
     // throws there is no new state -- the old state is passed through as-is, not quietly
@@ -172,7 +172,7 @@ describe("runGuardCycle", () => {
     expect(nextExecuteState).toEqual(startingState);
   });
 
-  it("kegagalan penjelasan tidak mengubah hasil eksekusi yang sudah terjadi", async () => {
+  it("a failed explanation does not change an execution result that already happened", async () => {
     const successResult = canned({
       sent: true,
       reason: "terkirim",
@@ -201,7 +201,7 @@ describe("runGuardCycle", () => {
     expect(result.explanation).toBe(result.reason);
   });
 
-  it("aksi NONE tidak pernah memanggil sendRepay (lewat executeDecision asli)", async () => {
+  it("a NONE action never calls sendRepay (through the real executeDecision)", async () => {
     const sendRepay = vi.fn(async () => "0xabc" as `0x${string}`);
     const execDeps: ExecuteDeps = { repayAsset: REPAY_ASSET, sendRepay, now: () => 1_700_000_000 };
     const execFn: ExecuteFn = (decision, pos, state) =>
@@ -219,8 +219,8 @@ describe("runGuardCycle", () => {
     expect(sendRepay).not.toHaveBeenCalled();
   });
 
-  it("aksi NONE tidak memanggil explainDecision sama sekali", async () => {
-    const explainDecisionSpy = vi.fn(async () => "tidak boleh terlihat");
+  it("a NONE action does not call explainDecision at all", async () => {
+    const explainDecisionSpy = vi.fn(async () => "must never be seen");
     const deps = baseDeps({
       readPosition: vi.fn(async () => SAFE_POSITION),
       explainDecision: explainDecisionSpy,
@@ -249,10 +249,10 @@ describe("runGuardCycle", () => {
     expect(result.explanation).toBe("penjelasan LLM");
   });
 
-  it("penjelasan dipanggil setelah eksekusi -- urutan pemanggilan dibuktikan", async () => {
+  it("the explanation is called after execution -- the call order is proven", async () => {
     const order: string[] = [];
     const deps = baseDeps({
-      readPosition: vi.fn(async () => RISKY_POSITION), // butuh aksi != NONE agar explain dipanggil
+      readPosition: vi.fn(async () => RISKY_POSITION), // needs an action != NONE for explain to be called
       executeDecision: vi.fn(async () => {
         order.push("execute");
         return canned();
@@ -268,13 +268,13 @@ describe("runGuardCycle", () => {
     expect(order).toEqual(["execute", "explain"]);
   });
 
-  it("dua siklus berturut-turut dengan executeDecision asli: siklus kedua ditolak oleh cooldown/anggaran, sendRepay hanya sekali", async () => {
+  it("two consecutive cycles with the real executeDecision: the second is refused by the cooldown/budget, sendRepay only once", async () => {
     const sendRepay = vi.fn(async () => "0xdeadbeef" as `0x${string}`);
     let clock = 1_700_000_000;
     const execDeps: ExecuteDeps = { repayAsset: REPAY_ASSET, sendRepay, now: () => clock };
     const theLimits = limits({
       maxPerActionUsd8: 100_000_000_000n, // $1000
-      maxPerDayUsd8: 100_000_000_000n, // $1000/hari -- habis dalam satu kirim
+      maxPerDayUsd8: 100_000_000_000n, // $1000/day -- exhausted in a single send
       minIntervalSeconds: 3_600, // 1 jam
     });
     const execFn: ExecuteFn = (decision, pos, state) =>
@@ -310,7 +310,7 @@ describe("runGuardCycle", () => {
     expect(sendRepay).toHaveBeenCalledTimes(1);
   });
 
-  it("logger yang melempar (mis. EPIPE) tidak menghentikan siklus", async () => {
+  it("a throwing logger (e.g. EPIPE) does not stop the cycle", async () => {
     const throwingLogger: Logger = {
       info: vi.fn(() => {
         throw new Error("EPIPE");
@@ -332,7 +332,7 @@ describe("runGuardCycle", () => {
     expect(result.error).toContain("RPC mati");
   });
 
-  it("now() yang melempar tidak menghentikan siklus, timestamp fallback dipakai", async () => {
+  it("a throwing now() does not stop the cycle, the fallback timestamp is used", async () => {
     const throwingNow = vi.fn(() => {
       throw new Error("jam sistem rusak");
     });
@@ -344,7 +344,7 @@ describe("runGuardCycle", () => {
     expect(result.timestamp).toBe(0);
   });
 
-  it("catatan membedakan alasan keputusan dari alasan eksekusi (kill switch menolak EMERGENCY)", async () => {
+  it("the record separates the decision reason from the execution reason (the kill switch refuses EMERGENCY)", async () => {
     const sendRepay = vi.fn(async () => "0xabc" as `0x${string}`);
     const execDeps: ExecuteDeps = { repayAsset: REPAY_ASSET, sendRepay, now: () => 1_700_000_000 };
     const execFn: ExecuteFn = (decision, pos, state) =>
@@ -363,7 +363,7 @@ describe("runGuardCycle", () => {
     expect(result.amountSentUsd8).toBe(0n);
     expect(sendRepay).not.toHaveBeenCalled();
     // The decision reason talks about the health factor/liquidation...
-    expect(result.reason).toMatch(/likuidasi|darurat/i);
+    expect(result.reason).toMatch(/liquidation|emergency/i);
     // ...while the execution reason must explicitly talk about the kill switch -- whoever
     // reads the record has to be able to tell "not sent because of the kill switch" from
     // "not sent because of the cooldown / an exhausted budget".
@@ -373,7 +373,7 @@ describe("runGuardCycle", () => {
 });
 
 describe("startGuardLoop", () => {
-  it("loop bisa dihentikan dan berhenti memanggil siklus setelahnya", async () => {
+  it("the loop can be stopped and calls no further cycles afterwards", async () => {
     vi.useFakeTimers();
     try {
       const readPosition = vi.fn(async () => SAFE_POSITION);
@@ -398,7 +398,7 @@ describe("startGuardLoop", () => {
     }
   });
 
-  it("kegagalan pembacaan posisi berulang tidak menghentikan loop -- siklus 2 dan 3 tetap berjalan", async () => {
+  it("repeated position-read failures do not stop the loop -- cycles 2 and 3 still run", async () => {
     vi.useFakeTimers();
     try {
       const readPosition = vi.fn(async () => {
@@ -425,7 +425,7 @@ describe("startGuardLoop", () => {
     }
   });
 
-  it("stop() dipanggil selagi siklus sedang berjalan mencegah siklus berikutnya dijadwalkan", async () => {
+  it("stop() called while a cycle is running prevents the next cycle from being scheduled", async () => {
     vi.useFakeTimers();
     try {
       let resolveReadPosition!: (pos: Position) => void;
@@ -456,7 +456,7 @@ describe("startGuardLoop", () => {
     }
   });
 
-  it("onCycle dipanggil dengan catatan setiap siklus dan getLastResult mengikuti siklus terbaru", async () => {
+  it("onCycle is called with the record of every cycle and getLastResult follows the latest one", async () => {
     vi.useFakeTimers();
     try {
       const onCycle = vi.fn();
@@ -475,7 +475,7 @@ describe("startGuardLoop", () => {
     }
   });
 
-  it("logger.info memuat health factor dan jumlah terformat, bukan basis mentah", async () => {
+  it("logger.info carries the health factor and amount formatted, not on the raw basis", async () => {
     vi.useFakeTimers();
     try {
       const logger = silentLogger();
@@ -485,8 +485,8 @@ describe("startGuardLoop", () => {
       await vi.advanceTimersByTimeAsync(0);
       expect(logger.info).toHaveBeenCalled();
       const meta = (logger.info as ReturnType<typeof vi.fn>).mock.calls[0][1] as Record<string, unknown>;
-      expect(meta.healthFactor).toBe("1,80");
-      expect(meta.amountSentUsd8).toBe("$0,00");
+      expect(meta.healthFactor).toBe("1.80");
+      expect(meta.amountSentUsd8).toBe("$0.00");
       expect(typeof meta.decisionReason).toBe("string");
       expect(typeof meta.executeReason).toBe("string");
 
@@ -496,13 +496,13 @@ describe("startGuardLoop", () => {
     }
   });
 
-  it("intervalMs nol atau negatif ditolak, bukan menjadi busy loop", () => {
+  it("a zero or negative intervalMs is refused instead of becoming a busy loop", () => {
     const deps = baseDeps();
     expect(() => startGuardLoop(deps, 0, execState())).toThrow();
     expect(() => startGuardLoop(deps, -100, execState())).toThrow();
   });
 
-  it("startGuardLoop mengalirkan state eksekusi antar siklus: anggaran habis di siklus 1 menolak siklus 2, sendRepay hanya sekali", async () => {
+  it("startGuardLoop flows the execution state between cycles: a budget exhausted in cycle 1 refuses cycle 2, sendRepay only once", async () => {
     // Round 2 review: the earlier two-cycle test called runGuardCycle directly and flowed
     // the state by hand at the test level -- that locks in runGuardCycle's contract, BUT it
     // does NOT lock in that startGuardLoop actually does that flowing itself. This test runs
@@ -515,7 +515,7 @@ describe("startGuardLoop", () => {
       const execDeps: ExecuteDeps = { repayAsset: REPAY_ASSET, sendRepay, now: () => 1_700_000_000 };
       const theLimits = limits({
         maxPerActionUsd8: 100_000_000_000n, // $1000
-        maxPerDayUsd8: 100_000_000_000n, // $1000/hari -- habis dalam satu kirim
+        maxPerDayUsd8: 100_000_000_000n, // $1000/day -- exhausted in a single send
         minIntervalSeconds: 0, // isolates the daily budget alone, not the cooldown
       });
       const execFn: ExecuteFn = (decision, pos, state) =>
@@ -546,7 +546,7 @@ describe("startGuardLoop", () => {
     }
   });
 
-  it("logger yang melempar terus-menerus (jalur sukses) tidak menghentikan penjadwalan siklus berikutnya", async () => {
+  it("a persistently throwing logger (the success path) does not stop the next cycle from being scheduled", async () => {
     vi.useFakeTimers();
     try {
       const throwingLogger: Logger = {
@@ -577,7 +577,7 @@ describe("startGuardLoop", () => {
     }
   });
 
-  it("logger yang melempar terus-menerus (jalur gagal) tidak menghentikan penjadwalan siklus berikutnya", async () => {
+  it("a persistently throwing logger (the failure path) does not stop the next cycle from being scheduled", async () => {
     vi.useFakeTimers();
     try {
       const throwingLogger: Logger = {
@@ -613,8 +613,8 @@ describe("startGuardLoop", () => {
   });
 });
 
-describe("C2 — kegagalan setelah transaksi mendarat tidak pernah membayar dua kali", () => {
-  it("runGuardCycle meneruskan state dari RepaySendError, bukan state lama", async () => {
+describe("C2 — a failure after the transaction landed never pays twice", () => {
+  it("runGuardCycle carries forward the state from RepaySendError, not the old state", async () => {
     // The failure shape that is the whole reason this rule exists: the transaction landed in
     // a block, only `waitForTransactionReceipt` failed.
     const sendRepay = vi.fn(async () => {
@@ -641,7 +641,7 @@ describe("C2 — kegagalan setelah transaksi mendarat tidak pernah membayar dua 
     expect(nextExecuteState.pendingRepay?.blockNumberBeforeSend).toBe(EMERGENCY_POSITION.blockNumber);
   });
 
-  it("INTI TASK: sendRepay melempar setelah tx mendarat -> siklus berikutnya TIDAK mengirim ulang", async () => {
+  it("THE HEART OF THE TASK: sendRepay throws after the tx landed -> the next cycle does NOT resend", async () => {
     vi.useFakeTimers();
     try {
       // The only thing allowed to hold back the second cycle in this test is the pending
@@ -685,7 +685,7 @@ describe("C2 — kegagalan setelah transaksi mendarat tidak pernah membayar dua 
     }
   });
 
-  it("rantai membuktikan repay mendarat -> catatan dibereskan dan Guardian boleh bertindak lagi", async () => {
+  it("the chain proves the repay landed -> the record is cleared and Guardian may act again", async () => {
     vi.useFakeTimers();
     try {
       const sendRepay = vi.fn(async () => {
@@ -735,7 +735,7 @@ describe("C2 — kegagalan setelah transaksi mendarat tidak pernah membayar dua 
   });
 });
 
-describe("C3 — kill switch punya tuas, dan state dipersist", () => {
+describe("C3 — the kill switch has a lever, and the state is persisted", () => {
   function killDeps(sendRepay: ReturnType<typeof vi.fn>, overrides: Partial<GuardCycleDeps> = {}) {
     const execDeps: ExecuteDeps = {
       repayAsset: REPAY_ASSET,
@@ -752,7 +752,7 @@ describe("C3 — kill switch punya tuas, dan state dipersist", () => {
     });
   }
 
-  it("kill() saat loop berjalan menghentikan pengiriman siklus berikutnya", async () => {
+  it("kill() while the loop is running stops the next cycle from sending", async () => {
     vi.useFakeTimers();
     try {
       const sendRepay = vi.fn(async () => "0xdeadbeef" as `0x${string}`);
@@ -779,7 +779,7 @@ describe("C3 — kill switch punya tuas, dan state dipersist", () => {
     }
   });
 
-  it("kill() di TENGAH siklus tidak bisa dibatalkan oleh hasil siklus itu", async () => {
+  it("kill() in the MIDDLE of a cycle cannot be undone by that cycle's result", async () => {
     vi.useFakeTimers();
     try {
       let lepas!: (pos: Position) => void;
@@ -819,7 +819,7 @@ describe("C3 — kill switch punya tuas, dan state dipersist", () => {
     }
   });
 
-  it("saveExecuteState dipanggil setiap siklus dan saat kill()", async () => {
+  it("saveExecuteState is called every cycle and on kill()", async () => {
     vi.useFakeTimers();
     try {
       const tersimpan: ExecuteState[] = [];
@@ -845,7 +845,7 @@ describe("C3 — kill switch punya tuas, dan state dipersist", () => {
     }
   });
 
-  it("saveExecuteState yang melempar dicatat tetapi tidak mematikan loop", async () => {
+  it("a throwing saveExecuteState is logged but does not kill the loop", async () => {
     vi.useFakeTimers();
     try {
       const readPosition = vi.fn(async () => SAFE_POSITION);
@@ -869,7 +869,7 @@ describe("C3 — kill switch punya tuas, dan state dipersist", () => {
     }
   });
 
-  it("state awal yang sudah killed tetap dihormati dan tidak pernah lepas", async () => {
+  it("an initial state that is already killed is honored and never released", async () => {
     vi.useFakeTimers();
     try {
       const sendRepay = vi.fn(async () => "0xdeadbeef" as `0x${string}`);
@@ -888,13 +888,13 @@ describe("C3 — kill switch punya tuas, dan state dipersist", () => {
   });
 });
 
-describe("guard mengenali kegagalan-setelah-kirim tanpa bergantung pada instanceof", () => {
-  it("galat pembungkus yang membawa penanda tetap memajukan state, bukan mengembalikan state lama", async () => {
+describe("guard recognizes a failure-after-send without relying on instanceof", () => {
+  it("a wrapper error carrying the marker still advances the state instead of returning the old one", async () => {
     // The backend scenario: `executeDecision` is wrapped for telemetry/retry, and the wrapper
     // throws a different error with a `cause`. If guard.ts used `instanceof`, this error would
     // fall into the "old state" branch — the budget would not move, the pending record would
     // be lost, and bug C2 would come back silently.
-    const stateSetelahKirim: ExecuteState = execState({
+    const stateAfterSend: ExecuteState = execState({
       spentTodayUsd8: 42_000_000n,
       lastActionAt: 1_700_000_000,
       pendingRepay: {
@@ -906,35 +906,35 @@ describe("guard mengenali kegagalan-setelah-kirim tanpa bergantung pada instance
         blockNumberBeforeSend: EMERGENCY_POSITION.blockNumber,
       },
     });
-    const asli = Object.assign(new Error("receipt timeout"), {
+    const original = Object.assign(new Error("receipt timeout"), {
       repaySendFailure: true,
-      stateAfterSend: stateSetelahKirim,
+      stateAfterSend: stateAfterSend,
     });
     const deps = baseDeps({
       readPosition: vi.fn(async () => EMERGENCY_POSITION),
       executeDecision: vi.fn(async () => {
-        throw new Error("siklus gagal (pembungkus telemetri)", { cause: asli });
+        throw new Error("the cycle failed (telemetry wrapper)", { cause: original });
       }),
     });
 
     const { result, nextExecuteState } = await runGuardCycle(deps, execState());
 
     expectFail(result);
-    expect(nextExecuteState).toEqual(stateSetelahKirim);
+    expect(nextExecuteState).toEqual(stateAfterSend);
     expect(nextExecuteState.pendingRepay).not.toBeNull();
   });
 
-  it("galat biasa tetap mengembalikan state lama — pembedaannya masih nyata", async () => {
-    const awal = execState({ spentTodayUsd8: 7_000_000n, lastActionAt: 42 });
+  it("an ordinary error still returns the old state — the distinction is still real", async () => {
+    const initial = execState({ spentTodayUsd8: 7_000_000n, lastActionAt: 42 });
     const deps = baseDeps({
       readPosition: vi.fn(async () => EMERGENCY_POSITION),
       executeDecision: vi.fn(async () => {
-        throw new Error("RPC 502 sebelum apa pun dikirim");
+        throw new Error("RPC 502 before anything was sent");
       }),
     });
 
-    const { nextExecuteState } = await runGuardCycle(deps, awal);
+    const { nextExecuteState } = await runGuardCycle(deps, initial);
 
-    expect(nextExecuteState).toEqual(awal);
+    expect(nextExecuteState).toEqual(initial);
   });
 });

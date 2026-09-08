@@ -19,10 +19,10 @@ export type GenerateFn = (prompt: string) => Promise<string>;
 const TIMEOUT_MS = 20_000;
 
 function buildPrompt(pos: Position, decision: Decision): string {
-  const hfStr = decision.healthFactor === null ? "tidak ada (tanpa hutang)" : formatHf(decision.healthFactor);
+  const hfStr = decision.healthFactor === null ? "none (no debt)" : formatHf(decision.healthFactor);
   const dropStr =
     decision.dropToLiquidationBps === null
-      ? "tidak berlaku"
+      ? "not applicable"
       : `${formatPercentFromBps(decision.dropToLiquidationBps)}%`;
   // `suggestedRepayBase` is USD on Aave's 8-decimal basis. Handing it to the prompt raw
   // (and through the prompt, to the user's eyes) once made 12345678 — which means $0.12 —
@@ -30,18 +30,18 @@ function buildPrompt(pos: Position, decision: Decision): string {
   // explicitly so the model does not guess.
   const repayLine =
     decision.suggestedRepayBase > 0n
-      ? `Jumlah yang disarankan dibayar: ${formatUsd8(decision.suggestedRepayBase)} (dalam dolar AS).`
-      : "Tidak ada pembayaran yang disarankan saat ini.";
+      ? `Suggested repayment amount: ${formatUsd8(decision.suggestedRepayBase)} (in US dollars).`
+      : "No repayment is suggested at this time.";
 
   return [
-    "Kamu membantu menjelaskan keputusan yang SUDAH diambil oleh sistem manajemen risiko posisi pinjaman crypto.",
-    `Protokol: ${pos.protocol}.`,
-    `Health factor saat ini: ${hfStr}.`,
-    `Jarak ke likuidasi: ${dropStr} penurunan agunan sebelum HF mencapai 1,0.`,
-    `Aksi yang diambil sistem: ${decision.action}.`,
+    "You are helping to explain a decision that has ALREADY been taken by a risk management system for a crypto lending position.",
+    `Protocol: ${pos.protocol}.`,
+    `Current health factor: ${hfStr}.`,
+    `Room to liquidation: a ${dropStr} fall in collateral before HF reaches 1.0.`,
+    `Action the system took: ${decision.action}.`,
     repayLine,
-    "Tulis satu atau dua kalimat penjelasan singkat dalam bahasa Indonesia untuk pemilik posisi, berdasarkan angka-angka di atas.",
-    "Jangan pernah mengarang angka, persentase, atau jumlah lain di luar yang sudah diberikan di atas.",
+    "Write one or two short sentences of explanation in English for the position's owner, based on the numbers above.",
+    "Never invent numbers, percentages, or any other figures beyond the ones given above.",
   ].join("\n");
 }
 
@@ -66,13 +66,13 @@ async function defaultGenerate(prompt: string): Promise<string> {
 function timeout(ms: number): { promise: Promise<never>; handle: ReturnType<typeof setTimeout> } {
   let handle!: ReturnType<typeof setTimeout>;
   const promise = new Promise<never>((_, reject) => {
-    handle = setTimeout(() => reject(new Error(`explainDecision timeout setelah ${ms}ms`)), ms);
+    handle = setTimeout(() => reject(new Error(`explainDecision timed out after ${ms}ms`)), ms);
   });
   return { promise, handle };
 }
 
 /**
- * Explains an already-final `decision` in an Indonesian sentence.
+ * Explains an already-final `decision` in an English sentence.
  * NEVER modifies `decision` or `pos`, and NEVER throws — any failure (building the prompt,
  * the network, a timeout, empty text) falls back to `decision.reason` as-is.
  */
@@ -86,9 +86,9 @@ export async function explainDecision(
 
   try {
     const prompt = buildPrompt(pos, decision);
-    const teks = await Promise.race([generate(prompt), timeoutPromise]);
-    if (typeof teks === "string" && teks.trim().length > 0) {
-      return teks;
+    const text = await Promise.race([generate(prompt), timeoutPromise]);
+    if (typeof text === "string" && text.trim().length > 0) {
+      return text;
     }
     return decision.reason;
   } catch {

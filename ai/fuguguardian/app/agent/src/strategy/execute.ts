@@ -310,9 +310,9 @@ export function reconcilePendingRepay(state: ExecuteState, pos: Position): Execu
   // have this field at all, and an `undefined` here must not make reconciliation throw.
   if (pending == null) return state;
   if (pos.blockNumber <= pending.blockNumberBeforeSend) return state;
-  const turun = pending.debtBaseBeforeSend - pos.debtBase;
-  const beda = turun > pending.amountUsd8 ? turun - pending.amountUsd8 : pending.amountUsd8 - turun;
-  if (beda > RECONCILE_TOLERANCE_USD8) return state;
+  const drop = pending.debtBaseBeforeSend - pos.debtBase;
+  const difference = drop > pending.amountUsd8 ? drop - pending.amountUsd8 : pending.amountUsd8 - drop;
+  if (difference > RECONCILE_TOLERANCE_USD8) return state;
   return { ...state, pendingRepay: null };
 }
 
@@ -340,23 +340,23 @@ export async function executeDecision(
 
   // 1. The absolute kill switch — checked first, beats everything.
   if (state.killed) {
-    return notSent("Kill switch aktif: eksekusi dihentikan total.", state);
+    return notSent("Kill switch engaged: execution is stopped entirely.", state);
   }
 
   // 2. A repay not yet proven complete blocks ALL new sends.
   if (state.pendingRepay != null) {
     const p = state.pendingRepay;
     return notSent(
-      `Ada repay yang belum terbukti selesai (${p.amountUsd8} basis 8 desimal, dicoba pada ` +
-        `${p.startedAt}, tx ${p.txHash ?? "tidak diketahui"}). Menahan diri sampai rantai ` +
-        "menunjukkan hutang berkurang — mengirim ulang berisiko membayar dua kali.",
+      `A repay has not yet been proven complete (${p.amountUsd8} on the 8-decimal basis, attempted at ` +
+        `${p.startedAt}, tx ${p.txHash ?? "unknown"}). Holding back until the chain ` +
+        "shows the debt reduced — resending risks paying twice.",
       state,
     );
   }
 
   // 3. An action that needs no payment never sends.
   if (!ACTIONS_REQUIRING_REPAY.has(d.action)) {
-    return notSent(`Aksi ${d.action} tidak memerlukan eksekusi transaksi.`, state);
+    return notSent(`Action ${d.action} requires no transaction execution.`, state);
   }
 
   let amount = d.suggestedRepayBase;
@@ -376,7 +376,7 @@ export async function executeDecision(
   const remainingToday = limits.maxPerDayUsd8 - effectiveSpentToday;
 
   if (remainingToday <= 0n) {
-    return notSent("Sisa anggaran harian nol: eksekusi ditahan sampai hari berikutnya.", state);
+    return notSent("The remaining daily budget is zero: execution is held back until the next day.", state);
   }
   if (amount > remainingToday) {
     amount = remainingToday;
@@ -384,15 +384,15 @@ export async function executeDecision(
   }
 
   if (amount <= 0n) {
-    return notSent("Tidak ada jumlah tersisa untuk dieksekusi setelah pemotongan.", state);
+    return notSent("No amount is left to execute after the caps were applied.", state);
   }
 
   // 6. Cooldown since the last action.
   const sinceLastAction = now - state.lastActionAt;
   if (sinceLastAction < limits.minIntervalSeconds) {
     return notSent(
-      `Masih dalam cooldown: ${sinceLastAction}s sejak aksi terakhir, ` +
-        `minimal ${limits.minIntervalSeconds}s.`,
+      `Still in cooldown: ${sinceLastAction}s since the last action, ` +
+        `minimum ${limits.minIntervalSeconds}s.`,
       state,
     );
   }
@@ -423,8 +423,8 @@ export async function executeDecision(
       // than not sending at all: the first ends with the user's money paid twice, the second
       // with one missed cycle. Marked `neverSent` because nothing has in fact been sent.
       throw new NeverSentError(
-        `Catatan repay menggantung gagal disimpan sebelum kirim; menolak mengirim apa pun. ` +
-          `Galat asli: ${messageOf(err)}`,
+        `The pending repay record could not be saved before sending; refusing to send anything. ` +
+          `Original error: ${messageOf(err)}`,
         { cause: err },
       );
     }
@@ -440,8 +440,8 @@ export async function executeDecision(
       throw err;
     }
     throw new RepaySendError(
-      `Pengiriman repay gagal SETELAH mungkin menyentuh jaringan; anggaran dan cooldown ` +
-        `tetap dipotong dan repay dicatat menggantung. Galat asli: ${messageOf(err)}`,
+      `The repay send failed AFTER it may have touched the network; the budget and cooldown ` +
+        `are still charged and the repay is recorded as pending. Original error: ${messageOf(err)}`,
       stateAfterSend,
       { cause: err },
     );
@@ -453,7 +453,7 @@ export async function executeDecision(
 
   return {
     sent: true,
-    reason: `Terkirim untuk posisi ${pos.account}.`,
+    reason: `Sent for position ${pos.account}.`,
     amountSentUsd8: amount,
     cappedPerAction,
     cappedPerDay,

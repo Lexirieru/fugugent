@@ -28,8 +28,8 @@ function fakeClient(overrides: { blockNumber?: bigint; tuple?: readonly bigint[]
   return { client, readContract, getBlockNumber };
 }
 
-describe("readAavePosition ditambatkan ke satu blok", () => {
-  it("membaca tuple PADA blok yang dilaporkan, bukan pada 'latest' yang terpisah", async () => {
+describe("readAavePosition is anchored to a single block", () => {
+  it("reads the tuple AT the reported block, not at a separate 'latest'", async () => {
     const { client, readContract, getBlockNumber } = fakeClient({ blockNumber: 129_912_345n });
 
     const pos = await readAavePosition(client, AKUN);
@@ -42,7 +42,7 @@ describe("readAavePosition ditambatkan ke satu blok", () => {
     expect(pos.blockNumber).toBe(129_912_345n);
   });
 
-  it("blok diambil SEBELUM tuple, sehingga tidak ada bacaan dari blok yang lebih baru", async () => {
+  it("the block is fetched BEFORE the tuple, so nothing is read from a newer block", async () => {
     const urutan: string[] = [];
     const client = {
       chain: { id: 56 },
@@ -61,7 +61,7 @@ describe("readAavePosition ditambatkan ke satu blok", () => {
     expect(urutan).toEqual(["blok", "tuple"]);
   });
 
-  it("memakai alamat pool default bila tidak disuntikkan, dan alamat yang disuntikkan bila ada", async () => {
+  it("uses the default pool address when none is injected, and the injected one when given", async () => {
     const a = fakeClient();
     await readAavePosition(a.client, AKUN);
     expect(a.readContract).toHaveBeenCalledWith(
@@ -73,13 +73,13 @@ describe("readAavePosition ditambatkan ke satu blok", () => {
     expect(b.readContract).toHaveBeenCalledWith(expect.objectContaining({ address: POOL_LAIN }));
   });
 
-  it("healthFactor sentinel 2^256-1 dinormalkan menjadi null", async () => {
+  it("the 2^256-1 healthFactor sentinel is normalized to null", async () => {
     const { client } = fakeClient({ tuple: [0n, 0n, 0n, 0n, 0n, 2n ** 256n - 1n] });
     const pos = await readAavePosition(client, AKUN);
     expect(pos.healthFactor).toBeNull();
   });
 
-  it("client tanpa chain ditolak sebelum satu panggilan pun dikirim", async () => {
+  it("a client with no chain is refused before a single call is sent", async () => {
     const readContract = vi.fn();
     const client = { readContract, getBlockNumber: vi.fn() } as unknown as PublicClient;
     await expect(readAavePosition(client, AKUN)).rejects.toThrow(PositionError);

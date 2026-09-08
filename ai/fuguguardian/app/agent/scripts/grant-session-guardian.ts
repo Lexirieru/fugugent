@@ -55,7 +55,7 @@ function main(): Promise<void> {
 
   const password = process.env.WALLET_PASSWORD;
   if (!password) {
-    throw new Error("WALLET_PASSWORD kosong; isi lewat .studio/.env.local, bukan baris perintah.");
+    throw new Error("WALLET_PASSWORD is empty; set it via .studio/.env.local, not on the command line.");
   }
   const rpcUrl = process.env.BSC_TESTNET_RPC_URL ?? DEFAULT_BSC_TESTNET_RPC_URL;
 
@@ -66,22 +66,22 @@ function main(): Promise<void> {
   ];
   const expiry = Math.floor(Date.now() / 1000) + EXPIRY_DAYS * 24 * 60 * 60;
 
-  console.log("Grant session key Altana ber-batas untuk Fugu Guardian");
-  console.log(`  RPC            : ${rpcUrl}`);
-  console.log(`  Wallet Altana  : ${ALTANA_WALLET}`);
-  console.log(`  File sesi      : ${GUARDIAN_SESSION_FILE}`);
-  console.log("  Allowlist (kontrak + selector, semantik AND):");
+  console.log("Granting a bounded Altana session key for Fugu Guardian");
+  console.log(`  RPC             : ${rpcUrl}`);
+  console.log(`  Altana wallet   : ${ALTANA_WALLET}`);
+  console.log(`  Session file    : ${GUARDIAN_SESSION_FILE}`);
+  console.log("  Allowlist (contract + selector, AND semantics):");
   for (const call of calls) console.log(`    - ${call.to}  ${call.signature}`);
-  console.log("  Spend cap:");
-  console.log(`    - native ${NATIVE_CAP_WEI} wei/hari (0,02 tBNB)`);
-  console.log(`    - ${REPAY_ASSET_ADDRESS} ${MUSD_CAP} unit/hari (100 mUSD, 18 desimal)`);
-  console.log(`  Expiry         : ${expiry} (${new Date(expiry * 1000).toISOString()})`);
-  console.log(`  register       : true (terlihat publik di Keystore on-chain)`);
+  console.log("  Spend caps:");
+  console.log(`    - native ${NATIVE_CAP_WEI} wei/day (0.02 tBNB)`);
+  console.log(`    - ${REPAY_ASSET_ADDRESS} ${MUSD_CAP} units/day (100 mUSD, 18 decimals)`);
+  console.log(`  Expiry          : ${expiry} (${new Date(expiry * 1000).toISOString()})`);
+  console.log(`  register        : true (publicly visible in the on-chain Keystore)`);
 
   if (existsSync(GUARDIAN_SESSION_FILE) && process.env.FORCE_REGRANT !== "1") {
     throw new Error(
-      `${GUARDIAN_SESSION_FILE} sudah ada. Grant ulang membakar ongkos registrasi Keystore lagi; ` +
-        "jalankan dengan FORCE_REGRANT=1 kalau memang itu yang diinginkan.",
+      `${GUARDIAN_SESSION_FILE} already exists. Re-granting burns the Keystore registration cost again; ` +
+        "run with FORCE_REGRANT=1 if that is really what is wanted.",
     );
   }
 
@@ -89,7 +89,7 @@ function main(): Promise<void> {
   const admin = adminProvider(password, ALTANA_WALLET, rpcUrl);
   if (admin.address.toLowerCase() !== ALTANA_WALLET.toLowerCase()) {
     throw new Error(
-      `Keystore membuka wallet ${admin.address}, bukan ${ALTANA_WALLET}; menolak melanjutkan.`,
+      `The keystore opened wallet ${admin.address}, not ${ALTANA_WALLET}; refusing to continue.`,
     );
   }
 
@@ -100,12 +100,12 @@ function main(): Promise<void> {
       writeFileSync(GUARDIAN_SESSION_FILE, serializeSession(session), { mode: 0o600 });
 
       // ONLY public metadata is printed. `session.signer` is never touched.
-      console.log("\n✔ Sesi ter-grant dan tersimpan.");
+      console.log("\n✔ The session was granted and saved.");
       console.log(`  walletAddress : ${session.walletAddress}`);
       console.log(`  publicKey     : ${session.publicKey}`);
       console.log(`  expiry        : ${session.expiry}`);
       const txHash = (session as { transactionHash?: string }).transactionHash;
-      console.log(`  tx grant      : ${txHash ?? "(relay tidak melaporkan hash)"}`);
+      console.log(`  grant tx      : ${txHash ?? "(the relay reported no hash)"}`);
       if (txHash) console.log(`  ${`https://testnet.bscscan.com/tx/${txHash}`}`);
     });
 }
@@ -113,7 +113,7 @@ function main(): Promise<void> {
 try {
   await main();
 } catch (err: unknown) {
-  console.error(`\n✖ GAGAL: ${err instanceof Error ? err.message : String(err)}`);
+  console.error(`\n✖ FAILED: ${err instanceof Error ? err.message : String(err)}`);
   if (err instanceof Error && err.stack) console.error(err.stack);
   process.exitCode = 1;
 }

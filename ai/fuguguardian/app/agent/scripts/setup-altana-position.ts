@@ -105,8 +105,8 @@ const POOL_ABI = [
   },
 ] as const;
 
-function wajib(kondisi: boolean, pesan: string): asserts kondisi {
-  if (!kondisi) throw new Error(pesan);
+function assertTrue(condition: boolean, message: string): asserts condition {
+  if (!condition) throw new Error(message);
 }
 
 async function main(): Promise<void> {
@@ -114,9 +114,9 @@ async function main(): Promise<void> {
   loadEnv(path.resolve(AGENT_ROOT, "../../../../contracts/.env")); // PRIVATE_KEY, BSC_TESTNET_RPC_URL
 
   const password = process.env.WALLET_PASSWORD;
-  wajib(!!password, "WALLET_PASSWORD kosong; isi lewat .studio/.env.local.");
+  assertTrue(!!password, "WALLET_PASSWORD is empty; set it via .studio/.env.local.");
   const deployerKey = process.env.PRIVATE_KEY;
-  wajib(!!deployerKey, "PRIVATE_KEY kosong; isi lewat contracts/.env.");
+  assertTrue(!!deployerKey, "PRIVATE_KEY is empty; set it via contracts/.env.");
   const rpcUrl = process.env.BSC_TESTNET_RPC_URL ?? DEFAULT_BSC_TESTNET_RPC_URL;
 
   const publicClient = createPublicClient({
@@ -124,9 +124,9 @@ async function main(): Promise<void> {
     transport: http(rpcUrl),
   }) as PublicClient;
   const chainId = await publicClient.getChainId();
-  wajib(chainId === 97, `Chain salah: ${chainId}, harus 97.`);
+  assertTrue(chainId === 97, `Wrong chain: ${chainId}, must be 97.`);
 
-  const posisi = async () =>
+  const readPosition = async () =>
     publicClient.readContract({
       address: MOCK_LENDING_POOL_ADDRESS,
       abi: POOL_ABI,
@@ -134,51 +134,51 @@ async function main(): Promise<void> {
       args: [ALTANA_WALLET],
     });
 
-  const [colAwal, debtAwal] = await posisi();
-  console.log(`Posisi wallet Altana saat ini: agunan ${formatUsd8(colAwal)} · hutang ${formatUsd8(debtAwal)}`);
-  if (colAwal > 0n && debtAwal > 0n) {
-    console.log("Posisi sudah ada; tidak ada yang perlu disiapkan.");
+  const [openCollateral, openDebt] = await readPosition();
+  console.log(`The Altana wallet's current position: collateral ${formatUsd8(openCollateral)} · debt ${formatUsd8(openDebt)}`);
+  if (openCollateral > 0n && openDebt > 0n) {
+    console.log("The position already exists; there is nothing to set up.");
     return;
   }
 
   // --- 1. Mint mBNB to the Altana wallet (the deployer EOA pays the gas) -----
-  const saldoMbnb = await publicClient.readContract({
+  const mbnbBalance = await publicClient.readContract({
     address: MBNB,
     abi: ERC20_ABI,
     functionName: "balanceOf",
     args: [ALTANA_WALLET],
   });
-  if (saldoMbnb < COLLATERAL_UNITS) {
+  if (mbnbBalance < COLLATERAL_UNITS) {
     const deployer = privateKeyToAccount(deployerKey as `0x${string}`);
     const wallet = createWalletClient({ account: deployer, chain: bscTestnet, transport: http(rpcUrl) });
-    console.log(`\nMint ${COLLATERAL_UNITS} unit mBNB ke ${ALTANA_WALLET} (dari ${deployer.address})`);
+    console.log(`\nMinting ${COLLATERAL_UNITS} units of mBNB to ${ALTANA_WALLET} (from ${deployer.address})`);
     const hash: Hash = await wallet.writeContract({
       account: deployer,
       chain: bscTestnet,
       address: MBNB,
       abi: ERC20_ABI,
       functionName: "mint",
-      args: [ALTANA_WALLET, COLLATERAL_UNITS - saldoMbnb],
+      args: [ALTANA_WALLET, COLLATERAL_UNITS - mbnbBalance],
     });
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
-    wajib(receipt.status === "success", `mint gagal (${hash}).`);
-    console.log(`  tx mint  : ${hash} (blok ${receipt.blockNumber})`);
+    assertTrue(receipt.status === "success", `the mint failed (${hash}).`);
+    console.log(`  mint tx  : ${hash} (block ${receipt.blockNumber})`);
   } else {
-    console.log(`\nWallet Altana sudah punya ${saldoMbnb} unit mBNB; mint dilewati.`);
+    console.log(`\nThe Altana wallet already holds ${mbnbBalance} units of mBNB; the mint is skipped.`);
   }
 
   // --- 2. approve + supply + borrow through Altana's ADMIN path -------------
   armAltanaSdk();
   const admin = adminProvider(password, ALTANA_WALLET, rpcUrl);
-  wajib(
+  assertTrue(
     admin.address.toLowerCase() === ALTANA_WALLET.toLowerCase(),
-    `Keystore membuka ${admin.address}, bukan ${ALTANA_WALLET}.`,
+    `The keystore opened ${admin.address}, not ${ALTANA_WALLET}.`,
   );
-  const kirim = relaySender(admin, publicClient);
+  const send = relaySender(admin, publicClient);
 
-  const langkah: readonly { label: string; call: RelayCall }[] = [
+  const steps: readonly { label: string; call: RelayCall }[] = [
     {
-      label: "approve mBNB ke pool",
+      label: "approve mBNB for the pool",
       call: {
         address: MBNB,
         abi: ERC20_ABI,
@@ -187,7 +187,7 @@ async function main(): Promise<void> {
       },
     },
     {
-      label: "supply mBNB sebagai agunan",
+      label: "supply mBNB as collateral",
       call: {
         address: MOCK_LENDING_POOL_ADDRESS,
         abi: POOL_ABI,
@@ -206,30 +206,30 @@ async function main(): Promise<void> {
     },
   ];
 
-  for (const { label, call } of langkah) {
-    console.log(`\n[admin Altana] ${label}`);
-    const result = await kirim([call], label);
-    wajib(result.status === 1, `${label} gagal (tx ${result.transactionHash}).`);
+  for (const { label, call } of steps) {
+    console.log(`\n[Altana admin] ${label}`);
+    const result = await send([call], label);
+    assertTrue(result.status === 1, `${label} failed (tx ${result.transactionHash}).`);
     console.log(`  tx : ${result.transactionHash}`);
     console.log(`  https://testnet.bscscan.com/tx/${result.transactionHash}`);
   }
 
-  const [col, debt, , lt, , hf] = await posisi();
-  console.log("\nPosisi wallet Altana setelah penyiapan:");
-  console.log(`  agunan : ${formatUsd8(col)}`);
-  console.log(`  hutang : ${formatUsd8(debt)}`);
-  console.log(`  lt     : ${lt} bps`);
-  console.log(`  HF     : ${formatHf(hf)}`);
-  wajib(col > 0n && debt > 0n, "Posisi tidak terbentuk.");
+  const [col, debt, , lt, , hf] = await readPosition();
+  console.log("\nThe Altana wallet's position after setup:");
+  console.log(`  collateral : ${formatUsd8(col)}`);
+  console.log(`  debt       : ${formatUsd8(debt)}`);
+  console.log(`  lt         : ${lt} bps`);
+  console.log(`  HF         : ${formatHf(hf)}`);
+  assertTrue(col > 0n && debt > 0n, "The position was not created.");
 
-  const sisa = await publicClient.getBalance({ address: ALTANA_WALLET });
-  console.log(`\nSaldo tBNB wallet Altana : ${sisa} wei`);
+  const remaining = await publicClient.getBalance({ address: ALTANA_WALLET });
+  console.log(`\nAltana wallet tBNB balance : ${remaining} wei`);
 }
 
 try {
   await main();
 } catch (err: unknown) {
-  console.error(`\n✖ GAGAL: ${err instanceof Error ? err.message : String(err)}`);
+  console.error(`\n✖ FAILED: ${err instanceof Error ? err.message : String(err)}`);
   if (err instanceof Error && err.stack) console.error(err.stack);
   process.exitCode = 1;
 }
