@@ -38,7 +38,7 @@
       "alasanPeriode": "120 detik mengikuti listing Guardian yang sudah live. Pendek BUKAN karena ini harga komersial ($0,05 per 2 menit jelas bukan), tetapi karena gerbang anti-sybil FuguSubscription.hasSubscribed baru terbuka setelah agent benar-benar MENERIMA >= 50% (minPaidBpsOfPeriod) harga SATU periode, dan claim proporsional terhadap waktu berjalan. Periode 30 hari berarti hak review baru terbuka setelah 15 hari — siklus sewa -> claim -> review tidak akan pernah selesai di depan juri; 120 detik membuatnya selesai dalam ~60 detik."
     },
     "erc8004AgentIdCaveat": "8004-8007 adalah PLACEHOLDER, bukan identitas ERC-8004 nyata. Tidak satu pun wallet agent memegang token IdentityRegistry ERC-8004 di BSC testnet: balanceOf pada 0x8004A818BFB912233c491871b3d84c89A494BD9e = 0 untuk keempatnya (diperiksa 2026-09-09). FuguRegistry memang tidak memverifikasi kepemilikan ERC-8004 (lihat NatSpec kontraknya) — ID ini hanya kunci unik lokal. Fakta ini juga tertulis di dalam metadata tiap listing, bukan hanya di berkas ini.",
-    "metadataFormat": "Listing 2-4 memakai `data:application/json;base64,...` — metadata ditanam on-chain, bisa dibaca tanpa server, IPFS, atau API key. Listing 1 masih memakai placeholder `ipfs://fugu-guardian-v1` peninggalan e2e yang tidak bisa di-resolve.",
+    "metadataFormat": "Keempat listing kini memakai `data:application/json;base64,...` — metadata ditanam on-chain, bisa dibaca tanpa server, IPFS, atau API key. Field yang dibaca backend: name, summary (atau description), onchainExecution, limits, verify, agentWallet.",
     "metadataDecode": "cast call --rpc-url \"$BSC_TESTNET_RPC_URL\" 0xb2f36070E6eae3353E8e755172B477DF213ae248 'getListing(uint256)((uint256,address,address,uint8,uint128,uint32,bool,bool,string))' 2 | sed -E 's/.*base64,//; s/\"\\)$//' | base64 -d",
     "items": [
       {
@@ -52,9 +52,13 @@
         "agentWallet": "0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E",
         "priceUsd8PerPeriod": 10000000,
         "periodSeconds": 120,
-        "metadataURI": "ipfs://fugu-guardian-v1",
+        "metadataURI": "data:application/json;base64,... (didekode di bawah; ditulis oleh script/UpdateGuardianMetadata.s.sol)",
         "txHash": "0x590d2f13731bef32c6409d32c9f278af8b897766a0a82e0b504acf6799ffeab7",
-        "note": "Didaftarkan saat e2e 2026-09-08, BUKAN oleh script/ListAgents.s.sol. Dua cacat yang diwariskan dan sengaja dicatat, bukan ditutupi: (1) `agentWallet` masih EOA deployer, bukan wallet Altana Guardian 0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0; (2) metadataURI-nya placeholder ipfs yang tidak bisa di-resolve. FuguRegistry tidak punya setter untuk `agentWallet` (updateListing hanya menyentuh harga/periode/metadataURI), jadi memperbaikinya berarti listing baru — yang akan membuat countByCategory(3) menjadi 2. Dibiarkan apa adanya."
+        "note": "Didaftarkan saat e2e 2026-09-08, BUKAN oleh script/ListAgents.s.sol. metadataURI-nya semula placeholder `ipfs://fugu-guardian-v1` yang tidak bisa dibaca backend (pembaca metadata sengaja menolak URI non-`data:` dan tidak pernah menyentuh jaringan), sehingga satu-satunya agent yang sudah benar-benar mengeksekusi on-chain tampil sebagai `Agent #8004` di marketplace sendiri. Diperbaiki 2026-09-09 lewat `updateListing` — satu transaksi, harga 10000000 dan periode 120 dibaca dari rantai lalu dikirim kembali apa adanya (updateListing menimpa ketiganya sekaligus), dan diverifikasi tidak berubah sesudahnya. `onchainExecution: true` di metadata Guardian adalah satu-satunya pembeda dari tiga listing lain, dan itu klaim tentang bukti (tx repay 0x619cfbe3…), bukan pemasaran. SISA KETERBATASAN: `agentWallet` masih EOA deployer, bukan wallet Altana Guardian 0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0. `updateListing` tidak menyentuh field itu dan FuguRegistry tidak punya setternya, jadi hanya listing baru yang bisa memperbaikinya — dan itu akan membuat countByCategory(3) menjadi 2. Metadata karena itu mendeklarasikan wallet Altana yang sungguhan menandatangani, dan backend melaporkan ketidakcocokannya (`agentWalletMatchesListing: false`) alih-alih menyajikan salah satu sebagai bukti.",
+        "metadataUpdateTxHash": "0x80a2b11a5a3556d0c393c3d618dbd0fffadb5fd697f87792dfd8a24ac75d31fd",
+        "metadataUpdateBlock": 129910392,
+        "metadataUpdateGasUsed": 1923013,
+        "onchainExecution": true
       },
       {
         "listingId": 2,
@@ -106,7 +110,8 @@
       }
     ],
     "honesty": "Listing 2-4 TIDAK mengklaim eksekusi on-chain. Metadata masing-masing menyatakan sendiri: mesin keputusan deterministik + backtest saja, belum pernah mengirim satu transaksi pun, dan menyewa mereka mencatat pembayaran di escrow tanpa memulai loop otonom (docs/STATUS.md §B3). Keempat listing `curated: false` — deployer memang kurator, tetapi FuguRegistry.setCurated menolak kurator yang mengkurasi listing miliknya sendiri (CannotCurateOwnListing), jadi tidak ada satu pun listing kita yang berstempel verifikasi.",
-    "biayaTotal": "0,000327803188 tBNB untuk tiga transaksi (gas 3.278.032 @ 0,1 gwei). Saldo deployer 0,086027768612945404 -> 0,085699965412945404 tBNB."
+    "biayaTotal": "0,000327803188 tBNB untuk tiga pendaftaran (3.278.032 gas @ 0,1 gwei) + 0,0001923013 tBNB untuk updateListing Guardian (1.923.013 gas). Saldo deployer 0,086027768612945404 -> 0,085507664112945404 tBNB.",
+    "backendCheck": "Diperiksa di container hidup 2026-09-09 (`curl 'localhost:8787/api/agents?category=<KATEGORI>'`): REBALANCING Fugu Rebalancer $0,05 onchainExecution=false · GRID Fugu Grid $0,05 false · YIELD Fugu Yield $0,05 false · HEALTH_FACTOR Fugu Guardian $0,10 true (agentWalletMatchesListing=false). Tidak ada lagi nama placeholder."
   },
   "previousDeployment": {
     "note": "deploy pertama, tanpa slippage guard dan ambang anti-sybil; tidak pernah memegang listing/langganan/dana",
