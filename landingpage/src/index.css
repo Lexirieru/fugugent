@@ -1,0 +1,294 @@
+@import "tailwindcss";
+
+/* ── Figma-hosted fonts ─────────────────────────────────────────── */
+
+@font-face {
+  font-family: 'Kalam:Bold';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('https://static.figma.com/font/Kalam-Bold_1') format('woff2');
+}
+
+@font-face {
+  font-family: 'Geist:SemiBold';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('https://static.figma.com/font/Geist_wght__1') format('woff2');
+}
+
+@font-face {
+  font-family: 'Geist:Medium';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('https://static.figma.com/font/Geist_wght__1') format('woff2');
+}
+
+/* ── Canvas ─────────────────────────────────────────────────────── */
+
+:root {
+  --cream: #F4EBE3;
+  --ink: #000;
+  --muted: #616161;
+  --accent: #EA580C;
+
+  background-color: var(--cream);
+  min-height: 100%;
+  color-scheme: light;
+}
+
+html {
+  background-color: var(--cream);
+  min-height: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  background-color: var(--cream);
+  min-height: 100%;
+  margin: 0;
+  overflow-x: hidden;
+  color: var(--ink);
+  font-family: 'Geist:Medium', ui-sans-serif, system-ui, sans-serif;
+  font-weight: 500;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  background-color: var(--cream);
+  min-height: 100%;
+}
+
+.page {
+  background-color: var(--cream);
+  min-height: 100svh;
+  overflow-x: hidden;
+}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+
+.site-header {
+  width: min(1200px, calc(100% - 48px));
+  height: 64px;
+  margin: 15px auto 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.logo:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.logo-word {
+  font-family: 'Geist:Medium', ui-sans-serif, system-ui, sans-serif;
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--ink);
+  text-decoration: none;
+  line-height: 1;
+}
+
+/* Logo mark: 12 CSS dots on a 22 × 22 modular grid */
+.logo-mark {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+
+.logo-mark i {
+  position: absolute;
+  width: 4.35px;
+  height: 4.35px;
+  border-radius: 50%;
+  background-color: var(--accent);
+}
+
+/* ── Download button ────────────────────────────────────────────── */
+
+.download-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px 10px 16px;
+  border-radius: 48px;
+  border: none;
+  color: #fff;
+  font-family: 'Geist:SemiBold', ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  background: radial-gradient(
+    ellipse at center,
+    #000 0%,
+    #060606 12.5%,
+    #0d0d0d 25%,
+    #1a1a1a 50%,
+    #343434 100%
+  );
+  transition:
+    filter 160ms ease,
+    transform 160ms ease;
+}
+
+.download-btn svg {
+  display: block;
+  flex: none;
+  fill: currentColor;
+}
+
+.download-btn:hover {
+  filter: brightness(1.16);
+  transform: translateY(-1px);
+}
+
+.download-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* ── Hero ───────────────────────────────────────────────────────── */
+
+.hero {
+  position: relative;
+  width: min(1200px, calc(100% - 48px));
+  min-height: 266px;
+  margin: 34px auto 0;
+}
+
+.hero-left {
+  width: 651px;
+  padding-top: 20px;
+}
+
+.hero-eyebrow {
+  font-family: 'Kalam:Bold', cursive;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -0.352px;
+  line-height: 1.3;
+  margin: 0 0 24px;
+}
+
+.hero-title {
+  font-family: 'Geist:SemiBold', ui-sans-serif, system-ui, sans-serif;
+  color: var(--ink);
+  max-width: 483px;
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: -2px;
+  line-height: 1.1;
+  margin: 0 0 24px;
+}
+
+.hero-desc {
+  position: absolute;
+  right: 0;
+  top: 184px;
+  width: 394px;
+  margin: 0;
+  font-family: 'Geist:Medium', ui-sans-serif, system-ui, sans-serif;
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.1068px;
+  line-height: 1.4;
+}
+
+/* ── Video ──────────────────────────────────────────────────────── */
+
+.media-placeholder {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background-color: var(--cream);
+}
+
+/* ── Responsive: tablet / mobile ────────────────────────────────── */
+
+@media (max-width: 760px) {
+  .site-header {
+    width: calc(100% - 32px);
+    height: 52px;
+    margin-top: 10px;
+  }
+
+  .logo-word {
+    font-size: 18px;
+  }
+
+  .site-header .download-btn {
+    padding: 9px 15px 9px 13px;
+    font-size: 13px;
+  }
+
+  .hero {
+    width: calc(100% - 32px);
+    margin-top: 20px;
+    min-height: 408px;
+  }
+
+  .hero-left {
+    width: 100%;
+    padding-top: 20px;
+  }
+
+  .hero-eyebrow {
+    font-size: 15px;
+    margin-bottom: 18px;
+  }
+
+  .hero-title {
+    max-width: 340px;
+    font-size: clamp(34px, 10vw, 40px);
+    letter-spacing: -1.7px;
+    margin-bottom: 26px;
+  }
+
+  .hero-desc {
+    left: 0;
+    right: auto;
+    top: 285px;
+    width: min(394px, 100%);
+    font-size: 15px;
+  }
+}
+
+/* ── Responsive: extra small ────────────────────────────────────── */
+
+@media (max-width: 390px) {
+  .site-header .download-btn .download-btn-label {
+    display: none;
+  }
+
+  .site-header .download-btn {
+    padding: 10px;
+  }
+
+  .hero {
+    min-height: 430px;
+  }
+
+  .hero-desc {
+    top: 300px;
+  }
+}
