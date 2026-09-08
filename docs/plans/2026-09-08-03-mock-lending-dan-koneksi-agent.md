@@ -240,3 +240,53 @@ yang secara kriptografis tidak bisa melampaui izinnya**, bahkan bila kodenya dib
 - [ ] **Step 6: Perbarui `docs/e2e/` dan `docs/STATUS.md`** — pindahkan butir session key
       dari BELUM ke SUDAH, dengan tx hash keberhasilan dan bukti penolakan.
 - [ ] **Step 7: Commit.** `feat(guardian): repay lewat session key Altana ber-batas`
+
+---
+
+### Task 9: Jadikan Guardian benar-benar bisa dijalankan sebagai layanan
+
+**Kenapa task ini ada:** review akhir seluruh cabang menemukan tiga cacat yang hanya terlihat
+dari melihat rantai secara utuh. Ketiganya harus beres sebelum backend dibangun di atasnya.
+
+**Files:**
+- Create: `src/strategy/units.ts`, `src/strategy/createGuardian.ts`, `src/strategy/state/store.ts` + test masing-masing
+- Modify: `src/strategy/execute.ts`, `src/strategy/guard.ts`, `src/strategy/chain/testnet.ts`,
+  `scripts/e2e-guardian.ts`, `docs/STATUS.md`
+
+**Urutan yang disarankan reviewer — ikuti:** C3 → C2 → I2+I3 → C1 → I4 → pembersihan dokumen.
+
+- [ ] **C3 — `ExecuteState` persisten + kill switch punya tuas.**
+      Restart saat ini mereset `spentTodayUsd8`, `dayStartedAt`, dan `lastActionAt` — cooldown
+      langsung lolos. Dan `GuardLoopHandle` hanya punya `stop()`/`getLastResult()`; tidak ada
+      jalan menyetel `killed` saat loop berjalan, padahal `docs/STATUS.md:34` mendaftarkan
+      kill switch sebagai kapabilitas. **Ini satu-satunya klaim yang memberi kesan melebihi
+      bukti** — perbaiki jalurnya, atau turunkan klaimnya sampai jalur itu ada.
+      Store-nya boleh sesederhana file JSON; yang penting antarmukanya disuntikkan sehingga
+      backend bisa menggantinya dengan Postgres tanpa menyentuh strategi.
+- [ ] **C2 — idempotensi repay.**
+      `waitForTransactionReceipt` timeout setelah tx mendarat → `sendRepay` melempar →
+      `guard.ts` mengembalikan state lama → bayar lagi siklus berikutnya, sampai cap sesi habis.
+      Untuk pengiriman jaringan, "gagal" tidak berarti "tidak terjadi". Catat in-flight
+      **sebelum** mengirim dan bereskan sesudahnya; atau minimal jangan pernah mengirim repay
+      bila `pos.blockNumber` belum melewati blok repay terakhir yang diketahui.
+      Wajib ada test: `sendRepay` melempar setelah tx "mendarat" → siklus berikutnya **tidak**
+      mengirim ulang.
+- [ ] **I2 + I3 — parameterkan aset repay, beri rumah pada konversi satuan.**
+      `REPAY_ASSET_ADDRESS` ter-hardcode di modul murni `execute.ts`. Konversi USD8↔unit token
+      hanya hidup di skrip; pindahkan ke `src/strategy/units.ts` dengan test sendiri.
+      Cek "bolak-balik" yang ada sekarang **tautologis** — `a·10^d/p·p/10^d` benar untuk `d` dan
+      `p` apa pun, jadi ia tidak menangkap desimal atau feed yang salah seperti diklaim
+      komentarnya. Ganti dengan cek yang benar-benar menangkapnya, atau hapus klaimnya.
+- [ ] **C1 — `createGuardian()` di `src/`.**
+      Rantai lengkap hanya hidup di `scripts/e2e-guardian.ts`. Lima potongan perakitan
+      (konversi satuan, baca `assets()` + feed, cek saldo, `ExecuteState` awal, `relaySender`)
+      tidak punya padanan di `src/` dan tidak dijaga test — siapa pun yang menyambungkan
+      runtime akan menyalinnya dari skrip demo. Buat composition root-nya di `src/`, lalu
+      **E2E memanggilnya**, bukan merakit ulang.
+- [ ] **I4 — tambatkan `readAavePosition` ke satu blok.** `Position.blockNumber` sekarang
+      datang dari panggilan RPC terpisah, bukan blok tempat angkanya dibaca.
+- [ ] **Pembersihan dokumen:** `docs/e2e/` baris 53-58 basi (dibantah dokumen yang sama);
+      root `CLAUDE.md` masih menandai `ai/` "belum"; `docs/STATUS.md` menyebut 135 test padahal 142.
+- [ ] **Commit.** `fix(guardian): persistensi state, idempotensi repay, composition root`
+
+**Ditunda dengan sengaja, dicatat di ledger:** I1, I5, I6, I7, dan sisa Minor.
