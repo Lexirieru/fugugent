@@ -6,11 +6,32 @@
  * DATABASE_ERROR` secara intermiten (4 dari 5 percobaan gagal saat riset).
  * dGrid membalas 403 tanpa User-Agent browser. Karena itu:
  *
- * - Header User-Agent browser SELALU dikirim, tidak bisa dimatikan.
+ * - Header User-Agent browser SELALU dikirim dan tidak bisa dikosongkan —
+ *   `userAgent` boleh diganti dengan string browser lain (mis. rotasi UA),
+ *   tapi string kosong/whitespace ditolak dan jatuh balik ke default.
  * - Retry dengan backoff pada 5xx, 429, dan kegagalan jaringan/timeout.
  * - TIDAK retry pada 4xx selain 429 (itu kesalahan klien, bukan upstream down).
- * - Circuit breaker: setelah N kegagalan berturut-turut, tolak cepat selama
- *   cooldown, lalu izinkan tepat satu percobaan pengintaian (half-open).
+ * - Body 2xx yang gagal di-parse sebagai JSON diperlakukan sebagai kegagalan
+ *   data (upstream sebenarnya menjawab), BUKAN kegagalan jaringan — tidak
+ *   retry, tidak menghitung ke breaker.
+ * - Circuit breaker menghitung kegagalan per **panggilan `get()` logis**,
+ *   bukan per percobaan retry internal. Dengan default (`maxAttempts=3`,
+ *   `failureThreshold=5`) artinya butuh 5 panggilan yang masing-masing gagal
+ *   total (bukan 5 percobaan mentah / ~1,7 panggilan) sebelum breaker
+ *   membuka. Ini dipilih karena breaker melindungi terhadap "upstream
+ *   sedang down", dan retry di dalam satu panggilan sudah menyerap
+ *   kegagalan transien — menghitung retry mentah membuat breaker jauh
+ *   lebih sensitif dari yang tersirat oleh angka `failureThreshold`.
+ * - Setelah cooldown breaker lewat, TEPAT SATU percobaan pengintaian
+ *   (half-open) boleh benar-benar menghubungi upstream pada satu waktu.
+ *   Flag `probeInFlight` di-set secara sinkron sebelum `await` apa pun,
+ *   supaya panggilan `get()` konkuren lain yang tiba di giliran sinkron
+ *   yang sama (mis. lewat `Promise.all` tepat saat cooldown lewat) melihat
+ *   flag ini dan ditolak cepat alih-alih ikut menembak upstream sekaligus.
+ *   Pemanggil yang bukan si pengintai TIDAK menunggu hasil pengintaian —
+ *   mereka ditolak cepat dengan `UpstreamError` (status 503) — karena
+ *   mereka bisa saja meminta URL/opsi yang berbeda dari si pengintai, dan
+ *   membagikan `data` dari satu URL ke pemanggil URL lain akan salah.
  *
  * `fetchImpl` dan `now` disuntikkan lewat opsi konstruktor supaya test tidak
  * pernah menyentuh jaringan sungguhan maupun jam dinding sungguhan.
@@ -30,20 +51,21 @@ export interface RetryOptions {
 }
 
 export interface BreakerOptions {
-  /** Jumlah kegagalan berturut-turut sebelum breaker membuka. */
+  /** Jumlah panggilan `get()` gagal berturut-turut sebelum breaker membuka. */
   failureThreshold: number;
   /** Lama breaker tetap terbuka sebelum mengizinkan satu percobaan pengintaian. */
   cooldownMs: number;
 }
 
-const DEFAULT_RETRY: RetryOptions = { maxAttempts: 3, baseDelayMs: 300 };
-const DEFAULT_BREAKER: BreakerOptions = { failureThreshold: 5, cooldownMs: 30_000 };
+export const DEFAULT_RETRY: RetryOptions = { maxAttempts: 3, baseDelayMs: 300 };
+export const DEFAULT_BREAKER: BreakerOptions = { failureThreshold: 5, cooldownMs: 30_000 };
 
 export interface HttpClientOptions {
   /** `fetch` disuntikkan — wajib, supaya test tidak menyentuh jaringan sungguhan. */
   fetchImpl: typeof fetch;
   /** Jam disuntikkan — wajib, supaya test breaker/cooldown deterministik. */
   now: () => number;
+  /** String kosong/whitespace ditolak dan jatuh balik ke `DEFAULT_USER_AGENT`. */
   userAgent?: string;
   timeoutMs?: number;
   retry?: Partial<RetryOptions>;
@@ -52,7 +74,12 @@ export interface HttpClientOptions {
 
 export interface HttpGetOptions {
   headers?: Record<string, string>;
-  /** Dikirim lewat header `X-API-Key`, tidak pernah lewat query string/URL. */
+  /**
+   * Dikirim lewat header `X-API-Key`, tidak pernah lewat query string/URL.
+   * JANGAN teruskan lewat literal `{ apiKey: rahasia }` di kode yang mungkin
+   * me-log opsi ini sebelum memanggil `get()` — pakai `withApiKey()` supaya
+   * key tetap non-enumerable (tidak ikut ke `JSON.stringify`/`console.log`).
+   */
   apiKey?: string;
   timeoutMs?: number;
 }
@@ -94,13 +121,38 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Bikin fragmen `HttpGetOptions` dengan `apiKey` non-enumerable, konsisten
+ * dengan pola yang dipakai `loadConfig()` di `config.ts`. Pakai ini alih-alih
+ * `{ apiKey }` literal setiap kali mengoper API key ke `client.get()`, supaya
+ * `console.log(opts)` / `JSON.stringify(opts)` di lapisan pemanggil tidak
+ * membocorkan key. `extra` (headers/timeoutMs tambahan) tetap enumerable
+ * seperti biasa.
+ */
+export function withApiKey(
+  apiKey: string,
+  extra?: Omit<HttpGetOptions, "apiKey">,
+): HttpGetOptions {
+  const opts: HttpGetOptions = { ...extra };
+  Object.defineProperty(opts, "apiKey", {
+    value: apiKey,
+    enumerable: false,
+    writable: false,
+    configurable: false,
+  });
+  return opts;
+}
+
 export interface HttpClient {
   get<T = unknown>(url: string, opts?: HttpGetOptions): Promise<HttpResult<T>>;
 }
 
 export function createHttpClient(options: HttpClientOptions): HttpClient {
   const { fetchImpl, now } = options;
-  const userAgent = options.userAgent ?? DEFAULT_USER_AGENT;
+  const userAgent =
+    options.userAgent && options.userAgent.trim().length > 0
+      ? options.userAgent
+      : DEFAULT_USER_AGENT;
   const defaultTimeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const retryOptions: RetryOptions = { ...DEFAULT_RETRY, ...options.retry };
   const breakerOptions: BreakerOptions = { ...DEFAULT_BREAKER, ...options.breaker };
@@ -108,6 +160,10 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
   // State breaker per instance klien (bukan per-request).
   let consecutiveFailures = 0;
   let openUntil: number | null = null;
+  // Single-flight guard untuk percobaan pengintaian half-open. Di-set secara
+  // SINKRON (tidak ada await sebelum ini di jalur pengintaian) supaya
+  // panggilan get() konkuren lain melihatnya di giliran sinkron yang sama.
+  let probeInFlight = false;
 
   function buildHeaders(opts?: HttpGetOptions): Headers {
     const headers = new Headers();
@@ -139,7 +195,9 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
     }
   }
 
-  function openBreakerIfThresholdReached(): void {
+  /** Dipanggil TEPAT SEKALI per panggilan `get()` logis yang akhirnya gagal total. */
+  function registerCallFailure(): void {
+    consecutiveFailures++;
     if (consecutiveFailures >= breakerOptions.failureThreshold) {
       openUntil = now() + breakerOptions.cooldownMs;
     }
@@ -162,7 +220,19 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
         const response = await doFetch(url, opts);
 
         if (response.status < 400) {
-          const data = (await response.json()) as T;
+          let data: T;
+          try {
+            data = (await response.json()) as T;
+          } catch (parseErr) {
+            // Upstream benar-benar menjawab (2xx) — ini kegagalan data, bukan
+            // kegagalan jaringan. Jangan retry, jangan hitung ke breaker.
+            const reason = parseErr instanceof Error ? parseErr.message : "body tidak valid";
+            throw new UpstreamError(
+              `upstream membalas ${response.status} dengan body JSON tidak valid: ${reason}`,
+              response.status,
+              attempt,
+            );
+          }
           onSuccess();
           return { data, status: response.status, attempts: attempt };
         }
@@ -177,7 +247,6 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
           );
         }
 
-        consecutiveFailures++;
         lastError = new UpstreamError(
           `upstream membalas status ${response.status}`,
           response.status,
@@ -189,7 +258,7 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
           continue;
         }
 
-        openBreakerIfThresholdReached();
+        registerCallFailure();
         throw lastError;
       } catch (err) {
         if (err instanceof UpstreamError) {
@@ -197,7 +266,6 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
         }
 
         // Kegagalan jaringan / timeout / abort.
-        consecutiveFailures++;
         const message = err instanceof Error ? err.message : "kegagalan jaringan";
         lastError = new UpstreamError(message, NETWORK_ERROR_STATUS, attempt);
 
@@ -206,7 +274,7 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
           continue;
         }
 
-        openBreakerIfThresholdReached();
+        registerCallFailure();
         throw lastError;
       }
     }
@@ -219,18 +287,34 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
     async get<T = unknown>(url: string, opts?: HttpGetOptions): Promise<HttpResult<T>> {
       const currentTime = now();
 
-      if (openUntil !== null && currentTime < openUntil) {
-        throw new UpstreamError(
-          "circuit breaker terbuka — upstream sedang dianggap tumbang",
-          BREAKER_OPEN_STATUS,
-          0,
-        );
+      if (openUntil !== null) {
+        if (currentTime < openUntil) {
+          throw new UpstreamError(
+            "circuit breaker terbuka — upstream sedang dianggap tumbang",
+            BREAKER_OPEN_STATUS,
+            0,
+          );
+        }
+
+        // Cooldown sudah lewat: hanya satu percobaan pengintaian yang boleh
+        // benar-benar jalan. Cek + set flag ini sinkron, tanpa await di
+        // antaranya, supaya pemanggil konkuren lain melihat flag yang sama.
+        if (probeInFlight) {
+          throw new UpstreamError(
+            "circuit breaker sedang menjalankan satu percobaan pengintaian — coba lagi sebentar",
+            BREAKER_OPEN_STATUS,
+            0,
+          );
+        }
+        probeInFlight = true;
+        try {
+          return await runAttempts<T>(url, opts, 1);
+        } finally {
+          probeInFlight = false;
+        }
       }
 
-      const isReconnaissance = openUntil !== null; // cooldown sudah lewat
-      const maxAttempts = isReconnaissance ? 1 : retryOptions.maxAttempts;
-
-      return runAttempts<T>(url, opts, maxAttempts);
+      return runAttempts<T>(url, opts, retryOptions.maxAttempts);
     },
   };
 }
