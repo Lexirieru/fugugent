@@ -2381,3 +2381,286 @@ describe("first-party FuguRegistry overlay", () => {
     expect(result.agent).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Listing metadata: our agents must not show up as "Agent #8006"
+// ---------------------------------------------------------------------------
+
+describe("first-party listings carry their real names", () => {
+  function metaUri(body: unknown): string {
+    return `data:application/json;base64,${Buffer.from(JSON.stringify(body), "utf8").toString("base64")}`;
+  }
+
+  /** An on-chain record whose listing carries metadata, as deployed. */
+  function namedListing(
+    tokenId: string,
+    category: Category,
+    body: unknown,
+  ): AgentRecord {
+    const base = onchainRecord(tokenId, category);
+    return {
+      ...base,
+      name: `Agent #${tokenId}`,
+      fuguListing: { ...base.fuguListing!, metadataURI: metaUri(body) },
+    };
+  }
+
+  it("the marketplace shows the real name, not the placeholder", async () => {
+    // Measured live: our four agents rendered as "Agent #8005"… next to 113
+    // third-party agents with real names, which made the only rentable agents on
+    // the page look broken.
+    const h = harness();
+    h.onchain.page = page(
+      [
+        namedListing("8006", "GRID", {
+          name: "Fugu Grid",
+          summary: "Grid trading on PancakeSwap v3.",
+          onchainExecution: false,
+        }),
+      ],
+      { source: "onchain" },
+    );
+    h.scan.page = page([record({ tokenId: "1" })]);
+
+    const result = await h.service.getAgentsByCategory("GRID");
+    const listed = result.items.find((i) => i.fuguListing !== null)!;
+    expect(listed.name).toBe("Fugu Grid");
+    expect(listed.description).toBe("Grid trading on PancakeSwap v3.");
+    expect(listed.name).not.toContain("#");
+  });
+
+  it("onchainExecution reaches the caller — hirable is not the same as able to act", async () => {
+    const h = harness();
+    h.onchain.page = page(
+      [
+        namedListing("8006", "GRID", { name: "Fugu Grid", onchainExecution: false }),
+        namedListing("8004", "HEALTH_FACTOR", { name: "Fugu Guardian", onchainExecution: true }),
+      ],
+      { source: "onchain" },
+    );
+    h.scan.page = page([record({ tokenId: "1" })]);
+
+    const grid = await h.service.getAgentsByCategory("GRID");
+    expect(grid.items.find((i) => i.name === "Fugu Grid")?.onchainExecution).toBe(false);
+
+    const guardian = await h.service.getAgentsByCategory("HEALTH_FACTOR");
+    expect(guardian.items.find((i) => i.name === "Fugu Guardian")?.onchainExecution).toBe(true);
+  });
+
+  it("tier 3 shows the SAME names as the overlay", async () => {
+    // Otherwise an agent is "Fugu Grid" while 8004scan is up and "Agent #8006"
+    // the moment it goes down — the marketplace would appear to rename it.
+    const h = harness();
+    h.onchain.page = page(
+      [namedListing("8006", "GRID", { name: "Fugu Grid", summary: "Grid trading." })],
+      { source: "onchain" },
+    );
+    h.scan.page = page([], { healthy: false, reason: "500 DATABASE_ERROR" });
+    h.cache.items = [];
+
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.source).toBe("onchain");
+    expect(result.items[0]!.name).toBe("Fugu Grid");
+  });
+
+  it("detail pages show the real name too", async () => {
+    const h = harness();
+    h.onchain.page = page(
+      [
+        namedListing("8006", "GRID", {
+          name: "Fugu Grid",
+          summary: "Grid trading.",
+          onchainExecution: false,
+        }),
+      ],
+      { source: "onchain" },
+    );
+    h.scan.detail = {
+      agent: null,
+      source: "scan8004",
+      healthy: false,
+      reason: "500",
+      fetchedAt: NOW.toISOString(),
+    };
+    h.cache.items = [];
+
+    const result = await h.service.getAgentDetail("97:8006");
+    expect(result.agent?.name).toBe("Fugu Grid");
+    expect(result.agent?.onchainExecution).toBe(false);
+  });
+
+  it("8004scan metadata wins for an agent it also knows — it is richer", async () => {
+    const h = harness();
+    h.onchain.page = page(
+      [namedListing("8006", "GRID", { name: "Fugu Grid", summary: "Short on-chain blurb." })],
+      { source: "onchain" },
+    );
+    h.scan.page = page([
+      record({ tokenId: "8006", name: "Fugu Grid (verified)", description: "Grid trading bot." }),
+    ]);
+
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]!.name).toBe("Fugu Grid (verified)");
+    expect(result.items[0]!.fuguListing).not.toBeNull();
+  });
+
+  it("malformed metadata keeps the placeholder and never breaks the page", async () => {
+    const h = harness();
+    const broken = onchainRecord("8006", "GRID");
+    h.onchain.page = page(
+      [
+        {
+          ...broken,
+          name: "Agent #8006",
+          fuguListing: { ...broken.fuguListing!, metadataURI: "data:application/json;base64,!!!!" },
+        },
+      ],
+      { source: "onchain" },
+    );
+    h.scan.page = page([record({ tokenId: "1" })]);
+
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.healthy).toBe(true);
+    const listed = result.items.find((i) => i.fuguListing !== null)!;
+    expect(listed.name).toBe("Agent #8006");
+    expect(result.firstParty?.unreadableMetadata).toBe(1);
+    expect(result.firstParty?.reason).toContain("unreadable metadata");
+  });
+
+  it("one malformed listing never hides the healthy ones", async () => {
+    const h = harness();
+    const broken = onchainRecord("8007", "GRID");
+    h.onchain.page = page(
+      [
+        {
+          ...broken,
+          name: "Agent #8007",
+          fuguListing: { ...broken.fuguListing!, metadataURI: "ipfs://not-fetched" },
+        },
+        namedListing("8006", "GRID", { name: "Fugu Grid" }),
+      ],
+      { source: "onchain" },
+    );
+    h.scan.page = page([record({ tokenId: "1" })]);
+
+    const result = await h.service.getAgentsByCategory("GRID");
+    const names = result.items.filter((i) => i.fuguListing !== null).map((i) => i.name);
+    expect(names).toContain("Fugu Grid");
+    expect(names).toContain("Agent #8007");
+    expect(result.firstParty?.unreadableMetadata).toBe(1);
+  });
+
+  it("a listing with no metadata at all is not reported as broken", async () => {
+    const h = harness();
+    const bare = onchainRecord("8006", "GRID");
+    h.onchain.page = page(
+      [{ ...bare, fuguListing: { ...bare.fuguListing!, metadataURI: "" } }],
+      { source: "onchain" },
+    );
+    h.scan.page = page([record({ tokenId: "1" })]);
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.firstParty?.unreadableMetadata).toBe(0);
+    expect(result.firstParty?.reason).toBeNull();
+  });
+
+  it("a metadata URI we deliberately do not fetch is reported, not silently ignored", async () => {
+    // `ipfs://` would need a network call, and the overlay must stay independent
+    // of anything that can be down. Declining is correct — hiding it is not: the
+    // name stays a placeholder and the caller deserves to know why.
+    const h = harness();
+    const remote = onchainRecord("8006", "GRID");
+    h.onchain.page = page(
+      [{ ...remote, fuguListing: { ...remote.fuguListing!, metadataURI: "ipfs://QmX" } }],
+      { source: "onchain" },
+    );
+    h.scan.page = page([record({ tokenId: "1" })]);
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.firstParty?.unreadableMetadata).toBe(1);
+    expect(result.items.find((i) => i.fuguListing !== null)!.name).toBe("Agent #8006");
+  });
+
+  it("money survives metadata handling", async () => {
+    const h = harness();
+    h.onchain.page = page(
+      [namedListing("8006", "GRID", { name: "Fugu Grid" })],
+      { source: "onchain" },
+    );
+    h.scan.page = page([record({ tokenId: "1" })]);
+    const result = await h.service.getAgentsByCategory("GRID");
+    const listing = result.items.find((i) => i.fuguListing !== null)!.fuguListing!;
+    expect(typeof listing.priceUsd8PerPeriod).toBe("bigint");
+    expect(listing.priceUsd8PerPeriod).toBe(1_500_000_000n);
+  });
+
+  it("a wallet the metadata claims never overrides the one the contract holds", async () => {
+    const h = harness();
+    const base = onchainRecord("8004", "HEALTH_FACTOR");
+    const deployerEoa = "0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E";
+    h.onchain.page = page(
+      [
+        {
+          ...base,
+          name: "Agent #8004",
+          agentWallet: deployerEoa as `0x${string}`,
+          fuguListing: {
+            ...base.fuguListing!,
+            agentWallet: deployerEoa as `0x${string}`,
+            metadataURI: metaUri({
+              name: "Fugu Guardian",
+              agentWallet: "0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0",
+            }),
+          },
+        },
+      ],
+      { source: "onchain" },
+    );
+    h.scan.page = page([record({ tokenId: "1" })]);
+
+    const result = await h.service.getAgentsByCategory("HEALTH_FACTOR");
+    const guardian = result.items.find((i) => i.fuguListing !== null)!;
+    expect(guardian.name).toBe("Fugu Guardian");
+    // Listing 1 still points at the deployer EOA and cannot be fixed without a
+    // new listing; the backend must not paper over that.
+    expect(guardian.agentWallet).toBe(deployerEoa);
+    expect(guardian.listingMetadata?.agentWalletMatchesListing).toBe(false);
+  });
+});
+
+describe("listing 1 (Guardian) carries no on-chain JSON — verified on-chain", () => {
+  it("an `ipfs://` metadataURI keeps the placeholder rather than guessing a name", async () => {
+    // `getListing(1)` returns metadataURI "ipfs://fugu-guardian-v1", not a data:
+    // URI, so there is no name on-chain to read. Fetching it would put a third
+    // party back in the critical path of the one layer built to avoid that, and
+    // inferring the name from the category would hand our agents' names to any
+    // stranger who lists a HEALTH_FACTOR agent. So: placeholder, and say why.
+    const h = harness();
+    const guardian = onchainRecord("8004", "HEALTH_FACTOR");
+    h.onchain.page = page(
+      [
+        {
+          ...guardian,
+          name: "Agent #8004",
+          fuguListing: {
+            ...guardian.fuguListing!,
+            metadataURI: "ipfs://fugu-guardian-v1",
+          },
+        },
+      ],
+      { source: "onchain" },
+    );
+    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.cache.items = [];
+
+    const result = await h.service.getAgentsByCategory("HEALTH_FACTOR");
+    const listed = result.items.find((i) => i.fuguListing !== null)!;
+    expect(listed.name).toBe("Agent #8004");
+    expect(listed.description).toBe("");
+    expect(listed.onchainExecution).toBeUndefined();
+    expect(result.firstParty?.unreadableMetadata).toBe(1);
+    // And it is still rentable and still shown — a missing name is not a reason
+    // to hide the only Health Factor agent that can be hired.
+    expect(listed.fuguListing?.priceUsd8PerPeriod).toBe(1_500_000_000n);
+    expect(result.healthy).toBe(true);
+  });
+});

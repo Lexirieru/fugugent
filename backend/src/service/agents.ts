@@ -80,6 +80,11 @@ import type {
   Category,
   SourceHealth,
 } from "../types.js";
+import {
+  applyListingMetadata,
+  type ListedAgentRecord,
+  type ListingMetadata,
+} from "./metadata.js";
 import { createSeedSource, type SeedSource } from "./seed.js";
 
 // ---------------------------------------------------------------------------
@@ -120,6 +125,12 @@ export interface FallbackAttempt {
 
 /** Halaman agent lengkap dengan provenance-nya. */
 export interface AgentServicePage extends AgentListPage {
+  /**
+   * Records may carry what their `FuguRegistry` listing declared — a real name
+   * instead of `Agent #8006`, and `onchainExecution`. Widening only adds
+   * optional properties, so a plain `AgentRecord[]` still satisfies this.
+   */
+  items: ListedAgentRecord[];
   /**
    * Jumlah agent kategori ini yang **benar-benar bisa dipertanggungjawabkan** —
    * bukan total upstream.
@@ -186,10 +197,18 @@ export interface FirstPartyReport {
   reason: string | null;
   /** Age of the held registry read, seconds. `null` when never read. */
   ageSeconds: number | null;
+  /**
+   * Listings whose `metadataURI` could not be read, so they still show the
+   * `Agent #<tokenId>` placeholder. Reported rather than hidden: a listing that
+   * silently lost its name looks like our bug, and this says whose it is.
+   */
+  unreadableMetadata?: number;
 }
 
 /** Satu agent lengkap dengan provenance-nya. */
 export interface AgentServiceDetail extends AgentDetailResult {
+  /** See {@link AgentServicePage.items} — may carry listing metadata. */
+  agent: ListedAgentRecord | null;
   ageSeconds: number | null;
   stale: boolean;
   degraded: boolean;
@@ -635,7 +654,9 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
   const firstPartyEnabled = (deps.firstPartyOverlay ?? true) && deps.onchain !== undefined;
 
   /** Last successful `FuguRegistry` read, held for {@link DEFAULT_FIRST_PARTY_TTL_MS}. */
-  let heldListings: { items: AgentRecord[]; loadedAtMs: number } | undefined;
+  let heldListings: { items: ListedAgentRecord[]; loadedAtMs: number } | undefined;
+  /** How many held listings still show a placeholder name. */
+  let unreadableMetadata = 0;
   /** Until when the registry read is skipped after a failure. */
   let registryBlockedUntil = 0;
   let registryFailure: string | null = null;
@@ -673,10 +694,21 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
         registryFailure = redact(page.reason ?? "FuguRegistry read unhealthy without a reason");
         return held?.items ?? [];
       }
-      heldListings = { items: page.items, loadedAtMs: at.getTime() };
+      // Names, descriptions and `onchainExecution` live in each listing's
+      // `metadataURI`. It is untrusted input, so a listing whose metadata cannot
+      // be read keeps its placeholder name and is counted instead of throwing.
+      const named: ListedAgentRecord[] = [];
+      let unreadable = 0;
+      for (const item of page.items) {
+        const applied = applyListingMetadata(item);
+        if (!applied.ok) unreadable++;
+        named.push(applied.record);
+      }
+      unreadableMetadata = unreadable;
+      heldListings = { items: named, loadedAtMs: at.getTime() };
       registryBlockedUntil = 0;
       registryFailure = null;
-      return page.items;
+      return named;
     } catch (err) {
       registryBlockedUntil = at.getTime() + upstreamCooldownMs;
       registryFailure =
@@ -700,8 +732,14 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       // A held read plus a live failure is still serving the truth, so it counts
       // as healthy — `reason` says the registry could not be re-read.
       healthy: registryFailure === null || heldListings !== undefined,
-      reason: registryFailure,
+      reason:
+        unreadableMetadata > 0
+          ? [registryFailure, `${unreadableMetadata} listing(s) with unreadable metadata`]
+              .filter((part): part is string => part !== null)
+              .join("; ")
+          : registryFailure,
       ageSeconds,
+      unreadableMetadata,
     };
   }
 
@@ -1035,10 +1073,16 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
             items: 0,
           });
         } else {
-          const matching = page.items.filter(
-            (item) => item.fuguListing?.category === category ||
-              item.classification?.category === category,
-          );
+          const matching = page.items
+            .filter(
+              (item) =>
+                item.fuguListing?.category === category ||
+                item.classification?.category === category,
+            )
+            // Tier 3 reads the very same listings as the overlay, so it must show
+            // the very same names — otherwise an agent is called "Fugu Grid" while
+            // 8004scan is up and "Agent #8006" the moment it goes down.
+            .map((item) => applyListingMetadata(item).record);
           const slice = matching.slice(offset, offset + limit);
           if (slice.length === 0) {
             step({ source: "onchain", outcome: "empty", reason: null, items: 0 });
@@ -1284,7 +1328,8 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
           // Dicocokkan lewat `id` utuh, yang memuat chainId. Mencocokkan
           // `tokenId` telanjang akan mengabaikan chain — token 42 di chain 1
           // dan di chain 97 adalah agent yang berbeda.
-          const hit = page.items.find((item) => item.id === id);
+          const found = page.items.find((item) => item.id === id);
+          const hit = found === undefined ? undefined : applyListingMetadata(found).record;
           if (hit === undefined) {
             step({ source: "onchain", outcome: "empty", reason: null, items: 0 });
           } else {
