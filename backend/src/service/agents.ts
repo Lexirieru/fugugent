@@ -66,7 +66,11 @@ import {
   type CachedAgentFilter,
 } from "../db/repo.js";
 import type { FuguDb } from "../db/client.js";
-import { ONCHAIN_DEFAULT_LIMIT, type OnchainSource } from "../sources/onchain.js";
+import {
+  ONCHAIN_DEFAULT_LIMIT,
+  ONCHAIN_MAX_LIMIT,
+  type OnchainSource,
+} from "../sources/onchain.js";
 import type { Scan8004Source } from "../sources/scan8004.js";
 import type {
   AgentDetailResult,
@@ -103,10 +107,32 @@ export interface FallbackAttempt {
   reason: string | null;
   /** Jumlah item yang tingkat ini berikan. */
   items: number;
+  /**
+   * Hanya pada tingkat 8004scan: total yang **upstream** laporkan untuk query
+   * semantic-nya. Ia BUKAN total kategori — classifier di sisi kita yang
+   * membuat kategori — dan karena itu sengaja tidak pernah menjadi `total`
+   * halaman. Disimpan di jejak supaya tetap bisa diperiksa saat menyelidiki
+   * kenapa sebuah kategori tampak sepi, tanpa pernah bisa menjanjikan halaman
+   * yang tidak ada kepada pengguna.
+   */
+  upstreamTotal?: number;
 }
 
 /** Halaman agent lengkap dengan provenance-nya. */
 export interface AgentServicePage extends AgentListPage {
+  /**
+   * Jumlah agent kategori ini yang **benar-benar bisa dipertanggungjawabkan** —
+   * bukan total upstream.
+   *
+   * Pada tingkat 8004scan, total yang dikembalikan upstream adalah total hasil
+   * **query semantic**, bukan total kategori: kategori dibuat oleh classifier
+   * di sisi kita. Melaporkannya di sini akan menjanjikan "4.812 agent Grid"
+   * sementara halaman ketiga sudah kosong — dan juri cukup menekan "next page"
+   * untuk menemukannya. Angka upstream tetap terbawa di
+   * {@link FallbackAttempt.upstreamTotal} pada `trail`, tempat ia jadi bahan
+   * penyelidikan alih-alih janji.
+   */
+  total: number;
   /** Umur item **tertua** di halaman ini, detik. `null` bila kosong. */
   ageSeconds: number | null;
   /** `true` bila data tidak bisa dipastikan segar (cache, seed, atau lewat TTL). */
@@ -290,6 +316,20 @@ function clampOffset(offset: number | undefined): number {
   return Math.max(Math.trunc(offset), 0);
 }
 
+/** `fetchedAt` item tertua. Dipakai sebagai `fetchedAt` halaman supaya ia tidak berbohong. */
+function oldestFetchedAt(items: readonly AgentRecord[]): string | null {
+  let oldest: string | null = null;
+  let oldestMs = Number.POSITIVE_INFINITY;
+  for (const item of items) {
+    const parsed = Date.parse(item.fetchedAt);
+    if (!Number.isNaN(parsed) && parsed < oldestMs) {
+      oldestMs = parsed;
+      oldest = item.fetchedAt;
+    }
+  }
+  return oldest;
+}
+
 /** Umur item tertua di sebuah daftar. Satu aturan untuk keempat tingkat. */
 function oldestAgeSeconds(items: readonly AgentRecord[], now: Date): number | null {
   if (items.length === 0) return null;
@@ -336,8 +376,15 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       reason: attempt.reason,
       checkedAt,
     };
+    const previous = lastSeen.get(attempt.source);
     lastSeen.set(attempt.source, health);
     if (!persistHealth || deps.cache === undefined) return;
+    // Hanya **perubahan** status yang ditulis. Satu tampilan halaman saat
+    // upstream tumbang menempuh empat tingkat; menulis keempatnya tiap
+    // permintaan mengubah `source_health` jadi log akses. Yang berguna bagi
+    // `/api/health` dan bagi juri adalah kapan sebuah sumber berpindah keadaan,
+    // dan itu yang disimpan. Status terkini tetap ada di memori proses ini.
+    if (previous !== undefined && previous.healthy === health.healthy) return;
     // Best-effort: gagal mencatat kesehatan tidak boleh menjatuhkan permintaan
     // yang sedang dilayani. Ironinya akan sempurna.
     void deps.cache.recordHealth(health).catch(() => undefined);
@@ -391,7 +438,13 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
         source,
         healthy,
         reason,
-        fetchedAt,
+        // `fetchedAt` menunjuk kapan DATANYA diambil, bukan kapan jawaban ini
+        // disusun. Menyetelnya ke `now` untuk hasil seed akan membuat satu objek
+        // membawa dua pernyataan yang bertentangan: "baru diambil" berdampingan
+        // dengan `ageSeconds` ratusan ribu detik. Konsumen yang membaca
+        // `fetchedAt` saja tetap mendapat angka yang benar, dan invariant
+        // `ageSeconds === now - fetchedAt` berlaku di keempat tingkat.
+        fetchedAt: oldestFetchedAt(items) ?? fetchedAt,
         ageSeconds,
         stale: isStale(source, ageSeconds, maxAgeSeconds),
         degraded: source !== "scan8004",
@@ -428,14 +481,30 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
         if (matching.length === 0) {
           // Termasuk kasus `DEFAULT_SPAM_FILTERS` mengosongkan chain 97:
           // jawaban sah dari upstream sehat, dan justru sebab tingkat 3 & 4 ada.
-          step({ source: "scan8004", outcome: "empty", reason: null, items: 0 });
+          step({
+            source: "scan8004",
+            outcome: "empty",
+            reason: null,
+            items: 0,
+            upstreamTotal: page.total,
+          });
         } else {
-          step({ source: "scan8004", outcome: "ok", reason: null, items: matching.length });
+          step({
+            source: "scan8004",
+            outcome: "ok",
+            reason: null,
+            items: matching.length,
+            upstreamTotal: page.total,
+          });
           await writeThrough(matching);
-          // `total` upstream hanya bisa dipertanggungjawabkan bila kita tidak
-          // membuang apa pun; kalau membuang, laporkan yang benar-benar kita punya.
-          const total = matching.length === page.items.length ? page.total : matching.length;
-          return finish("scan8004", matching, total, true, null);
+          // `page.total` adalah total hasil **query semantic**, BUKAN total
+          // kategori — upstream tidak punya keempat kategori kita, classifier
+          // di baris atas yang membuatnya. Melaporkannya sebagai `total` berarti
+          // menjanjikan "4.812 agent Grid" sementara halaman ketiga sudah kosong;
+          // juri cukup menekan "next page" untuk menemukannya. Yang kita punya
+          // adalah item yang benar-benar lolos, dan itu yang dilaporkan.
+          // Angka upstream tetap dibawa, terpisah dan bernama apa adanya.
+          return finish("scan8004", matching, matching.length, true, null);
         }
       }
     } catch (err) {
@@ -474,8 +543,15 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
     } else {
       try {
         // Kategori tersimpan di dalam listing, bukan di parameter kontrak, jadi
-        // penyaringan dan paging dilakukan di sini atas hasil bacaan.
-        const page = await deps.onchain.readFuguListings({ limit: onchainScanLimit, offset: 0 });
+        // penyaringan dan paging dilakukan di sini atas hasil bacaan. Jendela
+        // bacanya melebar mengikuti `offset` pemanggil: jendela tetap 100 akan
+        // membuat halaman 6 marketplace jatuh ke seed sementara halaman 1
+        // dilayani on-chain — provenance-nya tetap jujur, tapi sumbernya
+        // melompat tanpa sebab yang bisa dijelaskan ke pengguna.
+        const page = await deps.onchain.readFuguListings({
+          limit: Math.min(Math.max(onchainScanLimit, offset + limit), ONCHAIN_MAX_LIMIT),
+          offset: 0,
+        });
         if (!page.healthy) {
           step({
             source: "onchain",
@@ -505,14 +581,22 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
     // --- Tingkat 4: seed terkurasi ------------------------------------------
     try {
       const page = await seed.listAgents(category, { limit, offset });
+      // Halaman kosong wajib membawa penjelasannya di `reason`, bukan hanya di
+      // `trail`: itu tempat yang paling wajar dilihat, dan "kosong tanpa sebab"
+      // tidak bisa dibedakan dari kegagalan diam-diam.
+      const emptyReason =
+        page.items.length > 0
+          ? null
+          : (page.reason ??
+            `seed terkurasi tidak punya agent kategori ${category} pada offset ${offset}`);
       step({
         source: "seed",
         outcome: page.items.length === 0 ? "empty" : "ok",
-        reason: page.reason,
+        reason: page.items.length === 0 ? emptyReason : page.reason,
         items: page.items.length,
       });
       // Seed TIDAK ditulis ke cache — lihat catatan di kepala berkas.
-      return finish("seed", page.items, page.total, true, null);
+      return finish("seed", page.items, page.total, true, emptyReason);
     } catch (err) {
       step({ source: "seed", outcome: "threw", reason: describeThrow(err), items: 0 });
     }
@@ -549,7 +633,8 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
         source,
         healthy,
         reason,
-        fetchedAt,
+        // Sama seperti jalur daftar: `fetchedAt` menunjuk kapan DATANYA diambil.
+        fetchedAt: agent?.fetchedAt ?? fetchedAt,
         ageSeconds,
         stale: agent === null ? false : isStale(source, ageSeconds, maxAgeSeconds),
         degraded: source !== "scan8004",
@@ -566,16 +651,24 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       split > 0 && split < id.length - 1
         ? { chainId: Number(id.slice(0, split)), tokenId: id.slice(split + 1) }
         : null;
-    const target = parsed !== null && Number.isFinite(parsed.chainId) ? parsed : null;
+
+    // **chainId datang dari pemanggil dan tidak boleh dipercaya.** Tanpa
+    // pemeriksaan ini, `GET /api/agents/1:12345` membuat backend menanyakan
+    // agent MAINNET ke 8004scan dan merendernya sebagai halaman detail
+    // Fugugent — melanggar bingkai "testnet only" (CLAUDE.md aturan 7) dan
+    // menjadikan chain sebagai parameter yang dikendalikan pemanggil.
+    // Ditolak, bukan diam-diam dilayani.
+    const wrongChain =
+      parsed !== null && Number.isFinite(parsed.chainId) && parsed.chainId !== chainId;
+    const target =
+      parsed !== null && Number.isFinite(parsed.chainId) && !wrongChain ? parsed : null;
+    const targetReason = wrongChain
+      ? `id "${id}" menunjuk chain ${parsed?.chainId}, layanan ini hanya melayani chain ${chainId}`
+      : `id "${id}" tidak berbentuk chainId:tokenId`;
 
     // --- Tingkat 1: 8004scan -------------------------------------------------
     if (target === null) {
-      step({
-        source: "scan8004",
-        outcome: "unavailable",
-        reason: `id "${id}" tidak berbentuk chainId:tokenId`,
-        items: 0,
-      });
+      step({ source: "scan8004", outcome: "unavailable", reason: targetReason, items: 0 });
     } else {
       try {
         const detail = await deps.scan8004.getAgent(target.chainId, target.tokenId);
@@ -631,10 +724,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       step({
         source: "onchain",
         outcome: "unavailable",
-        reason:
-          deps.onchain === undefined
-            ? "on-chain tidak dipasang"
-            : `id "${id}" tidak berbentuk chainId:tokenId`,
+        reason: deps.onchain === undefined ? "on-chain tidak dipasang" : targetReason,
         items: 0,
       });
     } else {
@@ -652,7 +742,10 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
             items: 0,
           });
         } else {
-          const hit = page.items.find((item) => item.id === id || item.tokenId === target.tokenId);
+          // Dicocokkan lewat `id` utuh, yang memuat chainId. Mencocokkan
+          // `tokenId` telanjang akan mengabaikan chain — token 42 di chain 1
+          // dan di chain 97 adalah agent yang berbeda.
+          const hit = page.items.find((item) => item.id === id);
           if (hit === undefined) {
             step({ source: "onchain", outcome: "empty", reason: null, items: 0 });
           } else {

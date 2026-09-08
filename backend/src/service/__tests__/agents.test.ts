@@ -17,7 +17,7 @@
  *    bukan kegagalan.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { OnchainSource } from "../../sources/onchain.js";
+import type { OnchainSource, ReadFuguListingsOptions } from "../../sources/onchain.js";
 import type { Scan8004Source } from "../../sources/scan8004.js";
 import {
   makeAgentKey,
@@ -27,6 +27,7 @@ import {
   type Category,
   type SourceHealth,
 } from "../../types.js";
+import type { CachedAgentFilter } from "../../db/repo.js";
 import {
   CATEGORY_SEMANTIC_QUERIES,
   createAgentService,
@@ -141,9 +142,16 @@ class FakeCache implements AgentCachePort {
   saved: AgentRecord[][] = [];
   recorded: SourceHealth[] = [];
   latest: SourceHealth[] = [];
+  /** Argumen yang BENAR-BENAR diterima. Tanpa ini, regresi penyaring lolos tanpa suara. */
+  filters: CachedAgentFilter[] = [];
+  detailArgs: Array<{ id: string; now: Date }> = [];
 
-  async getAgents(): Promise<AgentListPage & { ageSeconds: number | null; stale: boolean }> {
+  async getAgents(
+    filter: CachedAgentFilter,
+    at: Date,
+  ): Promise<AgentListPage & { ageSeconds: number | null; stale: boolean }> {
     trace.push("cache.getAgents");
+    this.filters.push({ ...filter, now: at } as CachedAgentFilter & { now: Date });
     if (this.throws) throw this.throws;
     const ages = this.items.map((i) => Math.floor((NOW.getTime() - Date.parse(i.fetchedAt)) / 1000));
     return {
@@ -157,8 +165,12 @@ class FakeCache implements AgentCachePort {
     };
   }
 
-  async getAgent(id: string): Promise<AgentDetailResult & { ageSeconds: number | null }> {
+  async getAgent(
+    id: string,
+    at: Date,
+  ): Promise<AgentDetailResult & { ageSeconds: number | null }> {
     trace.push("cache.getAgent");
+    this.detailArgs.push({ id, now: at });
     if (this.throws) throw this.throws;
     const hit = this.items.find((i) => i.id === id) ?? null;
     return {
@@ -190,9 +202,11 @@ class FakeCache implements AgentCachePort {
 class FakeOnchain implements OnchainSource {
   page: AgentListPage = page([], { source: "onchain" });
   throws: Error | null = null;
+  reads: ReadFuguListingsOptions[] = [];
 
-  async readFuguListings(): Promise<AgentListPage> {
+  async readFuguListings(opts: ReadFuguListingsOptions = {}): Promise<AgentListPage> {
     trace.push("onchain.readFuguListings");
+    this.reads.push(opts);
     if (this.throws) throw this.throws;
     return this.page;
   }
@@ -910,6 +924,27 @@ describe("riwayat kesehatan sumber", () => {
     expect(h.cache.recorded[0]!.checkedAt).toBe(NOW.toISOString());
   });
 
+  it("hanya PERUBAHAN status yang ditulis — tabelnya riwayat, bukan log akses", async () => {
+    const h = harness();
+    h.scan.page = page([], { healthy: false, reason: "500 DATABASE_ERROR" });
+    h.cache.items = [record({ tokenId: "7", source: "cache" })];
+
+    await h.service.getAgentsByCategory("GRID");
+    expect(h.cache.recorded.map((r) => r.source)).toEqual(["scan8004", "cache"]);
+
+    // Permintaan kedua dengan keadaan yang persis sama: tidak ada yang berubah,
+    // jadi tidak ada baris baru. Empat insert per tampilan halaman akan
+    // mengubah `source_health` jadi log akses dan menenggelamkan transisinya.
+    await h.service.getAgentsByCategory("GRID");
+    expect(h.cache.recorded).toHaveLength(2);
+
+    // Upstream pulih: itu transisi, dan transisi WAJIB tercatat.
+    h.scan.page = page([record({ tokenId: "1" })]);
+    await h.service.getAgentsByCategory("GRID");
+    expect(h.cache.recorded).toHaveLength(3);
+    expect(h.cache.recorded[2]).toMatchObject({ source: "scan8004", healthy: true });
+  });
+
   it("bisa dimatikan lewat opsi, dan mematikannya tidak mengubah hasil", async () => {
     const h = harness({ persistHealth: false });
     h.scan.page = page([], { healthy: false, reason: "mati" });
@@ -981,5 +1016,384 @@ describe("invariant yang berlaku di semua tingkat", () => {
     const spy = vi.spyOn(h.onchain, "readFuguListings");
     await h.service.getAgentsByCategory("GRID");
     expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Important 1 — `total` tidak boleh melebih-lebihkan
+// ---------------------------------------------------------------------------
+
+describe("total yang dilaporkan bisa dipertanggungjawabkan", () => {
+  it("total upstream query semantic TIDAK dipakai sebagai total kategori", async () => {
+    // Kasus yang paling mudah ketahuan juri: semua item halaman ini lolos
+    // classifier, dan upstream melaporkan 4812 hasil untuk query semantic-nya.
+    // Melaporkan 4812 sebagai "agent Grid" menjanjikan halaman yang tidak ada —
+    // juri cukup menekan "next page".
+    const h = harness();
+    h.scan.page = page([record({ tokenId: "1" }), record({ tokenId: "2" })], { total: 4812 });
+
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.items).toHaveLength(2);
+    expect(result.total).toBe(2);
+    // Angka upstream tetap bisa diperiksa — di jejak, tempat ia jadi bahan
+    // penyelidikan alih-alih janji halaman yang tidak ada.
+    expect(result.trail[0]!.upstreamTotal).toBe(4812);
+  });
+
+  it("total tetap jumlah yang lolos ketika classifier membuang sebagian", async () => {
+    const h = harness();
+    h.scan.page = page(
+      [
+        record({ tokenId: "1" }),
+        record({
+          tokenId: "2",
+          name: "Health Guard",
+          description: "Monitors the health factor of Venus borrowing positions to avoid liquidation.",
+        }),
+      ],
+      { total: 4812 },
+    );
+
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.total).toBe(1);
+    expect(result.trail[0]!.upstreamTotal).toBe(4812);
+  });
+
+  it("tingkat selain 8004scan tidak pernah membawa angka upstream", async () => {
+    const h = harness();
+    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.cache.items = [record({ tokenId: "7", source: "cache" })];
+    const fromCache = await h.service.getAgentsByCategory("GRID");
+    expect(fromCache.trail[1]!.upstreamTotal).toBeUndefined();
+
+    h.cache.items = [];
+    h.onchain.page = page([onchainRecord("500", "GRID")], { source: "onchain" });
+    const fromChain = await h.service.getAgentsByCategory("GRID");
+    expect(fromChain.trail[2]!.upstreamTotal).toBeUndefined();
+
+    h.onchain.page = page([], { source: "onchain" });
+    const fromSeed = await h.service.getAgentsByCategory("GRID");
+    expect(fromSeed.trail[3]!.upstreamTotal).toBeUndefined();
+    expect(fromSeed.total).toBe(1);
+  });
+
+  it("upstream yang sehat tapi kosong tetap melaporkan angkanya di jejak", async () => {
+    const h = harness();
+    h.scan.page = page([], { healthy: true, total: 4812 });
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.trail[0]).toMatchObject({ outcome: "empty", upstreamTotal: 4812 });
+    expect(result.total).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Important 2 — argumen yang diterima tiap tingkat, bukan hanya urutannya
+// ---------------------------------------------------------------------------
+
+describe("filter yang benar-benar diterima tiap tingkat", () => {
+  it("cache menerima kategori, chainId, paging, dan ambang umur yang diminta", async () => {
+    // Tanpa assertion ini, menghapus `category` dari filter membuat tingkat 2
+    // mengembalikan SEMUA kategori berlabel `source: "cache"` — persis saat
+    // fallback seharusnya bersinar — dan seluruh suite tetap hijau.
+    const h = harness();
+    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.cache.items = [record({ tokenId: "7", source: "cache" })];
+
+    await h.service.getAgentsByCategory("YIELD", { limit: 7, offset: 14, maxAgeSeconds: 120 });
+
+    expect(h.cache.filters).toHaveLength(1);
+    expect(h.cache.filters[0]).toMatchObject({
+      category: "YIELD",
+      chainId: CHAIN_ID,
+      limit: 7,
+      offset: 14,
+      maxAgeSeconds: 120,
+    });
+  });
+
+  it("kategori yang diminta selalu ikut, untuk keempat kategori", async () => {
+    for (const category of ["REBALANCING", "GRID", "YIELD", "HEALTH_FACTOR"] as Category[]) {
+      const h = harness();
+      h.scan.page = page([], { healthy: false, reason: "mati" });
+      h.cache.items = [record({ tokenId: "7", source: "cache" })];
+      await h.service.getAgentsByCategory(category);
+      expect(h.cache.filters[0]!.category).toBe(category);
+    }
+  });
+
+  it("cache menerima jam yang disuntikkan, bukan jam dinding", async () => {
+    const h = harness();
+    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.cache.items = [record({ tokenId: "7", source: "cache" })];
+    await h.service.getAgentsByCategory("GRID");
+    expect((h.cache.filters[0] as CachedAgentFilter & { now: Date }).now).toEqual(NOW);
+  });
+
+  it("cache detail menerima id utuh dan jam yang disuntikkan", async () => {
+    const h = harness();
+    h.scan.detail = {
+      agent: null,
+      source: "scan8004",
+      healthy: false,
+      reason: "500",
+      fetchedAt: NOW.toISOString(),
+    };
+    await h.service.getAgentDetail("97:42");
+    expect(h.cache.detailArgs).toEqual([{ id: "97:42", now: NOW }]);
+  });
+
+  it("jendela baca on-chain melebar mengikuti offset, tidak tetap di 100", async () => {
+    const h = harness();
+    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.onchain.page = page([onchainRecord("500", "GRID")], { source: "onchain" });
+
+    await h.service.getAgentsByCategory("GRID", { limit: 20, offset: 0 });
+    expect(h.onchain.reads[0]).toMatchObject({ limit: 100, offset: 0 });
+
+    await h.service.getAgentsByCategory("GRID", { limit: 20, offset: 200 });
+    // Jendela tetap 100 akan membuat halaman ini jatuh ke seed sementara
+    // halaman 1 dilayani on-chain — sumber melompat tanpa sebab yang bisa
+    // dijelaskan ke pengguna.
+    expect(h.onchain.reads[1]!.limit).toBe(220);
+
+    await h.service.getAgentsByCategory("GRID", { limit: 100, offset: 100000 });
+    // Tetap dibatasi ONCHAIN_MAX_LIMIT supaya satu permintaan tidak membanjiri RPC.
+    expect(h.onchain.reads[2]!.limit).toBe(500);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Important 3 — chainId dari pemanggil tidak dipercaya
+// ---------------------------------------------------------------------------
+
+describe("chainId tidak boleh dikendalikan pemanggil", () => {
+  it("id chain lain tidak pernah dikirim ke 8004scan maupun ke pembacaan on-chain", async () => {
+    const h = harness();
+    h.scan.detail = {
+      agent: record({ tokenId: "12345" }),
+      source: "scan8004",
+      healthy: true,
+      reason: null,
+      fetchedAt: NOW.toISOString(),
+    };
+
+    const result = await h.service.getAgentDetail("1:12345");
+
+    expect(trace).not.toContain("scan8004.getAgent");
+    expect(trace).not.toContain("onchain.readFuguListings");
+    expect(result.trail[0]).toMatchObject({ source: "scan8004", outcome: "unavailable" });
+    expect(result.trail[0]!.reason).toContain("chain 1");
+    expect(result.trail[0]!.reason).toContain("chain 97");
+    expect(result.trail[2]).toMatchObject({ source: "onchain", outcome: "unavailable" });
+    expect(result.agent).toBeNull();
+    expect(result.healthy).toBe(true);
+  });
+
+  it("id chain sendiri tetap dilayani sepenuhnya", async () => {
+    const h = harness();
+    h.scan.detail = {
+      agent: record({ tokenId: "12345" }),
+      source: "scan8004",
+      healthy: true,
+      reason: null,
+      fetchedAt: NOW.toISOString(),
+    };
+    const result = await h.service.getAgentDetail("97:12345");
+    expect(result.source).toBe("scan8004");
+    expect(trace).toContain("scan8004.getAgent");
+  });
+
+  it("pencocokan on-chain memakai id utuh, bukan tokenId telanjang", async () => {
+    // Token 42 di chain 1 dan di chain 97 adalah agent yang berbeda.
+    const h = harness({ chainId: 1 });
+    h.scan.detail = {
+      agent: null,
+      source: "scan8004",
+      healthy: false,
+      reason: "500",
+      fetchedAt: NOW.toISOString(),
+    };
+    // `onchainRecord` membangun id `97:42`; permintaannya `1:42`.
+    h.onchain.page = page([onchainRecord("42", "GRID")], { source: "onchain" });
+    const result = await h.service.getAgentDetail("1:42");
+    expect(result.agent).toBeNull();
+    expect(result.trail[2]).toMatchObject({ source: "onchain", outcome: "empty" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Bentuk balasan yang aneh
+// ---------------------------------------------------------------------------
+
+describe("bentuk balasan yang tidak dikenali", () => {
+  it("halaman `healthy: true` dengan items bukan array turun ke tingkat berikutnya", async () => {
+    const h = harness();
+    // Ini yang terjadi bila upstream berubah bentuk dan normalizer meleset:
+    // `page.items.map(...)` melempar TypeError di dalam `try` tingkat 1.
+    h.scan.page = { ...page([]), items: undefined as unknown as AgentRecord[] };
+    h.cache.items = [record({ tokenId: "7", source: "cache" })];
+
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.source).toBe("cache");
+    expect(result.trail[0]).toMatchObject({ source: "scan8004", outcome: "threw" });
+  });
+
+  it("halaman on-chain dengan items bukan array turun ke seed", async () => {
+    const h = harness();
+    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.onchain.page = {
+      ...page([], { source: "onchain" }),
+      items: null as unknown as AgentRecord[],
+    };
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.source).toBe("seed");
+    expect(result.trail[2]).toMatchObject({ source: "onchain", outcome: "threw" });
+  });
+
+  it("detail dengan agent berbentuk aneh tidak menjatuhkan permintaan", async () => {
+    const h = harness();
+    h.scan.detail = {
+      agent: "bukan record" as unknown as AgentRecord,
+      source: "scan8004",
+      healthy: true,
+      reason: null,
+      fetchedAt: NOW.toISOString(),
+    };
+    await expect(h.service.getAgentDetail("97:1")).resolves.toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// `fetchedAt` halaman tidak boleh bertentangan dengan `ageSeconds`
+// ---------------------------------------------------------------------------
+
+describe("fetchedAt halaman menunjuk umur datanya, bukan waktu penyajian", () => {
+  it("ageSeconds selalu bisa diturunkan dari fetchedAt halaman, di keempat tingkat", async () => {
+    const setups: Array<() => Harness> = [
+      () => {
+        const h = harness();
+        h.scan.page = page([record({ tokenId: "1" })]);
+        return h;
+      },
+      () => {
+        const h = harness();
+        h.scan.page = page([], { healthy: false, reason: "mati" });
+        h.cache.items = [
+          record({ tokenId: "7", source: "cache", fetchedAt: "2026-09-10T11:00:00.000Z" }),
+        ];
+        return h;
+      },
+      () => {
+        const h = harness();
+        h.scan.page = page([], { healthy: false, reason: "mati" });
+        h.onchain.page = page([onchainRecord("500", "GRID")], { source: "onchain" });
+        return h;
+      },
+      () => {
+        const h = harness();
+        h.scan.page = page([], { healthy: false, reason: "mati" });
+        return h;
+      },
+    ];
+
+    for (const setup of setups) {
+      const result = await setup().service.getAgentsByCategory("GRID");
+      // Invariant yang menghapus kontradiksi: umur halaman selalu bisa
+      // diturunkan dari `fetchedAt`-nya sendiri terhadap jam sekarang.
+      const derived = Math.floor((NOW.getTime() - Date.parse(result.fetchedAt)) / 1000);
+      expect(derived).toBe(result.ageSeconds);
+    }
+  });
+
+  it("halaman seed tidak mengaku baru diambil", async () => {
+    const h = harness();
+    h.scan.page = page([], { healthy: false, reason: "mati" });
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.fetchedAt).not.toBe(NOW.toISOString());
+    expect(Date.parse(result.fetchedAt)).toBeLessThan(NOW.getTime());
+  });
+
+  it("halaman kosong memakai waktu penyajian, karena tidak ada data yang punya umur", async () => {
+    const h = harness({
+      seed: {
+        async listAgents() {
+          throw new Error("seed rusak");
+        },
+        async getAgent() {
+          throw new Error("seed rusak");
+        },
+      },
+    });
+    h.scan.throws = new Error("mati");
+    h.cache.throws = new Error("mati");
+    h.onchain.throws = new Error("mati");
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.fetchedAt).toBe(NOW.toISOString());
+    expect(result.ageSeconds).toBeNull();
+  });
+
+  it("detail juga: fetchedAt milik agennya, bukan waktu penyajian", async () => {
+    const h = harness();
+    h.scan.detail = {
+      agent: null,
+      source: "scan8004",
+      healthy: false,
+      reason: "500",
+      fetchedAt: NOW.toISOString(),
+    };
+    h.cache.items = [
+      record({ tokenId: "42", source: "cache", fetchedAt: "2026-09-10T11:00:00.000Z" }),
+    ];
+    const result = await h.service.getAgentDetail("97:42");
+    expect(result.fetchedAt).toBe("2026-09-10T11:00:00.000Z");
+    expect(result.ageSeconds).toBe(3600);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Halaman kosong wajib menjelaskan dirinya
+// ---------------------------------------------------------------------------
+
+describe("halaman kosong membawa alasannya di reason", () => {
+  it("offset yang melewati isi seed menjelaskan kenapa kosong", async () => {
+    const h = harness();
+    h.scan.page = page([], { healthy: false, reason: "mati" });
+    const result = await h.service.getAgentsByCategory("GRID", { limit: 20, offset: 50 });
+
+    expect(result.items).toEqual([]);
+    expect(result.source).toBe("seed");
+    expect(result.healthy).toBe(true);
+    expect(result.reason).not.toBeNull();
+    expect(result.reason).toContain("GRID");
+    expect(result.reason).toContain("50");
+  });
+
+  it("halaman seed yang berisi tidak membawa alasan palsu", async () => {
+    const h = harness();
+    h.scan.page = page([], { healthy: false, reason: "mati" });
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.items).toHaveLength(1);
+    expect(result.reason).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Isi query semantic, bukan hanya kabelnya
+// ---------------------------------------------------------------------------
+
+describe("query semantic memuat frasa yang membedakan kategorinya", () => {
+  it("tiap kategori memakai frasa majemuk, bukan kata telanjang", () => {
+    // Kata telanjang `grid`/`yield` di korpus 8004scan jauh lebih sering berarti
+    // hal lain (layanan pembayaran `Grid-hub`, "crop yield"). Yang mengunci
+    // kualitas query adalah frasa majemuknya, bukan bahwa konstantanya terpasang.
+    expect(CATEGORY_SEMANTIC_QUERIES.GRID).toContain("grid trading");
+    expect(CATEGORY_SEMANTIC_QUERIES.YIELD).toContain("yield farming");
+    expect(CATEGORY_SEMANTIC_QUERIES.REBALANCING).toContain("portfolio rebalancing");
+    expect(CATEGORY_SEMANTIC_QUERIES.HEALTH_FACTOR).toContain("health factor");
+  });
+
+  it("query tiap kategori berbeda satu sama lain", () => {
+    const queries = Object.values(CATEGORY_SEMANTIC_QUERIES);
+    expect(new Set(queries).size).toBe(queries.length);
   });
 });

@@ -57,6 +57,17 @@ describe("seed terkurasi", () => {
     expect(Math.floor((NOW.getTime() - Date.parse(CURATED_SEED_AT)) / 1000)).toBe(172_800);
   });
 
+  it("CURATED_SEED_AT wajib di masa lalu — bukan `now` yang menyamar", () => {
+    // Seluruh kejujuran `ageSeconds` seed bertumpu pada satu konstanta ini.
+    // Menggantinya dengan `new Date().toISOString()` di menit terakhir akan
+    // membuat data kurasi tampil sebagai data segar, dan assertion
+    // `fetchedAt === CURATED_SEED_AT` di atas tetap hijau. Karena itu
+    // konstantanya diperiksa terhadap jam sungguhan, bukan terhadap dirinya.
+    const parsed = Date.parse(CURATED_SEED_AT);
+    expect(Number.isNaN(parsed)).toBe(false);
+    expect(parsed).toBeLessThanOrEqual(Date.now() - 3_600_000);
+  });
+
   it("tidak mengklaim apa pun yang belum terjadi", () => {
     for (const agent of seedAgents(NOW)) {
       // Belum ada listing di FuguRegistry, belum ada agentId ERC-8004 —
