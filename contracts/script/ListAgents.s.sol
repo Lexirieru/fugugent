@@ -7,11 +7,11 @@ import {FuguRegistry} from "../src/FuguRegistry.sol";
 import {Category, Listing} from "../src/types/FuguTypes.sol";
 
 /// @title ListAgents
-/// @notice Daftarkan tiga agent Fugugent yang belum ada di `FuguRegistry` —
-///         Rebalancer (REBALANCING), Grid (GRID), Yield (YIELD) — supaya keempat
-///         kategori marketplace terisi, bukan cuma HEALTH_FACTOR.
+/// @notice Register the three Fugugent agents missing from `FuguRegistry` —
+///         Rebalancer (REBALANCING), Grid (GRID), Yield (YIELD) — so that all four
+///         marketplace categories are filled, not just HEALTH_FACTOR.
 ///
-/// @dev Cara pakai (SELALU simulasi dulu, tanpa `--broadcast`, dan baca keluarannya):
+/// @dev How to use it (ALWAYS simulate first, without `--broadcast`, and read the output):
 ///
 ///      ```
 ///      cd contracts
@@ -19,27 +19,27 @@ import {Category, Listing} from "../src/types/FuguTypes.sol";
 ///      forge script script/ListAgents.s.sol:ListAgents --rpc-url "$BSC_TESTNET_RPC_URL" --broadcast
 ///      ```
 ///
-///      ## Idempoten — tidak seperti `DeployMocks.s.sol`
+///      ## Idempotent — unlike `DeployMocks.s.sol`
 ///
-///      Setiap entri dilewati bila `erc8004AgentId`-nya sudah terpetakan ke sebuah
-///      listing (`listingByAgentId != 0`). Menjalankan ulang skrip ini karena satu tx
-///      gagal karena itu tidak menduplikasi listing yang sudah mendarat, dan tidak
-///      membakar tBNB untuk transaksi yang pasti revert dengan `AgentAlreadyListed`.
+///      Each entry is skipped if its `erc8004AgentId` already maps to a listing
+///      (`listingByAgentId != 0`). Re-running this script after one tx failed therefore
+///      does not duplicate the listings that already landed, and does not burn tBNB on
+///      transactions guaranteed to revert with `AgentAlreadyListed`.
 ///
-///      ## `erc8004AgentId` di sini adalah PLACEHOLDER, bukan identitas ERC-8004 nyata
+///      ## The `erc8004AgentId` values here are PLACEHOLDERS, not real ERC-8004 identities
 ///
-///      Tidak satu pun wallet agent kita memegang token IdentityRegistry ERC-8004 di
-///      BSC testnet (`balanceOf` pada `0x8004A818BFB912233c491871b3d84c89A494BD9e` = 0
-///      untuk keempatnya, per 2026-09-09). ID 8005/8006/8007 melanjutkan `8004` yang
-///      sudah dipakai listing Guardian: sekadar kunci unik lokal. `FuguRegistry`
-///      memang tidak memverifikasi kepemilikan ERC-8004 (lihat NatSpec kontraknya),
-///      jadi ID ini TIDAK boleh dibaca sebagai bukti identitas. Fakta itu ikut ditulis
-///      ke dalam metadata masing-masing listing, bukan hanya ke dokumen.
+///      Not one of our agent wallets holds an ERC-8004 IdentityRegistry token on BSC
+///      testnet (`balanceOf` on `0x8004A818BFB912233c491871b3d84c89A494BD9e` = 0 for all
+///      four, as of 2026-09-09). The IDs 8005/8006/8007 continue from the `8004` already
+///      used by the Guardian listing: they are nothing but locally unique keys.
+///      `FuguRegistry` does not verify ERC-8004 ownership (see its contract NatSpec), so
+///      these IDs MUST NOT be read as proof of identity. That fact is written into each
+///      listing's metadata too, not only into the docs.
 ///
-///      ## Metadata ditanam on-chain sebagai `data:` URI
+///      ## Metadata is embedded on-chain as a `data:` URI
 ///
-///      `metadataURI` bukan `ipfs://...` yang tidak pernah bisa di-resolve; isinya
-///      JSON base64 yang bisa dibaca siapa pun tanpa server, IPFS, atau API key:
+///      `metadataURI` is not an `ipfs://...` that can never be resolved; it holds base64
+///      JSON that anyone can read without a server, IPFS, or an API key:
 ///
 ///      ```
 ///      cast call --rpc-url "$BSC_TESTNET_RPC_URL" 0xb2f36070E6eae3353E8e755172B477DF213ae248 \
@@ -47,46 +47,46 @@ import {Category, Listing} from "../src/types/FuguTypes.sol";
 ///        | sed -E 's/.*base64,//; s/"\)$//' | base64 -d
 ///      ```
 ///
-///      Metadata itu menyatakan sendiri batas ketiga agent ini: mesin keputusan +
-///      backtest, **belum tersambung ke eksekusi on-chain**, dan belum pernah
-///      mengirim satu transaksi pun (`docs/STATUS.md` §B3). Marketplace tidak boleh
-///      mengklaim lebih dari itu.
+///      That metadata states the limits of these three agents itself: a decision engine
+///      plus a backtest, **not yet wired to on-chain execution**, and it has never sent a
+///      single transaction (`docs/STATUS.md` §B3). The marketplace must not claim more
+///      than that.
 ///
-///      `chainId` di-hardcode ke 97 (BSC testnet). **Ubah saat dipakai untuk mainnet.**
+///      `chainId` is hardcoded to 97 (BSC testnet). **Change it when using this for mainnet.**
 contract ListAgents is Script {
-    /// @dev BSC testnet. Ganti ke 56 untuk mainnet.
+    /// @dev BSC testnet. Change to 56 for mainnet.
     uint256 constant EXPECTED_CHAIN_ID = 97;
 
-    /// @dev Proxy FuguRegistry — terverifikasi live, lihat `deployments/bsc-testnet.json`.
+    /// @dev The FuguRegistry proxy — verified live, see `deployments/bsc-testnet.json`.
     address constant REGISTRY = 0xb2f36070E6eae3353E8e755172B477DF213ae248;
 
-    /// @dev IdentityRegistry ERC-8004 kanonik di BSC testnet, dirujuk di metadata
-    ///      supaya pembaca bisa memeriksa sendiri bahwa kami BELUM punya token identitas.
+    /// @dev The canonical ERC-8004 IdentityRegistry on BSC testnet, referenced in the
+    ///      metadata so a reader can check for themselves that we hold NO identity token.
     address constant ERC8004_IDENTITY_REGISTRY = 0x8004A818BFB912233c491871b3d84c89A494BD9e;
 
-    /// @dev Harga langganan basis 8 desimal: 5_000_000 = $0,05 per periode.
+    /// @dev Subscription price on an 8-decimal basis: 5_000_000 = $0.05 per period.
     ///
-    ///      Setengah dari listing Guardian ($0,10) dan disengaja: Guardian sudah
-    ///      terbukti mengeksekusi transaksi on-chain, ketiga agent ini baru mesin
-    ///      keputusan. Selisih harganya menyatakan selisih kemampuan yang sama yang
-    ///      ditulis di metadata — bukan angka yang dipilih supaya kelihatan bagus.
-    ///      Nol dilarang kontrak (`InvalidPrice`), dan harga sekecil ini tetap
-    ///      membuat escrow/claim/fee 5% berjalan dengan angka bukan-nol.
+    ///      Half of the Guardian listing ($0.10), and deliberately so: Guardian has
+    ///      demonstrably executed on-chain transactions, while these three agents are
+    ///      still only decision engines. The price gap states the same capability gap
+    ///      that is written in the metadata — it is not a number picked to look good.
+    ///      Zero is forbidden by the contract (`InvalidPrice`), and a price this small
+    ///      still makes escrow/claim/the 5% fee run with non-zero numbers.
     uint128 constant PRICE_USD8 = 5_000_000;
 
-    /// @dev Periode 120 detik, sama dengan listing Guardian yang sudah live.
+    /// @dev A 120-second period, the same as the Guardian listing already live.
     ///
-    ///      Pendek BUKAN karena ini harga komersial ($0,05/2 menit tentu bukan),
-    ///      tetapi karena gerbang anti-sybil `FuguSubscription.hasSubscribed` baru
-    ///      terbuka setelah agent benar-benar MENERIMA >= `minPaidBpsOfPeriod` (50%)
-    ///      dari harga SATU periode, dan `claim` proporsional terhadap waktu berjalan.
-    ///      Periode 30 hari berarti hak review baru terbuka setelah 15 hari — siklus
-    ///      sewa → claim → review tidak akan pernah selesai di depan juri. 120 detik
-    ///      membuatnya selesai dalam ~60 detik. Keempat kartu juga jadi sebanding
-    ///      karena memakai periode yang sama.
+    ///      It is short NOT because this is a commercial price ($0.05 per 2 minutes
+    ///      certainly is not), but because the anti-sybil gate
+    ///      `FuguSubscription.hasSubscribed` only opens once the agent has actually
+    ///      RECEIVED >= `minPaidBpsOfPeriod` (50%) of the price of ONE period, and `claim`
+    ///      is proportional to elapsed time. A 30-day period would mean the right to
+    ///      review opens only after 15 days — the hire -> claim -> review cycle would
+    ///      never finish in front of the judges. 120 seconds makes it finish in about 60
+    ///      seconds. It also makes all four cards comparable, since they use the same period.
     uint32 constant PERIOD_SECONDS = 120;
 
-    /// @dev 1 listing Guardian yang sudah ada + 3 yang didaftarkan skrip ini.
+    /// @dev The 1 existing Guardian listing + the 3 this script registers.
     uint256 constant EXPECTED_TOTAL_LISTINGS = 4;
 
     error WrongChain(uint256 expected, uint256 actual);
@@ -99,14 +99,14 @@ contract ListAgents is Script {
         uint256 erc8004AgentId;
         address agentWallet;
         Category category;
-        /// @dev Nama tampilan, sama dengan yang dipakai marketplace.
+        /// @dev Display name, the same one the marketplace uses.
         string name;
-        /// @dev Direktori agent di `ai/<slug>/app/agent` — dipakai di perintah bukti.
+        /// @dev The agent's directory at `ai/<slug>/app/agent` — used in the proof command.
         string slug;
-        /// @dev Apa yang benar-benar dilakukan mesin keputusannya, dengan ambang yang
-        ///      diturunkan (bukan ditebak). Diringkas dari `docs/STATUS.md` §A5.
+        /// @dev What the decision engine actually does, with thresholds that are derived
+        ///      (not guessed). Condensed from `docs/STATUS.md` §A5.
         string summary;
-        /// @dev Jumlah test yang bisa dijalankan ulang pembaca.
+        /// @dev The number of tests a reader can re-run.
         string testCount;
     }
 
@@ -135,10 +135,10 @@ contract ListAgents is Script {
         _logResult(registry);
     }
 
-    /// @notice Daftarkan seluruh entri rencana yang belum terdaftar.
-    /// @dev Dipisah dari `run()` supaya jalur yang persis sama bisa diuji terhadap
-    ///      `FuguRegistry` lokal (`test/ListAgentsScript.t.sol`) tanpa env var, tanpa
-    ///      broadcast, dan tanpa membelanjakan tBNB untuk menemukan argumen tertukar.
+    /// @notice Register every plan entry that is not yet registered.
+    /// @dev Split out of `run()` so the exact same path can be tested against a local
+    ///      `FuguRegistry` (`test/ListAgentsScript.t.sol`) with no env vars, no broadcast,
+    ///      and without spending tBNB to discover that two arguments were swapped.
     function _listAll(FuguRegistry registry) internal {
         AgentPlan[3] memory plans = _plan();
         for (uint256 i = 0; i < plans.length; ++i) {
@@ -155,9 +155,9 @@ contract ListAgents is Script {
         }
     }
 
-    /// @notice Gagal keras kalau hasil on-chain tidak persis seperti rencana.
-    /// @dev Dijalankan juga saat simulasi (`forge script` tanpa `--broadcast`), jadi
-    ///      ketidakcocokan membatalkan seluruh jalan SEBELUM satu tx pun dikirim.
+    /// @notice Fail hard if the on-chain result is not exactly what was planned.
+    /// @dev This also runs during simulation (`forge script` without `--broadcast`), so a
+    ///      mismatch aborts the whole run BEFORE a single tx is sent.
     function _verifyAll(FuguRegistry registry) internal view {
         AgentPlan[3] memory plans = _plan();
         for (uint256 i = 0; i < plans.length; ++i) {
@@ -170,7 +170,7 @@ contract ListAgents is Script {
         uint256 total = registry.listingCount();
         if (total != EXPECTED_TOTAL_LISTINGS) revert UnexpectedListingCount(EXPECTED_TOTAL_LISTINGS, total);
 
-        // Keempat kategori harus terisi tepat satu: itulah alasan skrip ini ada.
+        // All four categories must hold exactly one listing: that is why this script exists.
         for (uint8 c = 0; c <= uint8(Category.HEALTH_FACTOR); ++c) {
             uint256 n = registry.countByCategory(Category(c));
             if (n != 1) revert UnexpectedCategoryCount(c, 1, n);
@@ -188,9 +188,9 @@ contract ListAgents is Script {
         if (bytes(l.metadataURI).length == 0) revert ListingMismatch(listingId, "metadataURI");
     }
 
-    /// @notice Rencana pendaftaran. Wallet diambil dari `ai/<slug>/app/agent/studio.toml`.
-    /// @dev Kategori WAJIB cocok dengan indeks enum di `src/types/FuguTypes.sol`:
-    ///      0 REBALANCING, 1 GRID, 2 YIELD, 3 HEALTH_FACTOR (Guardian, sudah live).
+    /// @notice The registration plan. Wallets come from `ai/<slug>/app/agent/studio.toml`.
+    /// @dev The categories MUST match the enum indices in `src/types/FuguTypes.sol`:
+    ///      0 REBALANCING, 1 GRID, 2 YIELD, 3 HEALTH_FACTOR (Guardian, already live).
     function _plan() internal pure returns (AgentPlan[3] memory plans) {
         plans[0] = AgentPlan({
             erc8004AgentId: 8005,
@@ -221,17 +221,17 @@ contract ListAgents is Script {
         });
     }
 
-    /// @notice Metadata listing sebagai `data:application/json;base64,...`.
-    /// @dev Isinya sengaja menyebut apa yang BELUM ada. `onchainExecution: false` dan
-    ///      `limits` adalah kalimat yang sama dengan `docs/STATUS.md` §B3 — marketplace
-    ///      tidak boleh bertentangan dengan dokumen kejujuran kita sendiri.
+    /// @notice The listing metadata as `data:application/json;base64,...`.
+    /// @dev Its contents deliberately name what does NOT exist yet. `onchainExecution:
+    ///      false` and `limits` are the same sentences as `docs/STATUS.md` §B3 — the
+    ///      marketplace must not contradict our own honesty document.
     function _metadata(AgentPlan memory p) internal pure returns (string memory) {
         return string.concat("data:application/json;base64,", Base64.encode(bytes(_metadataJson(p))));
     }
 
-    /// @notice JSON mentah sebelum dibungkus base64.
-    /// @dev Dipisah supaya test bisa mem-parse-nya dengan `vm.parseJson*` — yang
-    ///      sekaligus membuktikan hasilnya JSON sah, bukan string yang kebetulan mirip.
+    /// @notice The raw JSON before it is wrapped in base64.
+    /// @dev Split out so tests can parse it with `vm.parseJson*` — which at the same time
+    ///      proves the result is valid JSON, not a string that merely looks like it.
     function _metadataJson(AgentPlan memory p) internal pure returns (string memory) {
         return string.concat(
             '{"name":"', p.name,

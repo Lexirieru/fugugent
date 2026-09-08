@@ -7,19 +7,19 @@ import {MockPriceFeed} from "../src/mocks/MockPriceFeed.sol";
 import {MockToken} from "../src/mocks/MockToken.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-/// @dev Menguji `MockLendingPool` terhadap rumus Aave v3 yang mengikat, sehingga
-///      adapter TypeScript `readAavePosition` (yang membaca `getUserAccountData`
-///      lewat urutan posisi, bukan nama field) bisa dipakai apa adanya di testnet.
+/// @dev Tests `MockLendingPool` against the binding Aave v3 formula, so the TypeScript
+///      adapter `readAavePosition` (which reads `getUserAccountData` by position order,
+///      not by field name) works as-is on testnet.
 contract MockLendingPoolTest is Test {
     uint256 internal constant WAD = 1e18;
 
     MockLendingPool internal pool;
 
-    MockToken internal collateralToken; // "cA" — dipakai sebagai agunan utama
-    MockToken internal debtToken; // "dB" — dipakai sebagai aset yang dipinjam
+    MockToken internal collateralToken; // "cA" — used as the main collateral
+    MockToken internal debtToken; // "dB" — used as the borrowed asset
 
-    MockPriceFeed internal collateralFeed; // $10 per token, 8 desimal
-    MockPriceFeed internal debtFeed; // $1 per token, 8 desimal
+    MockPriceFeed internal collateralFeed; // $10 per token, 8 decimals
+    MockPriceFeed internal debtFeed; // $1 per token, 8 decimals
 
     address internal borrower = address(0xB0B);
     address internal lender = address(0x1E4DE7);
@@ -41,14 +41,14 @@ contract MockLendingPoolTest is Test {
         pool.addAsset(address(collateralToken), address(collateralFeed), COLLATERAL_LTV_BPS, COLLATERAL_LT_BPS);
         pool.addAsset(address(debtToken), address(debtFeed), DEBT_LTV_BPS, DEBT_LT_BPS);
 
-        // Lender menyuplai likuiditas dB supaya bisa dipinjam borrower.
+        // The lender supplies dB liquidity so the borrower can borrow it.
         debtToken.mint(lender, 10_000 ether);
         vm.startPrank(lender);
         debtToken.approve(address(pool), type(uint256).max);
         pool.supply(address(debtToken), 10_000 ether);
         vm.stopPrank();
 
-        // Borrower disiapkan dengan agunan.
+        // The borrower is set up with collateral.
         collateralToken.mint(borrower, 1_000 ether);
         vm.prank(borrower);
         collateralToken.approve(address(pool), type(uint256).max);
@@ -71,7 +71,7 @@ contract MockLendingPoolTest is Test {
     // ---------------------------------------------------------------
 
     function test_supplyIncreasesTotalCollateralBaseByFeedPrice() public {
-        _supplyCollateral(100 ether); // 100 token * $10 = $1000
+        _supplyCollateral(100 ether); // 100 tokens * $10 = $1000
 
         (uint256 totalCollateralBase,,,,,) = pool.getUserAccountData(borrower);
         assertEq(totalCollateralBase, 1000 * 1e8);
@@ -135,7 +135,7 @@ contract MockLendingPoolTest is Test {
         _supplyCollateral(100 ether);
         _borrow(500 ether);
 
-        collateralFeed.setAnswer(5e8); // $5.00, setengah dari $10
+        collateralFeed.setAnswer(5e8); // $5.00, half of $10
 
         (,,,,, uint256 healthFactor) = pool.getUserAccountData(borrower);
         assertEq(healthFactor, 0.8e18);
@@ -150,20 +150,20 @@ contract MockLendingPoolTest is Test {
         _borrow(500 ether); // $500 debt, HF = 1.6
 
         // Additional $301 pushes total debt to $801 > $800 ceiling => HF < 1
-        // HF = (1000e8 * 8000 * 1e18) / (10000 * 801e8) = 998751560549313358 tepat
-        // (dihitung dengan pembagian bulat Python, formula identik dengan kontrak).
+        // HF = (1000e8 * 8000 * 1e18) / (10000 * 801e8) = 998751560549313358 exactly
+        // (computed with Python integer division, formula identical to the contract).
         vm.prank(borrower);
         vm.expectRevert(abi.encodeWithSelector(MockLendingPool.HealthFactorTooLow.selector, 998751560549313358));
         pool.borrow(address(debtToken), 301 ether);
     }
 
     function test_borrowRevertsWhenPoolLacksLiquidity() public {
-        _supplyCollateral(100 ether); // agunan cukup untuk HF, tapi likuiditas aset pinjaman nol
+        _supplyCollateral(100 ether); // enough collateral for HF, but zero liquidity in the borrowed asset
 
         MockToken illiquidToken = new MockToken("Illiquid", "ILQ");
         MockPriceFeed illiquidFeed = new MockPriceFeed(8, 1e8);
         pool.addAsset(address(illiquidToken), address(illiquidFeed), 5000, 6000);
-        // Tidak ada siapa pun yang men-supply illiquidToken ke pool -> saldo pool = 0.
+        // Nobody has supplied illiquidToken to the pool -> pool balance = 0.
 
         vm.prank(borrower);
         vm.expectRevert(
@@ -186,15 +186,15 @@ contract MockLendingPoolTest is Test {
         _borrow(500 ether); // $500 debt, HF = 1.6
 
         // Withdrawing 40 tokens ($400) leaves $600 collateral; ceiling debt becomes $480 < $500 debt => HF < 1
-        // HF = (600e8 * 8000 * 1e18) / (10000 * 500e8) = 960000000000000000 (0.96e18) tepat
-        // (dihitung dengan pembagian bulat Python, formula identik dengan kontrak).
+        // HF = (600e8 * 8000 * 1e18) / (10000 * 500e8) = 960000000000000000 (0.96e18) exactly
+        // (computed with Python integer division, formula identical to the contract).
         vm.prank(borrower);
         vm.expectRevert(abi.encodeWithSelector(MockLendingPool.HealthFactorTooLow.selector, 960000000000000000));
         pool.withdraw(address(collateralToken), 40 ether);
     }
 
     function test_withdrawRevertsWhenAmountExceedsCollateral() public {
-        _supplyCollateral(50 ether); // tanpa hutang sama sekali — ini murni jalur over-withdraw
+        _supplyCollateral(50 ether); // no debt at all — this is purely the over-withdraw path
 
         vm.prank(borrower);
         vm.expectRevert(
@@ -213,7 +213,7 @@ contract MockLendingPoolTest is Test {
 
         (,,,,, uint256 healthFactor) = pool.getUserAccountData(borrower);
         // totalCollateralBase = 630*1e8, currentLiquidationThreshold = 8000, totalDebtBase = 500*1e8
-        // HF = (630e8 * 8000 * 1e18) / (10000 * 500e8) = 1.008e18 tepat
+        // HF = (630e8 * 8000 * 1e18) / (10000 * 500e8) = 1.008e18 exactly
         assertEq(healthFactor, 1.008e18);
     }
 
@@ -247,11 +247,11 @@ contract MockLendingPoolTest is Test {
 
     function test_repayOnlyPullsOutstandingDebt() public {
         _supplyCollateral(100 ether);
-        _borrow(500 ether); // borrower menerima 500 ether dB dari pool, itu juga saldo dB-nya sekarang
+        _borrow(500 ether); // the borrower receives 500 ether dB from the pool, which is also their dB balance now
 
         uint256 balBefore = debtToken.balanceOf(borrower);
 
-        // Borrower mengajukan pelunasan jauh lebih besar dari hutangnya (500 ether).
+        // The borrower offers a repayment far larger than their debt (500 ether).
         vm.prank(borrower);
         pool.repay(address(debtToken), 10_000 ether);
 
@@ -259,7 +259,7 @@ contract MockLendingPoolTest is Test {
         assertEq(totalDebtBase, 0);
 
         uint256 balAfter = debtToken.balanceOf(borrower);
-        // Hanya sisa hutang lama (500 ether) yang benar-benar ditarik, bukan 10_000 ether yang diajukan.
+        // Only the remaining old debt (500 ether) is actually pulled, not the 10_000 ether offered.
         assertEq(balBefore - balAfter, 500 ether);
     }
 
@@ -309,27 +309,27 @@ contract MockLendingPoolTest is Test {
 
         assertEq(totalCollateralBase, 1000 * 1e8);
 
-        // rata-rata tertimbang: (600*8000 + 400*5000) / 1000 = 6800
+        // weighted average: (600*8000 + 400*5000) / 1000 = 6800
         assertEq(currentLiquidationThreshold, 6800);
-        // rata-rata tertimbang ltv: (600*6000 + 400*4000) / 1000 = 5200
+        // weighted average ltv: (600*6000 + 400*4000) / 1000 = 5200
         assertEq(ltv, 5200);
     }
 
     // ---------------------------------------------------------------
-    // penskalaan desimal feed (bukan 8) — bug penskalaan tidak akan terdeteksi
-    // kalau semua test lain memakai feed 8 desimal.
+    // scaling for feeds whose decimals are not 8 — a scaling bug would go undetected
+    // if every other test used an 8-decimal feed.
     // ---------------------------------------------------------------
 
     function test_priceScalingFromFeedWith18Decimals() public {
         MockToken token18 = new MockToken("Token 18dp feed", "T18");
-        MockPriceFeed feed18 = new MockPriceFeed(18, 2e18); // $2.00, feed 18 desimal
+        MockPriceFeed feed18 = new MockPriceFeed(18, 2e18); // $2.00, 18-decimal feed
 
         pool.addAsset(address(token18), address(feed18), 5000, 6000);
 
         token18.mint(borrower, 50 ether);
         vm.startPrank(borrower);
         token18.approve(address(pool), type(uint256).max);
-        pool.supply(address(token18), 50 ether); // 50 token * $2.00 = $100
+        pool.supply(address(token18), 50 ether); // 50 tokens * $2.00 = $100
         vm.stopPrank();
 
         (uint256 totalCollateralBase,,,,,) = pool.getUserAccountData(borrower);
@@ -338,20 +338,20 @@ contract MockLendingPoolTest is Test {
 
     function test_priceScalingFromFeedWith6Decimals() public {
         MockToken token6 = new MockToken("Token 6dp feed", "T6");
-        MockPriceFeed feed6 = new MockPriceFeed(6, 2_000_000); // $2.00, feed 6 desimal
+        MockPriceFeed feed6 = new MockPriceFeed(6, 2_000_000); // $2.00, 6-decimal feed
 
         pool.addAsset(address(token6), address(feed6), 5000, 6000);
 
         token6.mint(borrower, 50 ether);
         vm.startPrank(borrower);
         token6.approve(address(pool), type(uint256).max);
-        pool.supply(address(token6), 50 ether); // 50 token * $2.00 = $100
+        pool.supply(address(token6), 50 ether); // 50 tokens * $2.00 = $100
         vm.stopPrank();
 
         (uint256 totalCollateralBase,,,,,) = pool.getUserAccountData(borrower);
-        // Skala feed berbeda (18 vs 6 desimal), tapi harga USD yang dinormalkan sama
-        // ($2.00) dan jumlah token yang disupply sama -> nilai USD harus identik
-        // dengan test_priceScalingFromFeedWith18Decimals.
+        // Different feed scales (18 vs 6 decimals), but the normalized USD price is the
+        // same ($2.00) and the supplied token amount is the same -> the USD value must be
+        // identical to test_priceScalingFromFeedWith18Decimals.
         assertEq(totalCollateralBase, 100 * 1e8);
     }
 

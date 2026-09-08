@@ -7,24 +7,24 @@ import {Upgrade} from "../script/Upgrade.s.sol";
 import {FuguRegistry} from "../src/FuguRegistry.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 
-/// @dev Membuka `_assertUUPSImplementation` yang internal supaya bisa diuji tanpa
-///      menyentuh `run()` (yang butuh env var dan melakukan broadcast).
+/// @dev Exposes the internal `_assertUUPSImplementation` so it can be tested without
+///      touching `run()` (which needs env vars and broadcasts).
 contract UpgradeHarness is Upgrade {
     function assertUUPS(address impl) external view {
         _assertUUPSImplementation(impl);
     }
 }
 
-/// @dev Kontrak yang menjawab `proxiableUUID()` tapi dengan slot yang salah.
+/// @dev A contract that answers `proxiableUUID()` but with the wrong slot.
 contract WrongUUIDImpl {
     function proxiableUUID() external pure returns (bytes32) {
         return bytes32(uint256(1));
     }
 }
 
-/// @notice Butir 9 — `Upgrade.s.sol` harus menolak implementasi yang salah tempel
-///         SEBELUM `upgradeToAndCall`, karena upgrade ke kontrak non-UUPS mem-brick
-///         proxy secara permanen (tidak ada jalan upgrade kembali).
+/// @notice Item 9 — `Upgrade.s.sol` must reject a wrongly pasted implementation BEFORE
+///         `upgradeToAndCall`, because upgrading to a non-UUPS contract bricks the proxy
+///         permanently (there is no way to upgrade back).
 contract UpgradeScriptTest is Test {
     UpgradeHarness harness;
 
@@ -47,8 +47,8 @@ contract UpgradeScriptTest is Test {
         harness.assertUUPS(address(0xDEAD));
     }
 
-    /// @notice Kesalahan paling mudah dilakukan: menempelkan alamat PROXY ke `NEW_IMPL`.
-    ///         Proxy menolak `proxiableUUID()` (modifier `notDelegated`), jadi tertangkap.
+    /// @notice The easiest mistake to make: pasting the PROXY address into `NEW_IMPL`.
+    ///         The proxy refuses `proxiableUUID()` (the `notDelegated` modifier), so it is caught.
     function test_rejectsProxyPastedAsImplementation() public {
         FuguRegistry impl = new FuguRegistry();
         address proxy = address(

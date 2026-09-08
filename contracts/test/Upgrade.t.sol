@@ -51,7 +51,7 @@ contract UpgradeTest is Test {
         assertEq(upgraded.listingCount(), 1);
         assertEq(upgraded.countByCategory(Category.YIELD), 1);
 
-        // slot baru mulai dari nol dan bisa dipakai
+        // the new slot starts at zero and is usable
         assertEq(upgraded.extraField(), 0);
         upgraded.setExtraField(99);
         assertEq(upgraded.extraField(), 99);
@@ -116,34 +116,34 @@ contract UpgradeTest is Test {
     function test_subscriptionUpgradePreservesEscrowState() public {
         _setupSubscription();
 
-        // Create listing: $10 per 30 hari
+        // Create listing: $10 per 30 days
         vm.prank(creator);
         uint256 listingId = registry.list(1, address(0xA6E17), Category.GRID, 10_00000000, 30 days, "");
 
-        // Subscribe untuk 1 periode (30 hari, $10 = 10 token)
+        // Subscribe for 1 period (30 days, $10 = 10 tokens)
         vm.prank(user);
         uint256 subId = subs.subscribe(listingId, 1, address(usdt), type(uint256).max, block.timestamp + 1 hours);
 
-        // Majukan waktu ke separuh periode (15 hari)
+        // Advance time to half the period (15 days)
         vm.warp(block.timestamp + 15 days);
 
-        // Catat state sebelum upgrade
+        // Record the state before the upgrade
         FuguSubscription.Sub memory subBefore = subs.getSub(subId);
         uint256 claimableBefore = subs.claimable(subId);
         uint256 subsTokenBalBefore = usdt.balanceOf(address(subs));
 
-        // Upgrade ke V2
+        // Upgrade to V2
         FuguSubscriptionV2 v2impl = new FuguSubscriptionV2();
         vm.prank(owner);
         subs.upgradeToAndCall(address(v2impl), "");
 
-        // Cast ke V2
+        // Cast to V2
         FuguSubscriptionV2 upgraded = FuguSubscriptionV2(payable(address(subs)));
 
-        // Verifikasi upgrade terjadi
+        // Verify the upgrade happened
         assertEq(upgraded.version(), "v2");
 
-        // Verifikasi state escrow tetap sama
+        // Verify the escrow state is unchanged
         FuguSubscription.Sub memory subAfter = upgraded.getSub(subId);
         assertEq(subAfter.listingId, subBefore.listingId);
         assertEq(subAfter.subscriber, subBefore.subscriber);
@@ -155,24 +155,24 @@ contract UpgradeTest is Test {
         assertEq(subAfter.cancelled, subBefore.cancelled);
         assertEq(subAfter.feeBps, subBefore.feeBps);
 
-        // Verifikasi claimable tetap sama
+        // Verify claimable is unchanged
         uint256 claimableAfter = upgraded.claimable(subId);
         assertEq(claimableAfter, claimableBefore);
 
-        // Verifikasi saldo token tetap sama
+        // Verify the token balance is unchanged
         assertEq(usdt.balanceOf(address(upgraded)), subsTokenBalBefore);
 
-        // Verifikasi slot baru tersedia
+        // Verify the new slot is available
         assertEq(upgraded.extraField(), 0);
         upgraded.setExtraField(77);
         assertEq(upgraded.extraField(), 77);
 
-        // Verifikasi claim masih berfungsi: claim $5 yang sudah accrued
+        // Verify claim still works: claim the $5 already accrued
         uint256 creatorBalBefore = usdt.balanceOf(creator);
         uint256 treasuryBalBefore = usdt.balanceOf(treasury);
         upgraded.claim(subId);
 
-        // fee 5% dari 5 token = 0.25 token
+        // a 5% fee on 5 tokens = 0.25 tokens
         uint256 expectedFee = (5e18 * 500) / 10_000;
         uint256 expectedToCreator = 5e18 - expectedFee;
         assertEq(usdt.balanceOf(creator), creatorBalBefore + expectedToCreator);
@@ -189,13 +189,13 @@ contract UpgradeTest is Test {
     }
 
     // ---------------------------------------------------------------------
-    // Variabel state baru dari perbaikan review akhir — append-only
+    // New state variables from the final review fixes — append-only
     // ---------------------------------------------------------------------
 
-    /// @notice Variabel state yang ditambahkan pada perbaikan review akhir
-    ///         (`minPaidBpsOfPeriod`, `_periodPriceRef`, `listingByAgentId`) diletakkan
-    ///         di AKHIR daftar state, sehingga slot lama tidak bergeser dan `extraField`
-    ///         milik V2 tetap dimulai dari nol.
+    /// @notice The state variables added in the final review fixes
+    ///         (`minPaidBpsOfPeriod`, `_periodPriceRef`, `listingByAgentId`) are placed at
+    ///         the END of the state list, so the old slots do not shift and V2's
+    ///         `extraField` still starts at zero.
     function test_newStateVarsAppendOnlyAcrossUpgrade() public {
         _setupSubscription();
 
@@ -218,22 +218,22 @@ contract UpgradeTest is Test {
         subs.upgradeToAndCall(address(v2impl), "");
         FuguSubscriptionV2 upgraded = FuguSubscriptionV2(payable(address(subs)));
 
-        // Nilai variabel baru selamat melewati upgrade...
+        // The new variables' values survive the upgrade...
         assertEq(upgraded.minPaidBpsOfPeriod(), 5000);
         assertEq(upgraded.periodPriceRef(listingId, user), 10e18);
         assertEq(upgraded.paidToAgent(listingId, user), paidBefore);
         assertTrue(upgraded.hasSubscribed(listingId, user));
 
-        // ...dan slot V2 yang ditambahkan sesudahnya tetap perawan.
+        // ...and the V2 slot appended after them is still untouched.
         assertEq(upgraded.extraField(), 0);
         upgraded.setExtraField(123);
         assertEq(upgraded.extraField(), 123);
-        // menulis slot baru tidak merusak yang lama
+        // writing the new slot does not corrupt the old ones
         assertEq(upgraded.minPaidBpsOfPeriod(), 5000);
         assertEq(upgraded.periodPriceRef(listingId, user), 10e18);
     }
 
-    /// @notice `listingByAgentId` juga ditambahkan di akhir dan selamat melewati upgrade.
+    /// @notice `listingByAgentId` was also appended at the end and survives the upgrade.
     function test_registryListingByAgentIdSurvivesUpgrade() public {
         vm.prank(creator);
         uint256 id = registry.list(7, address(0xA6E17), Category.YIELD, 3_00000000, 7 days, "ipfs://x");
@@ -250,13 +250,13 @@ contract UpgradeTest is Test {
         assertEq(upgraded.listingByAgentId(7), id);
     }
 
-    /// @notice Proxy lama (yang `initialize`-nya sudah jalan sebelum ambang ini ada)
-    ///         mengisi `minPaidBpsOfPeriod` lewat `initializeV2`, dan hanya sekali.
+    /// @notice An old proxy (whose `initialize` already ran before this threshold existed)
+    ///         fills `minPaidBpsOfPeriod` via `initializeV2`, and only once.
     function test_initializeV2SetsMinPaidBpsOnUpgradedProxy() public {
         _setupSubscription();
 
-        // Simulasikan proxy lama: paksa slot ambang kembali ke 0 seperti kondisi
-        // sebelum variabel ini ada.
+        // Simulate an old proxy: force the threshold slot back to 0, the state it was in
+        // before this variable existed.
         vm.prank(owner);
         subs.setMinPaidBpsOfPeriod(0);
         assertEq(subs.minPaidBpsOfPeriod(), 0);
@@ -267,7 +267,7 @@ contract UpgradeTest is Test {
 
         assertEq(subs.minPaidBpsOfPeriod(), 5000);
 
-        // Tidak bisa dipanggil dua kali.
+        // It cannot be called twice.
         vm.expectRevert();
         subs.initializeV2();
     }

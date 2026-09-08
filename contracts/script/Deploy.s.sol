@@ -9,7 +9,7 @@ import {FuguSubscription} from "../src/FuguSubscription.sol";
 import {FuguReputation} from "../src/FuguReputation.sol";
 
 contract Deploy is Script {
-    // Alamat BSC testnet — terverifikasi live 2026-09-08
+    // BSC testnet addresses — verified live 2026-09-08
     address constant FEED_BNB_USD = 0x2514895c72f50D8bd4B4F9b1110F0D6bD2c97526;
     address constant FEED_USDT_USD = 0xEca2605f0BCF2BA5966372C99837b1F182d3D620;
     address constant FEED_BUSD_USD = 0x9331b55D9830EF609A2aBCfAc0FBCE050A52fdEa;
@@ -54,7 +54,7 @@ contract Deploy is Script {
             ))
         );
 
-        // Konfigurasi token pembayaran
+        // Configure the payment tokens
         oracle.setToken(
             address(0),
             FuguPriceOracle.TokenConfig({
@@ -71,7 +71,7 @@ contract Deploy is Script {
             FuguPriceOracle.TokenConfig({
                 kind: FuguPriceOracle.PriceSourceKind.CHAINLINK,
                 feed: FEED_USDT_USD,
-                maxStaleness: 93_600, // 26 jam — heartbeat stablecoin testnet lambat
+                maxStaleness: 93_600, // 26 hours — the testnet stablecoin heartbeat is slow
                 tokenDecimals: 18,
                 fixedPriceUsd8: 0,
                 enabled: true

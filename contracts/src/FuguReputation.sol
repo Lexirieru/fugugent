@@ -7,23 +7,23 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {IFuguSubscription} from "./interfaces/IFuguSubscription.sol";
 
 /// @title FuguReputation
-/// @notice Review yang hanya bisa ditulis wallet yang sudah membayar agent dalam jumlah
-///         berarti.
-/// @dev **Apa yang gate ini benar-benar jamin — dan apa yang tidak.**
-///      Hak review terbuka setelah agent benar-benar MENERIMA setidaknya sekian persen
-///      dari harga satu periode penuh (default 50%, lihat
-///      `FuguSubscription.minPaidBpsOfPeriod`). Ini ambang ekonomi, bukan bukti
-///      identitas: sybil tetap mungkin bagi siapa pun yang bersedia membayar setengah
-///      periode untuk tiap wallet, dan uangnya jatuh ke agent yang direview.
-///      **Batas penting yang harus diketahui pembaca rating:** penyebut ambang adalah
-///      harga satu periode listing itu sendiri, yang ditentukan pemilik listing sebelum
-///      terkunci pada langganan pertama tiap wallet. Pemilik listing yang ingin
-///      mengembang-kan rating listing MILIKNYA SENDIRI dapat menurunkan harga ke nilai
-///      debu, membiarkan wallet-wallet miliknya berlangganan, lalu menaikkan harga lagi —
-///      biaya bersihnya hanya fee protokol dan gas. Gate ini karena itu mahal bagi pihak
-///      luar yang menyerang rating agent ORANG LAIN, tetapi tidak mencegah pemilik
-///      memoles rating sendiri. Kurasi dan verifikasi kepemilikan ERC-8004 adalah lapisan
-///      yang menutup celah itu, dan keduanya belum lengkap.
+/// @notice Reviews that only a wallet which has paid an agent a meaningful amount can
+///         write.
+/// @dev **What this gate really guarantees — and what it does not.**
+///      The right to review opens once the agent has actually RECEIVED at least some
+///      percentage of the price of one full period (50% by default, see
+///      `FuguSubscription.minPaidBpsOfPeriod`). This is an economic threshold, not proof
+///      of identity: sybils remain possible for anyone willing to pay half a period per
+///      wallet, and that money goes to the very agent being reviewed.
+///      **The important limit anyone reading a rating must know:** the denominator of the
+///      threshold is the listing's own one-period price, set by the listing owner before
+///      it locks on each wallet's first subscription. A listing owner who wants to inflate
+///      the rating of THEIR OWN listing can drop the price to a dust value, let their own
+///      wallets subscribe, then raise the price again — the net cost is only the protocol
+///      fee and gas. This gate is therefore expensive for an outsider attacking SOMEONE
+///      ELSE'S agent rating, but it does not stop an owner from polishing their own.
+///      Curation and ERC-8004 ownership verification are the layers that close that gap,
+///      and neither is complete yet.
 /// @dev Trust boundary: The anti-sybil gate applies to end users. The contract owner
 ///      is a trusted entity who can bypass the gate by calling setSubscriptions() to
 ///      point to a malicious subscription contract, or by upgrading the contract logic
@@ -55,16 +55,16 @@ contract FuguReputation is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         subscriptions = IFuguSubscription(subscriptions_);
     }
 
-    /// @notice Tulis review untuk agent (listing).
-    /// @param listingId ID agent yang direview.
-    /// @param score Skor 1-5.
-    /// @param uri IPFS URI atau metadata URI.
-    /// @dev Hanya wallet yang sudah membayar agent dalam jumlah berarti
-    ///      (`hasSubscribed == true`) yang bisa menulis review: agent harus benar-benar
-    ///      sudah menerima setidaknya `minPaidBpsOfPeriod` bps — default 50% — dari harga
-    ///      satu periode penuh. Berlangganan lalu langsung batal tidak memberi hak, dan
-    ///      begitu pula membayar "debu" (subscribe, maju satu detik, claim, cancel).
-    ///      Satu wallet hanya bisa review sekali per agent.
+    /// @notice Write a review for an agent (listing).
+    /// @param listingId ID of the agent being reviewed.
+    /// @param score Score 1-5.
+    /// @param uri IPFS URI or metadata URI.
+    /// @dev Only a wallet that has paid the agent a meaningful amount
+    ///      (`hasSubscribed == true`) can write a review: the agent must have actually
+    ///      received at least `minPaidBpsOfPeriod` bps — 50% by default — of the price of
+    ///      one full period. Subscribing and cancelling right away grants nothing, and so
+    ///      does paying "dust" (subscribe, advance one second, claim, cancel).
+    ///      One wallet can review each agent only once.
     function review(uint256 listingId, uint8 score, string calldata uri) external {
         if (score == 0 || score > 5) revert InvalidScore(score);
         if (!subscriptions.hasSubscribed(listingId, msg.sender)) revert NotASubscriber();
@@ -82,7 +82,7 @@ contract FuguReputation is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         return _agg[listingId].count;
     }
 
-    /// @return Rata-rata skor dikali 100 (mis. 450 berarti 4,50).
+    /// @return The average score times 100 (e.g. 450 means 4.50).
     function averageScoreX100(uint256 listingId) external view returns (uint256) {
         Agg memory a = _agg[listingId];
         if (a.count == 0) return 0;

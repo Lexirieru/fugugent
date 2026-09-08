@@ -19,7 +19,7 @@ contract FuguPriceOracleTest is Test {
         bytes memory data = abi.encodeCall(FuguPriceOracle.initialize, (owner));
         oracle = FuguPriceOracle(address(new ERC1967Proxy(address(impl), data)));
 
-        // BNB/USD = $754.46, 8 desimal — meniru feed testnet asli
+        // BNB/USD = $754.46, 8 decimals — imitates the real testnet feed
         bnbFeed = new MockAggregator(8, 754_46000000);
 
         vm.prank(owner);
@@ -37,9 +37,9 @@ contract FuguPriceOracleTest is Test {
     }
 
     function test_quoteNativeAtKnownPrice() public view {
-        // $754.46 dalam USD8
+        // $754.46 in USD8
         uint256 oneBnbInUsd8 = 754_46000000;
-        // membeli senilai 1 BNB harus menghasilkan tepat 1e18
+        // buying 1 BNB worth must yield exactly 1e18
         assertEq(oracle.quote(address(0), oneBnbInUsd8), 1e18);
     }
 
@@ -83,13 +83,13 @@ contract FuguPriceOracleTest is Test {
                 enabled: true
             })
         );
-        // $5 pada peg $1 = 5 token
+        // $5 at a $1 peg = 5 tokens
         assertEq(oracle.quote(u, 5_00000000), 5e18);
     }
 
     function test_normalizesFeedWithNon8Decimals() public {
         address t = address(0xCAFE);
-        MockAggregator feed18 = new MockAggregator(18, 2e18); // $2, 18 desimal
+        MockAggregator feed18 = new MockAggregator(18, 2e18); // $2, 18 decimals
         vm.prank(owner);
         oracle.setToken(
             t,
@@ -138,7 +138,7 @@ contract FuguPriceOracleTest is Test {
     }
 
     // ---------------------------------------------------------------------
-    // Butir 5 — `tokenDecimals` diverifikasi ke `decimals()` on-chain
+    // Item 5 — `tokenDecimals` is verified against on-chain `decimals()`
     // ---------------------------------------------------------------------
 
     function _chainlinkCfg(uint8 tokenDecimals) internal view returns (FuguPriceOracle.TokenConfig memory) {
@@ -152,15 +152,15 @@ contract FuguPriceOracleTest is Test {
         });
     }
 
-    /// @notice Satu digit salah di `tokenDecimals` menggeser seluruh harga 10x, jadi
-    ///         nilai yang dideklarasikan owner harus cocok dengan token sungguhan.
+    /// @notice One wrong digit in `tokenDecimals` shifts the whole price by 10x, so the
+    ///         value declared by the owner must match the real token.
     function test_setTokenRejectsDecimalsMismatch() public {
         MockERC20Decimals sixDec = new MockERC20Decimals("Six", "SIX", 6);
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(FuguPriceOracle.DecimalsMismatch.selector, uint8(18), uint8(6)));
         oracle.setToken(address(sixDec), _chainlinkCfg(18));
 
-        // config lama tidak tertulis
+        // the old config was not written
         assertEq(uint8(oracle.tokenConfig(address(sixDec)).kind), uint8(FuguPriceOracle.PriceSourceKind.NONE));
     }
 
@@ -169,12 +169,12 @@ contract FuguPriceOracleTest is Test {
         vm.prank(owner);
         oracle.setToken(address(sixDec), _chainlinkCfg(6));
         assertEq(oracle.tokenConfig(address(sixDec)).tokenDecimals, 6);
-        // $754,46 dengan token 6 desimal = 1e6 unit
+        // $754.46 with a 6-decimal token = 1e6 units
         assertEq(oracle.quote(address(sixDec), 754_46000000), 1e6);
     }
 
-    /// @notice Token yang `decimals()`-nya revert tetap diterima, tapi harus meninggalkan
-    ///         jejak `DecimalsUnverified`.
+    /// @notice A token whose `decimals()` reverts is still accepted, but it must leave a
+    ///         `DecimalsUnverified` trace.
     function test_setTokenEmitsDecimalsUnverifiedWhenCallFails() public {
         MockERC20NoDecimals odd = new MockERC20NoDecimals("Odd", "ODD");
         vm.expectEmit(true, false, false, false, address(oracle));
@@ -184,8 +184,8 @@ contract FuguPriceOracleTest is Test {
         assertEq(oracle.tokenConfig(address(odd)).tokenDecimals, 18);
     }
 
-    /// @notice Alamat tanpa kode (mis. token yang belum ter-deploy) juga tidak bisa
-    ///         diverifikasi — diterima, tapi ditandai.
+    /// @notice An address with no code (e.g. a token not deployed yet) cannot be verified
+    ///         either — accepted, but flagged.
     function test_setTokenEmitsDecimalsUnverifiedForNonContract() public {
         vm.expectEmit(true, false, false, false, address(oracle));
         emit FuguPriceOracle.DecimalsUnverified(token);
@@ -193,8 +193,8 @@ contract FuguPriceOracleTest is Test {
         oracle.setToken(token, _chainlinkCfg(18));
     }
 
-    /// @notice Native coin (address(0)) tidak punya `decimals()` — jangan sampai
-    ///         verifikasi ini memblokir konfigurasi tBNB.
+    /// @notice The native coin (address(0)) has no `decimals()` — this verification must
+    ///         not block configuring tBNB.
     function test_setTokenSkipsDecimalsCheckForNative() public {
         vm.prank(owner);
         oracle.setToken(address(0), _chainlinkCfg(18));
@@ -202,11 +202,11 @@ contract FuguPriceOracleTest is Test {
     }
 
     // ---------------------------------------------------------------------
-    // Butir 8 — menonaktifkan token
+    // Item 8 — disabling a token
     // ---------------------------------------------------------------------
 
     function test_disableToken() public {
-        // Awalnya native aktif dan bisa di-quote.
+        // Initially native is enabled and can be quoted.
         assertGt(oracle.quote(address(0), 1e8), 0);
 
         vm.expectEmit(true, false, false, false, address(oracle));
@@ -218,12 +218,12 @@ contract FuguPriceOracleTest is Test {
         vm.expectRevert(abi.encodeWithSelector(FuguPriceOracle.TokenNotEnabled.selector, address(0)));
         oracle.quote(address(0), 1e8);
 
-        // Sisa config tetap utuh, jadi bisa dihidupkan lagi lewat setToken.
+        // The rest of the config stays intact, so it can be re-enabled via setToken.
         assertEq(oracle.tokenConfig(address(0)).feed, address(bnbFeed));
     }
 
-    /// @notice Jalur darurat ini harus tetap jalan walau config lamanya sudah tidak
-    ///         akan lolos validasi `setToken`.
+    /// @notice This emergency path must keep working even when the old config would no
+    ///         longer pass `setToken` validation.
     function test_disableTokenWorksOnUnconfiguredToken() public {
         vm.prank(owner);
         oracle.disableToken(address(0xDEAD));

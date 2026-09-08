@@ -7,16 +7,15 @@ import {MockPriceFeed} from "../src/mocks/MockPriceFeed.sol";
 import {MockLendingPool} from "../src/mocks/MockLendingPool.sol";
 
 /// @title DeployMocks
-/// @notice Deploy protokol lending tiruan (bergaya Aave v3) ke BSC testnet, isi
-///         likuiditas mUSD, dan buat satu posisi contoh (agunan mBNB, hutang mUSD)
-///         dengan health factor sekitar 1.8 — untuk nanti diselamatkan agent.
-/// @dev Skrip uji, bukan bagian produk. Tidak menyentuh kontrak Fugu* yang sudah ada.
-///      PERINGATAN: skrip ini SELALU men-deploy set mock (token+feed+pool) yang
-///      benar-benar baru setiap kali dijalankan — tidak ada guard idempotency.
-///      Menjalankannya berulang kali di testnet yang sama akan menumpuk banyak set
-///      mock yang tidak terpakai (masing-masing dengan alamat berbeda). Jalankan
-///      hanya sekali per kebutuhan, dan catat alamat hasilnya di
-///      `deployments/bsc-testnet.json`.
+/// @notice Deploys a fake lending protocol (Aave v3 style) to BSC testnet, seeds mUSD
+///         liquidity, and opens one sample position (mBNB collateral, mUSD debt) with a
+///         health factor around 1.8 — for an agent to rescue later.
+/// @dev A test script, not part of the product. It does not touch the existing Fugu*
+///      contracts. WARNING: this script ALWAYS deploys a completely fresh set of mocks
+///      (token+feed+pool) on every run — there is no idempotency guard. Running it
+///      repeatedly against the same testnet piles up many unused mock sets (each at a
+///      different address). Run it only once per need, and record the resulting addresses
+///      in `deployments/bsc-testnet.json`.
 contract DeployMocks is Script {
     uint16 internal constant USD_LTV_BPS = 8000; // 80%
     uint16 internal constant USD_LT_BPS = 8500; // 85%
@@ -26,21 +25,21 @@ contract DeployMocks is Script {
     int256 internal constant USD_PRICE_8DP = 1_00000000; // $1.00
     int256 internal constant BNB_PRICE_8DP = 750_00000000; // $750.00
 
-    uint256 internal constant MINT_USD = 100_000 ether; // mUSD 18 desimal
-    uint256 internal constant MINT_BNB = 100 ether; // mBNB 18 desimal
+    uint256 internal constant MINT_USD = 100_000 ether; // mUSD, 18 decimals
+    uint256 internal constant MINT_BNB = 100 ether; // mBNB, 18 decimals
 
     uint256 internal constant SEED_LIQUIDITY_USD = 50_000 ether;
 
-    // Posisi contoh: 10 mBNB agunan (= $7,500 @ LT 75% => daya likuidasi $5,625).
+    // Sample position: 10 mBNB of collateral (= $7,500 @ LT 75% => $5,625 of borrowing power).
     uint256 internal constant SAMPLE_COLLATERAL_BNB = 10 ether;
 
-    // Target health factor posisi contoh dan toleransi pemeriksaan runtime-nya.
-    // Jumlah pinjaman DITURUNKAN dari sini (lihat `_computeSampleBorrowAmount`),
-    // bukan angka tetap — supaya tidak diam-diam melenceng kalau harga/LT berubah.
+    // Target health factor for the sample position, and the tolerance of its runtime check.
+    // The borrow amount is DERIVED from this (see `_computeSampleBorrowAmount`), not a
+    // hardcoded number — so it cannot silently drift if the price or LT changes.
     uint256 internal constant TARGET_HF = 1.8e18;
     uint256 internal constant HF_TOLERANCE = 0.01e18;
 
-    // Gas bekal untuk alamat LP terpisah (lihat catatan di `_seedLiquidity`), dalam wei.
+    // Gas stipend for the separate LP address (see the note in `_seedLiquidity`), in wei.
     uint256 internal constant LP_GAS_STIPEND = 0.002 ether;
 
     struct Deployed {
@@ -62,7 +61,7 @@ contract DeployMocks is Script {
         _logResult(d, deployer);
     }
 
-    /// @dev Deploy token, feed, pool; daftarkan aset; mint token ke deployer.
+    /// @dev Deploy tokens, feeds, pool; register the assets; mint tokens to the deployer.
     function _deployAndConfigure(uint256 pk, address deployer) internal returns (Deployed memory d) {
         vm.startBroadcast(pk);
 
@@ -83,15 +82,16 @@ contract DeployMocks is Script {
         vm.stopBroadcast();
     }
 
-    /// @dev Seed likuiditas mUSD ke pool dari alamat LP terpisah — SENGAJA dipisah
-    ///      dari deployer. `MockLendingPool.supply()` selalu mencatat penyuplai
-    ///      sebagai kolateral miliknya sendiri (persis Aave v3: supply = jadi
-    ///      kolateral). Kalau likuiditas disuplai oleh deployer yang sama, saldo
-    ///      itu ikut tercampur ke posisi contoh deployer dan merusak target HF
-    ///      ~1.8 (Terverifikasi lewat simulasi: tanpa pemisahan ini HF jadi ~15.4,
-    ///      bukan ~1.8, karena kolateral deployer ikut menghitung 50.000 mUSD).
-    ///      Alamat LP pakai kunci-uji deterministik (bukan rahasia — mock testnet
-    ///      saja, tanpa nilai riil), dibekali sedikit gas native oleh deployer.
+    /// @dev Seed mUSD liquidity into the pool from a separate LP address — DELIBERATELY
+    ///      kept apart from the deployer. `MockLendingPool.supply()` always records the
+    ///      supplier's deposit as their own collateral (exactly like Aave v3: supply =
+    ///      becomes collateral). If the same deployer supplied the liquidity, that balance
+    ///      would get mixed into the deployer's sample position and wreck the ~1.8 HF
+    ///      target (Verified by simulation: without this separation the HF comes out at
+    ///      ~15.4 instead of ~1.8, because the deployer's collateral then counts the
+    ///      50,000 mUSD too). The LP address uses a deterministic test key (not a secret —
+    ///      testnet mocks only, with no real value), funded with a little native gas by
+    ///      the deployer.
     function _seedLiquidity(uint256 pk, Deployed memory d) internal {
         uint256 lpPk = uint256(keccak256("fugu-mock-lending-lp-testnet-seed"));
         address lp = vm.addr(lpPk);
@@ -110,20 +110,20 @@ contract DeployMocks is Script {
         console.log("LP (penyuplai likuid.)", lp);
     }
 
-    /// @dev Posisi contoh di alamat deployer: supply mBNB sebagai agunan, lalu
-    ///      borrow jumlah mUSD yang DIHITUNG dari `TARGET_HF`, bukan angka tetap,
-    ///      memakai rumus yang sama persis dengan `MockLendingPool.getUserAccountData`:
+    /// @dev Sample position at the deployer's address: supply mBNB as collateral, then
+    ///      borrow an mUSD amount COMPUTED from `TARGET_HF`, not a hardcoded number, using
+    ///      exactly the same formula as `MockLendingPool.getUserAccountData`:
     ///
     ///      healthFactor = (totalCollateralBase * currentLiquidationThreshold * 1e18)
     ///                     / (10000 * totalDebtBase)
     ///
-    ///      Dibalik untuk debt (kalikan dulu, baru bagi, supaya presisi terjaga):
+    ///      Inverted for debt (multiply first, divide last, to keep precision):
     ///
     ///      totalDebtBase = (collateralUsd8 * ltBps * 1e18) / (10000 * TARGET_HF)
     ///
-    ///      Posisi ini hanya punya SATU aset agunan (mBNB), jadi
-    ///      `currentLiquidationThreshold` = `BNB_LT_BPS` persis (rata-rata tertimbang
-    ///      atas satu aset = aset itu sendiri).
+    ///      This position has only ONE collateral asset (mBNB), so
+    ///      `currentLiquidationThreshold` equals `BNB_LT_BPS` exactly (a weighted average
+    ///      over one asset is that asset itself).
     function _openSamplePosition(uint256 pk, Deployed memory d) internal {
         uint256 borrowAmount = _computeSampleBorrowAmount();
 
@@ -134,25 +134,25 @@ contract DeployMocks is Script {
         vm.stopBroadcast();
     }
 
-    /// @dev Turunkan jumlah pinjaman mUSD (18 desimal) dari `TARGET_HF` dan
-    ///      parameter posisi contoh (`SAMPLE_COLLATERAL_BNB`, `BNB_PRICE_8DP`,
-    ///      `BNB_LT_BPS`, `USD_PRICE_8DP`) — bukan angka tetap.
+    /// @dev Derive the mUSD borrow amount (18 decimals) from `TARGET_HF` and the sample
+    ///      position parameters (`SAMPLE_COLLATERAL_BNB`, `BNB_PRICE_8DP`, `BNB_LT_BPS`,
+    ///      `USD_PRICE_8DP`) — not a hardcoded number.
     function _computeSampleBorrowAmount() internal pure returns (uint256 borrowAmount) {
-        // collateralUsd8 = jumlah mBNB (18dp) * harga mBNB (8dp) / 1e18
+        // collateralUsd8 = mBNB amount (18dp) * mBNB price (8dp) / 1e18
         uint256 collateralUsd8 = (SAMPLE_COLLATERAL_BNB * uint256(BNB_PRICE_8DP)) / 1e18;
 
         // totalDebtBase (usd8) = (collateralUsd8 * ltBps * 1e18) / (10000 * TARGET_HF)
-        // — kalikan dulu, bagi belakangan, sama seperti rumus healthFactor di kontrak.
+        // — multiply first, divide last, same as the healthFactor formula in the contract.
         uint256 targetDebtUsd8 = (collateralUsd8 * BNB_LT_BPS * 1e18) / (10_000 * TARGET_HF);
 
-        // borrowAmount (mUSD, 18dp) = targetDebtUsd8 (8dp) * 1e18 / harga mUSD (8dp)
+        // borrowAmount (mUSD, 18dp) = targetDebtUsd8 (8dp) * 1e18 / mUSD price (8dp)
         borrowAmount = (targetDebtUsd8 * 1e18) / uint256(USD_PRICE_8DP);
     }
 
-    /// @dev Pemeriksaan runtime SEBELUM mencetak hasil: gagal keras (bukan sekadar
-    ///      mencetak angka yang salah) kalau HF posisi contoh meleset dari
-    ///      `TARGET_HF` di luar `HF_TOLERANCE` — mis. karena parameter di atas
-    ///      diubah tanpa menyesuaikan yang lain.
+    /// @dev A runtime check BEFORE printing the result: fail hard (rather than just
+    ///      printing a wrong number) if the sample position's HF misses `TARGET_HF` by
+    ///      more than `HF_TOLERANCE` — e.g. because one of the parameters above was
+    ///      changed without adjusting the others.
     function _verifySampleHealthFactor(Deployed memory d, address deployer) internal view {
         (,,,,, uint256 healthFactor) = d.pool.getUserAccountData(deployer);
 

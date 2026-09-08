@@ -8,36 +8,36 @@ import {IFuguRegistry} from "./interfaces/IFuguRegistry.sol";
 import {Category, Listing} from "./types/FuguTypes.sol";
 
 /// @title FuguRegistry
-/// @notice Katalog agent yang layak ditampilkan di marketplace, menjembatani
-///         identitas ERC-8004 yang mentah dengan listing yang punya harga dan kategori.
+/// @notice Catalog of agents fit to show in the marketplace, bridging raw
+///         ERC-8004 identities with listings that carry a price and a category.
 ///
-/// @dev ## BATAS KEPERCAYAAN — kepemilikan ERC-8004 BELUM diverifikasi
+/// @dev ## TRUST BOUNDARY — ERC-8004 ownership is NOT verified
 ///
-///      `list()` bersifat permissionless dan kontrak ini **tidak memanggil registry
-///      ERC-8004 eksternal** untuk membuktikan bahwa `msg.sender` benar-benar memiliki
-///      `erc8004AgentId` yang ia daftarkan. Yang dijamin di sini hanyalah **keunikan
-///      first-come-first-served**: satu `erc8004AgentId` hanya bisa dipetakan ke satu
-///      listing (lihat `listingByAgentId`), sehingga tidak ada dua listing yang saling
-///      berebut identitas yang sama.
+///      `list()` is permissionless and this contract **does not call the external
+///      ERC-8004 registry** to prove that `msg.sender` really owns the
+///      `erc8004AgentId` it registers. The only thing guaranteed here is
+///      **first-come-first-served uniqueness**: one `erc8004AgentId` can map to only
+///      one listing (see `listingByAgentId`), so no two listings fight over the same
+///      identity.
 ///
-///      Artinya penyerang yang bergerak lebih dulu masih bisa "menyerobot" ID agent
-///      milik orang lain dan menerima pembayaran atas nama identitas itu. Untuk
-///      hackathon/testnet ini diterima secara sadar; **verifikasi kepemilikan token
-///      ERC-8004 di registry eksternal WAJIB ditambahkan sebelum kontrak ini menyentuh
-///      dana sungguhan (mainnet).** Mitigasi sementara: flag `curated` yang hanya bisa
-///      diset kurator terpercaya, dan UI sebaiknya hanya menonjolkan listing curated.
+///      That means an attacker who moves first can still "squat" someone else's agent
+///      ID and take payments in that identity's name. For the hackathon/testnet this
+///      is accepted knowingly; **verifying ERC-8004 token ownership against the
+///      external registry MUST be added before this contract touches real money
+///      (mainnet).** Temporary mitigation: the `curated` flag, which only trusted
+///      curators can set, and the UI should surface only curated listings.
 contract FuguRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, IFuguRegistry {
     uint256 private _listingCount;
     mapping(uint256 listingId => Listing) private _listings;
     mapping(Category => uint256) private _countByCategory;
     mapping(address => bool) public isCurator;
 
-    // --- variabel state baru (append-only, ditambahkan di AKHIR) ---
+    // --- new state variables (append-only, added at the END) ---
 
-    /// @notice Pemetaan identitas ERC-8004 -> listing yang sudah mengklaimnya.
-    /// @dev 0 berarti belum pernah diklaim (listing id selalu dimulai dari 1).
-    ///      Menjamin keunikan di dalam registry ini saja — bukan bukti kepemilikan,
-    ///      lihat NatSpec kontrak.
+    /// @notice Maps an ERC-8004 identity -> the listing that has claimed it.
+    /// @dev 0 means never claimed (listing ids always start at 1).
+    ///      Guarantees uniqueness inside this registry only — it is not proof of
+    ///      ownership, see the contract NatSpec.
     mapping(uint256 erc8004AgentId => uint256 listingId) public listingByAgentId;
 
     event Listed(uint256 indexed listingId, address indexed owner, Category indexed category, uint256 erc8004AgentId);
@@ -68,11 +68,11 @@ contract FuguRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, IFu
         _;
     }
 
-    /// @notice Daftarkan agent baru ke katalog.
-    /// @dev Satu `erc8004AgentId` hanya boleh dipakai satu listing; percobaan kedua
-    ///      revert dengan `AgentAlreadyListed`. Ini mencegah dua listing bersaing atas
-    ///      identitas yang sama, tapi TIDAK membuktikan `msg.sender` memiliki identitas
-    ///      itu — lihat NatSpec kontrak.
+    /// @notice Register a new agent in the catalog.
+    /// @dev One `erc8004AgentId` may be used by one listing only; a second attempt
+    ///      reverts with `AgentAlreadyListed`. This stops two listings from competing
+    ///      over the same identity, but it does NOT prove `msg.sender` owns that
+    ///      identity — see the contract NatSpec.
     function list(
         uint256 erc8004AgentId,
         address agentWallet,
@@ -131,10 +131,10 @@ contract FuguRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, IFu
         emit CuratorChanged(curator, allowed);
     }
 
-    /// @notice Tandai/lepas tanda kurasi pada sebuah listing.
-    /// @dev Kurator tidak boleh mengkurasi listing miliknya sendiri (`CannotCurateOwnListing`),
-    ///      supaya alamat yang kebetulan berstatus kurator tidak bisa memberi stempel
-    ///      kepercayaan pada listing-nya sendiri.
+    /// @notice Set or clear the curated mark on a listing.
+    /// @dev A curator may not curate their own listing (`CannotCurateOwnListing`), so
+    ///      an address that happens to hold curator status cannot stamp its own
+    ///      listing as trusted.
     function setCurated(uint256 listingId, bool curated) external {
         if (!isCurator[msg.sender]) revert NotCurator();
         address listingOwner = _listings[listingId].owner;
@@ -153,11 +153,11 @@ contract FuguRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, IFu
         return _listingCount;
     }
 
-    /// @notice Total listing yang PERNAH dibuat pada kategori ini.
-    /// @dev Angka ini tidak berkurang saat sebuah listing dinonaktifkan lewat
-    ///      `setActive(id, false)` — ini adalah hitungan kumulatif "pernah dibuat",
-    ///      bukan hitungan listing yang sedang aktif. Jangan ditafsirkan sebagai
-    ///      jumlah listing aktif di frontend.
+    /// @notice Total listings EVER created in this category.
+    /// @dev This number does not go down when a listing is disabled via
+    ///      `setActive(id, false)` — it is a cumulative "ever created" count, not a
+    ///      count of currently active listings. Do not read it as the number of
+    ///      active listings in the frontend.
     function countByCategory(Category category) external view returns (uint256) {
         return _countByCategory[category];
     }

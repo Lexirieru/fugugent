@@ -9,12 +9,12 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IAggregatorV3} from "../interfaces/IAggregatorV3.sol";
 
 /// @title MockLendingPool
-/// @notice Tiruan pool lending ber-antarmuka Aave v3, untuk testnet BSC.
-/// @dev Kontrak uji, bukan bagian produk: tidak upgradeable, tidak ada `__gap`,
-///      tidak pakai UUPS/Initializable. `getUserAccountData` mengembalikan enam
-///      nilai dengan urutan dan satuan persis Aave v3 supaya adapter TypeScript
-///      yang sudah ada (`readAavePosition`, yang membaca lewat posisi tuple bukan
-///      nama field) bisa dipakai apa adanya, hanya dengan mengganti alamat pool.
+/// @notice A fake lending pool with the Aave v3 interface, for BSC testnet.
+/// @dev A test contract, not part of the product: not upgradeable, no `__gap`, no
+///      UUPS/Initializable. `getUserAccountData` returns six values in exactly Aave
+///      v3's order and units so that the existing TypeScript adapter
+///      (`readAavePosition`, which reads by tuple position rather than field name)
+///      works as-is, just by swapping the pool address.
 contract MockLendingPool is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -31,13 +31,13 @@ contract MockLendingPool is Ownable, ReentrancyGuard {
 
     mapping(address asset => AssetConfig) public assets;
 
-    /// @dev saldo agunan dan hutang per user, dalam satuan token asli (bukan USD).
+    /// @dev per-user collateral and debt balances, in native token units (not USD).
     mapping(address user => mapping(address asset => uint256)) public collateralBalance;
     mapping(address user => mapping(address asset => uint256)) public debtBalance;
 
-    /// @dev daftar aset yang pernah disentuh user, dipakai untuk iterasi di
-    ///      `getUserAccountData`. Append-only per user; tidak dihapus saat saldo
-    ///      jadi nol karena kesederhanaan lebih penting daripada hemat gas di mock.
+    /// @dev the list of assets a user has ever touched, used to iterate in
+    ///      `getUserAccountData`. Append-only per user; entries are not removed when a
+    ///      balance hits zero, because simplicity matters more than saving gas in a mock.
     mapping(address user => address[]) private _userCollateralAssets;
     mapping(address user => address[]) private _userDebtAssets;
     mapping(address user => mapping(address asset => bool)) private _isCollateralAssetTracked;
@@ -60,7 +60,7 @@ contract MockLendingPool is Ownable, ReentrancyGuard {
 
     constructor(address owner_) Ownable(owner_) {}
 
-    /// @notice Daftarkan atau perbarui konfigurasi sebuah aset yang bisa dipakai sebagai agunan/hutang.
+    /// @notice Register or update the configuration of an asset usable as collateral/debt.
     function addAsset(address token, address feed, uint16 ltvBps, uint16 liquidationThresholdBps)
         external
         onlyOwner
@@ -81,7 +81,7 @@ contract MockLendingPool is Ownable, ReentrancyGuard {
         emit AssetAdded(token, feed, ltvBps, liquidationThresholdBps);
     }
 
-    /// @notice Setor `asset` sebagai agunan.
+    /// @notice Supply `asset` as collateral.
     function supply(address asset, uint256 amount) external nonReentrant {
         AssetConfig memory cfg = assets[asset];
         if (!cfg.enabled) revert AssetNotSupported(asset);
@@ -95,7 +95,7 @@ contract MockLendingPool is Ownable, ReentrancyGuard {
         emit Supply(msg.sender, asset, amount);
     }
 
-    /// @notice Tarik `asset` dari agunan. Ditolak bila membuat `healthFactor` turun di bawah 1e18.
+    /// @notice Withdraw `asset` from collateral. Rejected if it would drop `healthFactor` below 1e18.
     function withdraw(address asset, uint256 amount) external nonReentrant {
         if (amount == 0) revert ZeroAmount();
 
@@ -112,7 +112,7 @@ contract MockLendingPool is Ownable, ReentrancyGuard {
         emit Withdraw(msg.sender, asset, amount);
     }
 
-    /// @notice Pinjam `asset` dari likuiditas pool. Ditolak bila membuat `healthFactor` turun di bawah 1e18.
+    /// @notice Borrow `asset` from the pool's liquidity. Rejected if it would drop `healthFactor` below 1e18.
     function borrow(address asset, uint256 amount) external nonReentrant {
         AssetConfig memory cfg = assets[asset];
         if (!cfg.enabled) revert AssetNotSupported(asset);
@@ -132,7 +132,7 @@ contract MockLendingPool is Ownable, ReentrancyGuard {
         emit Borrow(msg.sender, asset, amount);
     }
 
-    /// @notice Lunasi hutang `asset`. Kelebihan pembayaran dipangkas ke sisa hutang.
+    /// @notice Repay `asset` debt. Overpayment is clamped to the remaining debt.
     function repay(address asset, uint256 amount) external nonReentrant {
         if (amount == 0) revert ZeroAmount();
 
@@ -147,9 +147,10 @@ contract MockLendingPool is Ownable, ReentrancyGuard {
         emit Repay(msg.sender, asset, repayAmount);
     }
 
-    /// @notice Posisi akun `user`, dalam urutan dan satuan persis Aave v3:
-    ///         `*Base` USD 8 desimal, `ltv`/`currentLiquidationThreshold` basis
-    ///         poin, `healthFactor` basis 1e18 (`type(uint256).max` bila tanpa hutang).
+    /// @notice The account position of `user`, in exactly Aave v3's order and units:
+    ///         `*Base` in USD with 8 decimals, `ltv`/`currentLiquidationThreshold` in
+    ///         basis points, `healthFactor` on a 1e18 basis (`type(uint256).max` when
+    ///         there is no debt).
     function getUserAccountData(address user)
         public
         view
@@ -202,14 +203,14 @@ contract MockLendingPool is Ownable, ReentrancyGuard {
         availableBorrowsBase = maxBorrowBase > totalDebtBase ? maxBorrowBase - totalDebtBase : 0;
     }
 
-    /// @dev Nilai USD 8 desimal dari `amount` unit token `asset`, memakai konfigurasi
-    ///      yang sudah dimuat (`cfg`) supaya tidak membaca storage dua kali di loop caller.
+    /// @dev The USD value, 8 decimals, of `amount` units of token `asset`, using the
+    ///      already-loaded config (`cfg`) to avoid reading storage twice in the caller's loop.
     function _valueUsd8(address asset, AssetConfig memory cfg, uint256 amount) private view returns (uint256) {
         uint256 price = _priceUsd8(asset, cfg);
         return (amount * price) / (10 ** cfg.tokenDecimals);
     }
 
-    /// @dev Harga `asset` dinormalkan ke 8 desimal, mengikuti konvensi `*Usd8` di seluruh proyek.
+    /// @dev The price of `asset` normalized to 8 decimals, following the `*Usd8` convention used throughout the project.
     function _priceUsd8(address asset, AssetConfig memory cfg) private view returns (uint256) {
         (, int256 answer,,,) = IAggregatorV3(cfg.feed).latestRoundData();
         if (answer <= 0) revert InvalidPrice(asset);
@@ -224,7 +225,7 @@ contract MockLendingPool is Ownable, ReentrancyGuard {
         return price;
     }
 
-    /// @dev Menambahkan `asset` ke daftar aset user hanya sekali (idempotent, append-only).
+    /// @dev Adds `asset` to the user's asset list only once (idempotent, append-only).
     function _trackAsset(address[] storage list, mapping(address => bool) storage tracked, address asset) private {
         if (!tracked[asset]) {
             tracked[asset] = true;

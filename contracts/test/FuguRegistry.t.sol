@@ -19,9 +19,8 @@ contract FuguRegistryTest is Test {
         );
     }
 
-    /// @dev Setiap listing perlu `erc8004AgentId` yang unik sekarang, jadi helper ini
-    ///      menaikkan nonce-nya sendiri. Tes yang peduli pada ID spesifik memanggil
-    ///      `registry.list` langsung.
+    /// @dev Every listing now needs a unique `erc8004AgentId`, so this helper bumps its
+    ///      own nonce. Tests that care about a specific ID call `registry.list` directly.
     uint256 private _agentIdNonce = 41;
 
     function _list(address as_, Category cat) internal returns (uint256) {
@@ -142,21 +141,21 @@ contract FuguRegistryTest is Test {
     }
 
     // ---------------------------------------------------------------------
-    // Butir 4 — keunikan erc8004AgentId dan kurasi diri sendiri
+    // Item 4 — erc8004AgentId uniqueness and self-curation
     // ---------------------------------------------------------------------
 
-    /// @notice Tanpa ini, siapa pun bisa me-list ulang `erc8004AgentId` milik orang lain
-    ///         dan menerima pembayaran atas nama identitas tersebut.
+    /// @notice Without this, anyone could re-list someone else's `erc8004AgentId` and
+    ///         take payments in that identity's name.
     function test_cannotListSameAgentIdTwice() public {
         vm.prank(creator);
         uint256 first = registry.list(1234, address(0xA6E17), Category.GRID, 5_00000000, 30 days, "");
 
-        // Bahkan pemiliknya sendiri tidak bisa mendaftarkan ID yang sama dua kali.
+        // Not even the owner can register the same ID twice.
         vm.prank(creator);
         vm.expectRevert(abi.encodeWithSelector(FuguRegistry.AgentAlreadyListed.selector, uint256(1234), first));
         registry.list(1234, address(0xA6E17), Category.GRID, 5_00000000, 30 days, "");
 
-        // Apalagi penyerobot.
+        // Let alone a squatter.
         vm.prank(stranger);
         vm.expectRevert(abi.encodeWithSelector(FuguRegistry.AgentAlreadyListed.selector, uint256(1234), first));
         registry.list(1234, address(0xBAD), Category.YIELD, 1_00000000, 1 days, "ipfs://hijack");
@@ -182,7 +181,7 @@ contract FuguRegistryTest is Test {
     }
 
     function test_cannotCurateOwnListing() public {
-        // `creator` sekaligus kurator — tetap tidak boleh menstempel listing sendiri.
+        // `creator` is also a curator — still not allowed to stamp their own listing.
         vm.prank(owner);
         registry.setCurator(creator, true);
 
@@ -192,14 +191,14 @@ contract FuguRegistryTest is Test {
         registry.setCurated(id, true);
         assertFalse(registry.getListing(id).curated);
 
-        // Tapi listing orang lain tetap boleh dikurasi.
+        // But someone else's listing can still be curated.
         uint256 other = _list(stranger, Category.YIELD);
         vm.prank(creator);
         registry.setCurated(other, true);
         assertTrue(registry.getListing(other).curated);
     }
 
-    /// @notice Larangan juga berlaku saat MELEPAS kurasi listing sendiri.
+    /// @notice The ban also applies when REMOVING the curated mark from your own listing.
     function test_cannotUncurateOwnListing() public {
         uint256 id = _list(creator, Category.YIELD);
         vm.prank(owner);
@@ -215,7 +214,7 @@ contract FuguRegistryTest is Test {
     }
 
     // ---------------------------------------------------------------------
-    // Butir 7 — harga nol
+    // Item 7 — zero price
     // ---------------------------------------------------------------------
 
     function test_listRejectsZeroPrice() public {
@@ -229,7 +228,7 @@ contract FuguRegistryTest is Test {
         vm.prank(creator);
         vm.expectRevert(FuguRegistry.InvalidPrice.selector);
         registry.updateListing(id, 0, 30 days, "");
-        // harga lama tidak berubah
+        // the old price is unchanged
         assertEq(registry.getListing(id).priceUsd8PerPeriod, 5_00000000);
     }
 }

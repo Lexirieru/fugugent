@@ -3,7 +3,7 @@ pragma solidity ^0.8.30;
 
 import {FuguSubscription} from "../../src/FuguSubscription.sol";
 
-/// @dev Menambahkan variabel state BARU DI AKHIR — pola append-only.
+/// @dev Adds a NEW state variable AT THE END — the append-only pattern.
 contract FuguSubscriptionV2 is FuguSubscription {
     uint256 public extraField;
 

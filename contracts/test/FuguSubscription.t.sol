@@ -63,7 +63,7 @@ contract FuguSubscriptionTest is Test {
         );
         vm.stopPrank();
 
-        // listing: $10 per 30 hari
+        // listing: $10 per 30 days
         vm.prank(creator);
         listingId = registry.list(1, address(0xA6E17), Category.GRID, 10_00000000, 30 days, "");
 
@@ -80,7 +80,7 @@ contract FuguSubscriptionTest is Test {
     function test_subscribePullsCorrectTokenAmount() public {
         uint256 before = usdt.balanceOf(user);
         _subscribeOnePeriod();
-        // $10 pada peg $1 = 10 token
+        // $10 at a $1 peg = 10 tokens
         assertEq(before - usdt.balanceOf(user), 10e18);
         assertEq(usdt.balanceOf(address(subs)), 10e18);
     }
@@ -106,7 +106,7 @@ contract FuguSubscriptionTest is Test {
         uint256 id = _subscribeOnePeriod();
         vm.warp(block.timestamp + 30 days);
         subs.claim(id);
-        // fee 5% dari 10 token
+        // a 5% fee on 10 tokens
         assertEq(usdt.balanceOf(treasury), 0.5e18);
         assertEq(usdt.balanceOf(creator), 9.5e18);
     }
@@ -127,7 +127,7 @@ contract FuguSubscriptionTest is Test {
         uint256 before = usdt.balanceOf(user);
         vm.prank(user);
         subs.cancel(id);
-        // separuh belum diperoleh agent, harus kembali
+        // half was not earned by the agent, it must come back
         assertEq(usdt.balanceOf(user) - before, 5e18);
     }
 
@@ -147,7 +147,7 @@ contract FuguSubscriptionTest is Test {
         vm.prank(user);
         subs.cancel(id);
         subs.claim(id);
-        assertEq(usdt.balanceOf(creator), 4.75e18); // 5 dikurangi fee 5%
+        assertEq(usdt.balanceOf(creator), 4.75e18); // 5 minus the 5% fee
     }
 
     function test_onlySubscriberCanCancel() public {
@@ -202,11 +202,11 @@ contract FuguSubscriptionTest is Test {
     function test_hasSubscribedGatesReputation() public {
         assertFalse(subs.hasSubscribed(listingId, user));
         uint256 id = _subscribeOnePeriod();
-        // Subscribe saja belum membayar apa pun ke agent — belum boleh menilai.
+        // Subscribing alone has paid the agent nothing — no rating allowed yet.
         assertFalse(subs.hasSubscribed(listingId, user));
         vm.warp(block.timestamp + 15 days);
         subs.claim(id);
-        // Baru setelah agent benar-benar dibayar, hak review terbuka.
+        // Only once the agent has actually been paid does the right to review open.
         assertTrue(subs.hasSubscribed(listingId, user));
     }
 
@@ -223,8 +223,8 @@ contract FuguSubscriptionTest is Test {
         subs.subscribe(listingId, 0, address(usdt), type(uint256).max, block.timestamp + 1 hours);
     }
 
-    /// @notice Kontrak tidak pernah membayar lebih (atau kurang, secara total) dari yang
-    ///         disetor — tidak ada dana yang bisa nyangkut di kontrak.
+    /// @notice The contract never pays out more (or, in total, less) than what was
+    ///         deposited — no funds can get stuck in the contract.
     function testFuzz_neverPaysOutMoreThanDeposited(uint32 periods, uint64 skipTime1, uint64 skipTime2) public {
         periods = uint32(bound(periods, 1, 12));
         skipTime1 = uint64(bound(skipTime1, 0, 400 days));
@@ -242,8 +242,8 @@ contract FuguSubscriptionTest is Test {
 
         if (subs.claimable(id) > 0) subs.claim(id);
 
-        // Warp lagi di antara claim dan cancel, supaya cabang "sudah lewat endsAt secara
-        // alami sebelum sempat di-cancel" ikut ter-fuzz.
+        // Warp again between claim and cancel, so the "already past endsAt naturally
+        // before it could be cancelled" branch gets fuzzed too.
         vm.warp(block.timestamp + skipTime2);
 
         vm.prank(user);
@@ -253,8 +253,8 @@ contract FuguSubscriptionTest is Test {
         uint256 paidOut = (usdt.balanceOf(creator) - creatorBefore) + (usdt.balanceOf(treasury) - treasuryBefore)
             + (usdt.balanceOf(user) - userBefore);
 
-        // Invarian penuh: bukan cuma "tidak lebih" — setiap rupiah yang disetor harus
-        // keluar lagi (ke creator, treasury, atau user), tidak ada yang nyangkut.
+        // The full invariant: not just "no more" — every cent deposited must come back out
+        // (to the creator, the treasury, or the user), with nothing stuck.
         assertEq(paidOut, deposited);
         assertEq(usdt.balanceOf(address(subs)), 0);
     }
@@ -266,8 +266,8 @@ contract FuguSubscriptionTest is Test {
         vm.prank(user);
         subs.cancel(id);
 
-        // Tidak ada waktu berlalu sama sekali -> seluruh deposit kembali, tidak ada yang
-        // "diperoleh" agent, dan gate reputasi tidak boleh terbuka hanya bermodal gas.
+        // No time elapsed at all -> the whole deposit comes back, the agent "earned"
+        // nothing, and the reputation gate must not open on the price of gas alone.
         assertEq(usdt.balanceOf(user) - before, 10e18);
         assertEq(subs.claimable(id), 0);
         assertFalse(subs.hasSubscribed(listingId, user));
@@ -299,7 +299,7 @@ contract FuguSubscriptionTest is Test {
 
         vm.warp(block.timestamp + 30 days);
 
-        // claim tidak boleh revert walau penerima menolak ETH.
+        // claim must not revert even when the recipient rejects ETH.
         subs.claim(id);
         assertEq(subs.pendingWithdrawals(address(rejector)), needed - (needed * 500) / 10_000);
         assertEq(address(rejector).balance, 0);
@@ -337,29 +337,29 @@ contract FuguSubscriptionTest is Test {
         uint256 id = _subscribeOnePeriod();
 
         vm.prank(owner);
-        subs.setProtocolFeeBps(2000); // naikkan ke 20% setelah subscribe
+        subs.setProtocolFeeBps(2000); // raise to 20% after subscribing
 
         vm.warp(block.timestamp + 30 days);
         subs.claim(id);
 
-        // Tetap dihitung dengan fee 5% yang berlaku saat subscribe, bukan 20% saat ini.
+        // Still computed with the 5% fee in force at subscribe time, not the current 20%.
         assertEq(usdt.balanceOf(treasury), 0.5e18);
         assertEq(usdt.balanceOf(creator), 9.5e18);
     }
 
     // ---------------------------------------------------------------------
-    // Butir 1 — slippage guard pada subscribe()
+    // Item 1 — the slippage guard on subscribe()
     // ---------------------------------------------------------------------
 
-    /// @notice Reproduksi serangan front-run: user menyiapkan tx dengan `maxAmount`
-    ///         wajar, pemilik listing menaikkan harga 100x lebih dulu, dan tx user
-    ///         harus revert alih-alih menguras seluruh allowance-nya.
+    /// @notice Reproduces the front-run attack: the user prepares a tx with a reasonable
+    ///         `maxAmount`, the listing owner raises the price 100x first, and the user's tx
+    ///         must revert instead of draining their whole allowance.
     function test_subscribeRevertsWhenPriceMovesAboveMax() public {
-        // User bersedia membayar paling banyak 10 USDT untuk satu periode ($10).
+        // The user is willing to pay at most 10 USDT for one period ($10).
         uint256 maxAmount = 10e18;
         uint256 balanceBefore = usdt.balanceOf(user);
 
-        // Pemilik listing mem-front-run: $10 -> $1000 per periode.
+        // The listing owner front-runs: $10 -> $1000 per period.
         vm.prank(creator);
         registry.updateListing(listingId, 1000_00000000, 30 days, "");
 
@@ -367,25 +367,25 @@ contract FuguSubscriptionTest is Test {
         vm.expectRevert(abi.encodeWithSelector(FuguSubscription.AmountExceedsMax.selector, 1000e18, maxAmount));
         subs.subscribe(listingId, 1, address(usdt), maxAmount, block.timestamp + 1 hours);
 
-        // Tidak sepeser pun berpindah: pemeriksaan terjadi sebelum safeTransferFrom.
+        // Not a cent moves: the check happens before safeTransferFrom.
         assertEq(usdt.balanceOf(user), balanceBefore);
         assertEq(usdt.balanceOf(address(subs)), 0);
     }
 
-    /// @notice Guard yang sama berlaku ketika yang bergerak adalah harga oracle,
-    ///         bukan harga listing.
+    /// @notice The same guard applies when it is the oracle price that moves, not the
+    ///         listing price.
     function test_subscribeRevertsWhenOraclePriceMovesAboveMax() public {
-        // maxAmount dihitung pada peg $1 = 10 token.
+        // maxAmount was computed at a $1 peg = 10 tokens.
         uint256 maxAmount = 10e18;
-        // Depeg: 1 USDT tiba-tiba dihargai $0,10, jadi butuh 100 token untuk $10.
-        usdtFeed.setPrice(10_000_000); // $0,10 dalam USD8
+        // Depeg: 1 USDT is suddenly priced at $0.10, so $10 now needs 100 tokens.
+        usdtFeed.setPrice(10_000_000); // $0.10 in USD8
 
         vm.prank(user);
         vm.expectRevert(abi.encodeWithSelector(FuguSubscription.AmountExceedsMax.selector, 100e18, maxAmount));
         subs.subscribe(listingId, 1, address(usdt), maxAmount, block.timestamp + 1 hours);
     }
 
-    /// @notice Jalur native memakai guard yang sama, dan tidak ada ETH yang tertinggal.
+    /// @notice The native path uses the same guard, and no ETH is left behind.
     function test_nativeSubscribeRevertsWhenAmountExceedsMax() public {
         _enableNative();
         uint256 needed = oracle.quote(address(0), 10_00000000);
@@ -398,7 +398,7 @@ contract FuguSubscriptionTest is Test {
         assertEq(user.balance, needed);
     }
 
-    /// @notice Batas persis sama dengan harga harus lolos — guard ini `>`, bukan `>=`.
+    /// @notice A bound exactly equal to the price must pass — this guard is `>`, not `>=`.
     function test_subscribeAcceptsAmountExactlyAtMax() public {
         vm.prank(user);
         uint256 id = subs.subscribe(listingId, 1, address(usdt), 10e18, block.timestamp + 1 hours);
@@ -412,14 +412,14 @@ contract FuguSubscriptionTest is Test {
         subs.subscribe(listingId, 1, address(usdt), type(uint256).max, deadline);
     }
 
-    /// @notice `deadline == block.timestamp` masih sah (guard-nya `>`, bukan `>=`).
+    /// @notice `deadline == block.timestamp` is still valid (the guard is `>`, not `>=`).
     function test_subscribeAcceptsDeadlineAtCurrentBlock() public {
         vm.prank(user);
         uint256 id = subs.subscribe(listingId, 1, address(usdt), type(uint256).max, block.timestamp);
         assertEq(subs.getSub(id).deposited, 10e18);
     }
 
-    /// @notice Deadline diperiksa sebelum apa pun yang menyentuh dana.
+    /// @notice The deadline is checked before anything that touches funds.
     function test_deadlineCheckedBeforeAnyTransfer() public {
         uint256 balanceBefore = usdt.balanceOf(user);
         vm.warp(block.timestamp + 2 hours);
@@ -430,16 +430,16 @@ contract FuguSubscriptionTest is Test {
     }
 
     // ---------------------------------------------------------------------
-    // Butir 2 — ambang anti-sybil pada hak review
+    // Item 2 — the anti-sybil threshold on review eligibility
     // ---------------------------------------------------------------------
 
     function test_defaultMinPaidBpsIsHalfPeriod() public view {
         assertEq(subs.minPaidBpsOfPeriod(), 5000);
     }
 
-    /// @notice Reproduksi PoC sybil: subscribe, maju 1 detik, claim, cancel.
-    ///         Total yang dibayar ~0,0000039 USDT — jauh di bawah ambang 50%,
-    ///         jadi hak review TIDAK boleh terbuka.
+    /// @notice Reproduces the sybil PoC: subscribe, advance 1 second, claim, cancel.
+    ///         Total paid is about 0.0000039 USDT — far below the 50% threshold, so the
+    ///         right to review MUST NOT open.
     function test_reviewGateRejectsDustPayment() public {
         uint256 id = _subscribeOnePeriod();
 
@@ -448,14 +448,14 @@ contract FuguSubscriptionTest is Test {
         vm.prank(user);
         subs.cancel(id);
 
-        // Pembayaran memang terjadi — tapi jumlahnya debu.
+        // A payment did happen — but the amount is dust.
         uint256 paid = subs.paidToAgent(listingId, user);
         assertGt(paid, 0);
-        assertLt(paid, 1e13); // < 0,00001 USDT
+        assertLt(paid, 1e13); // < 0.00001 USDT
         assertFalse(subs.hasSubscribed(listingId, user));
     }
 
-    /// @notice Membayar melewati separuh periode membuka hak review.
+    /// @notice Paying past half the period opens the right to review.
     function test_reviewGateAcceptsRealPayment() public {
         uint256 id = _subscribeOnePeriod();
 
@@ -466,7 +466,7 @@ contract FuguSubscriptionTest is Test {
         assertTrue(subs.hasSubscribed(listingId, user));
     }
 
-    /// @notice Tepat 50% adalah ambang yang lolos (perbandingannya `>=`).
+    /// @notice Exactly 50% passes the threshold (the comparison is `>=`).
     function test_reviewGateAcceptsExactlyHalfPeriod() public {
         uint256 id = _subscribeOnePeriod();
         vm.warp(block.timestamp + 15 days);
@@ -475,7 +475,7 @@ contract FuguSubscriptionTest is Test {
         assertTrue(subs.hasSubscribed(listingId, user));
     }
 
-    /// @notice Sedikit di bawah separuh periode belum cukup.
+    /// @notice A little under half the period is not enough.
     function test_reviewGateRejectsJustUnderHalfPeriod() public {
         uint256 id = _subscribeOnePeriod();
         vm.warp(block.timestamp + 15 days - 1);
@@ -483,8 +483,8 @@ contract FuguSubscriptionTest is Test {
         assertFalse(subs.hasSubscribed(listingId, user));
     }
 
-    /// @notice Berlangganan 3 periode: penyebutnya tetap harga SATU periode, jadi
-    ///         separuh periode pertama sudah cukup.
+    /// @notice Subscribing for 3 periods: the denominator is still the price of ONE
+    ///         period, so half of the first period is already enough.
     function test_reviewGateUsesOnePeriodAsDenominator() public {
         vm.prank(user);
         uint256 id = subs.subscribe(listingId, 3, address(usdt), type(uint256).max, block.timestamp + 1 hours);
@@ -495,9 +495,8 @@ contract FuguSubscriptionTest is Test {
         assertTrue(subs.hasSubscribed(listingId, user));
     }
 
-    /// @notice `_periodPriceRef` dikunci pada langganan pertama: pemilik listing tidak
-    ///         bisa menaikkan harga belakangan untuk mencabut hak review yang hampir
-    ///         diperoleh.
+    /// @notice `_periodPriceRef` is locked on the first subscription: the listing owner
+    ///         cannot raise the price later to revoke a review right that is nearly earned.
     function test_periodPriceRefLockedOnFirstSubscribe() public {
         _subscribeOnePeriod();
         assertEq(subs.periodPriceRef(listingId, user), 10e18);
@@ -508,7 +507,7 @@ contract FuguSubscriptionTest is Test {
         vm.prank(user);
         subs.subscribe(listingId, 1, address(usdt), type(uint256).max, block.timestamp + 1 hours);
 
-        // Tetap 10e18, bukan 100e18.
+        // Still 10e18, not 100e18.
         assertEq(subs.periodPriceRef(listingId, user), 10e18);
     }
 
@@ -520,10 +519,10 @@ contract FuguSubscriptionTest is Test {
         uint256 id = _subscribeOnePeriod();
         vm.warp(block.timestamp + 1 days);
         subs.claim(id);
-        // 1/30 periode < 50% -> masih tertutup
+        // 1/30 of a period < 50% -> still closed
         assertFalse(subs.hasSubscribed(listingId, user));
 
-        // Turunkan ambang ke 3% dari satu periode -> terbuka.
+        // Drop the threshold to 3% of one period -> it opens.
         vm.prank(owner);
         subs.setMinPaidBpsOfPeriod(300);
         assertTrue(subs.hasSubscribed(listingId, user));
@@ -535,7 +534,7 @@ contract FuguSubscriptionTest is Test {
     }
 
     // ---------------------------------------------------------------------
-    // Butir 6 — validasi alamat nol
+    // Item 6 — zero address validation
     // ---------------------------------------------------------------------
 
     function test_rejectsZeroAddresses() public {
@@ -565,14 +564,14 @@ contract FuguSubscriptionTest is Test {
     }
 
     // ---------------------------------------------------------------------
-    // Butir 7 — jumlah nol ditolak simetris di kedua jalur pembayaran
+    // Item 7 — a zero amount is rejected symmetrically on both payment paths
     // ---------------------------------------------------------------------
 
-    /// @notice Harga yang membulat ke nol harus revert dengan error yang SAMA pada
-    ///         jalur native maupun ERC-20 — sebelumnya jalur native diam-diam
-    ///         menerima langganan kosong senilai 0.
+    /// @notice A price that rounds down to zero must revert with the SAME error on both
+    ///         the native and the ERC-20 path — previously the native path silently
+    ///         accepted an empty subscription worth 0.
     function test_zeroQuoteRevertsOnBothPaymentPaths() public {
-        // Token 6 desimal berharga $1.000.000 per unit: $0,00000001 membulat ke 0 unit.
+        // A 6-decimal token priced at $1,000,000 per unit: $0.00000001 rounds down to 0 units.
         MockERC20Decimals pricey = new MockERC20Decimals("Pricey", "PRC", 6);
         MockAggregator priceyFeed = new MockAggregator(8, 1_000_000_00000000);
         vm.startPrank(owner);
@@ -587,7 +586,7 @@ contract FuguSubscriptionTest is Test {
                 enabled: true
             })
         );
-        // Native juga dihargai sangat tinggi.
+        // The native coin is priced extremely high too.
         MockAggregator nativeFeed = new MockAggregator(8, 1_000_000_00000000);
         oracle.setToken(
             address(0),
@@ -602,7 +601,7 @@ contract FuguSubscriptionTest is Test {
         );
         vm.stopPrank();
 
-        // Listing $0,000001 per periode -> quote membulat ke 0 pada kedua token.
+        // A $0.000001 per period listing -> the quote rounds down to 0 for both tokens.
         vm.prank(creator);
         uint256 cheapId = registry.list(777, address(0xA6E17), Category.GRID, 1, 30 days, "");
 
@@ -634,8 +633,8 @@ contract FuguSubscriptionTest is Test {
     }
 }
 
-/// @notice Kontrak minimal untuk menguji jalur pending-withdrawal: menolak ETH sampai
-///         `accept` diaktifkan.
+/// @notice A minimal contract to test the pending-withdrawal path: it rejects ETH until
+///         `accept` is turned on.
 contract RejectingReceiver {
     bool public accept;
 

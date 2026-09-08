@@ -14,24 +14,25 @@ import {FuguPriceOracle} from "./FuguPriceOracle.sol";
 import {Listing} from "./types/FuguTypes.sol";
 
 /// @title FuguSubscription
-/// @notice Escrow langganan agent. Agent hanya bisa menarik sebanding waktu yang
-///         sudah berjalan, dan user bisa membatalkan kapan saja untuk menarik sisanya.
+/// @notice Escrow for agent subscriptions. An agent can only withdraw in proportion to
+///         the time already elapsed, and a user can cancel at any point to take the rest back.
 ///
-/// @dev ## Asimetri snapshot: `feeBps` dibekukan, `treasury` dibaca live — DISENGAJA
+/// @dev ## Snapshot asymmetry: `feeBps` is frozen, `treasury` is read live — DELIBERATE
 ///
-///      `feeBps` di-snapshot ke dalam `Sub` saat `subscribe` dan dipakai apa adanya di
-///      setiap `claim`, sehingga kenaikan `protocolFeeBps` tidak pernah berlaku surut
-///      terhadap langganan yang sudah berjalan. Itu **harga**: bagian dari kesepakatan
-///      ekonomi yang user setujui saat membayar, jadi tidak boleh berubah di tengah jalan.
+///      `feeBps` is snapshotted into `Sub` at `subscribe` time and used as-is on every
+///      `claim`, so a rise in `protocolFeeBps` never applies retroactively to a
+///      subscription already in flight. That is a **price**: part of the economic deal
+///      the user agreed to when paying, so it must not change mid-stream.
 ///
-///      `treasury` sebaliknya dibaca live dari storage pada saat `claim`. Itu **alamat
-///      tujuan**, bukan harga: bila kunci treasury bocor atau treasury dipindah ke
-///      multisig baru, seluruh fee yang belum tertarik harus langsung mengalir ke alamat
-///      baru — membekukan alamat lama per langganan justru akan mengirim dana ke tempat
-///      yang sudah tidak dipercaya, dan menyandera fee dari langganan lama selamanya.
+///      `treasury`, by contrast, is read live from storage at `claim` time. That is a
+///      **destination address**, not a price: if the treasury key leaks or the treasury
+///      moves to a new multisig, every fee not yet withdrawn must flow to the new address
+///      immediately — freezing the old address per subscription would instead send funds
+///      to a place that is no longer trusted, and hold the fees from old subscriptions
+///      hostage forever.
 ///
-///      Konsekuensinya yang diterima secara sadar: mengganti `treasury` mengubah tujuan
-///      fee untuk langganan yang sudah ada. Itu memang efek yang diinginkan.
+///      The consequence, accepted knowingly: changing `treasury` changes where the fees
+///      from existing subscriptions go. That is exactly the intended effect.
 contract FuguSubscription is
     Initializable,
     UUPSUpgradeable,
@@ -51,8 +52,8 @@ contract FuguSubscription is
         uint64 startedAt;
         uint64 endsAt;
         bool cancelled;
-        // @dev Ditambahkan di akhir struct (append-only) — snapshot fee saat subscribe,
-        //      supaya kenaikan `protocolFeeBps` di kemudian hari tidak berlaku surut.
+        // @dev Added at the end of the struct (append-only) — the fee snapshotted at
+        //      subscribe time, so a later rise in `protocolFeeBps` does not apply retroactively.
         uint16 feeBps;
     }
 
@@ -63,30 +64,29 @@ contract FuguSubscription is
 
     uint256 private _subCount;
     mapping(uint256 subId => Sub) private _subs;
-    /// @dev listingId => subscriber => total yang sudah benar-benar dibayarkan ke agent
-    ///      (lewat `claim`). Sumber kebenaran untuk `hasSubscribed`: subscribe+cancel di
-    ///      blok yang sama tidak boleh membuka hak review — hanya pembayaran nyata yang
-    ///      membukanya.
+    /// @dev listingId => subscriber => total actually paid out to the agent (via `claim`).
+    ///      The source of truth for `hasSubscribed`: subscribe+cancel in the same block
+    ///      must not unlock the right to review — only real payment unlocks it.
     mapping(uint256 listingId => mapping(address user => uint256)) private _paidToAgent;
-    /// @dev Payout native yang gagal terkirim (push) menumpuk di sini untuk ditarik (pull)
-    ///      lewat `withdrawPending`, supaya listing owner berupa kontrak yang menolak ETH
-    ///      tidak mengunci bagian agent selamanya.
+    /// @dev Native payouts that failed to send (push) pile up here to be pulled via
+    ///      `withdrawPending`, so a listing owner that is a contract rejecting ETH does
+    ///      not lock the agent's share forever.
     mapping(address => uint256) public pendingWithdrawals;
 
-    // --- variabel state baru (append-only, ditambahkan di AKHIR) ---
+    // --- new state variables (append-only, added at the END) ---
 
-    /// @notice Ambang hak review, dalam basis point dari harga SATU periode penuh.
-    /// @dev 5000 = agent harus sudah benar-benar menerima >= 50% dari harga satu periode
-    ///      sebelum `hasSubscribed` (dan karenanya `FuguReputation.review`) terbuka.
-    ///      Diinisialisasi di `initialize` (deploy baru) atau `initializeV2` (proxy lama
-    ///      yang di-upgrade). Nilai 0 berarti gate praktis mati — jangan biarkan 0.
+    /// @notice Review-eligibility threshold, in basis points of the price of ONE full period.
+    /// @dev 5000 = the agent must have actually received >= 50% of one period's price
+    ///      before `hasSubscribed` (and therefore `FuguReputation.review`) opens up.
+    ///      Initialized in `initialize` (fresh deploy) or `initializeV2` (an existing
+    ///      proxy being upgraded). A value of 0 effectively kills the gate — never leave it 0.
     uint256 public minPaidBpsOfPeriod;
 
-    /// @dev listingId => subscriber => harga SATU periode (dalam token pembayaran) pada
-    ///      saat langganan pertama user itu di listing tersebut. Dipakai sebagai penyebut
-    ///      ambang anti-sybil. Dikunci pada nilai pertama supaya pemilik listing tidak
-    ///      bisa menurunkan harga setelahnya untuk mempermudah gate, atau menaikkannya
-    ///      untuk mencabut hak review yang sudah diperoleh.
+    /// @dev listingId => subscriber => the price of ONE period (in the payment token) at
+    ///      the time of that user's first subscription to that listing. Used as the
+    ///      denominator of the anti-sybil threshold. Locked to the first value so the
+    ///      listing owner cannot later cut the price to make the gate easier, or raise it
+    ///      to revoke a review right already earned.
     mapping(uint256 listingId => mapping(address user => uint256)) private _periodPriceRef;
 
     event Subscribed(
@@ -131,31 +131,31 @@ contract FuguSubscription is
         minPaidBpsOfPeriod = 5000;
     }
 
-    /// @notice Isi variabel state yang ditambahkan setelah deploy pertama.
-    /// @dev WAJIB dipanggil (lewat `upgradeToAndCall`) saat meng-upgrade proxy yang
-    ///      sudah ada ke versi ini: `minPaidBpsOfPeriod` tidak akan pernah terisi oleh
-    ///      `initialize` yang sudah terlanjur jalan, dan nilai 0 mematikan ambang
-    ///      anti-sybil. Tidak ada gunanya di deploy baru (initializer versi 1 sudah
-    ///      mengisinya), tapi aman karena `reinitializer(2)` hanya bisa jalan sekali.
+    /// @notice Fill in the state variables added after the first deploy.
+    /// @dev MUST be called (via `upgradeToAndCall`) when upgrading an existing proxy to
+    ///      this version: `minPaidBpsOfPeriod` will never be filled in by an `initialize`
+    ///      that has already run, and a value of 0 kills the anti-sybil threshold. It is
+    ///      pointless on a fresh deploy (the version 1 initializer already sets it), but
+    ///      safe, because `reinitializer(2)` can only run once.
     function initializeV2() external reinitializer(2) {
         minPaidBpsOfPeriod = 5000;
         emit MinPaidBpsOfPeriodChanged(5000);
     }
 
-    /// @notice Berlangganan sebuah listing untuk `periods` periode penuh.
-    /// @param listingId Listing yang dilanggan.
-    /// @param periods Jumlah periode yang dibayar di muka.
-    /// @param payToken Token pembayaran; `address(0)` berarti native coin.
-    /// @param maxAmount Batas atas jumlah token yang boleh ditarik dari pemanggil.
-    /// @param deadline Timestamp terakhir tx ini boleh dieksekusi.
-    /// @dev **Slippage guard.** Harga akhir = `Registry.priceUsd8PerPeriod` x `Oracle.quote()`,
-    ///      dan KEDUANYA bisa berubah antara user menandatangani tx dan tx masuk blok.
-    ///      Tanpa guard, pemilik listing bisa mem-front-run `updateListing` dari $10 ke
-    ///      $1000 dan menguras seluruh allowance user. `maxAmount` diperiksa **sebelum**
-    ///      `safeTransferFrom` sehingga tidak ada dana yang berpindah sebelum batasnya
-    ///      dihormati; `deadline` menutup tx basi yang duduk lama di mempool.
-    ///      Pemanggil yang benar-benar tidak peduli slippage bisa mengirim
-    ///      `type(uint256).max`, tapi UI TIDAK BOLEH melakukannya.
+    /// @notice Subscribe to a listing for `periods` full periods.
+    /// @param listingId The listing being subscribed to.
+    /// @param periods Number of periods paid up front.
+    /// @param payToken Payment token; `address(0)` means the native coin.
+    /// @param maxAmount Upper bound on the token amount that may be pulled from the caller.
+    /// @param deadline Last timestamp at which this tx may execute.
+    /// @dev **Slippage guard.** Final price = `Registry.priceUsd8PerPeriod` x `Oracle.quote()`,
+    ///      and BOTH can change between the user signing the tx and the tx landing in a
+    ///      block. Without a guard, the listing owner could front-run with `updateListing`
+    ///      from $10 to $1000 and drain the user's entire allowance. `maxAmount` is checked
+    ///      **before** `safeTransferFrom`, so no funds move before the bound is honored;
+    ///      `deadline` kills stale txs that sat in the mempool too long.
+    ///      A caller who genuinely does not care about slippage can pass
+    ///      `type(uint256).max`, but the UI MUST NOT do that.
     function subscribe(uint256 listingId, uint32 periods, address payToken, uint256 maxAmount, uint256 deadline)
         external
         payable
@@ -170,8 +170,8 @@ contract FuguSubscription is
         uint256 usdTotal8 = uint256(l.priceUsd8PerPeriod) * periods;
         uint256 amount = oracle.quote(payToken, usdTotal8);
 
-        // Jumlah nol ditolak di KEDUA jalur pembayaran (native maupun ERC-20): sebuah
-        // langganan tanpa pembayaran hanya menghasilkan escrow kosong yang membingungkan.
+        // A zero amount is rejected on BOTH payment paths (native and ERC-20): a
+        // subscription with no payment only produces a confusing empty escrow.
         if (amount == 0) revert ZeroAmountReceived();
         if (amount > maxAmount) revert AmountExceedsMax(amount, maxAmount);
 
@@ -179,9 +179,9 @@ contract FuguSubscription is
             if (msg.value != amount) revert WrongNativeAmount(amount, msg.value);
         } else {
             if (msg.value != 0) revert WrongNativeAmount(0, msg.value);
-            // Ukur delta saldo nyata alih-alih mempercayai `amount` hasil quote, supaya
-            // token fee-on-transfer / rebasing tidak membuat `deposited` mengklaim lebih
-            // dari yang benar-benar diterima kontrak.
+            // Measure the real balance delta instead of trusting the quoted `amount`, so
+            // that fee-on-transfer / rebasing tokens cannot make `deposited` claim more
+            // than the contract actually received.
             uint256 balBefore = IERC20(payToken).balanceOf(address(this));
             IERC20(payToken).safeTransferFrom(msg.sender, address(this), amount);
             uint256 received = IERC20(payToken).balanceOf(address(this)) - balBefore;
@@ -189,8 +189,8 @@ contract FuguSubscription is
             amount = received;
         }
 
-        // Referensi harga satu periode untuk ambang hak review. Dikunci pada langganan
-        // pertama user di listing ini dan tidak pernah ditimpa sesudahnya.
+        // One-period price reference for the review-eligibility threshold. Locked on the
+        // user's first subscription to this listing and never overwritten afterwards.
         if (_periodPriceRef[listingId][msg.sender] == 0) {
             _periodPriceRef[listingId][msg.sender] = amount / periods;
         }
@@ -230,11 +230,11 @@ contract FuguSubscription is
         uint256 amount = _earned(s) - s.claimed;
         if (amount == 0) revert NothingToClaim();
         s.claimed += amount.toUint128();
-        // Sumber kebenaran hak review: dibayar dulu, baru boleh dinilai.
+        // Source of truth for review eligibility: pay first, only then may you rate.
         _paidToAgent[s.listingId][s.subscriber] += amount;
 
-        // Fee dipakai dari snapshot saat subscribe, bukan `protocolFeeBps` saat ini,
-        // supaya kenaikan fee tidak berlaku surut ke penghasilan yang sudah accrued.
+        // The fee comes from the snapshot taken at subscribe time, not from the current
+        // `protocolFeeBps`, so a fee rise does not apply retroactively to earnings already accrued.
         uint256 fee = (amount * s.feeBps) / 10_000;
         uint256 toOwner = amount - fee;
         address listingOwner = registry.getListing(s.listingId).owner;
@@ -254,7 +254,7 @@ contract FuguSubscription is
         uint256 refund = uint256(s.deposited) - earned;
 
         s.cancelled = true;
-        // hentikan pertumbuhan bagian agent
+        // stop the agent's share from growing
         if (block.timestamp < s.endsAt) {
             s.endsAt = uint64(block.timestamp);
             s.deposited = earned.toUint128();
@@ -267,10 +267,10 @@ contract FuguSubscription is
     function _payout(address token, address to, uint256 amount) internal {
         if (amount == 0) return;
         if (token == address(0)) {
-            // Push payment: bila penerima menolak ETH (mis. listing owner adalah kontrak
-            // tanpa `receive`/`payable fallback`, atau sengaja menolak), JANGAN revert
-            // seluruh `claim` — kredit ke `pendingWithdrawals` supaya bagian agent tidak
-            // terkunci selamanya dan bisa ditarik nanti lewat `withdrawPending`.
+            // Push payment: if the recipient rejects ETH (e.g. the listing owner is a
+            // contract with no `receive`/`payable fallback`, or refuses on purpose), do
+            // NOT revert the whole `claim` — credit `pendingWithdrawals` so the agent's
+            // share is not locked forever and can be pulled later via `withdrawPending`.
             (bool ok,) = payable(to).call{value: amount}("");
             if (!ok) {
                 pendingWithdrawals[to] += amount;
@@ -281,7 +281,7 @@ contract FuguSubscription is
         }
     }
 
-    /// @notice Tarik native coin yang gagal terkirim otomatis lewat `_payout`.
+    /// @notice Withdraw native coin that `_payout` failed to send automatically.
     function withdrawPending() external nonReentrant {
         uint256 amount = pendingWithdrawals[msg.sender];
         if (amount == 0) revert NothingToWithdraw();
@@ -298,43 +298,42 @@ contract FuguSubscription is
         return _subCount;
     }
 
-    /// @notice Apakah `user` sudah membayar cukup banyak ke agent `listingId` untuk
-    ///         berhak menulis review.
-    /// @return True bila agent sudah benar-benar menerima (lewat `claim`) setidaknya
-    ///         `minPaidBpsOfPeriod` basis point dari harga SATU periode penuh —
-    ///         secara default 50%.
-    /// @dev Ini adalah **ambang ekonomi, bukan jaminan absolut.** Gate ini tidak
-    ///      membuktikan identitas dan tidak mencegah sybil; ia hanya membuat sybil
-    ///      berbiaya nyata. Siapa pun yang bersedia membayar setengah periode penuh
-    ///      per akun tetap bisa membeli sejumlah hak review — itu memang trade-off
-    ///      yang dipilih. Yang ditutup adalah serangan "debu": versi lama hanya
-    ///      mensyaratkan pembayaran > 0, sehingga subscribe -> maju 1 detik -> claim ->
-    ///      cancel (total ~0,0000039 USDT untuk listing $10/30 hari) sudah cukup untuk
-    ///      membuka hak review.
+    /// @notice Whether `user` has paid enough to agent `listingId` to earn the right to
+    ///         write a review.
+    /// @return True if the agent has actually received (via `claim`) at least
+    ///         `minPaidBpsOfPeriod` basis points of the price of ONE full period —
+    ///         50% by default.
+    /// @dev This is an **economic threshold, not an absolute guarantee.** The gate does
+    ///      not prove identity and does not prevent sybils; it only makes sybils cost
+    ///      real money. Anyone willing to pay half a full period per account can still
+    ///      buy a number of review rights — that is the trade-off chosen. What it closes
+    ///      is the "dust" attack: the old version only required payment > 0, so
+    ///      subscribe -> advance 1 second -> claim -> cancel (about 0.0000039 USDT in
+    ///      total for a $10/30-day listing) was enough to unlock the right to review.
     ///
-    ///      Penyebutnya adalah `_periodPriceRef`, harga satu periode pada langganan
-    ///      PERTAMA user di listing ini — bukan harga saat ini — supaya pemilik listing
-    ///      tidak bisa menggeser ambang setelah user membayar. Bila user belum pernah
-    ///      berlangganan sama sekali (`_periodPriceRef == 0`), hasilnya selalu false.
+    ///      The denominator is `_periodPriceRef`, the one-period price at the user's FIRST
+    ///      subscription to this listing — not the current price — so the listing owner
+    ///      cannot move the threshold after the user has paid. If the user has never
+    ///      subscribed at all (`_periodPriceRef == 0`), the result is always false.
     function hasSubscribed(uint256 listingId, address user) external view returns (bool) {
         uint256 ref = _periodPriceRef[listingId][user];
         if (ref == 0) return false;
         return _paidToAgent[listingId][user] * 10_000 >= ref * minPaidBpsOfPeriod;
     }
 
-    /// @notice Harga satu periode yang dipakai sebagai penyebut ambang hak review.
+    /// @notice The one-period price used as the denominator of the review-eligibility threshold.
     function periodPriceRef(uint256 listingId, address user) external view returns (uint256) {
         return _periodPriceRef[listingId][user];
     }
 
-    /// @notice Total yang sudah benar-benar mengalir ke agent untuk pasangan ini.
+    /// @notice Total that has actually flowed to the agent for this pair.
     function paidToAgent(uint256 listingId, address user) external view returns (uint256) {
         return _paidToAgent[listingId][user];
     }
 
-    /// @notice Ubah ambang hak review (basis point dari harga satu periode).
-    /// @dev 5000 = 50%. Menaikkan nilai ini memperketat gate untuk review yang BELUM
-    ///      ditulis; review yang sudah tercatat di `FuguReputation` tidak terpengaruh.
+    /// @notice Change the review-eligibility threshold (basis points of one period's price).
+    /// @dev 5000 = 50%. Raising this tightens the gate for reviews NOT yet written;
+    ///      reviews already recorded in `FuguReputation` are unaffected.
     function setMinPaidBpsOfPeriod(uint256 bps) external onlyOwner {
         minPaidBpsOfPeriod = bps;
         emit MinPaidBpsOfPeriodChanged(bps);

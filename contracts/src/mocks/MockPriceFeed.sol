@@ -5,8 +5,8 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IAggregatorV3} from "../interfaces/IAggregatorV3.sol";
 
 /// @title MockPriceFeed
-/// @notice Feed harga Chainlink-kompatibel untuk pengujian di testnet.
-/// @dev Kontrak uji, bukan bagian produk: tidak upgradeable, tidak ada `__gap`.
+/// @notice A Chainlink-compatible price feed for testing on testnet.
+/// @dev A test contract, not part of the product: not upgradeable, no `__gap`.
 contract MockPriceFeed is IAggregatorV3, Ownable {
     uint8 private immutable _decimals;
     int256 private _answer;
@@ -18,7 +18,7 @@ contract MockPriceFeed is IAggregatorV3, Ownable {
         _updatedAt = block.timestamp;
     }
 
-    /// @notice Ubah harga yang dilaporkan feed; memperbarui `updatedAt` ke waktu saat ini.
+    /// @notice Change the price the feed reports; updates `updatedAt` to the current time.
     function setAnswer(int256 newAnswer) external onlyOwner {
         _answer = newAnswer;
         _updatedAt = block.timestamp;

@@ -4,22 +4,22 @@ pragma solidity ^0.8.30;
 import {Script, console} from "forge-std/Script.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-/// @notice Upgrade satu proxy UUPS ke implementasi baru.
-/// @dev Cara pakai: PROXY=0x.. NEW_IMPL=0x.. forge script script/Upgrade.s.sol:Upgrade --rpc-url "$BSC_TESTNET_RPC_URL"
+/// @notice Upgrade one UUPS proxy to a new implementation.
+/// @dev How to use: PROXY=0x.. NEW_IMPL=0x.. forge script script/Upgrade.s.sol:Upgrade --rpc-url "$BSC_TESTNET_RPC_URL"
 ///
-///      **SELALU jalankan simulasi tanpa `--broadcast` terlebih dahulu** dan baca
-///      keluarannya (alamat proxy, implementasi lama, implementasi baru, chain id)
-///      sebelum menambahkan `--broadcast`. Salah menempelkan `PROXY` berarti
-///      meng-upgrade proxy yang salah — salah satu proxy Fugugent (`FuguSubscription`)
-///      memegang dana user, jadi kesalahan di sini bukan sekadar kesalahan kosmetik.
+///      **ALWAYS run the simulation without `--broadcast` first** and read its output
+///      (proxy address, old implementation, new implementation, chain id) before adding
+///      `--broadcast`. Pasting the wrong `PROXY` means upgrading the wrong proxy — one of
+///      the Fugugent proxies (`FuguSubscription`) holds user funds, so a mistake here is
+///      not merely cosmetic.
 ///
-///      `chainId` di-hardcode ke 97 (BSC testnet). **Ubah nilai ini saat script
-///      dipakai untuk mainnet (BSC = 56).**
+///      `chainId` is hardcoded to 97 (BSC testnet). **Change this value when the script
+///      is used for mainnet (BSC = 56).**
 contract Upgrade is Script {
-    /// @dev Slot implementasi EIP-1967: bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1)
+    /// @dev EIP-1967 implementation slot: bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1)
     bytes32 constant IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
-    /// @dev BSC testnet. Ganti ke 56 untuk mainnet.
+    /// @dev BSC testnet. Change to 56 for mainnet.
     uint256 constant EXPECTED_CHAIN_ID = 97;
 
     error ZeroAddress(string label);
@@ -40,11 +40,11 @@ contract Upgrade is Script {
         if (proxy.code.length == 0) revert NoCode("PROXY", proxy);
         if (newImpl.code.length == 0) revert NoCode("NEW_IMPL", newImpl);
 
-        // Sanity check ERC-1822: implementasi UUPS yang benar menjawab `proxiableUUID()`
-        // dengan slot implementasi ERC-1967. Kontrak yang salah tempel (mis. alamat proxy
-        // lain, kontrak non-UUPS, atau library) akan gagal di sini alih-alih mem-BRICK
-        // proxy secara permanen — setelah `upgradeToAndCall` ke implementasi tanpa
-        // `_authorizeUpgrade`/`proxiableUUID`, tidak ada jalan upgrade kembali.
+        // ERC-1822 sanity check: a correct UUPS implementation answers `proxiableUUID()`
+        // with the ERC-1967 implementation slot. A wrongly pasted contract (e.g. another
+        // proxy's address, a non-UUPS contract, or a library) fails here instead of
+        // BRICKING the proxy permanently — after `upgradeToAndCall` to an implementation
+        // without `_authorizeUpgrade`/`proxiableUUID`, there is no way to upgrade back.
         _assertUUPSImplementation(newImpl);
 
         address oldImpl = address(uint160(uint256(vm.load(proxy, IMPLEMENTATION_SLOT))));
@@ -56,12 +56,12 @@ contract Upgrade is Script {
         console.log("implementation (new)", newImpl);
 
         vm.startBroadcast(pk);
-        // INIT_DATA opsional: calldata yang dijalankan DI DALAM konteks proxy tepat
-        // setelah implementasi berganti. Wajib diisi ketika implementasi baru punya
-        // `reinitializer` yang harus berjalan — misalnya `initializeV2()` pada
-        // FuguSubscription, yang menyetel ambang anti-sybil. Meng-upgrade tanpa itu
-        // membuat ambangnya bernilai nol dan gate-nya mati. Kosongkan hanya bila
-        // implementasi baru memang tidak punya initializer baru.
+        // INIT_DATA is optional: calldata executed INSIDE the proxy's context right after
+        // the implementation is swapped. It MUST be set when the new implementation has a
+        // `reinitializer` that has to run — for example `initializeV2()` on
+        // FuguSubscription, which sets the anti-sybil threshold. Upgrading without it
+        // leaves that threshold at zero and the gate dead. Leave it empty only when the
+        // new implementation genuinely has no new initializer.
         bytes memory initData = vm.envOr("INIT_DATA", bytes(""));
         if (initData.length == 0) {
             console.log("INIT_DATA kosong - pastikan implementasi baru tidak punya reinitializer");
@@ -77,9 +77,9 @@ contract Upgrade is Script {
         console.log("implementation (now active)", confirmedImpl);
     }
 
-    /// @notice Revert kecuali `impl` benar-benar sebuah implementasi UUPS (ERC-1822).
-    /// @dev `staticcall` mentah dipakai supaya kontrak yang sama sekali tidak punya
-    ///      fungsi ini menghasilkan pesan kita sendiri, bukan revert tanpa penjelasan.
+    /// @notice Revert unless `impl` really is a UUPS implementation (ERC-1822).
+    /// @dev A raw `staticcall` is used so that a contract lacking this function entirely
+    ///      produces our own message, not an unexplained revert.
     function _assertUUPSImplementation(address impl) internal view {
         (bool ok, bytes memory ret) = impl.staticcall(abi.encodeWithSignature("proxiableUUID()"));
         if (!ok || ret.length != 32) revert NotUUPSImplementation(impl);

@@ -4,12 +4,12 @@ pragma solidity ^0.8.30;
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 /// @title MockToken
-/// @notice Token ERC-20 18 desimal dengan `mint` terbuka, untuk pengujian di testnet.
-/// @dev Kontrak uji, bukan bagian produk: tidak upgradeable, tidak ada `__gap`.
+/// @notice An 18-decimal ERC-20 token with open `mint`, for testing on testnet.
+/// @dev A test contract, not part of the product: not upgradeable, no `__gap`.
 contract MockToken is ERC20 {
     constructor(string memory name_, string memory symbol_) ERC20(name_, symbol_) {}
 
-    /// @notice Mint bebas akses — kontrak ini hanya dipakai di testnet untuk simulasi.
+    /// @notice Unrestricted mint — this contract is only used on testnet for simulation.
     function mint(address to, uint256 amount) external {
         _mint(to, amount);
     }

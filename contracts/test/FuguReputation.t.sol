@@ -102,11 +102,11 @@ contract FuguReputationTest is Test {
     }
 
     // ---------------------------------------------------------------------
-    // Butir 6 — validasi alamat nol
+    // Item 6 — zero address validation
     // ---------------------------------------------------------------------
 
-    /// @notice `subscriptions` yang nol akan membuat seluruh `review()` revert tanpa
-    ///         penjelasan; tolak sejak awal.
+    /// @notice A zero `subscriptions` would make every `review()` revert with no
+    ///         explanation; reject it up front.
     function test_rejectsZeroAddresses() public {
         FuguReputation impl = new FuguReputation();
 
@@ -117,7 +117,7 @@ contract FuguReputationTest is Test {
         vm.expectRevert(FuguReputation.ZeroAddress.selector);
         rep.setSubscriptions(address(0));
 
-        // alamat lama tetap terpasang
+        // the old address is still in place
         assertEq(address(rep.subscriptions()), address(stub));
     }
 }
