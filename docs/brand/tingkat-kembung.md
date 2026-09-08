@@ -1,242 +1,240 @@
-# Fugugent — Tingkat Kembung
+# Fugugent — Puff Levels
 
-**Tanggal:** 2026-09-08
-**Sumber ambang Guardian:** `ai/fuguguardian/app/agent/src/strategy/types.ts`
-(`DEFAULT_THRESHOLDS`) dan `decide.ts`. **Bila kode berubah, dokumen ini ikut berubah**
-— bukan sebaliknya. Angka di UI harus selalu sama dengan angka yang dipakai mesin
-keputusan; kalau tidak, kita mengulangi persis kesalahan yang membunuh Giza/ARMA
-(dashboard bercerita lain daripada rantai).
+**Date:** 2026-09-08
+**Source of the Guardian thresholds:** `ai/fuguguardian/app/agent/src/strategy/types.ts`
+(`DEFAULT_THRESHOLDS`) and `decide.ts`. **If the code changes, this document changes with it**
+— not the other way round. The numbers in the UI must always be the same as the numbers the
+decision engine uses; otherwise we repeat exactly the mistake that killed Giza/ARMA (the
+dashboard telling a different story than the chain).
 
 ---
 
-## 0. Kontrak visual
+## 0. The visual contract
 
-Lima tingkat. Tidak empat, tidak tujuh. Lima karena itu jumlah tepat untuk mencakup
-empat ambang keputusan Guardian (`WARN`, `PARTIAL_REPAY`, `DELEVERAGE`, `EMERGENCY`)
-plus satu keadaan "tidak ada yang perlu dilakukan".
+Five levels. Not four, not seven. Five because that is the exact number needed to cover the
+four Guardian decision thresholds (`WARN`, `PARTIAL_REPAY`, `DELEVERAGE`, `EMERGENCY`) plus
+one "nothing needs doing" state.
 
-Setiap tingkat berbeda pada **enam kanal sekaligus**. Bukan mubazir — masing-masing
-kanal bertahan pada kondisi yang berbeda (ukuran kecil, grayscale, buta warna, animasi
-mati, screenshot terkompresi).
+Every level differs on **six channels at once**. This is not redundancy — each channel
+survives a different condition (small size, grayscale, colour blindness, animation off,
+compressed screenshot).
 
-| # | Kanal | Kenapa ada |
+| # | Channel | Why it exists |
 |---|---|---|
-| 1 | Lebar badan | bertahan sampai 16 px dan setelah blur |
-| 2 | Duri | bertahan di siluet |
-| 3 | Mata & mulut | bertahan di ≥64 px, membawa muatan emosional |
-| 4 | Cincin (rim) di sekeliling avatar | pola, bukan warna — bertahan di grayscale |
-| 5 | Warna cincin | cepat dibaca oleh mayoritas, **tidak pernah sendirian** |
-| 6 | Chip teks angka | satu-satunya kanal yang tidak ambigu; wajib ada di kartu dan detail |
+| 1 | Body width | survives down to 16 px and after blurring |
+| 2 | Spikes | survives in the silhouette |
+| 3 | Eyes & mouth | survives at ≥64 px, carries the emotional payload |
+| 4 | Ring (rim) around the avatar | pattern, not colour — survives in grayscale |
+| 5 | Ring colour | read quickly by the majority, **never on its own** |
+| 6 | Numeric text chip | the only unambiguous channel; required on both the card and the detail page |
 
-**Aturan mutlak:** warna badan agent **tidak pernah** berubah karena tingkat kembung.
-Yang berubah hanya bentuk badan dan cincin. Guardian yang gawat tetap kobalt; ia hanya
-menjadi bulat, berduri, dan dikelilingi loreng.
-
----
-
-## 1. Lima tingkat
-
-Satuan geometri: kotak 100×100 unit, padding 8 unit (lihat `karakter.md` §1).
-
-### Tingkat 1 — **Tenang**
-
-- **Lebar badan** 56 u · tinggi 52 u (paling ramping)
-- **Duri** tersembunyi seluruhnya; punggung mulus
-- **Wajah** mata bulat rileks, kelopak sedikit turun, mulut `ω` kecil netral
-- **Cincin** garis tipis 2 u, **utuh (solid)**, hanya di 40% keliling (busur atas)
-- **Warna cincin** Reef Green `#009E73`
-- **Chip** teks pada latar transparan, warna teks normal
-- **Gerak** mengambang naik-turun 3 u, siklus 4 detik
-- **Arti** tidak ada yang perlu dikerjakan. Agent hidup, memantau, tidak bertindak.
-
-### Tingkat 2 — **Awas**
-
-- **Lebar badan** 64 u · tinggi 58 u
-- **Duri** muncul 25%, ujung masih **tumpul**
-- **Wajah** satu alis naik, mata sedikit lebih terbuka, mulut tetap netral
-- **Cincin** garis 3 u, **utuh**, 100% keliling, dengan **satu takik** di jam 12
-- **Warna cincin** Shoal Yellow `#F0E442`
-- **Chip** teks normal, ditambah label kata
-- **Gerak** mengambang 2 u, siklus 3 detik
-- **Arti** ambang pertama tersentuh. Agent sudah memberi tahu, belum membelanjakan apa
-  pun. Ini tingkat yang paling sering dilihat pengguna dan **tidak boleh terasa seperti
-  alarm** — kalau tingkat 2 sudah bikin panik, tingkat 5 kehilangan daya.
-
-### Tingkat 3 — **Tegang**
-
-- **Lebar badan** 72 u · tinggi 66 u
-- **Duri** keluar 60%, ujung mulai runcing
-- **Wajah** mata menyipit, pipi menggembung, mulut mengerucut menahan
-- **Cincin** garis 3 u, **putus-putus** (dash 6 u / gap 4 u), 100% keliling
-- **Warna cincin** Tide Amber `#E69F00`
-- **Chip** teks normal + panah arah tren (naik/turun) — di sini arah mulai penting
-- **Gerak** getar halus 1 u, 8 Hz, hanya saat data baru masuk
-- **Arti** agent akan bertindak dan **membelanjakan uang**. Untuk Guardian: membayar
-  sebagian hutang. Inilah tingkat pertama yang punya konsekuensi finansial, dan
-  perubahan pola cincin dari utuh ke putus-putus menandainya tanpa perlu warna.
-
-### Tingkat 4 — **Kritis**
-
-- **Lebar badan** 80 u · tinggi 74 u
-- **Duri** keluar 100%, runcing penuh
-- **Wajah** mata melebar, pupil mengecil, satu tetes keringat di pelipis, mulut terbuka kecil
-- **Cincin** **ganda** — dua garis 2 u dengan jarak 2 u, keduanya utuh
-- **Warna cincin** Deep Vermillion `#D55E00`
-- **Chip** teks tebal + ikon segitiga peringatan
-- **Gerak** denyut skala 1,00 → 1,04, siklus 1,2 detik
-- **Arti** tindakan agresif sedang berjalan (deleverage). Posisi masih bisa
-  diselamatkan. Cincin ganda = "ada dua hal yang bergerak sekaligus".
-
-### Tingkat 5 — **Gawat**
-
-Ini tingkat yang harus terbaca tanpa warna sama sekali.
-
-- **Lebar badan** 84 u · tinggi 82 u — **menyentuh dan sedikit terpotong bingkai
-  kotak**. Satu-satunya tingkat yang keluar dari kotaknya. Fugu sudah tidak muat lagi.
-- **Duri** 100% + baris duri sekunder di sela baris utama
-- **Wajah** mata menjadi **silang (×)** — satu-satunya tingkat dengan mata bukan
-  lingkaran; mulut terbuka lebar
-- **Cincin** **loreng diagonal 45°**, lebar pita 4 u, berselang-seling
-  `#F4F8F9` dan `#05121A` — kontras luminans 17,7:1, terbaca pada monokrom murni,
-  pada layar rusak, dan pada cetakan hitam-putih
-- **Warna** Alarm Red `#A4210E` dipakai hanya sebagai **blok isi chip**, dengan teks
-  putih di atasnya (kontras 7,49:1). Merahnya adalah bonus, bukan pembawa pesan.
-- **Chip** blok penuh, teks putih, huruf kapital, berisi angka + kata: `HF 0,98 · GAWAT`
-- **Gerak** tidak ada. **Sengaja diam.** Semua tingkat lain bergerak; tingkat 5 membeku.
-  Perubahan dari bergerak ke berhenti adalah sinyal yang sangat kuat secara periferal,
-  dan ia tetap bekerja untuk pengguna yang mematikan animasi (lihat §5).
-- **Arti** ambang terakhir sudah dilewati. Untuk Guardian: posisi berada di titik
-  likuidasi.
-
-**Empat kanal tingkat 5 yang tidak bergantung warna sedikit pun:** siluet terpotong
-bingkai · mata silang · loreng hitam-putih · teks kapital pada chip. Hilangkan warna
-seluruhnya dan tingkat 5 tetap satu-satunya yang tidak mungkin dikira tingkat lain.
+**Absolute rule:** the agent's body colour **never** changes because of the puff level. Only
+the body shape and the ring change. A Guardian in an emergency is still cobalt; it just
+becomes round, spiky, and surrounded by hazard stripes.
 
 ---
 
-## 2. Ringkasan tabel
+## 1. The five levels
 
-| # | Nama | Lebar | Duri | Cincin (pola) | Cincin (warna) | Gerak |
+Geometry unit: a 100×100 unit box, 8 units of padding (see `karakter.md` §1).
+
+### Level 1 — **Calm**
+
+- **Body width** 56 u · height 52 u (the slimmest)
+- **Spikes** fully retracted; the back is smooth
+- **Face** relaxed round eyes, lids slightly lowered, small neutral `ω` mouth
+- **Ring** thin 2 u line, **solid**, covering only 40% of the circumference (upper arc)
+- **Ring colour** Reef Green `#009E73`
+- **Chip** text on a transparent background, normal text colour
+- **Motion** floating up and down 3 u, 4-second cycle
+- **Meaning** nothing needs doing. The agent is alive, monitoring, not acting.
+
+### Level 2 — **Watchful**
+
+- **Body width** 64 u · height 58 u
+- **Spikes** out 25%, tips still **blunt**
+- **Face** one eyebrow raised, eyes slightly wider, mouth still neutral
+- **Ring** 3 u line, **solid**, full circumference, with **one notch** at twelve o'clock
+- **Ring colour** Shoal Yellow `#F0E442`
+- **Chip** normal text, plus a word label
+- **Motion** floating 2 u, 3-second cycle
+- **Meaning** the first threshold has been touched. The agent has given notice; it has not
+  spent anything yet. This is the level users see most often and it **must not feel like an
+  alarm** — if level 2 already causes panic, level 5 loses its force.
+
+### Level 3 — **Strained**
+
+- **Body width** 72 u · height 66 u
+- **Spikes** out 60%, tips starting to sharpen
+- **Face** eyes narrowed, cheeks puffed, mouth pursed as if holding back
+- **Ring** 3 u line, **dashed** (6 u dash / 4 u gap), full circumference
+- **Ring colour** Tide Amber `#E69F00`
+- **Chip** normal text + a trend direction arrow (up/down) — direction starts to matter here
+- **Motion** fine 1 u tremor, 8 Hz, only when new data arrives
+- **Meaning** the agent is about to act and **spend money**. For Guardian: repaying part of
+  the debt. This is the first level with a financial consequence, and the ring pattern
+  changing from solid to dashed marks it without needing colour.
+
+### Level 4 — **Critical**
+
+- **Body width** 80 u · height 74 u
+- **Spikes** out 100%, fully pointed
+- **Face** eyes wide, pupils small, one bead of sweat at the temple, mouth slightly open
+- **Ring** **double** — two 2 u lines 2 u apart, both solid
+- **Ring colour** Deep Vermillion `#D55E00`
+- **Chip** bold text + warning triangle icon
+- **Motion** pulse scaling 1.00 → 1.04, 1.2-second cycle
+- **Meaning** an aggressive action is under way (deleverage). The position can still be
+  saved. The double ring = "two things are moving at once".
+
+### Level 5 — **Emergency**
+
+This is the level that has to be readable with no colour at all.
+
+- **Body width** 84 u · height 82 u — **touching and slightly cropped by the square frame**.
+  The only level that leaves its box. The fugu no longer fits.
+- **Spikes** 100% + a secondary row of spikes between the main rows
+- **Face** the eyes become **crosses (×)** — the only level whose eyes are not circles; the
+  mouth hangs wide open
+- **Ring** **45° diagonal hazard stripes**, 4 u stripe width, alternating
+  `#F4F8F9` and `#05121A` — luminance contrast 17.7:1, readable in pure monochrome, on a
+  broken screen, and in black-and-white print
+- **Colour** Alarm Red `#A4210E` is used only as a **solid chip fill**, with white text on it
+  (contrast 7.49:1). The red is a bonus, not the carrier of the message.
+- **Chip** solid block, white text, all caps, containing the number + a word:
+  `HF 0.98 · EMERGENCY`
+- **Motion** none. **Deliberately still.** Every other level moves; level 5 freezes. The change
+  from moving to stopped is a very strong signal in peripheral vision, and it still works for
+  users who turn animation off (see §5).
+- **Meaning** the last threshold has been crossed. For Guardian: the position is at the
+  liquidation point.
+
+**The four level-5 channels that do not depend on colour at all:** the silhouette cropped by
+the frame · cross eyes · black-and-white hazard stripes · all-caps text on the chip. Remove
+colour entirely and level 5 is still the only one that cannot be mistaken for another level.
+
+---
+
+## 2. Summary table
+
+| # | Name | Width | Spikes | Ring (pattern) | Ring (colour) | Motion |
 |---|---|---|---|---|---|---|
-| 1 | Tenang | 56 u | 0% | busur tipis utuh | `#009E73` | mengambang lambat |
-| 2 | Awas | 64 u | 25% tumpul | utuh + takik | `#F0E442` | mengambang |
-| 3 | Tegang | 72 u | 60% | putus-putus | `#E69F00` | getar saat update |
-| 4 | Kritis | 80 u | 100% | ganda | `#D55E00` | denyut |
-| 5 | Gawat | 84 u, terpotong | 100% + sekunder | **loreng 45° hitam-putih** | `#A4210E` (blok chip saja) | **diam** |
+| 1 | Calm | 56 u | 0% | thin solid arc | `#009E73` | slow float |
+| 2 | Watchful | 64 u | 25% blunt | solid + notch | `#F0E442` | float |
+| 3 | Strained | 72 u | 60% | dashed | `#E69F00` | tremor on update |
+| 4 | Critical | 80 u | 100% | double | `#D55E00` | pulse |
+| 5 | Emergency | 84 u, cropped | 100% + secondary | **45° black-and-white hazard stripes** | `#A4210E` (chip fill only) | **still** |
 
 ---
 
-## 3. Pemetaan Guardian — `HEALTH_FACTOR`
+## 3. Guardian mapping — `HEALTH_FACTOR`
 
-Ini pemetaan yang mengikat, disalin langsung dari perbandingan di `decide.ts`. Perhatikan
-bahwa **semua batas bersifat inklusif ke sisi yang lebih gawat** — kode memeriksa dari
-kondisi paling gawat ke paling ringan supaya kasus tepat di ambang selalu jatuh ke
-tindakan yang lebih aman. Visualnya harus meniru itu persis; kalau UI menampilkan
-"Tegang" sementara agent sudah menjalankan `DELEVERAGE`, kita berbohong.
+This is the binding mapping, copied straight from the comparisons in `decide.ts`. Note that
+**every boundary is inclusive toward the more severe side** — the code checks from the most
+severe condition to the mildest so that a case sitting exactly on a threshold always falls to
+the safer action. The visuals must mirror that exactly; if the UI shows "Strained" while the
+agent is already running `DELEVERAGE`, we are lying.
 
-| Tingkat | Kondisi HF | `Action` di kode | Yang dikerjakan agent |
+| Level | HF condition | `Action` in code | What the agent does |
 |---|---|---|---|
-| 1 Tenang | `HF > 1,5` **atau `HF = null`** | `NONE` | memantau saja |
-| 2 Awas | `1,2 < HF ≤ 1,5` | `WARN` | memberi tahu, tidak membelanjakan |
-| 3 Tegang | `1,1 < HF ≤ 1,2` | `PARTIAL_REPAY` | membayar sebagian hutang |
-| 4 Kritis | `1,0 < HF ≤ 1,1` | `DELEVERAGE` | mengurangi leverage |
-| 5 Gawat | `HF ≤ 1,0` | `EMERGENCY` | tindakan darurat; sudah di titik likuidasi |
+| 1 Calm | `HF > 1.5` **or `HF = null`** | `NONE` | monitor only |
+| 2 Watchful | `1.2 < HF ≤ 1.5` | `WARN` | notify, spend nothing |
+| 3 Strained | `1.1 < HF ≤ 1.2` | `PARTIAL_REPAY` | repay part of the debt |
+| 4 Critical | `1.0 < HF ≤ 1.1` | `DELEVERAGE` | reduce leverage |
+| 5 Emergency | `HF ≤ 1.0` | `EMERGENCY` | emergency action; already at the liquidation point |
 
-**Kasus `HF = null` (tidak ada hutang).** Ini keadaan **paling aman**, bukan keadaan
-tidak diketahui, dan kode sudah menyatakannya begitu (`"Tidak ada hutang sehingga tidak
-ada risiko likuidasi."`). Visualnya: tingkat 1 penuh, dengan chip `∞` menggantikan
-angka. Jangan pernah menampilkan `—` atau `N/A`; itu membuat keadaan teraman terlihat
-seperti data yang gagal dibaca.
+**The `HF = null` case (no debt).** This is the **safest** state, not an unknown one, and the
+code already says so (`"Tidak ada hutang sehingga tidak ada risiko likuidasi."`). Visually:
+level 1 at full, with an `∞` chip replacing the number. Never show `—` or `N/A`; that makes
+the safest state look like data that failed to load.
 
-**Angka pendamping wajib.** Selain HF, chip Guardian menampilkan `dropToLiquidationBps`
-sebagai persen: *"agunan boleh turun 6,4% sebelum likuidasi"*. Untuk banyak orang
-kalimat itu lebih bisa ditindaklanjuti daripada "HF 1,18", dan ia sudah dihitung oleh
-kode. Di kartu 48 px hanya angka HF yang muat; persentase muncul pada hover dan di
-halaman detail.
+**The companion number is mandatory.** Besides HF, the Guardian chip shows
+`dropToLiquidationBps` as a percentage: *"collateral can fall 6.4% before liquidation"*. For
+many people that sentence is more actionable than "HF 1.18", and the code already computes it.
+On a 48 px card only the HF number fits; the percentage appears on hover and on the detail page.
 
-**Keadaan data basi.** Kalau pembacaan on-chain gagal atau lebih tua dari 2× interval
-poll, jangan tampilkan tingkat apa pun. Tampilkan siluet fugu **berlubang (outline saja,
-tanpa isi)** dengan chip `data basi · terakhir 4m lalu`. Menebak tingkat dari data lama
-adalah kebohongan yang paling mahal di produk ini.
+**Stale data state.** If the on-chain read fails or is older than 2× the poll interval, do not
+show any level at all. Show a **hollow fugu silhouette (outline only, no fill)** with the chip
+`stale data · last read 4m ago`. Guessing a level from old data is the most expensive lie in
+this product.
 
 ---
 
-## 4. Pemetaan tiga agent lain
+## 4. Mapping for the other three agents
 
-Prinsipnya sama: tiap agent memetakan **satu metrik risiko utama** yang bisa
-diverifikasi on-chain ke lima tingkat yang sama. Metriknya berbeda per kategori — itu
-memang yang dimaksud "metrik setara-dalam per kategori" di spec §7.5.
+The principle is the same: each agent maps **one primary risk metric** that can be verified
+on-chain onto the same five levels. The metric differs per category — that is exactly what
+"equivalent-within-category metric" means in spec §7.5.
 
 ### Rebalancer — `REBALANCING`
-Metrik: **persen waktu posisi LP berada di luar range** (rolling 24 jam), dari
-perbandingan tick posisi dan tick pool.
+Metric: **percentage of time the LP position is out of range** (rolling 24 hours), from
+comparing the position tick against the pool tick.
 
-| Tingkat | Waktu di luar range 24j |
+| Level | Time out of range, 24h |
 |---|---|
-| 1 Tenang | < 5% |
-| 2 Awas | 5–15% |
-| 3 Tegang | 15–30% |
-| 4 Kritis | 30–50% |
-| 5 Gawat | > 50%, **atau** di luar range > 24 jam tanpa rebalance yang menguntungkan |
+| 1 Calm | < 5% |
+| 2 Watchful | 5–15% |
+| 3 Strained | 15–30% |
+| 4 Critical | 30–50% |
+| 5 Emergency | > 50%, **or** out of range for > 24 hours with no profitable rebalance |
 
-Kondisi kedua pada tingkat 5 penting: posisi bisa "hanya" 40% di luar range tetapi
-macet karena `ΔFee − Gas − Slippage − ΔIL` selalu negatif. Itu keadaan gawat yang
-sesungguhnya — agent tidak bisa menolong, dan pengguna harus tahu.
+The second condition at level 5 matters: a position can be "only" 40% out of range but stuck
+because `ΔFee − Gas − Slippage − ΔIL` is always negative. That is the real emergency — the
+agent cannot help, and the user needs to know.
 
 ### Grid — `GRID`
-Metrik: **drawdown terhadap ekuitas puncak** sejak langganan dimulai.
+Metric: **drawdown from peak equity** since the subscription started.
 
-| Tingkat | Drawdown |
+| Level | Drawdown |
 |---|---|
-| 1 Tenang | < 2% |
-| 2 Awas | 2–5% |
-| 3 Tegang | 5–10% |
-| 4 Kritis | 10–18% |
-| 5 Gawat | > 18%, **atau** harga keluar dari batas atas/bawah grid |
+| 1 Calm | < 2% |
+| 2 Watchful | 2–5% |
+| 3 Strained | 5–10% |
+| 4 Critical | 10–18% |
+| 5 Emergency | > 18%, **or** price leaves the upper/lower grid bound |
 
-Harga keluar batas grid = strategi berhenti bekerja sama sekali (semua modal berada di
-satu sisi). Grid harus mengembang penuh di situ walau drawdown-nya belum 18%, karena
-inilah mode kegagalan struktural yang sudah kami janjikan untuk dinyatakan terbuka.
+Price leaving the grid bounds = the strategy stops working entirely (all capital sits on one
+side). Grid must puff up fully there even if the drawdown has not reached 18%, because this is
+the structural failure mode we promised to state openly.
 
 ### Yield — `YIELD`
-Metrik: **utilisasi pool tempat dana ditempatkan** (`borrow / supply`) — proksi
-langsung untuk risiko "tidak bisa menarik dana".
+Metric: **utilisation of the pool the funds sit in** (`borrow / supply`) — a direct proxy for
+the "cannot withdraw" risk.
 
-| Tingkat | Utilisasi |
+| Level | Utilisation |
 |---|---|
-| 1 Tenang | < 70% |
-| 2 Awas | 70–85% |
-| 3 Tegang | 85–92% |
-| 4 Kritis | 92–97% |
-| 5 Gawat | > 97%, **atau** penarikan gagal karena likuiditas habis |
+| 1 Calm | < 70% |
+| 2 Watchful | 70–85% |
+| 3 Strained | 85–92% |
+| 4 Critical | 92–97% |
+| 5 Emergency | > 97%, **or** a withdrawal fails because liquidity ran out |
 
-APR tinggi **tidak pernah** mengecilkan fugu. Kembung hanya bicara risiko. Kalau APR
-naik karena utilisasi naik, fugu mengembang — itu justru pesan yang benar, dan itu yang
-membedakan kami dari dashboard yang memajang APR headline tanpa konteks.
+A high APR **never** shrinks the fugu. Puffing only talks about risk. If APR rises because
+utilisation rises, the fugu puffs up — that is in fact the correct message, and it is what
+separates us from dashboards that display a headline APR with no context.
 
 ---
 
-## 5. Aturan implementasi
+## 5. Implementation rules
 
-1. **Ambang datang dari satu sumber.** Backend mengirim `bloatLevel: 1|2|3|4|5` yang
-   sudah dihitung dari metrik mentah; frontend **tidak boleh** menghitung ulang ambang.
-   Frontend juga menerima metrik mentah untuk ditampilkan, tapi bukan untuk memutuskan.
-2. **Transisi naik cepat, turun lambat.** Mengembang 400 ms `ease-out`; mengempis
-   900 ms `ease-in-out`. Risiko datang mendadak, pemulihan tidak. Ini juga mencegah
-   avatar berkedip-kedip saat metrik bergetar di sekitar ambang.
-3. **Histeresis 3%.** Untuk turun satu tingkat, metrik harus melewati ambang sejauh 3%
-   ke arah aman. Tanpa ini, HF 1,199 → 1,201 → 1,199 membuat fugu berkedip dan
-   pengguna berhenti mempercayainya.
-4. **`prefers-reduced-motion`.** Semua gerak dimatikan; bentuk, cincin, dan chip
-   tetap membawa seluruh informasi. Tidak ada informasi yang **hanya** ada di animasi —
-   termasuk "diam" pada tingkat 5, yang tetap ditandai loreng dan mata silang.
-5. **Ukuran minimum tampil.** Cincin dan duri boleh disederhanakan di bawah 32 px,
-   tetapi chip angka tidak boleh dihilangkan di ukuran mana pun yang menampilkan
-   tingkat 4 atau 5. Kalau tidak muat, jangan tampilkan avatarnya sama sekali —
-   tampilkan barisnya sebagai teks.
-6. **Aria.** `role="img"` dengan `aria-label` yang berisi kalimat penuh, bukan angka
-   telanjang: *"Fugu Guardian, tingkat 4 dari 5, kritis. Health factor 1,06. Agunan
-   boleh turun 5,7 persen sebelum likuidasi."*
-7. **Jangan pernah memakai tingkat kembung untuk hal selain risiko.** Bukan untuk
-   popularitas, bukan untuk AUM, bukan untuk jumlah hirer. Satu mekanik, satu makna —
-   begitu ia dipakai untuk dua hal, ia berhenti berarti apa pun.
+1. **Thresholds come from one source.** The backend sends `bloatLevel: 1|2|3|4|5` already
+   computed from the raw metrics; the frontend **must not** recompute the thresholds. The
+   frontend also receives the raw metrics, for display, but not for deciding.
+2. **Fast up, slow down.** Puffing up takes 400 ms `ease-out`; deflating takes 900 ms
+   `ease-in-out`. Risk arrives suddenly, recovery does not. This also stops the avatar from
+   flickering when a metric jitters around a threshold.
+3. **3% hysteresis.** To drop one level, the metric must pass the threshold by 3% in the safe
+   direction. Without this, HF 1.199 → 1.201 → 1.199 makes the fugu flicker and users stop
+   trusting it.
+4. **`prefers-reduced-motion`.** All motion is turned off; shape, ring, and chip still carry
+   the entire message. No information exists **only** in the animation — including the
+   stillness at level 5, which is still marked by the hazard stripes and the cross eyes.
+5. **Minimum display size.** The ring and spikes may be simplified below 32 px, but the
+   numeric chip must not be dropped at any size that displays level 4 or 5. If it does not
+   fit, do not show the avatar at all — show the row as text.
+6. **Aria.** `role="img"` with an `aria-label` containing a full sentence, not a bare number:
+   *"Fugu Guardian, level 4 of 5, critical. Health factor 1.06. Collateral can fall 5.7 percent
+   before liquidation."*
+7. **Never use the puff level for anything other than risk.** Not for popularity, not for AUM,
+   not for the number of hirers. One mechanic, one meaning — the moment it is used for two
+   things, it stops meaning anything.

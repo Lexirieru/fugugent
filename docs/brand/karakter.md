@@ -1,207 +1,200 @@
-# Fugugent — Karakter
+# Fugugent — Characters
 
-**Tanggal:** 2026-09-08
-**Ruang lingkup:** identitas visual empat agent Fugu. Kategori terkunci di
+**Date:** 2026-09-08
+**Scope:** the visual identity of the four Fugu agents. The categories are locked in
 `contracts/src/types/FuguTypes.sol` (`REBALANCING | GRID | YIELD | HEALTH_FACTOR`)
-dan tidak boleh diubah dari sisi brand.
+and must not be changed from the brand side.
 
-Dokumen pendamping: `tingkat-kembung.md` (state risiko), `palet.md` (warna),
-`prompt-gambar.md` (produksi gambar).
-
----
-
-## 0. Ide inti
-
-Fugu mengembang seiring beban risiko. Ini bukan hiasan: tingkat kembung adalah
-**pembacaan metrik**, sama seriusnya dengan angka di sebelahnya. Karena itu ada satu
-aturan yang tidak boleh dilanggar di seluruh sistem:
-
-> **Warna badan menyatakan siapa agent itu. Bentuk badan menyatakan seberapa berat
-> risikonya.** Warna badan tidak pernah berubah karena risiko; kembung tidak pernah
-> berubah karena kategori.
-
-Konsekuensinya: seorang pengguna buta warna tetap bisa membaca risiko (bentuk), dan
-seorang pengguna yang melihat kartu dalam ukuran 48 piksel tetap bisa membedakan agent
-(siluet). Dua kanal yang saling melengkapi, bukan saling menumpuk.
-
-Ini juga alasan mengapa kami tidak memakai wajah gembira/sedih sebagai penanda utama:
-ekspresi hilang di bawah ~64 piksel, sedangkan siluet dan lebar badan bertahan.
+Companion documents: `tingkat-kembung.md` (risk states), `palet.md` (colours),
+`prompt-gambar.md` (image production).
 
 ---
 
-## 1. Aturan keluarga
+## 0. The core idea
 
-Yang membuat keempatnya terlihat satu spesies, bukan empat stok gambar:
+A fugu puffs up as risk load grows. This is not decoration: the puff level is a
+**metric reading**, exactly as serious as the number next to it. That is why there is one
+rule that must not be broken anywhere in the system:
 
-| Aspek | Aturan |
+> **Body colour says who the agent is. Body shape says how heavy the risk is.**
+> Body colour never changes because of risk; puffing never changes because of category.
+
+The consequence: a colour-blind user can still read risk (shape), and a user looking at a
+card at 48 pixels can still tell the agents apart (silhouette). Two channels that complement
+each other rather than stack on each other.
+
+This is also why we do not use happy/sad faces as the primary marker: expressions disappear
+below ~64 pixels, whereas silhouette and body width survive.
+
+---
+
+## 1. Family rules
+
+What makes all four look like one species rather than four pieces of stock art:
+
+| Aspect | Rule |
 |---|---|
-| Sudut pandang | 3/4 depan, sedikit dari atas, menghadap **kanan**. Tidak pernah profil murni, tidak pernah dari belakang. |
-| Bidang | Kotak 1:1. Badan hidup di kotak 100×100 unit dengan padding 8 unit di semua sisi. |
-| Konstruksi | Badan = telur/bulat telur. Kepala dan badan satu bentuk — fugu tidak punya leher. |
-| Garis luar | Tebal seragam **3 unit** (di 48 px ≈ 1,5–2 px), warna `#05121A` (Abyss 900), **bukan hitam murni**. |
-| Mata | Dua lingkaran besar, jarak antar-mata = 1 diameter mata, pupil bulat + **satu** kilau putih di jam 10. |
-| Mulut | Kecil, di bawah titik tengah mata, bentuk `ω` pipih. |
-| Sirip | Dua sirip dada kecil, satu sirip ekor kipas 3 lembar. |
-| Perut | Selalu 18% lebih terang dari warna badan, batasnya garis lengkung tunggal. |
-| Duri | Titik keluar duri **sama persis** di keempat karakter: 5 baris mengikuti kontur punggung dan sisi. Yang berbeda cuma seberapa keluar. |
-| Bayangan | Satu blok datar (bukan gradasi) di sisi kiri-bawah badan, 12% lebih gelap. |
-| Rendering | Vektor datar, tanpa gradasi mesh, tanpa tekstur, tanpa outline ganda. |
-| Properti | Setiap agent punya **satu** properti khas, dan properti itu **menempel di badan** — tidak dipegang. Tangan tidak terbaca di 48 px. |
+| Viewpoint | 3/4 front, slightly from above, facing **right**. Never pure profile, never from behind. |
+| Frame | 1:1 square. The body lives in a 100×100 unit box with 8 units of padding on every side. |
+| Construction | Body = egg/oval. Head and body are a single shape — a fugu has no neck. |
+| Outline | Uniform **3 units** thick (at 48 px ≈ 1.5–2 px), colour `#05121A` (Abyss 900), **not pure black**. |
+| Eyes | Two large circles, gap between eyes = 1 eye diameter, round pupil + **one** white glint at ten o'clock. |
+| Mouth | Small, below the midpoint of the eyes, a flattened `ω` shape. |
+| Fins | Two small pectoral fins, one three-lobed fan tail. |
+| Belly | Always 18% lighter than the body colour, bounded by a single curved line. |
+| Spikes | The spike exit points are **exactly the same** on all four characters: 5 rows following the contour of the back and sides. The only difference is how far they come out. |
+| Shadow | One flat block (not a gradient) on the lower-left of the body, 12% darker. |
+| Rendering | Flat vector, no mesh gradients, no texture, no double outlines. |
+| Prop | Each agent has **one** signature prop, and that prop is **attached to the body** — not held. Hands do not read at 48 px. |
 
-**Uji keluarga:** jika keempat siluet hitam diletakkan berdampingan, orang harus bisa
-bilang "ini empat ikan yang sama jenisnya" *dan* menunjuk mana yang mana. Kalau salah
-satu gagal, desainnya yang salah, bukan pembacanya.
+**The family test:** if the four black silhouettes are placed side by side, a person must be
+able to say "these are four fish of the same species" *and* point out which is which. If
+either fails, the design is wrong, not the reader.
 
 ---
 
 ## 2. Fugu Guardian — `HEALTH_FACTOR`
 
-**Tugas:** menjaga posisi lending dari likuidasi (Venus, Aave v3).
+**Job:** protect lending positions from liquidation (Venus, Aave v3).
 
-**Watak.** Penjaga malam. Tenang sampai ke titik membosankan, dan itu memang
-prestasinya. Tidak pernah menaikkan suara; kalau Guardian bergerak, artinya angkanya
-memang sudah menyentuh ambang. Bicara dalam angka, bukan dalam kata sifat: bukan
-"posisimu agak berisiko", tapi "HF 1,18 — 6,4% penurunan harga lagi sampai likuidasi".
+**Temperament.** A night watchman. Calm to the point of being boring, and that is precisely
+its achievement. It never raises its voice; if Guardian moves, it means the numbers really
+did hit a threshold. It speaks in numbers, not adjectives: not "your position is a bit
+risky", but "HF 1.18 — another 6.4% price drop to liquidation".
 
-**Siluet.** Paling **lebar dan rendah** dari keempatnya (rasio lebar:tinggi ≈ 1,15:1).
-Ciri unik: **garis punggung lurus** karena ada cangkang perisai setengah-lingkaran yang
-menempel di punggung. Hanya Guardian yang punya bagian atas rata — tiga lainnya
-melengkung. Alis tebal, sedikit turun ke tengah (fokus, bukan marah).
+**Silhouette.** The **widest and lowest** of the four (width:height ratio ≈ 1.15:1).
+Unique trait: a **straight back line**, because a half-circle shield shell is fused onto its
+back. Only Guardian has a flat top edge — the other three are curved. Thick eyebrows, angled
+slightly down toward the centre (focused, not angry).
 
-**Warna.** Badan Guardian Cobalt `#0072B2` · perut `#58A9E0` · perisai Foam `#E3ECEF`
-dengan garis Abyss. Mata putih `#F4F8F9`, pupil Abyss 900.
+**Colours.** Body Guardian Cobalt `#0072B2` · belly `#58A9E0` · shield Foam `#E3ECEF`
+outlined in Abyss. Eyes white `#F4F8F9`, pupils Abyss 900.
 
-**Properti khas.** Perisai punggung, dengan **satu bilah meteran vertikal** di sisi
-kanan perisai yang terisi dari bawah — itulah bar Health Factor. Di level tenang
-terisi penuh; di level gawat tinggal segaris.
+**Signature prop.** The back shield, with **one vertical gauge bar** on the right edge of the
+shield that fills from the bottom — that is the Health Factor bar. At the calm level it is
+full; at the emergency level only a sliver is left.
 
-**Yang membuatnya terbaca di 48 px.** Punggung rata. Itu saja sudah cukup: dalam siluet
-monokrom 48 px, Guardian adalah satu-satunya bentuk dengan tepi atas horizontal, dan
-satu-satunya yang lebih lebar daripada tinggi. Warna kobalt gelap menjadi pembeda
-kedua, bukan pertama.
+**What makes it readable at 48 px.** The flat back. That alone is enough: in a monochrome
+48 px silhouette, Guardian is the only shape with a horizontal top edge, and the only one
+wider than it is tall. The dark cobalt colour is the second differentiator, not the first.
 
 ---
 
 ## 3. Fugu Rebalancer — `REBALANCING`
 
-**Tugas:** menjaga bobot portofolio / posisi LP PancakeSwap v3 tetap dalam range.
+**Job:** keep portfolio weights / PancakeSwap v3 LP positions inside their range.
 
-**Watak.** Perfeksionis yang gelisah halus. Tidak tahan melihat sesuatu miring. Tapi ia
-juga tahu merapikan itu ada ongkosnya — ia hanya bergerak bila `ΔFee − Gas − Slippage −
-ΔIL > 0`. Jadi wataknya: rewel, tetapi berhitung. Bukan tipe yang menyentuh posisi
-setiap jam.
+**Temperament.** A quietly anxious perfectionist. It cannot stand seeing something crooked.
+But it also knows tidying has a cost — it only moves when `ΔFee − Gas − Slippage − ΔIL > 0`.
+So its temperament is: fussy, but calculating. Not the type to touch a position every hour.
 
-**Siluet.** Badan sedikit lebih **tinggi daripada lebar** (≈ 1:1,1) — telur berdiri.
-Ciri unik: **dua sirip dada besar terentang mendatar**, simetris, pada ketinggian yang
-sama persis, seperti lengan timbangan. Hanya Rebalancer yang punya lebar melewati badan
-ke kiri dan kanan. Ekor pendek dan kecil supaya lengan itu tetap jadi bentuk dominan.
+**Silhouette.** The body is slightly **taller than wide** (≈ 1:1.1) — a standing egg.
+Unique trait: **two large pectoral fins held straight out horizontally**, symmetrical, at
+exactly the same height, like the arms of a balance scale. Only Rebalancer extends past the
+body to the left and right. The tail is short and small so those arms stay the dominant shape.
 
-**Warna.** Badan Rebalancer Orchid `#CC79A7` · perut `#E9A8CC` · ujung sirip Foam.
+**Colours.** Body Rebalancer Orchid `#CC79A7` · belly `#E9A8CC` · fin tips Foam.
 
-**Properti khas.** Satu gelembung di ujung tiap sirip, **berukuran tidak sama** —
-gelembung kiri lebih besar dari kanan saat portofolio miring, dan menjadi sama besar
-saat seimbang. Ini properti yang ikut hidup: perbedaan ukuran gelembung = deviasi bobot.
+**Signature prop.** One bubble at the tip of each fin, **of unequal size** — the left bubble
+is larger than the right when the portfolio is skewed, and they become equal when it is
+balanced. This is a prop that stays alive: the difference in bubble size = weight deviation.
 
-**Yang membuatnya terbaca di 48 px.** Bentuk "T mendatar": dua titik di kiri dan kanan
-pada garis tinggi yang sama. Bahkan saat detail sirip hilang, dua titik itu bertahan
-sebagai dua piksel gelap simetris — pola yang tidak dimiliki tiga lainnya.
+**What makes it readable at 48 px.** The horizontal "T" shape: two dots on the left and right
+at the same height. Even when the fin detail disappears, those two dots survive as two
+symmetrical dark pixels — a pattern none of the other three have.
 
 ---
 
 ## 4. Fugu Grid — `GRID`
 
-**Tugas:** perdagangan grid di PancakeSwap v3 (swap langsung; PancakeSwap tidak punya
-order-book on-chain, jadi Grid memantau `slot0()` sendiri).
+**Job:** grid trading on PancakeSwap v3 (direct swaps; PancakeSwap has no on-chain order
+book, so Grid watches `slot0()` itself).
 
-**Watak.** Metodis dan dingin. Tidak punya pendapat soal arah pasar — hanya soal level.
-Dan ia jujur soal kelemahannya: strategi grid secara struktural mean-reversion, jadi
-**rugi di pasar trending**, dan itu ditulis terbuka di halaman agent. Karakter yang
-mengakui batasnya lebih dipercaya daripada karakter yang tersenyum terus.
+**Temperament.** Methodical and cold. It has no opinion about market direction — only about
+levels. And it is honest about its weakness: a grid strategy is structurally mean-reverting,
+so it **loses in trending markets**, and that is stated openly on the agent page. A character
+that admits its limits is more trusted than one that smiles the whole time.
 
-**Siluet.** Paling **bersudut**. Badan tetap bulat telur (aturan keluarga), tapi sirip
-punggung berbentuk **segitiga tajam tunggal** yang mencuat tegak — satu-satunya sudut
-runcing di keluarga ini saat level tenang. Ekor kipas dipotong rata, bukan melengkung.
+**Silhouette.** The most **angular**. The body stays an egg (family rule), but the dorsal fin
+is a **single sharp triangle** pointing straight up — the only sharp angle in this family at
+the calm level. The fan tail is cut off flat rather than curved.
 
-**Warna.** Badan Grid Sky `#56B4E9` · perut `#8FD3F4` · garis kisi Abyss 900 pada
-opasitas 20%.
+**Colours.** Body Grid Sky `#56B4E9` · belly `#8FD3F4` · grid lines Abyss 900 at 20% opacity.
 
-**Properti khas.** **Visor persegi tipis** melintang di kedua mata (satu garis horizontal
-gelap), plus **kisi 3×3** tercetak samar di badan. Level grid yang sudah terisi
-ditandai satu kotak kisi yang penuh warna.
+**Signature prop.** A **thin rectangular visor** running across both eyes (one dark horizontal
+bar), plus a **3×3 grid** printed faintly on the body. A grid level that has been filled is
+marked by one grid cell in full colour.
 
-**Yang membuatnya terbaca di 48 px.** Dua tanda yang bertahan: segitiga tegak di atas
-badan, dan satu garis gelap horizontal melintasi wajah. Kisi 3×3 akan menyatu jadi
-tekstur abu-abu di ukuran kecil — itu tidak apa-apa, ia berperan sebagai "badan agak
-lebih gelap", bukan sebagai informasi.
+**What makes it readable at 48 px.** Two marks survive: the upright triangle above the body,
+and one dark horizontal line across the face. The 3×3 grid will merge into a grey texture at
+small sizes — that is fine, it acts as "a slightly darker body", not as information.
 
 ---
 
 ## 5. Fugu Yield — `YIELD`
 
-**Tugas:** memindahkan posisi ke pool ber-APR-tertimbang-risiko tertinggi
+**Job:** move positions into the pool with the highest risk-adjusted APR
 (Venus, Aave v3, Lista).
 
-**Watak.** Pemburu yang ramah dan sedikit rakus. Selalu mengendus. Optimis, tapi
-optimisme yang dihitung: ia hanya pindah kalau selisih APR melebihi ongkos migrasi.
-Dari keempatnya, dialah yang paling mudah disukai — dan justru karena itu halaman
-detailnya harus paling keras soal disclaimer.
+**Temperament.** A friendly, slightly greedy forager. Always sniffing around. Optimistic, but
+with calculated optimism: it only moves if the APR difference exceeds the migration cost. Of
+the four, it is the easiest to like — and precisely for that reason its detail page has to be
+the harshest about disclaimers.
 
-**Siluet.** Paling **bulat dan penuh** bahkan pada level tenang — baseline-nya memang
-lebih besar 8% dari tiga lainnya (dia sudah gemuk sebelum risiko datang; itu bagian
-dari leluconnya). Ciri unik: **sirip punggung berbentuk daun**, melengkung miring ke
-belakang — tonjolan diagonal di kanan-atas siluet.
+**Silhouette.** The **roundest and fullest**, even at the calm level — its baseline really is
+8% bigger than the other three (it was already chubby before risk arrived; that is part of the
+joke). Unique trait: a **leaf-shaped dorsal fin**, curving diagonally backwards — a diagonal
+bump on the upper right of the silhouette.
 
-**Warna.** Badan Yield Amber `#E69F00` · perut `#FFC24D`. Satu-satunya fugu berwarna
-hangat, dan itu disengaja.
+**Colours.** Body Yield Amber `#E69F00` · belly `#FFC24D`. The only warm-coloured fugu, and
+that is deliberate.
 
-**Properti khas.** **Tiga gelembung menaik** di belakang ekor, ukurannya mengecil ke
-atas — arus hasil yang mengalir. Gelembung ini juga jadi indikator: makin cepat
-animasinya, makin sering agent memindahkan posisi.
+**Signature prop.** **Three rising bubbles** behind the tail, getting smaller toward the top —
+a flowing stream of yield. These bubbles are also an indicator: the faster the animation, the
+more often the agent is moving positions.
 
-**Yang membuatnya terbaca di 48 px.** Tonjolan daun diagonal di kanan-atas + suhu
-warna. Dalam deret empat avatar, Yield adalah satu-satunya bercak hangat; dalam siluet
-monokrom, satu-satunya dengan tonjolan miring (bukan tegak seperti Grid, bukan rata
-seperti Guardian).
+**What makes it readable at 48 px.** The diagonal leaf bump on the upper right + colour
+temperature. In a row of four avatars, Yield is the only warm patch; in a monochrome
+silhouette, the only one with a slanted bump (not upright like Grid, not flat like Guardian).
 
 ---
 
-## 6. Matriks pembeda 48 piksel
+## 6. The 48-pixel differentiation matrix
 
-Diurutkan dari kanal yang paling tahan penyusutan ke yang paling cepat hilang.
+Ordered from the channel that survives shrinking best to the one that disappears first.
 
-| Kanal | Guardian | Rebalancer | Grid | Yield |
+| Channel | Guardian | Rebalancer | Grid | Yield |
 |---|---|---|---|---|
-| **Tepi atas siluet** | rata (perisai) | melengkung | segitiga tegak | tonjolan miring |
-| **Rasio lebar:tinggi** | 1,15 : 1 | 1 : 1,1 | 1 : 1 | 1,05 : 1 (baseline +8%) |
-| **Lebar melewati badan** | tidak | ya, kiri+kanan | tidak | tidak |
-| **Tanda pada wajah** | alis tebal | — | garis visor mendatar | — |
-| **Suhu warna** | dingin gelap | dingin muda (magenta) | dingin terang | **hangat** |
-| **Tekstur badan** | polos | polos | kisi samar | polos |
+| **Top edge of silhouette** | flat (shield) | curved | upright triangle | slanted bump |
+| **Width:height ratio** | 1.15 : 1 | 1 : 1.1 | 1 : 1 | 1.05 : 1 (baseline +8%) |
+| **Extends past the body** | no | yes, left+right | no | no |
+| **Mark on the face** | thick eyebrows | — | horizontal visor line | — |
+| **Colour temperature** | cold dark | cold light (magenta) | cold bright | **warm** |
+| **Body texture** | plain | plain | faint grid | plain |
 
-**Uji wajib sebelum aset dianggap selesai:**
+**Mandatory tests before an asset is considered done:**
 
-1. Render 48×48 px, lalu ubah ke **grayscale**. Keempatnya harus tetap bisa
-   dipasangkan ke nama yang benar oleh orang yang baru melihatnya satu kali.
-2. Render 48×48 px, lalu **blur 2 px**. Siluet harus tetap berbeda.
-3. Letakkan keempatnya di latar `#0B1E2B` dan `#F4F8F9`. Tidak boleh ada yang hilang
-   di salah satunya.
-4. Simulasi deuteranopia dan protanopia. Guardian/Grid/Rebalancer akan saling mirip
-   dalam hue — itu diterima, karena pembedanya siluet. Yang **tidak** diterima adalah
-   kalau dua siluet ikut mirip.
+1. Render at 48×48 px, then convert to **grayscale**. All four must still be matched to the
+   right name by someone who has seen them only once.
+2. Render at 48×48 px, then **blur by 2 px**. The silhouettes must still differ.
+3. Place all four on `#0B1E2B` and on `#F4F8F9` backgrounds. None may disappear on either.
+4. Simulate deuteranopia and protanopia. Guardian/Grid/Rebalancer will look similar to each
+   other in hue — that is accepted, because the differentiator is the silhouette. What is
+   **not** accepted is two silhouettes looking similar as well.
 
 ---
 
-## 7. Agent pihak ketiga (fallback)
+## 7. Third-party agents (fallback)
 
-Spec `§8` menetapkan fugu fallback berwarna deterministik dari ID agent. Aturan brand:
+Spec `§8` specifies a fallback fugu coloured deterministically from the agent ID. Brand rules:
 
-- Fallback memakai **siluet netral**: badan telur polos, tanpa properti khas, tanpa
-  perisai/visor/daun/lengan. Properti khas milik empat agent first-party dan tidak
-  boleh bocor ke pihak ketiga — itu yang membuat empat agent kami terbaca sebagai
-  lantai kualitas, bukan sekadar empat dari 309 ribu.
-- Hue diambil dari `hash(agentId) mod 360`, tetapi **saturasi dan lightness dikunci**
-  (S 42%, L 52%) supaya tidak pernah ada kartu yang menyala lebih terang daripada
-  agent terkurasi, dan supaya kontras teks tetap bisa diprediksi.
-- Hue di rentang 95°–150° (hijau) dan 0°–20° (merah) **dilewati** — dua rentang itu
-  milik semantik risiko, bukan milik identitas.
-- Fallback tetap ikut sistem kembung: ia mengembang juga, karena metriknya sama.
+- The fallback uses a **neutral silhouette**: a plain egg body, no signature prop, no
+  shield/visor/leaf/arms. The signature props belong to the four first-party agents and must
+  not leak to third parties — that is what makes our four agents read as a quality floor
+  rather than as four out of 309 thousand.
+- The hue is taken from `hash(agentId) mod 360`, but **saturation and lightness are locked**
+  (S 42%, L 52%) so that no card ever glows brighter than a curated agent, and so text
+  contrast stays predictable.
+- Hues in the 95°–150° (green) and 0°–20° (red) ranges are **skipped** — those two ranges
+  belong to risk semantics, not to identity.
+- The fallback still follows the puff system: it puffs up too, because the metric is the same.

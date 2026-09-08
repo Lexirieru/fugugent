@@ -1,43 +1,40 @@
-# Fugugent — Prompt Gambar
+# Fugugent — Image Prompts
 
-**Tanggal:** 2026-09-08
-**Tujuan:** menghasilkan aset yang **konsisten antar-jalan**. Dua orang yang menjalankan
-prompt yang sama, pada hari yang berbeda, harus mendapat karakter yang sama — bukan
-sekadar "ikan buntal yang mirip".
+**Date:** 2026-09-08
+**Purpose:** produce assets that are **consistent across runs**. Two people running the same
+prompt on different days must get the same character — not merely "a similar-looking
+pufferfish".
 
-**Prompt ditulis dalam bahasa Inggris.** Ini keputusan teknis, bukan kelalaian gaya:
-model gambar yang kita pakai jauh lebih patuh pada instruksi geometris (rasio, sudut,
-tebal garis) dalam bahasa Inggris. Seluruh penjelasan dan kaidah tetap bahasa Indonesia.
+**The prompts are written in English.** This is a technical decision, not a lapse of style:
+the image models we use follow geometric instructions (ratios, angles, line weight) far more
+faithfully in English. Everything outside the prompt blocks is explanation and rules.
 
 ---
 
-## 0. Cara merakit prompt
+## 0. How to assemble a prompt
 
-Setiap prompt karakter = **tiga blok, digabung dengan tanda titik, berurutan:**
+Each character prompt = **three blocks, joined with full stops, in this order:**
 
 ```
-[BLOK GAYA] + [BLOK KARAKTER] + [BLOK TINGKAT]
+[STYLE BLOCK] + [CHARACTER BLOCK] + [LEVEL BLOCK]
 ```
 
-Aturan yang menjaga konsistensi:
+The rules that keep it consistent:
 
-1. **Blok gaya disalin persis, karakter demi karakter.** Jangan diparafrase, jangan
-   diringkas, jangan diubah urutan kalimatnya. Sebagian besar ketidakkonsistenan antar-
-   jalan berasal dari sini.
-2. **Rantai referensi.** Hasilkan **jangkar** lebih dulu (Guardian tingkat 1). Semua
-   gambar berikutnya dijalankan dengan jangkar itu sebagai `reference_images`, dan
-   gambar tingkat berikutnya memakai gambar tingkat sebelumnya dari karakter yang sama.
-   Teks saja tidak cukup untuk menjaga identitas.
-3. **Satu model untuk seluruh set.** Jangan mencampur model di tengah set; perbedaan
-   antar-model jauh lebih besar daripada perbedaan antar-jalan pada model yang sama.
-4. **Rasio 1:1, resolusi 2K** untuk semua avatar. OG image adalah satu-satunya
-   pengecualian.
-5. **Selalu sertakan blok negatif** di akhir bila tool mendukungnya; kalau tidak, kalimat
-   larangan sudah dititipkan di dalam blok gaya.
+1. **Copy the style block exactly, character for character.** Do not paraphrase, do not
+   shorten, do not reorder its sentences. Most run-to-run inconsistency comes from here.
+2. **Reference chain.** Generate the **anchor** first (Guardian level 1). Every later image is
+   run with that anchor as `reference_images`, and each next level image uses the previous
+   level's image of the same character. Text alone is not enough to hold the identity.
+3. **One model for the whole set.** Do not mix models mid-set; the difference between models is
+   far larger than the difference between runs of the same model.
+4. **1:1 ratio, 2K resolution** for all avatars. The OG image is the only exception.
+5. **Always append the negative block** at the end if the tool supports it; if not, the
+   prohibitions are already embedded inside the style block.
 
-**Setelan yang dipakai** (catat setiap perubahan di `hasil.md`):
+**Settings used** (record any change in `hasil.md`):
 
-| Parameter | Nilai |
+| Parameter | Value |
 |---|---|
 | Tool | `mcp__claude_ai_pika__generate_image` |
 | `provider` | `nano-banana-pro` |
@@ -47,7 +44,7 @@ Aturan yang menjaga konsistensi:
 
 ---
 
-## 1. BLOK GAYA (salin persis)
+## 1. STYLE BLOCK (copy exactly)
 
 ```
 Flat vector mascot illustration in a clean modern app-icon style. Thick uniform dark
@@ -64,7 +61,7 @@ high contrast, sticker-like, designed to stay readable when scaled down to a
 48-pixel avatar.
 ```
 
-## 2. BLOK NEGATIF (salin persis)
+## 2. NEGATIVE BLOCK (copy exactly)
 
 ```
 photorealistic, 3d render, realistic fish anatomy, detailed scales, gradient mesh,
@@ -75,7 +72,7 @@ character, human hands, extra fins, extra eyes, spikes on a calm character
 
 ---
 
-## 3. BLOK KARAKTER
+## 3. CHARACTER BLOCKS
 
 ### 3.1 Guardian — `HEALTH_FACTOR`
 
@@ -127,11 +124,11 @@ diagonal line behind its tail, each one smaller than the one below it.
 
 ---
 
-## 4. BLOK TINGKAT (lima)
+## 4. LEVEL BLOCKS (five)
 
-Berlaku untuk keempat karakter. Ukuran dinyatakan relatif terhadap kotak 100 unit.
+These apply to all four characters. Sizes are expressed relative to the 100 unit box.
 
-### Tingkat 1 — Tenang
+### Level 1 — Calm
 ```
 The fish is at bloat level 1 of 5, calm. Its body is at its slimmest, about 56 units
 wide and 52 units tall inside a 100 unit square. No spikes at all; the back is
@@ -140,7 +137,7 @@ is small and neutral. A thin solid arc, 2 units thick, in colour #009E73, curves
 the upper 40 percent of the character like a partial ring.
 ```
 
-### Tingkat 2 — Awas
+### Level 2 — Watchful
 ```
 The fish is at bloat level 2 of 5, watchful. Its body has puffed to about 64 units wide
 and 58 units tall inside a 100 unit square. Short blunt-tipped spikes have emerged about
@@ -150,7 +147,7 @@ fully surrounds the character, with a single small notch cut out of it at the tw
 o'clock position.
 ```
 
-### Tingkat 3 — Tegang
+### Level 3 — Strained
 ```
 The fish is at bloat level 3 of 5, strained. Its body has puffed to about 72 units wide
 and 66 units tall inside a 100 unit square. The spikes are extended about 60 percent and
@@ -159,7 +156,7 @@ the mouth is pursed as if holding a breath. A dashed ring 3 units thick in colou
 #E69F00 fully surrounds the character, with dashes 6 units long separated by 4 unit gaps.
 ```
 
-### Tingkat 4 — Kritis
+### Level 4 — Critical
 ```
 The fish is at bloat level 4 of 5, critical. Its body has puffed to about 80 units wide
 and 74 units tall inside a 100 unit square. The spikes are fully extended and sharply
@@ -168,7 +165,7 @@ temple, and the mouth is open in a small circle. Two concentric solid rings, eac
 units thick and 2 units apart, in colour #D55E00, surround the character.
 ```
 
-### Tingkat 5 — Gawat
+### Level 5 — Emergency
 ```
 The fish is at bloat level 5 of 5, an emergency. Its body is enormous, about 84 units
 wide and 82 units tall inside a 100 unit square, so that it touches and is very slightly
@@ -182,12 +179,12 @@ black and white contrast.
 
 ---
 
-## 5. Prompt aset merek
+## 5. Brand asset prompts
 
-### 5.1 Maskot utama / logo
+### 5.1 Primary mascot / logo
 
 ```
-[BLOK GAYA] The character is the Fugugent mascot, a friendly cartoon pufferfish shown at
+[STYLE BLOCK] The character is the Fugugent mascot, a friendly cartoon pufferfish shown at
 a calm, slightly puffed state, about 62 units wide inside a 100 unit square. It has no
 shell, no visor, no leaf fin and no outstretched scale arms; it is the neutral parent
 form of the family. Body colour #0E7C86, belly colour #9CE9EE. Its spikes are short,
@@ -198,17 +195,17 @@ boundary or permission perimeter rather than a halo. Perfectly symmetrical enoug
 work as an app icon, with the silhouette readable as one clean shape.
 ```
 
-Turunan yang harus dibuat dari file yang sama, jangan digenerate ulang:
-`logo-mark.svg` (jiplak vektor), `logo-lockup.svg` (maskot + kata "Fugugent"),
-`logo-mono.svg` (satu warna, untuk sponsor sheet).
+Derivatives must be made from the same file, not generated again:
+`logo-mark.svg` (vector trace), `logo-lockup.svg` (mascot + the word "Fugugent"),
+`logo-mono.svg` (single colour, for the sponsor sheet).
 
 ### 5.2 Favicon
 
-Favicon **tidak digenerate dari nol** — ia dipangkas dari maskot utama. Kalau memang
-harus digenerate, ini promptnya:
+The favicon is **not generated from scratch** — it is cropped from the primary mascot. If it
+really must be generated, this is the prompt:
 
 ```
-[BLOK GAYA] Extreme simplification for a 16 by 16 pixel favicon: only the head and upper
+[STYLE BLOCK] Extreme simplification for a 16 by 16 pixel favicon: only the head and upper
 body of the Fugugent pufferfish mascot, cropped square, filling 92 percent of the frame.
 Body colour #0E7C86 on a solid #05121A background. Only four shapes are allowed: the
 body silhouette, two eyes, and four short rounded spikes on the top edge. No belly line,
@@ -216,14 +213,13 @@ no mouth, no ring, no fins, no tail, no detail of any kind. Maximum contrast bet
 body and the background so the shape survives at 16 pixels.
 ```
 
-Uji sebelum diterima: perkecil ke 16 px, dan lihat di tab browser bersebelahan dengan
-tab lain. Kalau tidak bisa dibedakan dari lingkaran biasa, tambah duri, jangan tambah
-detail.
+Test before accepting: shrink it to 16 px and look at it in a browser tab next to other tabs.
+If it cannot be told apart from a plain circle, add spikes, do not add detail.
 
 ### 5.3 OG image (`1200×630`)
 
-Rasio 16:9, lalu dipotong ke 1200×630. Teks **jangan** dibuat oleh model gambar —
-render teksnya di lapisan Next.js (`opengraph-image.tsx`) di atas gambar ini.
+Ratio 16:9, then cropped to 1200×630. The text must **not** be made by the image model —
+render the text in a Next.js layer (`opengraph-image.tsx`) on top of this image.
 
 ```
 Flat vector illustration banner, wide 16 by 9 composition, in a clean modern app style
@@ -240,10 +236,10 @@ The entire left third of the image is empty flat background reserved for text. N
 no letters, no numbers, no logo, no watermark.
 ```
 
-### 5.4 Kartu kosong / fallback pihak ketiga
+### 5.4 Empty card / third-party fallback
 
 ```
-[BLOK GAYA] The character is a neutral fallback pufferfish with no distinguishing
+[STYLE BLOCK] The character is a neutral fallback pufferfish with no distinguishing
 accessories at all: no shell, no visor, no leaf fin, no outstretched arms, no bubbles.
 Plain egg-shaped body, about 60 units wide inside a 100 unit square, spikes retracted.
 Body colour #6E8C6E, belly 18 percent lighter. Eyes are open but neutral, mouth is a
@@ -253,47 +249,45 @@ unremarkable presence next to the four named characters.
 
 ---
 
-## 6. Daftar aset minimum
+## 6. Minimum asset list
 
-| Berkas | Prompt |
+| File | Prompt |
 |---|---|
-| `guardian.svg` | GAYA + 3.1 + Tingkat 1 |
-| `rebalancer.svg` | GAYA + 3.2 + Tingkat 1 |
-| `grid.svg` | GAYA + 3.3 + Tingkat 1 |
-| `yield.svg` | GAYA + 3.4 + Tingkat 1 |
-| `guardian-kembung-1.svg` … `-5.svg` | GAYA + 3.1 + Tingkat 1…5 |
+| `guardian.svg` | STYLE + 3.1 + Level 1 |
+| `rebalancer.svg` | STYLE + 3.2 + Level 1 |
+| `grid.svg` | STYLE + 3.3 + Level 1 |
+| `yield.svg` | STYLE + 3.4 + Level 1 |
+| `guardian-kembung-1.svg` … `-5.svg` | STYLE + 3.1 + Levels 1…5 |
 | `maskot.svg` | §5.1 |
 | `favicon-src.svg` | §5.2 |
 | `og.svg` | §5.3 |
 | `fallback.svg` | §5.4 |
 
-> Aset yang benar-benar ada di repo saat ini adalah **SVG hasil gambar tangan**
-> (`docs/brand/generate-svg.py`), bukan keluaran model. Alasannya ada di
-> `hasil.md`. Prompt di atas tetap berlaku bila nanti ingin membuat versi
-> ilustratif yang lebih kaya untuk materi pemasaran.
+> The assets that actually exist in the repo right now are **hand-drawn SVGs**
+> (`docs/brand/generate-svg.py`), not model output. The reasons are in
+> `hasil.md`. The prompts above still stand if we later want to make a richer
+> illustrative version for marketing material.
 
-Semua disimpan di `landingpage/public/brand/`, dicatat di `docs/brand/hasil.md`.
+Everything is stored in `landingpage/public/brand/` and recorded in `docs/brand/hasil.md`.
 
 ---
 
-## 7. Kriteria terima
+## 7. Acceptance criteria
 
-Sebuah gambar **ditolak** kalau salah satu dari ini terjadi — tidak peduli seberapa
-bagus rupanya:
+An image is **rejected** if any of these is true — no matter how good it looks:
 
-1. Durinya muncul pada tingkat 1. Tingkat 1 harus mulus; kalau tidak, seluruh skala
-   kehilangan titik nolnya.
-2. Tingkat 5 tidak terpotong bingkai, atau matanya masih lingkaran.
-3. Ada teks, angka, atau tanda air di dalam gambar.
-4. Ada gradasi, cahaya, atau bayangan lembut.
-5. Warna badan meleset dari hex yang ditentukan lebih dari sekilas mata bisa terima —
-   periksa dengan color picker, jangan dengan perasaan.
-6. Setelah diubah ke grayscale dan dikecilkan ke 48 px, karakternya tertukar dengan
-   karakter lain dalam set.
+1. Spikes appear at level 1. Level 1 has to be smooth; otherwise the whole scale loses its
+   zero point.
+2. Level 5 is not cropped by the frame, or its eyes are still circles.
+3. There is text, a number, or a watermark inside the image.
+4. There is a gradient, a glow, or a soft shadow.
+5. The body colour is off the specified hex by more than a glance can accept — check with a
+   colour picker, not by feel.
+6. After converting to grayscale and shrinking to 48 px, the character is confused with
+   another character in the set.
 
-Gambar model generatif **tidak akan** presisi pada hex dan rasio. Itu sudah
-diperhitungkan: aset ini dipakai untuk halaman landing, OG image, dan materi presentasi.
-**Avatar 48 px di marketplace harus SVG yang digambar tangan** mengikuti spec di
-`karakter.md`, bukan PNG hasil generate — karena di ukuran itu presisi geometri adalah
-segalanya, dan karena avatar harus bisa berubah tingkat kembungnya secara langsung
-lewat CSS/props.
+Generative model images **will not** be precise on hex and ratio. That is accounted for: these
+assets are used for the landing page, the OG image, and presentation material.
+**The 48 px avatar in the marketplace must be a hand-drawn SVG** following the spec in
+`karakter.md`, not a generated PNG — because at that size geometric precision is everything,
+and because the avatar must be able to change its puff level directly through CSS/props.
