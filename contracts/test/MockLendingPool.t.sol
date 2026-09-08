@@ -150,8 +150,10 @@ contract MockLendingPoolTest is Test {
         _borrow(500 ether); // $500 debt, HF = 1.6
 
         // Additional $301 pushes total debt to $801 > $800 ceiling => HF < 1
+        // HF = (1000e8 * 8000 * 1e18) / (10000 * 801e8) = 998751560549313358 tepat
+        // (dihitung dengan pembagian bulat Python, formula identik dengan kontrak).
         vm.prank(borrower);
-        vm.expectPartialRevert(MockLendingPool.HealthFactorTooLow.selector);
+        vm.expectRevert(abi.encodeWithSelector(MockLendingPool.HealthFactorTooLow.selector, 998751560549313358));
         pool.borrow(address(debtToken), 301 ether);
     }
 
@@ -184,8 +186,10 @@ contract MockLendingPoolTest is Test {
         _borrow(500 ether); // $500 debt, HF = 1.6
 
         // Withdrawing 40 tokens ($400) leaves $600 collateral; ceiling debt becomes $480 < $500 debt => HF < 1
+        // HF = (600e8 * 8000 * 1e18) / (10000 * 500e8) = 960000000000000000 (0.96e18) tepat
+        // (dihitung dengan pembagian bulat Python, formula identik dengan kontrak).
         vm.prank(borrower);
-        vm.expectPartialRevert(MockLendingPool.HealthFactorTooLow.selector);
+        vm.expectRevert(abi.encodeWithSelector(MockLendingPool.HealthFactorTooLow.selector, 960000000000000000));
         pool.withdraw(address(collateralToken), 40 ether);
     }
 
