@@ -196,3 +196,43 @@ describe("toAgentRow / fromAgentRow — pemetaan baris Postgres", () => {
     expect(toAgentRow(makeRecord({ id: "salah" })).id).toBe("97:49637");
   });
 });
+
+describe("toAgentRow — record cacat ditolak di tepi, bukan di tengah transaksi", () => {
+  it("menolak tokenId yang bukan bilangan bulat desimal", () => {
+    expect(() => toAgentRow(makeRecord({ tokenId: "1e+21" }))).toThrow(/tokenId/);
+    expect(() => toAgentRow(makeRecord({ tokenId: "1.5" }))).toThrow(/tokenId/);
+    expect(() => toAgentRow(makeRecord({ tokenId: "" }))).toThrow(/tokenId/);
+  });
+
+  it("menolak fetchedAt yang bukan ISO 8601", () => {
+    expect(() => toAgentRow(makeRecord({ fetchedAt: "kemarin sore" }))).toThrow(/fetchedAt/);
+  });
+
+  it("menolak nilai uang yang tidak muat numeric(78, 0)", () => {
+    const listing = { ...makeRecord().fuguListing!, priceUsd8PerPeriod: 10n ** 78n };
+    expect(() => toAgentRow(makeRecord({ fuguListing: listing }))).toThrow(/numeric\(78, 0\)/);
+    // 78 digit tepat masih muat — `uint256` maksimum tidak boleh ikut tertolak
+    expect(() =>
+      toAgentRow(makeRecord({ fuguListing: { ...listing, priceUsd8PerPeriod: MAX_UINT256 } })),
+    ).not.toThrow();
+  });
+});
+
+describe("fromAgentRow — tidak mengarang nilai untuk baris setengah terisi", () => {
+  it("melaporkan tidak ada listing alih-alih owner `0x` dan kategori palsu", () => {
+    const row = toAgentRow(makeRecord());
+    expect(fromAgentRow({ ...row, fuguOwner: null }).fuguListing).toBeNull();
+    expect(fromAgentRow({ ...row, fuguCategory: null }).fuguListing).toBeNull();
+    expect(fromAgentRow({ ...row, fuguPeriodSeconds: null }).fuguListing).toBeNull();
+  });
+
+  it("kategori yang tidak dikenal dilaporkan sebagai belum terklasifikasi", () => {
+    const row = toAgentRow(makeRecord());
+    const back = fromAgentRow({
+      ...row,
+      classificationCategory: "SCALPING" as never,
+    });
+    expect(back.classification?.category).toBeNull();
+    expect(back.fuguListing).not.toBeNull();
+  });
+});

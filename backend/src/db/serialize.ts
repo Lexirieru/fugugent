@@ -18,6 +18,7 @@
  * `bigint` di dalam, `number` tidak pernah.**
  */
 import {
+  CATEGORIES,
   makeAgentKey,
   type AgentClassification,
   type AgentRecord,
@@ -25,10 +26,13 @@ import {
   type Category,
   type FuguListing,
 } from "../types.js";
-import type { AgentRow } from "./schema.js";
+import { MONEY_PRECISION, type AgentRow } from "./schema.js";
 
 /** Hanya digit desimal, boleh diawali `-`. Tidak ada `1e9`, tidak ada `15.5`. */
 const DECIMAL_INTEGER = /^-?\d+$/;
+
+/** `tokenId` adalah `uint256` desimal. `"1.5"` dan `"1e+21"` bukan token id. */
+const DECIMAL_UNSIGNED = /^\d+$/;
 
 /** `bigint` → string desimal. Tidak pernah menghasilkan notasi ilmiah. */
 export function encodeMoney(value: bigint): string {
@@ -127,6 +131,23 @@ export function deserializeAgentRecord(json: AgentRecordJson): AgentRecord {
 // Bentuk baris Postgres
 // ---------------------------------------------------------------------------
 
+/**
+ * Seperti `encodeMoney`, tetapi menolak nilai yang tidak muat di
+ * `numeric(78, 0)`. Tanpa ini Postgres yang menolaknya — di tengah transaksi,
+ * setelah seluruh batch terlanjur dirakit — dan satu record cacat menjatuhkan
+ * 19 record sehat bersamanya.
+ */
+function encodeMoneyForColumn(value: bigint, field: string): string {
+  const encoded = encodeMoney(value);
+  const digits = encoded.startsWith("-") ? encoded.length - 1 : encoded.length;
+  if (digits > MONEY_PRECISION) {
+    throw new RangeError(
+      `${field} tidak muat di numeric(${MONEY_PRECISION}, 0): ${digits} digit`,
+    );
+  }
+  return encoded;
+}
+
 function toDate(iso: string): Date {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) throw new TypeError(`fetchedAt bukan ISO 8601: ${iso}`);
@@ -146,6 +167,11 @@ function toDate(iso: string): Date {
  * kalau dilewatkan `Date`.
  */
 export function toAgentRow(record: AgentRecord): AgentRow {
+  if (!DECIMAL_UNSIGNED.test(record.tokenId)) {
+    // Nilai ini menjadi kunci primer cache dan potongan URL detail. `1e21` yang
+    // lolos jadi `"97:1e+21"` adalah agent yang tidak akan pernah bisa dicari lagi.
+    throw new TypeError(`tokenId bukan bilangan bulat desimal: ${JSON.stringify(record.tokenId)}`);
+  }
   const listing = record.fuguListing;
   return {
     id: makeAgentKey(record.chainId, record.tokenId),
@@ -184,12 +210,16 @@ export function toAgentRow(record: AgentRecord): AgentRow {
     classificationConfidence: record.classification?.confidence ?? null,
     classificationReason: record.classification?.reason ?? null,
 
-    fuguListingId: listing ? encodeMoney(listing.listingId) : null,
-    fuguErc8004AgentId: listing ? encodeMoney(listing.erc8004AgentId) : null,
+    fuguListingId: listing ? encodeMoneyForColumn(listing.listingId, "listingId") : null,
+    fuguErc8004AgentId: listing
+      ? encodeMoneyForColumn(listing.erc8004AgentId, "erc8004AgentId")
+      : null,
     fuguOwner: listing ? listing.owner : null,
     fuguAgentWallet: listing ? listing.agentWallet : null,
     fuguCategory: listing ? listing.category : null,
-    fuguPriceUsd8PerPeriod: listing ? encodeMoney(listing.priceUsd8PerPeriod) : null,
+    fuguPriceUsd8PerPeriod: listing
+      ? encodeMoneyForColumn(listing.priceUsd8PerPeriod, "priceUsd8PerPeriod")
+      : null,
     fuguPeriodSeconds: listing ? listing.periodSeconds : null,
     fuguActive: listing ? listing.active : null,
     fuguCurated: listing ? listing.curated : null,
@@ -202,18 +232,42 @@ export function toAgentRow(record: AgentRecord): AgentRow {
   };
 }
 
+function isCategory(value: string | null): value is Category {
+  return value !== null && (CATEGORIES as readonly string[]).includes(value);
+}
+
+/**
+ * Listing dari baris — atau `null` bila barisnya tidak memuat listing yang utuh.
+ *
+ * Sengaja **tidak** mengarang nilai bawaan. Baris setengah terisi (mungkin dari
+ * migrasi atau tulisan manual) dulu menghasilkan `owner: "0x"` — alamat yang
+ * tidak sah — dan `category: "REBALANCING"` — kategori sungguhan yang akan
+ * ditampilkan ke pengguna seolah-olah itu fakta. Lebih baik mengaku tidak punya
+ * listing, sama seperti normalizer yang melewati item tanpa identitas.
+ */
 function listingFromRow(row: AgentRow): FuguListing | null {
-  if (row.fuguListingId === null || row.fuguPriceUsd8PerPeriod === null) return null;
+  if (
+    row.fuguListingId === null ||
+    row.fuguPriceUsd8PerPeriod === null ||
+    row.fuguOwner === null ||
+    row.fuguAgentWallet === null ||
+    !isCategory(row.fuguCategory) ||
+    row.fuguPeriodSeconds === null ||
+    row.fuguActive === null ||
+    row.fuguCurated === null
+  ) {
+    return null;
+  }
   return {
     listingId: decodeMoney(row.fuguListingId),
     erc8004AgentId: decodeMoneyOrNull(row.fuguErc8004AgentId) ?? 0n,
-    owner: (row.fuguOwner ?? "0x") as Address,
-    agentWallet: (row.fuguAgentWallet ?? "0x") as Address,
-    category: (row.fuguCategory ?? "REBALANCING") as Category,
+    owner: row.fuguOwner as Address,
+    agentWallet: row.fuguAgentWallet as Address,
+    category: row.fuguCategory,
     priceUsd8PerPeriod: decodeMoney(row.fuguPriceUsd8PerPeriod),
-    periodSeconds: row.fuguPeriodSeconds ?? 0,
-    active: row.fuguActive ?? false,
-    curated: row.fuguCurated ?? false,
+    periodSeconds: row.fuguPeriodSeconds,
+    active: row.fuguActive,
+    curated: row.fuguCurated,
     metadataURI: row.fuguMetadataUri ?? "",
   };
 }
@@ -221,7 +275,9 @@ function listingFromRow(row: AgentRow): FuguListing | null {
 function classificationFromRow(row: AgentRow): AgentClassification | null {
   if (row.classificationCategory === null && row.classificationConfidence === null) return null;
   return {
-    category: row.classificationCategory,
+    // Kategori yang tidak dikenal (skema lebih tua, tulisan manual) dilaporkan
+    // `null` — "belum terklasifikasi" — bukan diteruskan sebagai kategori palsu.
+    category: isCategory(row.classificationCategory) ? row.classificationCategory : null,
     confidence: row.classificationConfidence ?? 0,
     reason: row.classificationReason ?? "",
   };

@@ -1,33 +1,86 @@
 /**
  * Cache agent — **tingkat kedua dari empat tingkat fallback**.
  *
- * Bila 8004scan tumbang, inilah yang menjawab. Karena itu ada dua janji yang
+ * Bila 8004scan tumbang, inilah yang menjawab. Karena itu ada tiga janji yang
  * dipegang berkas ini:
  *
- * 1. **Tidak pernah melempar ke pemanggil.** Sama seperti `AgentListPage` pada
- *    sumber lain, kegagalan diwakili `healthy: false` + `reason`.
- * 2. **Umur data selalu ikut terbawa.** Setiap pembacaan mengembalikan
+ * 1. **Umur data selalu ikut terbawa.** Setiap pembacaan mengembalikan
  *    `ageSeconds`, `oldestFetchedAt`, dan `stale` supaya UI bisa jujur berkata
  *    "data berumur N detik" alih-alih berpura-pura segar. Ini janji produk,
  *    bukan detail teknis — data basi yang ditampilkan sebagai basi masih
  *    berguna; data basi yang menyamar sebagai segar adalah kebohongan.
+ * 2. **Penulisan dari satu sumber tidak pernah menghapus apa yang hanya
+ *    diketahui sumber lain.** Lihat "Aturan penggabungan" di bawah.
+ * 3. **Jalur baca dan jalur pelaporan kesehatan tidak pernah melempar.**
+ *    `getCachedAgents`, `getCachedAgent`, `recordSourceHealth`, dan
+ *    `getLatestSourceHealth` mengembalikan bentuk yang menyatakan kegagalan.
+ *    `/api/health` justru paling dibutuhkan ketika Postgres mati; endpoint itu
+ *    tidak boleh ikut mati bersamanya.
+ *
+ *    **Satu-satunya pengecualian adalah `upsertAgents`, yang sengaja melempar**
+ *    bila infrastrukturnya gagal. Penulisan yang gagal harus terlihat oleh
+ *    scheduler; kalau ia mengembalikan 0 dengan tenang, cache membusuk tanpa
+ *    ada yang tahu sampai juri membuka marketplace. Pemanggilnya wajib
+ *    membungkus dengan `try` — Task 5/6, ini bagian kalian.
  *
  * Perhatikan bahwa **umur tidak pernah menjadi alasan menyembunyikan data**.
  * `maxAgeSeconds` hanya menyalakan penanda `stale`; barisnya tetap dikembalikan.
  * Marketplace kosong jauh lebih buruk daripada marketplace yang mengaku basi.
+ *
+ * ## Aturan penggabungan (kenapa `upsertAgents` tidak sekadar menimpa)
+ *
+ * Satu agent bisa ditulis oleh dua sumber yang tahu hal berbeda: `onchain` tahu
+ * listing `FuguRegistry` (harga, `curated`) tapi namanya cuma `"Agent #49637"`;
+ * `scan8004` tahu nama, deskripsi, tag, dan reputasi tapi tidak tahu apa-apa
+ * tentang listing kita. Menimpa seluruh kolom membuat penyegaran yang **berhasil**
+ * justru menghapus listing first-party kita sendiri — persis sebelum cache ini
+ * dibutuhkan sebagai tingkat kedua. Tiga aturan mencegahnya:
+ *
+ * - **A. `null` berarti "tidak tahu", bukan "tidak ada".** Kolom opsional
+ *   (`fugu_*`, `classification_*`, alamat, skor) memakai
+ *   `coalesce(excluded, agents)`.
+ * - **B. Teks wajib yang kosong juga berarti "tidak tahu".** `name` dan
+ *   `description` memakai `coalesce(nullif(excluded, ''), agents)`.
+ * - **C. Sumber yang buta terhadap metadata deskriptif tidak menyentuhnya.**
+ *   `onchain` tidak pernah menimpa nama/deskripsi/tag/skill/reputasi/badge milik
+ *   baris yang sudah ada — nilainya hanya placeholder. Pada baris **baru** nilai
+ *   itu tetap dipakai, karena saat itu memang cuma itu yang kita punya.
+ *
+ * Konsekuensi yang harus disadari: dengan aturan A, `fuguListing` tidak bisa
+ * dikosongkan lewat `upsertAgents`. Listing yang dicabut ditandai
+ * `active: false` oleh `FuguRegistry` (bukan dihapus), jadi jalur itu tetap
+ * benar; penghapusan sungguhan butuh `delete` eksplisit.
  */
-import { and, asc, desc, eq, getTableColumns, gte, ilike, inArray, isNotNull, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  getTableColumns,
+  gte,
+  ilike,
+  inArray,
+  isNotNull,
+  or,
+  sql,
+} from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import type { PgUpdateSetSource } from "drizzle-orm/pg-core";
 import type {
   AgentDetailResult,
   AgentListPage,
   AgentRecord,
+  AgentSource,
   Category,
   SourceHealth,
 } from "../types.js";
 import type { FuguDb } from "./client.js";
-import { agentCategories, agents, sourceHealth as sourceHealthTable, type AgentRow } from "./schema.js";
+import {
+  agentCategories,
+  agents,
+  sourceHealth as sourceHealthTable,
+  type AgentRow,
+} from "./schema.js";
 import { fromAgentRow, toAgentRow } from "./serialize.js";
 
 /** Batas bawaan satu halaman. */
@@ -39,6 +92,16 @@ export const MAX_LIMIT = 100;
  * (detail 60 dtk · leaderboard 5 mnt · trending 1 mnt · global 60 dtk).
  */
 export const DEFAULT_MAX_AGE_SECONDS = 60;
+
+/**
+ * Sumber yang **tidak** punya pendapat tentang metadata deskriptif.
+ *
+ * `readFuguListings()` menyusun `name: "Agent #<tokenId>"`, `description: ""`,
+ * `tags: []` — bukan karena agent-nya memang begitu, tapi karena kontrak tidak
+ * menyimpannya. Menganggap itu sebagai pendapat berarti setiap penyegaran
+ * on-chain mengganti nama sungguhan dengan placeholder.
+ */
+export const SOURCES_BLIND_TO_DESCRIPTIVE_METADATA: readonly AgentSource[] = ["onchain"];
 
 export interface CachedAgentFilter {
   chainId?: number;
@@ -82,6 +145,22 @@ export interface CachedAgentResult extends AgentDetailResult {
   maxAgeSeconds: number;
 }
 
+/** Satu record yang tidak jadi ditulis, beserta alasannya. */
+export interface SkippedRecord {
+  /** `` `${chainId}:${tokenId}` `` bila masih bisa dihitung, selain itu `tokenId` mentah. */
+  id: string;
+  reason: string;
+}
+
+export interface UpsertOptions {
+  /**
+   * Dipanggil untuk tiap record cacat yang dilewati. Sengaja callback dan bukan
+   * nilai balik supaya tanda tangan `upsertAgents` tetap `Promise<number>` bagi
+   * pemanggil yang tidak peduli.
+   */
+  onSkipped?: (skipped: SkippedRecord) => void;
+}
+
 /** Umur satu record dalam detik. Tidak pernah negatif walau jam bergeser. */
 export function agentAgeSeconds(record: AgentRecord, now: Date = new Date()): number {
   return ageOf(new Date(record.fetchedAt), now);
@@ -106,6 +185,125 @@ function escapeLike(term: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Aturan penggabungan per kolom
+// ---------------------------------------------------------------------------
+
+type MergeStrategy =
+  /** Penulis terakhir menang. Untuk kolom yang setiap sumber punya pendapatnya. */
+  | "overwrite"
+  /** Aturan A: `null` pada nilai baru berarti "tidak tahu" — nilai lama bertahan. */
+  | "keepOldWhenNull"
+  /** Aturan B: string kosong pada nilai baru juga berarti "tidak tahu". */
+  | "keepOldWhenEmptyText";
+
+interface MergeRule {
+  strategy: MergeStrategy;
+  /** Aturan C: kolom ini tidak boleh disentuh sumber yang buta metadata deskriptif. */
+  descriptive?: true;
+}
+
+/**
+ * Aturan untuk **setiap** kolom `agents`.
+ *
+ * Sengaja `Record<keyof AgentRow, …>`: menambah kolom tanpa memutuskan aturannya
+ * membuat build gagal. Cacat yang ditemukan review lahir persis dari kolom baru
+ * yang diam-diam ikut `excluded.*`.
+ */
+const MERGE_RULES: Record<keyof AgentRow, MergeRule> = {
+  // identitas — sama persis di kedua sisi konflik
+  id: { strategy: "overwrite" },
+  chainId: { strategy: "overwrite" },
+  tokenId: { strategy: "overwrite" },
+  registryAddress: { strategy: "keepOldWhenNull" },
+  agentId: { strategy: "keepOldWhenNull", descriptive: true },
+
+  // metadata deskriptif — hanya sumber yang benar-benar tahu yang boleh menulis
+  name: { strategy: "keepOldWhenEmptyText", descriptive: true },
+  description: { strategy: "keepOldWhenEmptyText", descriptive: true },
+  imageUrl: { strategy: "keepOldWhenNull", descriptive: true },
+  agentType: { strategy: "keepOldWhenNull", descriptive: true },
+  tags: { strategy: "overwrite", descriptive: true },
+  upstreamCategories: { strategy: "overwrite", descriptive: true },
+  skills: { strategy: "overwrite", descriptive: true },
+  domains: { strategy: "overwrite", descriptive: true },
+  supportedProtocols: { strategy: "overwrite", descriptive: true },
+
+  // kepemilikan — alamat diketahui kedua sumber, nama pengguna hanya upstream
+  ownerAddress: { strategy: "keepOldWhenNull" },
+  ownerUsername: { strategy: "keepOldWhenNull", descriptive: true },
+  ownerPublisherTier: { strategy: "keepOldWhenNull", descriptive: true },
+  agentWallet: { strategy: "keepOldWhenNull" },
+
+  // status — `false` adalah pendapat yang sah, jadi ditimpa…
+  isActive: { strategy: "overwrite" },
+  // …kecuali badge kepercayaan, yang tidak diketahui pembaca on-chain
+  isVerified: { strategy: "overwrite", descriptive: true },
+  isEndpointVerified: { strategy: "overwrite", descriptive: true },
+  x402Supported: { strategy: "overwrite", descriptive: true },
+
+  // reputasi — seluruhnya milik 8004scan
+  reputationTotalScore: { strategy: "keepOldWhenNull", descriptive: true },
+  reputationHealthScore: { strategy: "keepOldWhenNull", descriptive: true },
+  reputationTotalFeedbacks: { strategy: "overwrite", descriptive: true },
+  reputationAverageScore: { strategy: "keepOldWhenNull", descriptive: true },
+  reputationStarCount: { strategy: "overwrite", descriptive: true },
+
+  // klasifikasi (Task 4) — penulis tanpa klasifikasi tidak menghapus yang lama
+  classificationCategory: { strategy: "keepOldWhenNull" },
+  classificationConfidence: { strategy: "keepOldWhenNull" },
+  classificationReason: { strategy: "keepOldWhenNull" },
+
+  // listing first-party — hanya diketahui pembacaan on-chain
+  fuguListingId: { strategy: "keepOldWhenNull" },
+  fuguErc8004AgentId: { strategy: "keepOldWhenNull" },
+  fuguOwner: { strategy: "keepOldWhenNull" },
+  fuguAgentWallet: { strategy: "keepOldWhenNull" },
+  fuguCategory: { strategy: "keepOldWhenNull" },
+  fuguPriceUsd8PerPeriod: { strategy: "keepOldWhenNull" },
+  fuguPeriodSeconds: { strategy: "keepOldWhenNull" },
+  fuguActive: { strategy: "keepOldWhenNull" },
+  fuguCurated: { strategy: "keepOldWhenNull" },
+  fuguMetadataUri: { strategy: "keepOldWhenNull" },
+
+  // provenance — mencatat penulis terakhir, bukan asal tiap kolom
+  source: { strategy: "overwrite" },
+  fetchedAt: { strategy: "overwrite" },
+  upstreamCreatedAt: { strategy: "keepOldWhenNull", descriptive: true },
+  upstreamUpdatedAt: { strategy: "keepOldWhenNull", descriptive: true },
+};
+
+const BLIND_SOURCE_LIST = SOURCES_BLIND_TO_DESCRIPTIVE_METADATA.map(
+  (source) => `'${source}'`,
+).join(", ");
+
+/** Ekspresi `SET` untuk satu kolom pada `ON CONFLICT DO UPDATE`. */
+function mergeExpression(columnName: string, rule: MergeRule): string {
+  const target = `agents."${columnName}"`;
+  const incoming = `excluded."${columnName}"`;
+  const base =
+    rule.strategy === "overwrite"
+      ? incoming
+      : rule.strategy === "keepOldWhenNull"
+        ? `coalesce(${incoming}, ${target})`
+        : `coalesce(nullif(${incoming}, ''), ${target})`;
+
+  if (rule.descriptive !== true) return base;
+  return `case when excluded."source" in (${BLIND_SOURCE_LIST}) then ${target} else ${base} end`;
+}
+
+function buildMergeSet(): PgUpdateSetSource<typeof agents> {
+  const columns = getTableColumns(agents);
+  return Object.fromEntries(
+    Object.entries(columns)
+      .filter(([key]) => key !== "id")
+      .map(([key, column]) => [
+        key,
+        sql.raw(mergeExpression(column.name, MERGE_RULES[key as keyof AgentRow])),
+      ]),
+  ) as PgUpdateSetSource<typeof agents>;
+}
+
+// ---------------------------------------------------------------------------
 // Tulis
 // ---------------------------------------------------------------------------
 
@@ -113,79 +311,159 @@ function escapeLike(term: string): string {
  * Menulis (atau memperbarui) sekumpulan agent ke cache.
  *
  * **Idempoten**: kunci primernya `id` = `` `${chainId}:${tokenId}` ``, dan
- * konfliknya menimpa seluruh kolom. Memanggilnya dua kali dengan data yang sama
- * menghasilkan tepat baris yang sama — bukan duplikat.
+ * konfliknya digabungkan menurut `MERGE_RULES`. Memanggilnya dua kali dengan
+ * data yang sama menghasilkan tepat baris yang sama — bukan duplikat, dan tanpa
+ * kehilangan apa pun yang ditulis sumber lain (lihat "Aturan penggabungan").
  *
- * Klasifikasi ditulis ke `agent_categories` dengan pola hapus-lalu-sisip untuk
- * id yang disentuh, sehingga classifier yang berubah pikiran tidak meninggalkan
- * kategori lama yang menghantui hasil pencarian.
+ * Klasifikasi ditulis ke `agent_categories`; barisnya dihapus **hanya** untuk id
+ * yang membawa klasifikasi baru, sehingga penyegaran dari sumber yang tidak
+ * mengklasifikasi apa pun tidak menghapus kategori yang sudah ada.
  *
- * @returns jumlah agent unik yang ditulis.
+ * **Record cacat dilewati, bukan menjatuhkan batch.** `fetchedAt` tidak sah,
+ * `tokenId` bukan desimal, atau nilai uang yang tidak muat `numeric(78,0)` hanya
+ * membuang record itu sendiri — 19 record sehat lainnya tetap tersimpan. Ini
+ * disiplin yang sama dengan normalizer Task 2, dan lapisan yang berjanji "jangan
+ * pernah kosong" tidak punya alasan memegang disiplin yang lebih longgar.
+ *
+ * **Melempar** bila infrastrukturnya gagal (Postgres mati, skema hilang) — satu-
+ * satunya fungsi di berkas ini yang begitu, dan disengaja: lihat catatan kepala.
+ *
+ * @returns jumlah agent unik yang benar-benar ditulis.
  */
-export async function upsertAgents(db: FuguDb, records: AgentRecord[]): Promise<number> {
+export async function upsertAgents(
+  db: FuguDb,
+  records: AgentRecord[],
+  options: UpsertOptions = {},
+): Promise<number> {
   if (records.length === 0) return 0;
 
-  // Dua record dengan id sama dalam satu batch akan membuat Postgres menolak
-  // (`ON CONFLICT DO UPDATE cannot affect row a second time`). Yang terakhir menang.
-  const byId = new Map<string, AgentRecord>();
-  for (const record of records) byId.set(toAgentRow(record).id, record);
+  const entries: { record: AgentRecord; row: AgentRow }[] = [];
+  for (const record of records) {
+    try {
+      entries.push({ record, row: toAgentRow(record) });
+    } catch (error) {
+      options.onSkipped?.({
+        id: record.id || record.tokenId,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  if (entries.length === 0) return 0;
 
-  const rows: AgentRow[] = [...byId.values()].map(toAgentRow);
-  const ids = rows.map((row) => row.id);
+  // Postgres menolak dua baris dengan id sama dalam satu pernyataan
+  // `ON CONFLICT DO UPDATE` ("cannot affect row a second time"). Membuang yang
+  // duplikat ("yang terakhir menang") akan menghidupkan kembali cacat yang sama:
+  // satu batch berisi record on-chain **dan** record 8004scan untuk agent yang
+  // sama akan kehilangan salah satunya. Karena itu batch dipecah menjadi
+  // beberapa putaran ber-id unik, dijalankan berurutan di dalam satu transaksi —
+  // sehingga aturan penggabungan di `MERGE_RULES` yang menyatukannya, bukan
+  // logika kedua yang harus dijaga tetap sejalan.
+  const rounds: AgentRow[][] = [];
+  const seenPerRound: Set<string>[] = [];
+  for (const { row } of entries) {
+    let index = 0;
+    while (seenPerRound[index]?.has(row.id) === true) index += 1;
+    if (rounds[index] === undefined) {
+      rounds[index] = [];
+      seenPerRound[index] = new Set<string>();
+    }
+    rounds[index]!.push(row);
+    seenPerRound[index]!.add(row.id);
+  }
 
-  const columns = getTableColumns(agents);
-  const overwrite = Object.fromEntries(
-    Object.entries(columns)
-      .filter(([key]) => key !== "id")
-      .map(([key, column]) => [key, sql.raw(`excluded."${column.name}"`)]),
-  ) as PgUpdateSetSource<typeof agents>;
+  // Klasifikasi terakhir yang benar-benar punya pendapat untuk tiap id — sejajar
+  // dengan `coalesce(excluded, agents)` pada kolom `classification_*`.
+  const categoryByKey = new Map<string, typeof agentCategories.$inferInsert>();
+  for (const { record, row } of entries) {
+    const classification = record.classification;
+    if (!classification || classification.category === null) continue;
+    categoryByKey.set(row.id, {
+      agentKey: row.id,
+      category: classification.category,
+      confidence: classification.confidence,
+      reason: classification.reason,
+      assignedAt: row.fetchedAt,
+    });
+  }
+  const categoryRows = [...categoryByKey.values()];
 
-  const categoryRows = [...byId.values()]
-    .map((record) => {
-      const classification = record.classification;
-      if (!classification || classification.category === null) return null;
-      return {
-        agentId: toAgentRow(record).id,
-        category: classification.category,
-        confidence: classification.confidence,
-        reason: classification.reason,
-        assignedAt: new Date(record.fetchedAt),
-      };
-    })
-    .filter((row): row is NonNullable<typeof row> => row !== null);
-
+  const mergeSet = buildMergeSet();
   await db.transaction(async (tx) => {
-    await tx.insert(agents).values(rows).onConflictDoUpdate({ target: agents.id, set: overwrite });
-    await tx.delete(agentCategories).where(inArray(agentCategories.agentId, ids));
-    if (categoryRows.length > 0) await tx.insert(agentCategories).values(categoryRows);
+    for (const round of rounds) {
+      await tx.insert(agents).values(round).onConflictDoUpdate({ target: agents.id, set: mergeSet });
+    }
+
+    if (categoryRows.length > 0) {
+      await tx.delete(agentCategories).where(
+        inArray(
+          agentCategories.agentKey,
+          categoryRows.map((row) => row.agentKey),
+        ),
+      );
+      await tx.insert(agentCategories).values(categoryRows);
+    }
   });
 
-  return rows.length;
+  return new Set(entries.map((entry) => entry.row.id)).size;
 }
 
-/** Mencatat status satu sumber data. Riwayat disimpan, bukan ditimpa. */
-export async function recordSourceHealth(db: FuguDb, health: SourceHealth): Promise<void> {
-  await db.insert(sourceHealthTable).values({
-    source: health.source,
-    healthy: health.healthy,
-    reason: health.reason,
-    checkedAt: new Date(health.checkedAt),
-  });
+/**
+ * Mencatat status satu sumber data. Riwayat disimpan, bukan ditimpa.
+ *
+ * Tidak pernah melempar: ini sering dipanggil **dari** jalur penanganan
+ * kegagalan, dan kegagalan mencatat kegagalan tidak boleh menimpa kegagalan
+ * aslinya.
+ *
+ * @returns `true` bila benar-benar tercatat.
+ */
+export async function recordSourceHealth(db: FuguDb, health: SourceHealth): Promise<boolean> {
+  try {
+    await db.insert(sourceHealthTable).values({
+      source: health.source,
+      healthy: health.healthy,
+      reason: health.reason,
+      checkedAt: new Date(health.checkedAt),
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-/** Status terakhir tiap sumber — dasar `/api/health`. */
-export async function getLatestSourceHealth(db: FuguDb): Promise<SourceHealth[]> {
-  const rows = await db
-    .selectDistinctOn([sourceHealthTable.source])
-    .from(sourceHealthTable)
-    .orderBy(sourceHealthTable.source, desc(sourceHealthTable.checkedAt));
+/**
+ * Status terakhir tiap sumber — dasar `/api/health`.
+ *
+ * Tidak pernah melempar. Bila cache-nya sendiri yang tidak bisa dibaca, ia
+ * melaporkan hal itu sebagai satu entri `source: "cache", healthy: false` —
+ * jawaban yang jauh lebih berguna daripada HTTP 500 tanpa penjelasan, tepat
+ * ketika pengguna sedang bertanya "apa yang sedang tumbang?".
+ */
+export async function getLatestSourceHealth(
+  db: FuguDb,
+  now: Date = new Date(),
+): Promise<SourceHealth[]> {
+  try {
+    const rows = await db
+      .selectDistinctOn([sourceHealthTable.source])
+      .from(sourceHealthTable)
+      .orderBy(sourceHealthTable.source, desc(sourceHealthTable.checkedAt));
 
-  return rows.map((row) => ({
-    source: row.source,
-    healthy: row.healthy,
-    reason: row.reason,
-    checkedAt: row.checkedAt.toISOString(),
-  }));
+    return rows.map((row) => ({
+      source: row.source,
+      healthy: row.healthy,
+      reason: row.reason,
+      checkedAt: row.checkedAt.toISOString(),
+    }));
+  } catch (error) {
+    return [
+      {
+        source: "cache",
+        healthy: false,
+        reason: describeError(error),
+        checkedAt: now.toISOString(),
+      },
+    ];
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -210,7 +488,7 @@ function buildWhere(db: FuguDb, filter: CachedAgentFilter): SQL | undefined {
 
   if (filter.category !== undefined) {
     const classified = db
-      .select({ agentId: agentCategories.agentId })
+      .select({ agentKey: agentCategories.agentKey })
       .from(agentCategories)
       .where(
         and(

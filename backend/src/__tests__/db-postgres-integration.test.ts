@@ -90,6 +90,17 @@ describe.skipIf(!handle)("integrasi Postgres sungguhan (butuh FUGU_TEST_DATABASE
     expect(page.items[0]!.fuguListing?.priceUsd8PerPeriod).toBe(2n ** 200n);
     expect(page.ageSeconds).toBe(30);
 
+    // Aturan penggabungan dijalankan lewat SQL (`coalesce`/`nullif`/`case`), jadi
+    // ia harus dibuktikan di Postgres sungguhan, bukan hanya di PGlite.
+    await upsertAgents(db, [
+      { ...record, name: "Integrasi Fugu v2", fuguListing: null, classification: null },
+    ]);
+    const merged = await getCachedAgents(db, { onlyListed: true });
+    expect(merged.total).toBe(1);
+    expect(merged.items[0]!.name).toBe("Integrasi Fugu v2");
+    expect(merged.items[0]!.fuguListing?.priceUsd8PerPeriod).toBe(2n ** 200n);
+    expect((await getCachedAgents(db, { category: "YIELD" })).total).toBe(1);
+
     await recordSourceHealth(db, {
       source: "scan8004",
       healthy: true,

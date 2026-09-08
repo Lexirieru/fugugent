@@ -1,4 +1,5 @@
 import { PGlite } from "@electric-sql/pglite";
+import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { AgentRecord } from "../types.js";
@@ -374,5 +375,260 @@ describe("recordSourceHealth", () => {
 
   it("tanpa catatan sama sekali mengembalikan daftar kosong", async () => {
     expect(await getLatestSourceHealth(db)).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regresi review putaran 1 — Critical 3.1
+//
+// Sebelum perbaikan, `upsertAgents` menimpa SELURUH kolom dengan `excluded.*`
+// dan menghapus `agent_categories` untuk semua id yang disentuh. Akibatnya
+// penyegaran 8004scan yang BERHASIL menghapus listing first-party kita sendiri
+// beserta hasil classifier — persis sebelum cache ini dibutuhkan sebagai
+// tingkat kedua fallback. Setiap test di blok ini gagal bila perbaikan itu
+// dibatalkan.
+// ---------------------------------------------------------------------------
+
+const LISTING = {
+  listingId: 7n,
+  erc8004AgentId: 49637n,
+  owner: "0x2222222222222222222222222222222222222222" as const,
+  agentWallet: "0x1111111111111111111111111111111111111111" as const,
+  category: "YIELD" as const,
+  priceUsd8PerPeriod: 1_500_000_000n,
+  periodSeconds: 2_592_000,
+  active: true,
+  curated: true,
+  metadataURI: "ipfs://bafy",
+};
+
+/** Bentuk record seperti yang benar-benar disusun `readFuguListings()`. */
+function onchainRecord(overrides: Partial<AgentRecord> = {}): AgentRecord {
+  return makeRecord({
+    source: "onchain",
+    name: "Agent #49637",
+    description: "",
+    tags: [],
+    supportedProtocols: [],
+    isVerified: true,
+    reputation: {
+      totalScore: null,
+      healthScore: null,
+      totalFeedbacks: 0,
+      averageScore: null,
+      starCount: 0,
+    },
+    fuguListing: LISTING,
+    classification: { category: "YIELD", confidence: 0.95, reason: "kategori on-chain" },
+    ...overrides,
+  });
+}
+
+/** Bentuk record seperti yang disusun normalizer 8004scan: kaya metadata, buta listing. */
+function scanRecord(overrides: Partial<AgentRecord> = {}): AgentRecord {
+  return makeRecord({
+    source: "scan8004",
+    name: "OpenOdds.Ai",
+    description: "Verifiable pre-match football odds prediction agent",
+    tags: ["prediction", "sports"],
+    supportedProtocols: ["MCP", "A2A", "Web"],
+    isVerified: true,
+    reputation: {
+      totalScore: 49.06,
+      healthScore: 100,
+      totalFeedbacks: 3,
+      averageScore: 100,
+      starCount: 8,
+    },
+    fuguListing: null,
+    classification: null,
+    ...overrides,
+  });
+}
+
+describe("penggabungan lintas sumber — penulisan satu sumber tidak menghapus milik sumber lain", () => {
+  let db: FuguDb;
+  beforeEach(async () => {
+    db = await freshDb();
+  });
+
+  it("penyegaran 8004scan tidak menghapus listing FuguRegistry yang dibaca on-chain", async () => {
+    await upsertAgents(db, [onchainRecord()]);
+    await upsertAgents(db, [scanRecord()]);
+
+    const page = await getCachedAgents(db);
+    const agent = page.items[0]!;
+
+    // yang HILANG sebelum perbaikan:
+    expect(agent.fuguListing?.priceUsd8PerPeriod).toBe(1_500_000_000n);
+    expect(agent.fuguListing?.curated).toBe(true);
+    expect((await getCachedAgents(db, { onlyListed: true })).total).toBe(1);
+    expect((await getCachedAgents(db, { onlyCurated: true })).total).toBe(1);
+
+    // yang memang seharusnya diperbarui oleh 8004scan:
+    expect(agent.name).toBe("OpenOdds.Ai");
+    expect(agent.tags).toEqual(["prediction", "sports"]);
+    expect(agent.reputation.starCount).toBe(8);
+  });
+
+  it("penyegaran 8004scan tidak menghapus klasifikasi maupun baris agent_categories", async () => {
+    await upsertAgents(db, [onchainRecord()]);
+    await upsertAgents(db, [scanRecord()]);
+
+    // kolom klasifikasi bertahan…
+    const page = await getCachedAgents(db);
+    expect(page.items[0]!.classification).toEqual({
+      category: "YIELD",
+      confidence: 0.95,
+      reason: "kategori on-chain",
+    });
+    // …dan navigasi per kategori tetap menemukannya
+    expect((await getCachedAgents(db, { category: "YIELD" })).total).toBe(1);
+  });
+
+  it("pembacaan on-chain tidak mengganti nama sungguhan dengan placeholder `Agent #…`", async () => {
+    await upsertAgents(db, [scanRecord()]);
+    await upsertAgents(db, [onchainRecord({ classification: null })]);
+
+    const agent = (await getCachedAgents(db)).items[0]!;
+    expect(agent.name).toBe("OpenOdds.Ai");
+    expect(agent.description).toBe("Verifiable pre-match football odds prediction agent");
+    expect(agent.tags).toEqual(["prediction", "sports"]);
+    expect(agent.supportedProtocols).toEqual(["MCP", "A2A", "Web"]);
+    expect(agent.reputation.starCount).toBe(8);
+    expect(agent.reputation.totalScore).toBe(49.06);
+
+    // …sementara listing yang memang hanya diketahui on-chain tetap masuk
+    expect(agent.fuguListing?.priceUsd8PerPeriod).toBe(1_500_000_000n);
+  });
+
+  it("urutan penulisan tidak mengubah hasil akhir", async () => {
+    await upsertAgents(db, [onchainRecord(), scanRecord()]);
+    const forward = (await getCachedAgents(db)).items[0]!;
+
+    const other = await freshDb();
+    await upsertAgents(other, [scanRecord()]);
+    await upsertAgents(other, [onchainRecord()]);
+    const backward = (await getCachedAgents(other)).items[0]!;
+
+    expect(forward.name).toBe(backward.name);
+    expect(forward.fuguListing?.priceUsd8PerPeriod).toBe(backward.fuguListing?.priceUsd8PerPeriod);
+    expect(forward.classification?.category).toBe(backward.classification?.category);
+  });
+
+  it("penggabungan tidak membekukan status: `isActive` tetap bisa diubah menjadi false", async () => {
+    await upsertAgents(db, [scanRecord()]);
+    await upsertAgents(db, [scanRecord({ isActive: false })]);
+    expect((await getCachedAgents(db, { onlyActive: true })).total).toBe(0);
+  });
+
+  it("sumber yang sama tetap boleh memperbarui metadatanya sendiri", async () => {
+    await upsertAgents(db, [scanRecord()]);
+    await upsertAgents(db, [scanRecord({ name: "OpenOdds.Ai v2", tags: ["prediction"] })]);
+    const agent = (await getCachedAgents(db)).items[0]!;
+    expect(agent.name).toBe("OpenOdds.Ai v2");
+    expect(agent.tags).toEqual(["prediction"]);
+  });
+});
+
+describe("record cacat dilewati, batch tetap tersimpan", () => {
+  let db: FuguDb;
+  beforeEach(async () => {
+    db = await freshDb();
+  });
+
+  it("satu `fetchedAt` tidak sah tidak menjatuhkan 2 record sehat", async () => {
+    const skipped: { id: string; reason: string }[] = [];
+    const written = await upsertAgents(
+      db,
+      [
+        makeRecord({ tokenId: "1" }),
+        makeRecord({ tokenId: "2", fetchedAt: "kemarin sore" }),
+        makeRecord({ tokenId: "3" }),
+      ],
+      { onSkipped: (entry) => skipped.push(entry) },
+    );
+
+    expect(written).toBe(2);
+    expect((await getCachedAgents(db)).total).toBe(2);
+    expect(skipped).toHaveLength(1);
+    expect(skipped[0]!.reason).toMatch(/fetchedAt/);
+  });
+
+  it("`tokenId` yang bukan bilangan bulat desimal dilewati, bukan menjadi kunci primer palsu", async () => {
+    const skipped: { id: string; reason: string }[] = [];
+    const written = await upsertAgents(
+      db,
+      [
+        makeRecord({ tokenId: "1e+21" }),
+        makeRecord({ tokenId: "1.5" }),
+        makeRecord({ tokenId: "42" }),
+      ],
+      { onSkipped: (entry) => skipped.push(entry) },
+    );
+
+    expect(written).toBe(1);
+    expect((await getCachedAgents(db)).items.map((i) => i.id)).toEqual(["97:42"]);
+    expect(skipped).toHaveLength(2);
+    expect(skipped[0]!.reason).toMatch(/tokenId/);
+  });
+
+  it("nilai uang yang tidak muat numeric(78,0) dilewati, bukan melempar dari tengah transaksi", async () => {
+    const skipped: { id: string; reason: string }[] = [];
+    const written = await upsertAgents(
+      db,
+      [
+        makeRecord({
+          tokenId: "1",
+          fuguListing: { ...LISTING, priceUsd8PerPeriod: 10n ** 78n },
+        }),
+        makeRecord({ tokenId: "2" }),
+      ],
+      { onSkipped: (entry) => skipped.push(entry) },
+    );
+
+    expect(written).toBe(1);
+    expect((await getCachedAgents(db)).total).toBe(1);
+    expect(skipped[0]!.reason).toMatch(/numeric\(78, 0\)/);
+  });
+
+  it("batch yang seluruhnya cacat mengembalikan 0 tanpa menyentuh database", async () => {
+    expect(await upsertAgents(db, [makeRecord({ tokenId: "1.5" })])).toBe(0);
+    expect((await getCachedAgents(db)).total).toBe(0);
+  });
+});
+
+describe("kegagalan infrastruktur — pelaporan kesehatan tetap hidup", () => {
+  let db: FuguDb;
+  beforeEach(async () => {
+    db = await freshDb();
+  });
+
+  it("`recordSourceHealth` mengembalikan false alih-alih melempar saat tabelnya hilang", async () => {
+    await db.execute(sql`drop table source_health`);
+    await expect(
+      recordSourceHealth(db, {
+        source: "scan8004",
+        healthy: false,
+        reason: "500 DATABASE_ERROR",
+        checkedAt: "2026-09-08T12:00:00.000Z",
+      }),
+    ).resolves.toBe(false);
+  });
+
+  it("`getLatestSourceHealth` melaporkan cache-nya sendiri sakit, bukan melempar", async () => {
+    await db.execute(sql`drop table source_health`);
+    const latest = await getLatestSourceHealth(db, new Date("2026-09-08T12:00:00.000Z"));
+    expect(latest).toHaveLength(1);
+    expect(latest[0]!.source).toBe("cache");
+    expect(latest[0]!.healthy).toBe(false);
+    expect(latest[0]!.reason).toMatch(/cache Postgres gagal/);
+    expect(latest[0]!.checkedAt).toBe("2026-09-08T12:00:00.000Z");
+  });
+
+  it("`upsertAgents` sengaja tetap melempar — penulisan yang gagal harus terlihat", async () => {
+    await db.execute(sql`drop table agent_categories`);
+    await db.execute(sql`drop table agents`);
+    await expect(upsertAgents(db, [makeRecord()])).rejects.toThrow();
   });
 });

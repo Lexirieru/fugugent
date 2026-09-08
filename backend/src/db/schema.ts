@@ -114,7 +114,15 @@ export const agents = pgTable(
 export const agentCategories = pgTable(
   "agent_categories",
   {
-    agentId: text("agent_id").notNull(),
+    /**
+     * **Berisi `agents.id` (`` `${chainId}:${tokenId}` ``), BUKAN `agents.agent_id`.**
+     * Dinamai `agent_key` justru supaya tidak tertukar: `agents.agent_id` menyimpan
+     * id komposit 8004scan (`"56:0x8004…:49637"`) yang bentuknya sama sekali berbeda.
+     * Join yang benar selalu `agent_categories.agent_key = agents.id`.
+     */
+    agentKey: text("agent_key")
+      .notNull()
+      .references(() => agents.id, { onDelete: "cascade" }),
     /** Salah satu dari empat `Category` Fugu. */
     category: text("category").$type<Category>().notNull(),
     /** 0–1, dari classifier. */
@@ -123,7 +131,7 @@ export const agentCategories = pgTable(
     assignedAt: timestamp("assigned_at", { withTimezone: true, mode: "date" }).notNull(),
   },
   (table) => [
-    primaryKey({ columns: [table.agentId, table.category] }),
+    primaryKey({ columns: [table.agentKey, table.category] }),
     index("agent_categories_category_idx").on(table.category),
   ],
 );
@@ -151,8 +159,13 @@ export type SourceHealthRow = typeof sourceHealth.$inferSelect;
  * Ditulis tangan dan bukan hasil `drizzle-kit` supaya `ensureSchema()` bisa
  * dijalankan langsung oleh test dan oleh boot API tanpa langkah migrasi
  * terpisah. Semuanya `IF NOT EXISTS` sehingga aman dipanggil berulang.
- * Kalau DDL ini menyimpang dari definisi Drizzle di atas, test repo langsung
- * merah — kueri Drizzle akan menyebut kolom yang tidak ada.
+ *
+ * **Batas jaring pengamannya:** kalau **nama kolom** di sini menyimpang dari
+ * definisi Drizzle di atas, test repo langsung merah karena kueri menyebut
+ * kolom yang tidak ada. **Constraint tidak dijaga begitu** — karena itu FK
+ * `agent_categories.agent_key -> agents(id)` sekarang dideklarasikan di kedua
+ * tempat, dan siapa pun yang menambah constraint harus melakukan hal yang sama
+ * sampai proyek ini beralih ke `drizzle-kit`.
  */
 export const SCHEMA_STATEMENTS: readonly string[] = [
   `create table if not exists agents (
@@ -205,12 +218,12 @@ export const SCHEMA_STATEMENTS: readonly string[] = [
   `create index if not exists agents_fetched_at_idx on agents (fetched_at)`,
   `create index if not exists agents_total_score_idx on agents (reputation_total_score)`,
   `create table if not exists agent_categories (
-    agent_id text not null references agents (id) on delete cascade,
+    agent_key text not null references agents (id) on delete cascade,
     category text not null,
     confidence double precision not null,
     reason text,
     assigned_at timestamptz not null,
-    primary key (agent_id, category)
+    primary key (agent_key, category)
   )`,
   `create index if not exists agent_categories_category_idx on agent_categories (category)`,
   `create table if not exists source_health (
