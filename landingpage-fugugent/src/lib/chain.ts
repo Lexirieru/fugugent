@@ -1,12 +1,12 @@
 /**
- * Satu-satunya sumber kebenaran untuk setiap angka dan alamat yang tampil di
- * landing page. Semuanya disalin apa adanya dari:
+ * The single source of truth for every number and address shown on the landing page.
+ * All of it is copied verbatim from:
  *   - contracts/deployments/bsc-testnet.json
  *   - docs/e2e/2026-09-08-e2e-testnet.md
  *   - docs/STATUS.md
  *
- * Aturan: kalau sebuah angka tidak punya `tx` atau perintah verifikasi di sini,
- * angka itu tidak boleh ditampilkan di halaman.
+ * The rule: if a number has no `tx` and no verification command here, that number must
+ * not appear on the page.
  */
 
 export const CHAIN = {
@@ -24,13 +24,13 @@ export function addressUrl(address: string): string {
   return `${CHAIN.explorer}/address/${address}`;
 }
 
-/** Potong hash/alamat panjang agar terbaca tanpa memaksa scroll horizontal. */
+/** Truncate a long hash or address so it reads without forcing a horizontal scroll. */
 export function shorten(value: string, head = 10, tail = 6): string {
   if (value.length <= head + tail + 1) return value;
   return `${value.slice(0, head)}…${value.slice(-tail)}`;
 }
 
-/** Empat kontrak UUPS yang live di testnet. Belum diverifikasi sumbernya di BscScan. */
+/** The four UUPS contracts live on testnet. Their source is not yet verified on BscScan. */
 export const CONTRACTS = [
   {
     name: "FuguRegistry",
@@ -55,16 +55,16 @@ export const CONTRACTS = [
 ] as const;
 
 export const ALTANA = {
-  /** Wallet Altana milik pengguna; agent hanya memegang session key di atasnya. */
+  /** The user's own Altana wallet; the agent only holds a session key on top of it. */
   wallet: "0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0",
-  /** Keystore publik Altana — tempat keabsahan session key bisa dibaca siapa pun. */
+  /** Altana's public Keystore — where anyone can read whether the session key is valid. */
   keystore: "0x6b8361C29d05D498b1a12B54A37310f94171E94A",
   keyHash: "0x7a467115cdf6d03f85f0f059733843b43cbe291d9f4489e3bf27d45e5148b377",
   expiry: "8 October 2026",
   dailyCap: "0.02 tBNB + 100 mUSD per day",
 } as const;
 
-/** Perintah verifikasi yang bisa disalin apa adanya. Tanpa API key. */
+/** A verification command that can be copied verbatim. No API key. */
 export const VERIFY_COMMAND = `cast call --rpc-url ${CHAIN.rpc} \\
   ${ALTANA.keystore} \\
   'isValidKey(address,bytes32)(bool)' \\
@@ -76,13 +76,13 @@ export type Proof = {
   id: string;
   label: string;
   detail: string;
-  /** Hash transaksi, atau `null` bila memang tidak ada blok yang bisa dibuka. */
+  /** The transaction hash, or `null` when there genuinely is no block to open. */
   hash: string | null;
-  /** Dipakai saat `hash` null — menjelaskan kenapa tidak ada tautan. */
+  /** Used when `hash` is null — it explains why there is no link. */
   noLinkReason?: string;
 };
 
-/** Siklus penyelamatan Guardian, ditandatangani session key ber-batas. */
+/** Guardian's rescue cycle, signed by a bounded session key. */
 export const GUARDIAN_RESCUE: Proof[] = [
   {
     id: "drop",
@@ -113,7 +113,7 @@ export const GUARDIAN_RESCUE: Proof[] = [
   },
 ];
 
-/** Sesi itu sendiri: bukti bahwa kuncinya terdaftar publik. */
+/** The session itself: proof that the key is registered publicly. */
 export const SESSION_GRANT: Proof = {
   id: "grant",
   label: "Session key granted and registered in the Altana Keystore",
@@ -121,7 +121,7 @@ export const SESSION_GRANT: Proof = {
   hash: "0x15e67a21e5ec25f8459ac2e83798033ca9afe5a14b41143aeb28fe2a47b64b52",
 };
 
-/** Jalan lama: repay yang sama, tapi ditandatangani EOA deployer. Disimpan sebagai riwayat. */
+/** The old path: the same repay, but signed by the deployer EOA. Kept as history. */
 export const DEPLOYER_RESCUE: Proof = {
   id: "eoa-repay",
   label: "Earlier run of the same cycle, signed by a full-power deployer key",
@@ -129,7 +129,7 @@ export const DEPLOYER_RESCUE: Proof = {
   hash: "0x6ccb4c5a8d9f6ca5201dff73a663992dbc6a3b2efa74406e84a02d93584d5fcc",
 };
 
-/** Siklus hidup marketplace, dijalankan di jaringan sungguhan. Biaya total 0,0015 tBNB. */
+/** The marketplace lifecycle, run on the real network. Total cost 0.0015 tBNB. */
 export const MARKETPLACE_CYCLE: Proof[] = [
   {
     id: "list",

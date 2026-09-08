@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { txUrl, type Proof } from "@/lib/chain";
 
-/** Pembungkus seksi — lebar maksimum konsisten, tanpa scroll horizontal. */
+/** The section wrapper — one consistent maximum width, no horizontal scroll. */
 export function Section({
   id,
   children,
@@ -37,8 +37,8 @@ export function Lede({ children }: { children: ReactNode }) {
 }
 
 /**
- * Satu baris bukti. Kalau ada tx hash, seluruh baris jadi tautan ke BscScan.
- * Kalau tidak ada, alasannya dinyatakan terbuka — bukan disembunyikan.
+ * One proof row. When there is a tx hash, the whole row becomes a link to BscScan.
+ * When there is not, the reason is stated openly — never hidden.
  */
 export function ProofRow({ proof, index }: { proof: Proof; index?: number }) {
   const num =

@@ -2,8 +2,8 @@
 
 /*
   Fugugent — landing page.
-  Tema tunggal (gelap, "kedalaman laut"). Sengaja tidak menyediakan tema terang:
-  satu tampilan yang dikerjakan matang lebih baik daripada dua yang setengah jadi.
+  A single theme (dark, "deep sea"). There is deliberately no light theme: one look
+  done properly beats two done halfway.
 */
 
 :root {
@@ -20,11 +20,11 @@
   --fg-muted: #96a7bf;
   --fg-faint: #6b7e97;
 
-  /* Kuning BNB Chain — dipakai hemat, hanya untuk aksi dan penekanan. */
+  /* BNB Chain yellow — used sparingly, for actions and emphasis only. */
   --accent: #f0b90b;
   --accent-soft: rgba(240, 185, 11, 0.14);
 
-  /* Skala kembung fugu: tenang → kritis. */
+  /* The fugu puff scale: calm → critical. */
   --calm: #2dd4bf;
   --watch: #facc15;
   --stress: #fb923c;
@@ -54,7 +54,7 @@
 
 html {
   scroll-behavior: smooth;
-  /* Nav lengket setinggi ~56px — beri ruang saat melompat ke anchor. */
+  /* The sticky nav is ~56px tall — leave room when jumping to an anchor. */
   scroll-padding-top: 5rem;
 }
 
@@ -62,7 +62,7 @@ body {
   background-color: var(--bg);
   color: var(--fg);
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  /* Tidak pernah ada scroll horizontal di body. */
+  /* The body never scrolls horizontally. */
   overflow-x: hidden;
 }
 
@@ -80,7 +80,7 @@ body {
   }
 }
 
-/* Napas fugu — halus, hanya terasa saat tekanan risiko tinggi. */
+/* The fugu's breathing — subtle, only noticeable when risk pressure is high. */
 @keyframes fugu-breathe {
   0%,
   100% {
@@ -96,7 +96,7 @@ body {
   transform-origin: 50% 52%;
 }
 
-/* Riak cahaya di latar hero. */
+/* The ripple of light behind the hero. */
 @keyframes fugu-drift {
   0%,
   100% {

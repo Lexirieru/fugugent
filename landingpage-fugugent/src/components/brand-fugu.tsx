@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 import { Fugu } from "@/components/fugu";
 
 /**
- * Menampilkan aset merek `/brand/<nama>.png` bila berkasnya sudah ada, dan
- * jatuh ke fugu SVG bila belum. Gambar diprobe lebih dulu lewat `Image()`,
- * jadi tidak pernah ada elemen <img> rusak yang sempat terlihat — halaman
- * tetap utuh sementara aset merek dikerjakan terpisah.
+ * Shows the brand asset `/brand/<name>.png` when that file already exists, and falls
+ * back to the SVG fugu when it does not. The image is probed first through `Image()`, so
+ * a broken <img> element is never briefly visible — the page stays whole while the brand
+ * assets are worked on separately.
  */
 export function BrandFugu({
   src,

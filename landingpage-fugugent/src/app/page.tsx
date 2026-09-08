@@ -16,14 +16,14 @@ import {
 } from "@/lib/chain";
 
 /*
-  Bahasa halaman: Inggris. Juri hackathon BNB Chain berasal dari banyak negara,
-  dan seluruh bukti yang ditautkan (BscScan, nama fungsi kontrak) juga Inggris.
-  Komentar kode dan commit tetap bahasa Indonesia sesuai aturan repo.
+  Page language: English. The BNB Chain hackathon judges come from many countries, and
+  every piece of evidence this page links to (BscScan, contract function names) is in
+  English too. Code comments and commits are in English as well.
 */
 
 const REPAY_TX = GUARDIAN_RESCUE.find((p) => p.id === "repay")!.hash!;
 
-/* ---------------------------------------------------------------- navigasi */
+/* --------------------------------------------------------------------- nav */
 
 const NAV = [
   { href: "#read", label: "How to read a fugu" },
@@ -160,7 +160,7 @@ function HeroStat({
   );
 }
 
-/* ------------------------------------------------------- cara membaca fugu */
+/* ------------------------------------------------------ how to read a fugu */
 
 const SCALE = [
   { puff: 0, band: "HF > 1.50", name: "Calm", note: "Agent watches. Spends nothing." },
@@ -231,7 +231,7 @@ function HowToRead() {
   );
 }
 
-/* ------------------------------------------------------------ empat kategori */
+/* --------------------------------------------------------- four categories */
 
 const AGENTS = [
   {
@@ -363,7 +363,7 @@ function Row({ term, desc }: { term: string; desc: string }) {
   );
 }
 
-/* ------------------------------------------------------------------- bukti */
+/* ------------------------------------------------------------------- proof */
 
 function Proof() {
   return (
@@ -435,7 +435,7 @@ function Proof() {
   );
 }
 
-/* --------------------------------------------------------- session key ber-batas */
+/* ----------------------------------------------- a bounded session key */
 
 const NOT_PROVEN = [
   "The receipt cannot tell an admin key apart from a session key. What closes that gap is the rejection above: an admin key would never have been refused.",
@@ -541,7 +541,7 @@ Details: UnauthorizedCall(
   );
 }
 
-/* ------------------------------------------------------- kenapa semua ditautkan */
+/* ------------------------------------------ why everything is linked */
 
 function WhyLinks() {
   return (

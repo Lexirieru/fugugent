@@ -5,22 +5,23 @@ import { Fugu, puffColor } from "@/components/fugu";
 import { GUARDIAN_RESCUE, txUrl } from "@/lib/chain";
 
 /**
- * Alat baca inti produk: geser health factor, lihat fugu mengembang.
+ * The core reading instrument of the product: drag the health factor, watch the fugu
+ * puff up.
  *
- * Ambang dan nama aksinya bukan hiasan — persis `DEFAULT_THRESHOLDS` dan
- * `decide()` di ai/fuguguardian/app/agent/src/strategy. Kalau ambang di
- * strategi berubah, angka di sini harus ikut diubah.
+ * The thresholds and the action names are not decoration — they are exactly
+ * `DEFAULT_THRESHOLDS` and `decide()` in ai/fuguguardian/app/agent/src/strategy. If a
+ * threshold changes in the strategy, the numbers here must change with it.
  */
 
-const MIN_CENTS = 100; // health factor 1,00 — batas likuidasi
-const MAX_CENTS = 300; // 3,00 — sangat aman
-const REAL_CENTS = 114; // 1,14 — bacaan sungguhan pada run yang dibuktikan
+const MIN_CENTS = 100; // health factor 1.00 — the liquidation threshold
+const MAX_CENTS = 300; // 3.00 — very safe
+const REAL_CENTS = 114; // 1.14 — the real reading from the run we proved
 
 type Band = {
   action: string;
   headline: string;
   body: string;
-  min: number; // batas bawah eksklusif, dalam sen
+  min: number; // the exclusive lower bound, in cents
 };
 
 const BANDS: Band[] = [
@@ -60,13 +61,13 @@ function bandFor(cents: number): Band {
   return BANDS.find((b) => cents > b.min) ?? BANDS[BANDS.length - 1];
 }
 
-/** 0 = tenang, 1 = kritis. Dipetakan dari health factor, bukan dari selera. */
+/** 0 = calm, 1 = critical. Mapped from the health factor, not from taste. */
 function puffFor(cents: number): number {
   const p = (200 - cents) / 100;
   return Math.min(1, Math.max(0, p));
 }
 
-/** Seberapa jauh harga agunan boleh turun sebelum likuidasi: 1 − 1/HF. */
+/** How far the collateral price may fall before liquidation: 1 − 1/HF. */
 function dropToLiquidation(cents: number): number {
   if (cents <= 100) return 0;
   return (1 - 100 / cents) * 100;
