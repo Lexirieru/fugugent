@@ -49,9 +49,22 @@ bag doctor && bag dev
 
 ## Status wallet & session (BSC testnet)
 
-| Agent | Wallet admin Altana | Session |
+Keempat agent punya wallet Altana sendiri dengan session ber-batas yang terdaftar di
+Keystore on-chain `0x6b8361C29d05D498b1a12B54A37310f94171E94A`. Semuanya diverifikasi
+dengan `isValidKey` → `true` dan lolos `bag doctor` 14 PASS / 0 FAIL.
+
+| Agent | Kategori | Wallet admin Altana |
 |---|---|---|
-| `fuguguardian` | `0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0` | aktif, 30 hari, 10 U/hari + 0,02 tBNB/hari, terdaftar di Keystore |
+| `fuguguardian` | Health Factor | `0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0` |
+| `fugurebalancer` | Rebalancing | `0xb8f155D1278f0437b9De7c63911f2C0EDa485941` |
+| `fugugrid` | Grid Trading | `0x2AA59d5cf540c8f1b1CE4C667C2e745475d4EAd9` |
+| `fuguyield` | Yield Optimisation | `0x15dE73F47Ca58a11A6Ef9dB24dfDc6F096b0a866` |
+
+Semua session: **10 U/hari + 0,02 tBNB/hari, expiry 30 hari (8 Okt 2026)**, `register=true`.
+
+**Temuan:** grant session **tidak** memerlukan saldo U di wallet — U hanya dipakai untuk
+allowance Commerce. `bag doctor` akan WARN soal saldo U, tapi session tetap sah dan
+terdaftar. Berguna karena faucet U dibatasi 10 U per 30 menit.
 
 Verifikasi publik tanpa API key apa pun:
 ```bash
@@ -59,10 +72,9 @@ cast call --rpc-url https://data-seed-prebsc-1-s1.bnbchain.org:8545 \
   0x6b8361C29d05D498b1a12B54A37310f94171E94A \
   'isValidKey(address,bytes32)(bool)' <WALLET_AGENT> <KEY_HASH>
 ```
-`KEY_HASH` = `cast keccak <session public key>`. Session public key bisa dilihat dengan
-`bag wallet session status` (jalankan dari `app/agent/`).
+`KEY_HASH` = `cast keccak <session public key>`; public key dari `bag wallet session status`
+(dijalankan di `app/agent/`).
 
-Perpanjang session yang kedaluwarsa: `bag wallet session grant --force`, lalu deploy ulang.
-Cabut: `bag wallet session revoke --yes`.
+Perpanjang: `bag wallet session grant --force`. Cabut: `bag wallet session revoke --yes`.
 
 **Jangan pernah** mencetak, menyalin, atau mem-parse bagian `signer` dari file session.

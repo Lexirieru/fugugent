@@ -1,0 +1,54 @@
+[project]
+name = "fugugrid-agent"
+
+[stack]
+# Project-lifetime facts: which runtime adapter recipe this Agent was
+# scaffolded against. doctor / dev / deploy read these to know what to
+# check, load, and route. runtime: agentcore | azure-foundry.
+runtime = "agentcore"
+# Public faces exposed by this one runtime and signer (canonical order):
+#   A2A — serveA2a: agent card + negotiate/notify_funded skills.
+#   MCP — streamable-HTTP /mcp: negotiate (signed quote) + notify_funded
+#         (verify → deliver → submit, synchronously within the tool call) +
+#         read-only chain tools.
+#   X402 or MPP — publish exactly one sibling B402 seller route (/x402 or
+#          /mpp). Payment-only still uses A2A as the cloud carrier but hides
+#          that native face at the public gateway.
+protocols = ["A2A","MCP"]
+
+[network]
+default = "bsc-testnet"
+
+[wallet]
+# Altana custody: the encrypted ADMIN keystore stays under the workspace
+# .studio directory. The running Agent receives only the bounded session file.
+kind = "altana"
+keystore_dir = "../../.studio/wallets"
+session_file = "../../.studio/wallets/altana-session.json"
+# address = "0x..."   # filled by `bag wallet new`; session must match it
+address = "0x2AA59d5cf540c8f1b1CE4C667C2e745475d4EAd9"
+
+[llm]
+provider = "openai"
+model = "openai/gpt-5.6-luna"
+base_url = "https://api.dgrid.ai/v1"
+
+[payments.erc8183]
+# Read by the Agent: it quotes the FIXED `price`, CLAMPS it to [min,max],
+# freezes a short-TTL offer, and EIP-191 signs it — pricing is rule-based, the
+# LLM never prices. price=0 is FREE and is supported by the canonical stack.
+currency = "0xc70B8741B8B07A6d61E54fd4B20f22Fa648E5565"   # $U token address — prefilled from [network].default; rarely changed
+# All prices are in wei of the currency token. U has 18 decimals (not 6 like USDC).
+price = "100000000000000000"                    # wei; 0 = FREE (zero token escrow)
+min_price = "0"                                # wei — clamp floor
+max_price = ""                                 # wei — clamp ceiling; empty = unbounded; SET before going live
+quote_ttl_seconds = 900                        # seconds a signed quote stays valid; SDK caps at 900 (~15min work window)
+default_estimated_completion_seconds = 600
+poll_interval_seconds = 30
+auto_settle = false                            # opt-in: detect dispute-window-elapsed → settle
+
+[storage]
+# Deliverables written to local disk (file://). Offline-dev only —
+# does NOT survive deploy. Path from STORAGE_LOCAL_PATH.
+kind = "local"
+
