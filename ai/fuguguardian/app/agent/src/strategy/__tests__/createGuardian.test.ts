@@ -14,17 +14,17 @@ import {
 import type { Logger } from "../guard.js";
 import type { ExecuteState } from "../execute.js";
 
-const AKUN = "0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0" as const;
+const ACCOUNT = "0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0" as const;
 const POOL = "0xb3e1F06Ac529aded2aA20aA38F4C0b4AD317e5F5" as const;
 const MUSD = "0x932E82632E80b06318ca969e33F99A54F1a04b10" as const;
 const FEED = "0x0aA42416bAccdb2fd4768B61111DeB7F7D212F9B" as const;
 const TX = `0x${"ab".repeat(32)}` as const;
 
 /** The sample position: $7,500 collateral, $6,000 debt, LT 75% -> HF 0.9375 (EMERGENCY). */
-const AGUNAN = 750_000_000_000n;
-const HUTANG = 600_000_000_000n;
+const COLLATERAL = 750_000_000_000n;
+const DEBT = 600_000_000_000n;
 const LT_BPS = 7_500n;
-const HF = (AGUNAN * LT_BPS * 10n ** 18n) / (10_000n * HUTANG);
+const HF = (COLLATERAL * LT_BPS * 10n ** 18n) / (10_000n * DEBT);
 
 interface RantaiPalsu {
   tokenDecimalsPool?: number;
@@ -32,7 +32,7 @@ interface RantaiPalsu {
   feedDecimals?: number;
   hargaUsd8?: bigint;
   enabled?: boolean;
-  saldo?: bigint;
+  balance?: bigint;
   allowance?: bigint;
   debtBase?: bigint;
   blockNumber?: bigint;
@@ -57,13 +57,13 @@ function fakeClient(o: RantaiPalsu = {}) {
       case "latestRoundData":
         return [1n, o.hargaUsd8 ?? 100_000_000n, 0n, 0n, 1n];
       case "balanceOf":
-        return o.saldo ?? 10n ** 30n;
+        return o.balance ?? 10n ** 30n;
       case "allowance":
         return o.allowance ?? 0n;
       case "getUserAccountData":
-        return [AGUNAN, o.debtBase ?? HUTANG, 0n, LT_BPS, 6_000n, HF];
+        return [COLLATERAL, o.debtBase ?? DEBT, 0n, LT_BPS, 6_000n, HF];
       default:
-        throw new Error(`fungsi tak terduga: ${args.functionName}`);
+        throw new Error(`unexpected function: ${args.functionName}`);
     }
   });
   const getBlockNumber = vi.fn(async () => o.blockNumber ?? 1_000n);
@@ -88,7 +88,7 @@ function silentLogger(): Logger {
 function config(overrides: Partial<GuardianConfig> = {}): GuardianConfig {
   const { client } = fakeClient();
   return {
-    account: AKUN,
+    account: ACCOUNT,
     client,
     pool: POOL,
     repayAsset: MUSD,
@@ -179,7 +179,7 @@ describe("createGuardian — one whole cycle with no network", () => {
 
   it("an insufficient token balance -> no batch is sent at all", async () => {
     const sendCalls = fakeSendCalls();
-    const { client } = fakeClient({ saldo: 1n });
+    const { client } = fakeClient({ balance: 1n });
     const g = await createGuardian(config({ client, sendCalls }));
 
     const { result } = await g.runOnce();
@@ -204,19 +204,19 @@ describe("createGuardian — one whole cycle with no network", () => {
     const g = await createGuardian(config({ client }));
     const pos = await g.readPosition();
     expect(pos.blockNumber).toBe(129_912_345n);
-    expect(pos.account).toBe(AKUN);
+    expect(pos.account).toBe(ACCOUNT);
   });
 });
 
-describe("createGuardian — state persisten (C3)", () => {
+describe("createGuardian — persistent state (C3)", () => {
   it("loads the stored state instead of starting from an empty budget", async () => {
-    const tersimpan: ExecuteState = {
+    const stored: ExecuteState = {
       ...initialExecuteState(1_700_000_000),
       spentTodayUsd8: 199_000_000_000n, // only $10 left of the $2,000 cap
     };
     const sendCalls = fakeSendCalls();
     const g = await createGuardian(
-      config({ stateStore: createMemoryStateStore(tersimpan), sendCalls }),
+      config({ stateStore: createMemoryStateStore(stored), sendCalls }),
     );
 
     const { result } = await g.runOnce();
@@ -235,12 +235,12 @@ describe("createGuardian — state persisten (C3)", () => {
     const { result } = await g1.runOnce();
     expect(result.ok && result.sent).toBe(true);
 
-    const tersimpan = await store.load();
-    expect(tersimpan?.spentTodayUsd8).toBeGreaterThan(0n);
+    const stored = await store.load();
+    expect(stored?.spentTodayUsd8).toBeGreaterThan(0n);
 
     // "Restart": a new Guardian over the same store does not start the budget over.
     const g2 = await createGuardian(config({ stateStore: store }));
-    expect(g2.getExecuteState().spentTodayUsd8).toBe(tersimpan?.spentTodayUsd8);
+    expect(g2.getExecuteState().spentTodayUsd8).toBe(stored?.spentTodayUsd8);
   });
 
   it("a stored state with killed:true refuses to send after a restart", async () => {
@@ -283,7 +283,7 @@ describe("createGuardian — state persisten (C3)", () => {
   });
 });
 
-describe("createGuardian — C2 lewat rantai lengkap", () => {
+describe("createGuardian — C2 through the whole chain", () => {
   it("sendCalls throws after the tx landed: the next cycle does NOT resend", async () => {
     vi.useFakeTimers();
     try {
@@ -303,9 +303,9 @@ describe("createGuardian — C2 lewat rantai lengkap", () => {
       await vi.advanceTimersByTimeAsync(1_000);
       expect(sendCalls).toHaveBeenCalledTimes(1);
 
-      const tersimpan = await store.load();
-      expect(tersimpan?.pendingRepay).not.toBeNull();
-      expect(tersimpan?.spentTodayUsd8).toBeGreaterThan(0n);
+      const stored = await store.load();
+      expect(stored?.pendingRepay).not.toBeNull();
+      expect(stored?.spentTodayUsd8).toBeGreaterThan(0n);
 
       handle.stop();
     } finally {
@@ -344,10 +344,10 @@ describe("createGuardian — a real file store surviving a 'process death'", () 
     void g.runOnce(); // deliberately NOT awaited: this cycle will never finish
     await sudahMasukKirim;
 
-    const isi = await store.load();
-    expect(isi).not.toBeNull();
-    expect(isi?.pendingRepay).not.toBeNull();
-    expect(isi?.spentTodayUsd8).toBeGreaterThan(0n);
+    const contents = await store.load();
+    expect(contents).not.toBeNull();
+    expect(contents?.pendingRepay).not.toBeNull();
+    expect(contents?.spentTodayUsd8).toBeGreaterThan(0n);
   });
 
   it("a restart after a receipt-wait failure does NOT pay again", async () => {
@@ -370,11 +370,11 @@ describe("createGuardian — a real file store surviving a 'process death'", () 
     const g2 = await createGuardian(
       config({ stateStore: createFileStateStore(file), sendCalls: sendCalls2 }),
     );
-    const kedua = await g2.runOnce();
+    const second = await g2.runOnce();
 
     expect(sendCalls2).not.toHaveBeenCalled();
-    expect(kedua.result.ok).toBe(true);
-    expect(kedua.result.ok === true ? kedua.result.executeReason : "").toMatch(
+    expect(second.result.ok).toBe(true);
+    expect(second.result.ok === true ? second.result.executeReason : "").toMatch(
       /has not yet been proven complete/i,
     );
   });
@@ -389,21 +389,21 @@ describe("createGuardian — a real file store surviving a 'process death'", () 
     );
     await g1.runOnce();
 
-    const menggantung = (await createFileStateStore(file).load())?.pendingRepay;
-    expect(menggantung).toBeTruthy();
+    const pending = (await createFileStateStore(file).load())?.pendingRepay;
+    expect(pending).toBeTruthy();
 
     // The chain now reports the debt falling by EXACTLY the amount paid, at a newer block.
     const { client } = fakeClient({
-      debtBase: HUTANG - menggantung!.amountUsd8,
+      debtBase: DEBT - pending!.amountUsd8,
       blockNumber: 2_000n,
     });
     const sendCalls2 = fakeSendCalls();
     const g2 = await createGuardian(
       config({ client, stateStore: createFileStateStore(file), sendCalls: sendCalls2 }),
     );
-    const kedua = await g2.runOnce();
+    const second = await g2.runOnce();
 
-    expect(kedua.nextExecuteState.pendingRepay).toBeNull();
+    expect(second.nextExecuteState.pendingRepay).toBeNull();
     // The remaining debt is still in the danger zone, so Guardian is free to act again.
     expect(sendCalls2).toHaveBeenCalledTimes(1);
   });

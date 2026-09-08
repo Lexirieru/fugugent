@@ -136,7 +136,7 @@ describe("executeDecision", () => {
 
     expect(result.sent).toBe(true);
     expect(result.cappedPerDay).toBe(true);
-    expect(result.amountSentUsd8).toBe(50_000_000_000n); // sisa $500
+    expect(result.amountSentUsd8).toBe(50_000_000_000n); // $500 left
     expect(dep.sendRepay).toHaveBeenCalledWith(expect.anything(), 50_000_000_000n);
   });
 

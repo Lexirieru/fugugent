@@ -129,7 +129,7 @@ describe("runGuardCycle", () => {
 
   it("a failed position read does not throw, is recorded as a failed cycle, and does not call execution", async () => {
     const readPosition = vi.fn(async () => {
-      throw new Error("RPC mati");
+      throw new Error("the RPC is down");
     });
     const executeDecisionSpy = vi.fn();
     const explainDecisionSpy = vi.fn();
@@ -142,7 +142,7 @@ describe("runGuardCycle", () => {
     const { result, nextExecuteState } = await runGuardCycle(deps, execState());
 
     expectFail(result);
-    expect(result.error).toContain("RPC mati");
+    expect(result.error).toContain("the RPC is down");
     expect(result.account).toBe(ACCOUNT);
     expect(executeDecisionSpy).not.toHaveBeenCalled();
     expect(explainDecisionSpy).not.toHaveBeenCalled();
@@ -175,7 +175,7 @@ describe("runGuardCycle", () => {
   it("a failed explanation does not change an execution result that already happened", async () => {
     const successResult = canned({
       sent: true,
-      reason: "terkirim",
+      reason: "sent",
       amountSentUsd8: 42_000_000n,
       txHash: "0xdeadbeef" as `0x${string}`,
       state: execState({ spentTodayUsd8: 42_000_000n, lastActionAt: 1_700_000_000 }),
@@ -208,7 +208,7 @@ describe("runGuardCycle", () => {
       executeDecision(decision, pos, limits(), state, execDeps);
 
     const deps = baseDeps({
-      readPosition: vi.fn(async () => SAFE_POSITION), // HF tinggi -> decide menghasilkan NONE
+      readPosition: vi.fn(async () => SAFE_POSITION), // a high HF -> decide produces NONE
       executeDecision: execFn,
     });
 
@@ -234,8 +234,8 @@ describe("runGuardCycle", () => {
     expect(result.explanation).toBe(result.reason);
   });
 
-  it("aksi selain NONE tetap memanggil explainDecision", async () => {
-    const explainDecisionSpy = vi.fn(async () => "penjelasan LLM");
+  it("an action other than NONE does call explainDecision", async () => {
+    const explainDecisionSpy = vi.fn(async () => "an LLM explanation");
     const deps = baseDeps({
       readPosition: vi.fn(async () => RISKY_POSITION),
       explainDecision: explainDecisionSpy,
@@ -246,7 +246,7 @@ describe("runGuardCycle", () => {
     expectOk(result);
     expect(result.action).not.toBe("NONE");
     expect(explainDecisionSpy).toHaveBeenCalledOnce();
-    expect(result.explanation).toBe("penjelasan LLM");
+    expect(result.explanation).toBe("an LLM explanation");
   });
 
   it("the explanation is called after execution -- the call order is proven", async () => {
@@ -259,7 +259,7 @@ describe("runGuardCycle", () => {
       }),
       explainDecision: vi.fn(async () => {
         order.push("explain");
-        return "penjelasan";
+        return "an explanation";
       }),
     });
 
@@ -322,19 +322,19 @@ describe("runGuardCycle", () => {
     const deps = baseDeps({
       logger: throwingLogger,
       readPosition: vi.fn(async () => {
-        throw new Error("RPC mati");
+        throw new Error("the RPC is down");
       }),
     });
 
     const { result } = await runGuardCycle(deps, execState());
 
     expectFail(result);
-    expect(result.error).toContain("RPC mati");
+    expect(result.error).toContain("the RPC is down");
   });
 
   it("a throwing now() does not stop the cycle, the fallback timestamp is used", async () => {
     const throwingNow = vi.fn(() => {
-      throw new Error("jam sistem rusak");
+      throw new Error("the system clock is broken");
     });
     const deps = baseDeps({ now: throwingNow });
 
@@ -402,7 +402,7 @@ describe("startGuardLoop", () => {
     vi.useFakeTimers();
     try {
       const readPosition = vi.fn(async () => {
-        throw new Error("RPC selalu mati");
+        throw new Error("the RPC is always down");
       });
       const deps = baseDeps({ readPosition });
 
@@ -589,7 +589,7 @@ describe("startGuardLoop", () => {
         }),
       };
       const readPosition = vi.fn(async () => {
-        throw new Error("RPC mati");
+        throw new Error("the RPC is down");
       });
       const deps = baseDeps({ logger: throwingLogger, readPosition });
 
@@ -706,12 +706,12 @@ describe("C2 — a failure after the transaction landed never pays twice", () =>
       // rather than retyped, so this test keeps binding if `decide`'s thresholds change.
       let handle: GuardLoopHandle | undefined;
       const readPosition = vi.fn(async () => {
-        const menggantung = handle?.getExecuteState().pendingRepay;
-        if (!menggantung) return EMERGENCY_POSITION;
+        const pending = handle?.getExecuteState().pendingRepay;
+        if (!pending) return EMERGENCY_POSITION;
         return {
           ...EMERGENCY_POSITION,
           blockNumber: EMERGENCY_POSITION.blockNumber + 5n,
-          debtBase: EMERGENCY_POSITION.debtBase - menggantung.amountUsd8,
+          debtBase: EMERGENCY_POSITION.debtBase - pending.amountUsd8,
         };
       });
 
@@ -769,9 +769,9 @@ describe("C3 — the kill switch has a lever, and the state is persisted", () =>
       await vi.advanceTimersByTimeAsync(1_000);
       await vi.advanceTimersByTimeAsync(1_000);
       expect(sendRepay).toHaveBeenCalledTimes(1);
-      const terakhir = handle.getLastResult();
-      expect(terakhir?.ok).toBe(true);
-      expect(terakhir?.ok === true ? terakhir.executeReason : "").toMatch(/kill switch/i);
+      const last = handle.getLastResult();
+      expect(last?.ok).toBe(true);
+      expect(last?.ok === true ? last.executeReason : "").toMatch(/kill switch/i);
 
       handle.stop();
     } finally {
@@ -783,13 +783,13 @@ describe("C3 — the kill switch has a lever, and the state is persisted", () =>
     vi.useFakeTimers();
     try {
       let lepas!: (pos: Position) => void;
-      const tertunda = new Promise<Position>((resolve) => {
+      const deferred = new Promise<Position>((resolve) => {
         lepas = resolve;
       });
-      let bacaanKe = 0;
+      let readCount = 0;
       const readPosition = vi.fn(async () => {
-        bacaanKe += 1;
-        return bacaanKe === 1 ? tertunda : EMERGENCY_POSITION;
+        readCount += 1;
+        return readCount === 1 ? deferred : EMERGENCY_POSITION;
       });
       const sendRepay = vi.fn(async () => "0xdeadbeef" as `0x${string}`);
       const deps = killDeps(sendRepay, { readPosition });
@@ -822,22 +822,22 @@ describe("C3 — the kill switch has a lever, and the state is persisted", () =>
   it("saveExecuteState is called every cycle and on kill()", async () => {
     vi.useFakeTimers();
     try {
-      const tersimpan: ExecuteState[] = [];
+      const stored: ExecuteState[] = [];
       const sendRepay = vi.fn(async () => "0xdeadbeef" as `0x${string}`);
       const deps = killDeps(sendRepay);
       const handle = startGuardLoop(deps, 1_000, execState({ dayStartedAt: 1_700_000_000 }), {
         saveExecuteState: (s) => {
-          tersimpan.push(s);
+          stored.push(s);
         },
       });
 
       await vi.advanceTimersByTimeAsync(0);
-      expect(tersimpan).toHaveLength(1);
-      expect(tersimpan[0].spentTodayUsd8).toBeGreaterThan(0n);
+      expect(stored).toHaveLength(1);
+      expect(stored[0].spentTodayUsd8).toBeGreaterThan(0n);
 
       handle.kill();
       await vi.advanceTimersByTimeAsync(0);
-      expect(tersimpan.at(-1)?.killed).toBe(true);
+      expect(stored.at(-1)?.killed).toBe(true);
 
       handle.stop();
     } finally {
@@ -853,7 +853,7 @@ describe("C3 — the kill switch has a lever, and the state is persisted", () =>
       const deps = baseDeps({ readPosition, logger });
       const handle = startGuardLoop(deps, 1_000, execState(), {
         saveExecuteState: () => {
-          throw new Error("disk penuh");
+          throw new Error("the disk is full");
         },
       });
 

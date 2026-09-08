@@ -37,9 +37,9 @@ export function dropToLiquidationBps(hf: bigint | null): bigint | null {
 /** The HF if the collateral price fell by `dropBps`. */
 export function healthFactorAfterPriceDrop(pos: Position, dropBps: bigint): bigint | null {
   if (pos.debtBase === 0n) return null;
-  const sisa = dropBps >= BPS ? 0n : BPS - dropBps;
+  const remaining = dropBps >= BPS ? 0n : BPS - dropBps;
   return computeHealthFactor(
-    (pos.collateralBase * sisa) / BPS,
+    (pos.collateralBase * remaining) / BPS,
     pos.debtBase,
     pos.liquidationThresholdBps,
   );

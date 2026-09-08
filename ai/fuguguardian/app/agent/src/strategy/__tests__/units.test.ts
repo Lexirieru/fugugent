@@ -10,7 +10,7 @@ import {
 
 const ASSET = "0x932E82632E80b06318ca969e33F99A54F1a04b10" as const;
 const ONE_DOLLAR_PRICE = USD8_ONE; // $1.00 on the 8-decimal basis
-const HARGA_750 = 75_000_000_000n; // $750,00
+const PRICE_750 = 75_000_000_000n; // $750.00
 
 describe("usd8ToTokenUnits", () => {
   it("$1.00 at a price of $1.00 with an 18-decimal token = 1e18 units", () => {
@@ -25,13 +25,13 @@ describe("usd8ToTokenUnits", () => {
     // CLAUDE.md #2: every token on BSC has 18 decimals, including USDT. If someone uses 6
     // out of habit from another chain, the amount sent is off by a factor of ten trillion.
     // This test nails that gap down so it is visible.
-    const delapanBelas = usd8ToTokenUnits(USD8_ONE, 18, ONE_DOLLAR_PRICE);
-    const enam = usd8ToTokenUnits(USD8_ONE, 6, ONE_DOLLAR_PRICE);
-    expect(delapanBelas / enam).toBe(10n ** 12n);
+    const eighteen = usd8ToTokenUnits(USD8_ONE, 18, ONE_DOLLAR_PRICE);
+    const six = usd8ToTokenUnits(USD8_ONE, 6, ONE_DOLLAR_PRICE);
+    expect(eighteen / six).toBe(10n ** 12n);
   });
 
   it("$750.00 at a price of $750.00 with an 18-decimal token = 1e18 units (one token)", () => {
-    expect(usd8ToTokenUnits(HARGA_750, 18, HARGA_750)).toBe(10n ** 18n);
+    expect(usd8ToTokenUnits(PRICE_750, 18, PRICE_750)).toBe(10n ** 18n);
   });
 
   it("rounds DOWN: the agent never sends more than what was decided", () => {
@@ -63,7 +63,7 @@ describe("tokenUnitsToUsd8", () => {
   });
 
   it("1e18 units at a price of $750.00 = $750.00", () => {
-    expect(tokenUnitsToUsd8(10n ** 18n, 18, HARGA_750)).toBe(HARGA_750);
+    expect(tokenUnitsToUsd8(10n ** 18n, 18, PRICE_750)).toBe(PRICE_750);
   });
 
   it("rounds down", () => {

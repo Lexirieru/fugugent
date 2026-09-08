@@ -244,8 +244,8 @@ export async function runGuardCycle(
     // would make `instanceof` fail SILENTLY, and the branch below would return the old
     // state. That is bug C2 coming back without a single test shouting.
     // `asRepaySendFailure` also walks the `cause` chain.
-    const kegagalanSetelahKirim = asRepaySendFailure(err);
-    if (kegagalanSetelahKirim !== null) {
+    const failureAfterSend = asRepaySendFailure(err);
+    if (failureAfterSend !== null) {
       // The transaction MAY already have landed — only reading its result failed. The
       // state carried by this error has already deducted the budget, started the cooldown,
       // and recorded the repay as pending; passing it along is the only thing that stops
@@ -261,7 +261,7 @@ export async function runGuardCycle(
       });
       return {
         result: { ok: false, timestamp, account: deps.account, error },
-        nextExecuteState: kegagalanSetelahKirim.stateAfterSend,
+        nextExecuteState: failureAfterSend.stateAfterSend,
       };
     }
     logError(deps.logger, "guard: execution failed, cycle skipped", {
@@ -464,7 +464,7 @@ export function startGuardLoop(
     } catch (err) {
       // `runGuardCycle` should never reach here, but the loop must not die silently even
       // if it does (defense in depth).
-      logError(deps.logger, "guard: siklus melempar tak terduga di loop, lanjut ke siklus berikutnya", {
+      logError(deps.logger, "guard: the cycle threw unexpectedly in the loop, continuing to the next cycle", {
         account: deps.account,
         error: toMessage(err),
       });

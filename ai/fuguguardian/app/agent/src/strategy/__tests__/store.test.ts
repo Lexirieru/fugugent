@@ -28,11 +28,11 @@ describe("ExecuteState serialization", () => {
     // A value above Number.MAX_SAFE_INTEGER: if serialization went through a plain
     // JSON.parse (float), the last digit would be silently lost — exactly the digit that
     // decides how many dollars have been spent.
-    const besar = 9_007_199_254_740_993n; // MAX_SAFE_INTEGER + 2
-    const original = state({ spentTodayUsd8: besar });
-    const balik = parseExecuteState(serializeExecuteState(original));
-    expect(balik.spentTodayUsd8).toBe(besar);
-    expect(balik).toEqual(original);
+    const large = 9_007_199_254_740_993n; // MAX_SAFE_INTEGER + 2
+    const original = state({ spentTodayUsd8: large });
+    const roundTripped = parseExecuteState(serializeExecuteState(original));
+    expect(roundTripped.spentTodayUsd8).toBe(large);
+    expect(roundTripped).toEqual(original);
   });
 
   it("a round trip keeps the whole pendingRepay", () => {
@@ -88,8 +88,8 @@ describe("createMemoryStateStore", () => {
     const s = state();
     await store.save(s);
     s.spentTodayUsd8 = 0n;
-    const dimuat = await store.load();
-    expect(dimuat?.spentTodayUsd8).toBe(123_456_789n);
+    const loaded = await store.load();
+    expect(loaded?.spentTodayUsd8).toBe(123_456_789n);
   });
 });
 

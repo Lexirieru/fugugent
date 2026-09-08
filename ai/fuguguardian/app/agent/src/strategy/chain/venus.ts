@@ -73,7 +73,7 @@ export async function readVenusLiquidity(
   ]);
 
   if (error !== 0n) {
-    throw new PositionError(`Venus getAccountLiquidity mengembalikan kode error ${error}.`);
+    throw new PositionError(`Venus getAccountLiquidity returned error code ${error}.`);
   }
 
   return {

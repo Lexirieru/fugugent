@@ -226,11 +226,11 @@ function looksLikeExecuteState(value: unknown): value is ExecuteState {
  * treat the old state as the one in force.
  */
 export function asRepaySendFailure(err: unknown): { stateAfterSend: ExecuteState } | null {
-  const terlihat = new Set<unknown>();
+  const seen = new Set<unknown>();
   let current: unknown = err;
   for (let i = 0; i < MAX_CAUSE_DEPTH && current !== null && current !== undefined; i++) {
-    if (terlihat.has(current)) break;
-    terlihat.add(current);
+    if (seen.has(current)) break;
+    seen.add(current);
     if (typeof current === "object") {
       const c = current as { repaySendFailure?: unknown; stateAfterSend?: unknown; cause?: unknown };
       if (c.repaySendFailure === true && looksLikeExecuteState(c.stateAfterSend)) {
