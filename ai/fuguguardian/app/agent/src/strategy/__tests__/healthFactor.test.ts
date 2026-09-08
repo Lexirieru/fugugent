@@ -1,0 +1,90 @@
+import { describe, expect, it } from "vitest";
+import {
+  computeHealthFactor,
+  dropToLiquidationBps,
+  healthFactorAfterPriceDrop,
+  repayToReachTarget,
+} from "../healthFactor.js";
+import { HF_ONE, type Position } from "../types.js";
+
+const pos = (collateral: bigint, debt: bigint, ltBps = 8000n): Position => ({
+  protocol: "aave",
+  account: "0x0000000000000000000000000000000000000001",
+  collateralBase: collateral,
+  debtBase: debt,
+  liquidationThresholdBps: ltBps,
+  healthFactor: computeHealthFactor(collateral, debt, ltBps),
+  blockNumber: 1n,
+});
+
+describe("computeHealthFactor", () => {
+  it("agunan 1000, hutang 500, LT 80% menghasilkan HF 1.6", () => {
+    expect(computeHealthFactor(1000n, 500n, 8000n)).toBe(1_600_000_000_000_000_000n);
+  });
+
+  it("tepat di ambang likuidasi menghasilkan HF 1.0", () => {
+    expect(computeHealthFactor(1000n, 800n, 8000n)).toBe(HF_ONE);
+  });
+
+  it("hutang nol berarti tidak ada risiko sama sekali, dikembalikan null", () => {
+    expect(computeHealthFactor(1000n, 0n, 8000n)).toBeNull();
+  });
+
+  it("agunan nol dengan hutang berjalan menghasilkan HF nol", () => {
+    expect(computeHealthFactor(0n, 100n, 8000n)).toBe(0n);
+  });
+});
+
+describe("dropToLiquidationBps", () => {
+  it("HF 2.0 berarti agunan boleh turun 50%", () => {
+    expect(dropToLiquidationBps(2n * HF_ONE)).toBe(5000n);
+  });
+
+  it("HF 1.25 berarti agunan boleh turun 20%", () => {
+    expect(dropToLiquidationBps(1_250_000_000_000_000_000n)).toBe(2000n);
+  });
+
+  it("HF tepat 1.0 berarti tidak ada ruang turun sama sekali", () => {
+    expect(dropToLiquidationBps(HF_ONE)).toBe(0n);
+  });
+
+  it("HF di bawah 1.0 tetap nol, bukan negatif", () => {
+    expect(dropToLiquidationBps(900_000_000_000_000_000n)).toBe(0n);
+  });
+
+  it("tanpa hutang, jarak ke likuidasi tidak terdefinisi", () => {
+    expect(dropToLiquidationBps(null)).toBeNull();
+  });
+});
+
+describe("healthFactorAfterPriceDrop", () => {
+  it("HF 1.6 setelah agunan turun 25% menjadi 1.2", () => {
+    expect(healthFactorAfterPriceDrop(pos(1000n, 500n), 2500n)).toBe(1_200_000_000_000_000_000n);
+  });
+
+  it("turun sebesar jarak ke likuidasi mendaratkan HF tepat di 1.0", () => {
+    const p = pos(1000n, 500n);
+    const d = dropToLiquidationBps(p.healthFactor)!;
+    expect(healthFactorAfterPriceDrop(p, d)).toBe(HF_ONE);
+  });
+
+  it("posisi tanpa hutang tetap aman berapa pun harga turun", () => {
+    expect(healthFactorAfterPriceDrop(pos(1000n, 0n), 9000n)).toBeNull();
+  });
+});
+
+describe("repayToReachTarget", () => {
+  it("menghitung pembayaran yang membawa HF ke target", () => {
+    const p = pos(1000n, 800n); // HF 1.0
+    const repay = repayToReachTarget(p, 1_600_000_000_000_000_000n);
+    expect(repay).toBe(300n); // sisa hutang 500 memberi HF 1.6
+  });
+
+  it("posisi yang sudah lebih aman dari target tidak perlu membayar apa pun", () => {
+    expect(repayToReachTarget(pos(1000n, 100n), 1_200_000_000_000_000_000n)).toBe(0n);
+  });
+
+  it("posisi tanpa hutang tidak perlu membayar apa pun", () => {
+    expect(repayToReachTarget(pos(1000n, 0n), 2n * HF_ONE)).toBe(0n);
+  });
+});
