@@ -20,11 +20,11 @@ Domain: `fugugent.xyz` (landing) · `app.fugugent.xyz` (marketplace) · `api.fug
 
 | Folder | Isi | Status |
 |---|---|---|
-| `contracts/` | 4 kontrak UUPS (Foundry) | dikerjakan |
-| `ai/` | 4 agent Fugu (BNB Agent Studio, wallet Altana) | Guardian: lapisan strategi + eksekusi terbukti on-chain; 3 agent lain baru scaffold + session key |
-| `backend/` | Hono + Postgres + Redis: BFF, indexer, classifier, scheduler | belum |
-| `frontend/` | Next.js 16 marketplace | scaffold |
-| `landingpage/` | Next.js 16 landing | scaffold |
+| `contracts/` | 4 kontrak UUPS (Foundry) | live di testnet, 131 test |
+| `ai/` | 4 agent Fugu (BNB Agent Studio, wallet Altana) | Guardian terbukti on-chain lewat session key (249 test); Rebalancer/Grid/Yield punya mesin keputusan + backtest (88/99/93), belum tersambung eksekusi |
+| `backend/` | Hono + Postgres + Redis: BFF, classifier, fallback berjenjang | jalan di Docker Compose, 374 test; fallback 4 tingkat terbukti live |
+| `frontend/` | Next.js 16 marketplace | daftar + detail ber-URL + alur sewa, build hijau |
+| `landingpage/` | Next.js 16 landing | selesai, build hijau |
 
 ## Aturan yang tidak boleh dilanggar
 
