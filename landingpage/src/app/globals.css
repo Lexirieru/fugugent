@@ -1,26 +1,122 @@
 @import "tailwindcss";
 
+/*
+  Fugugent — landing page.
+  Tema tunggal (gelap, "kedalaman laut"). Sengaja tidak menyediakan tema terang:
+  satu tampilan yang dikerjakan matang lebih baik daripada dua yang setengah jadi.
+*/
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: dark;
+
+  --bg: #05080f;
+  --bg-elev: #0a1120;
+  --surface: rgba(255, 255, 255, 0.035);
+  --surface-strong: rgba(255, 255, 255, 0.06);
+  --border: rgba(148, 176, 214, 0.16);
+  --border-strong: rgba(148, 176, 214, 0.3);
+
+  --fg: #e9eef7;
+  --fg-muted: #96a7bf;
+  --fg-faint: #6b7e97;
+
+  /* Kuning BNB Chain — dipakai hemat, hanya untuk aksi dan penekanan. */
+  --accent: #f0b90b;
+  --accent-soft: rgba(240, 185, 11, 0.14);
+
+  /* Skala kembung fugu: tenang → kritis. */
+  --calm: #2dd4bf;
+  --watch: #facc15;
+  --stress: #fb923c;
+  --critical: #f43f5e;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-bg: var(--bg);
+  --color-bg-elev: var(--bg-elev);
+  --color-surface: var(--surface);
+  --color-surface-strong: var(--surface-strong);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-fg: var(--fg);
+  --color-muted: var(--fg-muted);
+  --color-faint: var(--fg-faint);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-calm: var(--calm);
+  --color-watch: var(--watch);
+  --color-stress: var(--stress);
+  --color-critical: var(--critical);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
+  /* Nav lengket setinggi ~56px — beri ruang saat melompat ke anchor. */
+  scroll-padding-top: 5rem;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  /* Tidak pernah ada scroll horizontal di body. */
+  overflow-x: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Napas fugu — halus, hanya terasa saat tekanan risiko tinggi. */
+@keyframes fugu-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.022);
+  }
+}
+
+.fugu-breathe {
+  animation: fugu-breathe 3.6s ease-in-out infinite;
+  transform-origin: 50% 52%;
+}
+
+/* Riak cahaya di latar hero. */
+@keyframes fugu-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -14px, 0);
+  }
+}
+
+.fugu-drift {
+  animation: fugu-drift 11s ease-in-out infinite;
+}
+
+::selection {
+  background: rgba(240, 185, 11, 0.28);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
 }
