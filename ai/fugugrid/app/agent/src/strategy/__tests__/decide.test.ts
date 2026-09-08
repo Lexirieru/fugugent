@@ -17,25 +17,25 @@ const grid: GridConfig = {
   capitalBase: usd(1_000n),
 };
 
-const biaya: CostModel = { swapFeeBps: 5n, slippageBps: 10n, gasCostBase: 5_000_000n };
+const cost: CostModel = { swapFeeBps: 5n, slippageBps: 10n, gasCostBase: 5_000_000n };
 
 function state(over: Partial<GridState> = {}): GridState {
   return { bandIndex: 5, lotsHeld: 5, consecutiveOutside: 0, outsideSide: null, ...over };
 }
 
-const lihat = (dolar: bigint, s: GridState = state()) =>
-  decide(grid, s, { priceBase: usd(dolar), blockNumber: 1n }, biaya);
+const observe = (dollars: bigint, s: GridState = state()) =>
+  decide(grid, s, { priceBase: usd(dollars), blockNumber: 1n }, cost);
 
-describe("decide — perdagangan di dalam rentang", () => {
-  it("harga tidak berpindah pita berarti tidak ada yang dilakukan", () => {
-    const d = lihat(600n);
+describe("decide — trading inside the range", () => {
+  it("a price that does not change band means nothing is done", () => {
+    const d = observe(600n);
     expect(d.action).toBe("IDLE");
     expect(d.lots).toBe(0);
     expect(d.notionalBase).toBe(0n);
   });
 
-  it("harga turun dua pita memicu pembelian dua lot", () => {
-    const d = lihat(560n);
+  it("a price falling two bands triggers a two-lot buy", () => {
+    const d = observe(560n);
     expect(d.action).toBe("BUY");
     expect(d.lots).toBe(2);
     expect(d.notionalBase).toBe(usd(200n));
@@ -43,8 +43,8 @@ describe("decide — perdagangan di dalam rentang", () => {
     expect(d.nextState.bandIndex).toBe(3);
   });
 
-  it("harga naik tiga pita memicu penjualan tiga lot", () => {
-    const d = lihat(660n);
+  it("a price rising three bands triggers a three-lot sell", () => {
+    const d = observe(660n);
     expect(d.action).toBe("SELL");
     expect(d.lots).toBe(3);
     expect(d.notionalBase).toBe(usd(300n));
@@ -52,108 +52,108 @@ describe("decide — perdagangan di dalam rentang", () => {
     expect(d.nextState.bandIndex).toBe(8);
   });
 
-  it("fungsi murni: dua panggilan identik menghasilkan keputusan identik", () => {
-    expect(lihat(560n)).toEqual(lihat(560n));
+  it("pure function: two identical calls produce identical decisions", () => {
+    expect(observe(560n)).toEqual(observe(560n));
   });
 
-  it("tidak memutasi state masukan", () => {
+  it("does not mutate the input state", () => {
     const s = state();
-    const salinan = { ...s };
-    lihat(560n, s);
-    expect(s).toEqual(salinan);
+    const copy = { ...s };
+    observe(560n, s);
+    expect(s).toEqual(copy);
   });
 });
 
-describe("decide — batas modal dan batas persediaan", () => {
-  it("tidak bisa membeli lebih banyak lot daripada sisa kapasitas modal", () => {
-    const d = lihat(560n, state({ bandIndex: 5, lotsHeld: 9 }));
+describe("decide — capital limits and inventory limits", () => {
+  it("cannot buy more lots than the remaining capital capacity", () => {
+    const d = observe(560n, state({ bandIndex: 5, lotsHeld: 9 }));
     expect(d.action).toBe("BUY");
     expect(d.lots).toBe(1);
     expect(d.lotsCapped).toBe(true);
     expect(d.nextState.lotsHeld).toBe(10);
   });
 
-  it("modal habis berarti tidak ada pembelian sama sekali, bukan pembelian sebagian dari nol", () => {
-    const d = lihat(560n, state({ bandIndex: 5, lotsHeld: 10 }));
+  it("exhausted capital means no buy at all, not a partial buy of zero", () => {
+    const d = observe(560n, state({ bandIndex: 5, lotsHeld: 10 }));
     expect(d.action).toBe("IDLE");
     expect(d.lots).toBe(0);
     expect(d.lotsCapped).toBe(true);
   });
 
-  it("tidak bisa menjual lot yang tidak dipegang", () => {
-    const d = lihat(660n, state({ bandIndex: 5, lotsHeld: 1 }));
+  it("cannot sell lots that are not held", () => {
+    const d = observe(660n, state({ bandIndex: 5, lotsHeld: 1 }));
     expect(d.action).toBe("SELL");
     expect(d.lots).toBe(1);
     expect(d.lotsCapped).toBe(true);
     expect(d.nextState.lotsHeld).toBe(0);
   });
 
-  it("pita tetap maju walaupun lot dibatasi — kalau tidak, persilangan yang sama akan memicu lagi selamanya", () => {
-    const d = lihat(560n, state({ bandIndex: 5, lotsHeld: 10 }));
+  it("the band still advances even when lots are capped — otherwise the same crossing would retrigger forever", () => {
+    const d = observe(560n, state({ bandIndex: 5, lotsHeld: 10 }));
     expect(d.nextState.bandIndex).toBe(3);
   });
 });
 
-describe("decide — kapan grid berhenti berlaku", () => {
-  it("harga di dalam buffer atas belum breakout, hanya diamati", () => {
-    const d = lihat(714n, state({ bandIndex: 9, lotsHeld: 0 }));
+describe("decide — when the grid stops applying", () => {
+  it("a price inside the upper buffer is not a breakout yet, only watched", () => {
+    const d = observe(714n, state({ bandIndex: 9, lotsHeld: 0 }));
     expect(d.action).toBe("WATCH_BREAKOUT");
     expect(d.breakout).toBe("WATCHING_ABOVE");
     expect(d.nextState.consecutiveOutside).toBe(1);
   });
 
-  it("breakout atas dikonfirmasi setelah tiga pengamatan berturut-turut", () => {
-    const d = lihat(714n, state({ bandIndex: 9, lotsHeld: 2, consecutiveOutside: 2, outsideSide: "ABOVE" }));
+  it("an upward breakout is confirmed after three consecutive observations", () => {
+    const d = observe(714n, state({ bandIndex: 9, lotsHeld: 2, consecutiveOutside: 2, outsideSide: "ABOVE" }));
     expect(d.action).toBe("EXIT_ABOVE");
     expect(d.nextState.consecutiveOutside).toBe(3);
   });
 
-  it("hitungan konfirmasi direset begitu harga kembali ke dalam rentang", () => {
-    const d = lihat(600n, state({ bandIndex: 5, lotsHeld: 5, consecutiveOutside: 2, outsideSide: "ABOVE" }));
+  it("the confirmation count resets as soon as the price returns inside the range", () => {
+    const d = observe(600n, state({ bandIndex: 5, lotsHeld: 5, consecutiveOutside: 2, outsideSide: "ABOVE" }));
     expect(d.nextState.consecutiveOutside).toBe(0);
     expect(d.nextState.outsideSide).toBeNull();
   });
 
-  it("berbalik arah mereset hitungan — dua pelanggaran arah berbeda bukan konfirmasi", () => {
-    const d = lihat(490n, state({ bandIndex: 0, lotsHeld: 5, consecutiveOutside: 2, outsideSide: "ABOVE" }));
+  it("flipping direction resets the count — two breaches in different directions are not a confirmation", () => {
+    const d = observe(490n, state({ bandIndex: 0, lotsHeld: 5, consecutiveOutside: 2, outsideSide: "ABOVE" }));
     expect(d.nextState.outsideSide).toBe("BELOW");
     expect(d.nextState.consecutiveOutside).toBe(1);
     expect(d.action).toBe("WATCH_BREAKOUT");
   });
 
-  it("breakout keras keluar seketika, tanpa menunggu konfirmasi", () => {
-    const d = lihat(770n, state({ bandIndex: 9, lotsHeld: 3, consecutiveOutside: 0 }));
+  it("a hard breakout exits at once, without waiting for confirmation", () => {
+    const d = observe(770n, state({ bandIndex: 9, lotsHeld: 3, consecutiveOutside: 0 }));
     expect(d.action).toBe("EXIT_ABOVE");
   });
 
-  it("breakout keras ke bawah keluar seketika", () => {
-    const d = lihat(450n, state({ bandIndex: 0, lotsHeld: 8, consecutiveOutside: 0 }));
+  it("a hard breakout downward exits at once", () => {
+    const d = observe(450n, state({ bandIndex: 0, lotsHeld: 8, consecutiveOutside: 0 }));
     expect(d.action).toBe("EXIT_BELOW");
   });
 
-  it("keluar berarti membongkar SELURUH persediaan — grid di bawah rentangnya 100% long tanpa rencana", () => {
-    const d = lihat(450n, state({ bandIndex: 0, lotsHeld: 8 }));
+  it("exiting means unwinding the ENTIRE inventory — a grid below its range is 100% long with no plan", () => {
+    const d = observe(450n, state({ bandIndex: 0, lotsHeld: 8 }));
     expect(d.lots).toBe(8);
     expect(d.notionalBase).toBe(usd(800n));
     expect(d.nextState.lotsHeld).toBe(0);
   });
 
-  it("keluar ke atas juga membongkar sisa persediaan supaya tidak ada posisi yatim", () => {
-    const d = lihat(770n, state({ bandIndex: 9, lotsHeld: 3 }));
+  it("exiting upward also unwinds the remaining inventory so no position is orphaned", () => {
+    const d = observe(770n, state({ bandIndex: 9, lotsHeld: 3 }));
     expect(d.lots).toBe(3);
     expect(d.nextState.lotsHeld).toBe(0);
   });
 
-  it("harga di antara batas atas dan buffer masih boleh menjual sisa lot", () => {
+  it("a price between the upper bound and the buffer may still sell the remaining lots", () => {
     // $705 is above $700 but below $714: the band clamps to 9 and the sale still happens
-    const d = lihat(705n, state({ bandIndex: 5, lotsHeld: 5 }));
+    const d = observe(705n, state({ bandIndex: 5, lotsHeld: 5 }));
     expect(d.action).toBe("SELL");
     expect(d.lots).toBe(4);
     expect(d.breakout).toBe("NONE");
   });
 
-  it("lompatan harga langsung melewati buffer tetap menjual sisa lot sebelum keluar diamati", () => {
-    const d = lihat(714n, state({ bandIndex: 5, lotsHeld: 5 }));
+  it("a price jump straight past the buffer still sells the remaining lots before the exit is watched", () => {
+    const d = observe(714n, state({ bandIndex: 5, lotsHeld: 5 }));
     expect(d.action).toBe("SELL");
     expect(d.lots).toBe(4);
     expect(d.breakout).toBe("WATCHING_ABOVE");
@@ -161,79 +161,79 @@ describe("decide — kapan grid berhenti berlaku", () => {
   });
 });
 
-describe("decide — penjelasan", () => {
-  it("alasan menyebut harga terformat, bukan angka mentah basis 8 desimal", () => {
-    const d = lihat(560n);
-    expect(d.reason).toContain("$560,00");
+describe("decide — the explanation", () => {
+  it("the reason names the formatted price, not the raw 8-decimal number", () => {
+    const d = observe(560n);
+    expect(d.reason).toContain("$560.00");
     expect(d.reason).not.toContain("56000000000");
   });
 
-  it("alasan keluar menyebut mengapa grid berhenti berlaku", () => {
-    const d = lihat(770n, state({ bandIndex: 9, lotsHeld: 1 }));
-    expect(d.reason).toContain("$770,00");
+  it("the exit reason says why the grid stopped applying", () => {
+    const d = observe(770n, state({ bandIndex: 9, lotsHeld: 1 }));
+    expect(d.reason).toContain("$770.00");
     expect(d.reason.length).toBeGreaterThan(20);
   });
 });
 
-describe("decide — gagal keras pada konfigurasi yang tidak bisa untung", () => {
-  it("grid dengan langkah lebih sempit daripada ongkos putaran ditolak", () => {
-    expect(() => decide({ ...grid, levels: 101 }, state({ bandIndex: 50, lotsHeld: 50 }), { priceBase: usd(600n), blockNumber: 1n }, biaya)).toThrow(GridError);
+describe("decide — hard failure on a configuration that cannot turn a profit", () => {
+  it("rejects a grid whose step is narrower than one round trip's cost", () => {
+    expect(() => decide({ ...grid, levels: 101 }, state({ bandIndex: 50, lotsHeld: 50 }), { priceBase: usd(600n), blockNumber: 1n }, cost)).toThrow(GridError);
   });
 
-  it("batas atas di bawah batas bawah ditolak", () => {
-    expect(() => decide({ ...grid, lowerBase: usd(700n), upperBase: usd(500n) }, state(), { priceBase: usd(600n), blockNumber: 1n }, biaya)).toThrow(GridError);
+  it("rejects an upper bound below the lower bound", () => {
+    expect(() => decide({ ...grid, lowerBase: usd(700n), upperBase: usd(500n) }, state(), { priceBase: usd(600n), blockNumber: 1n }, cost)).toThrow(GridError);
   });
 
-  it("batas bawah nol ditolak — harga nol bukan harga", () => {
-    expect(() => decide({ ...grid, lowerBase: 0n }, state(), { priceBase: usd(600n), blockNumber: 1n }, biaya)).toThrow(GridError);
+  it("rejects a zero lower bound — a price of zero is not a price", () => {
+    expect(() => decide({ ...grid, lowerBase: 0n }, state(), { priceBase: usd(600n), blockNumber: 1n }, cost)).toThrow(GridError);
   });
 
-  it("rentang lebih lebar daripada 3x ditolak karena distorsi grid aritmetik jadi tak terkendali", () => {
-    expect(() => decide({ ...grid, upperBase: usd(2_000n) }, state(), { priceBase: usd(600n), blockNumber: 1n }, biaya)).toThrow(GridError);
+  it("rejects a range wider than 3x because the arithmetic grid's distortion becomes uncontrolled", () => {
+    expect(() => decide({ ...grid, upperBase: usd(2_000n) }, state(), { priceBase: usd(600n), blockNumber: 1n }, cost)).toThrow(GridError);
   });
 
-  it("kurang dari tiga garis bukan grid", () => {
-    expect(() => decide({ ...grid, levels: 2 }, state({ bandIndex: 0, lotsHeld: 0 }), { priceBase: usd(600n), blockNumber: 1n }, biaya)).toThrow(GridError);
+  it("fewer than three lines is not a grid", () => {
+    expect(() => decide({ ...grid, levels: 2 }, state({ bandIndex: 0, lotsHeld: 0 }), { priceBase: usd(600n), blockNumber: 1n }, cost)).toThrow(GridError);
   });
 
-  it("jumlah level pecahan ditolak", () => {
-    expect(() => decide({ ...grid, levels: 10.5 }, state(), { priceBase: usd(600n), blockNumber: 1n }, biaya)).toThrow(GridError);
+  it("rejects a fractional level count", () => {
+    expect(() => decide({ ...grid, levels: 10.5 }, state(), { priceBase: usd(600n), blockNumber: 1n }, cost)).toThrow(GridError);
   });
 
-  it("modal nol ditolak", () => {
-    expect(() => decide({ ...grid, capitalBase: 0n }, state(), { priceBase: usd(600n), blockNumber: 1n }, biaya)).toThrow(GridError);
+  it("rejects zero capital", () => {
+    expect(() => decide({ ...grid, capitalBase: 0n }, state(), { priceBase: usd(600n), blockNumber: 1n }, cost)).toThrow(GridError);
   });
 
-  it("harga nol atau negatif ditolak — itu pembacaan rusak, bukan aset gratis", () => {
-    expect(() => decide(grid, state(), { priceBase: 0n, blockNumber: 1n }, biaya)).toThrow(GridError);
-    expect(() => decide(grid, state(), { priceBase: -1n, blockNumber: 1n }, biaya)).toThrow(GridError);
+  it("rejects a zero or negative price — that is a broken reading, not a free asset", () => {
+    expect(() => decide(grid, state(), { priceBase: 0n, blockNumber: 1n }, cost)).toThrow(GridError);
+    expect(() => decide(grid, state(), { priceBase: -1n, blockNumber: 1n }, cost)).toThrow(GridError);
   });
 
-  it("lot dipegang melebihi jumlah interval ditolak", () => {
-    expect(() => lihat(600n, state({ lotsHeld: 11 }))).toThrow(GridError);
+  it("rejects lots held above the interval count", () => {
+    expect(() => observe(600n, state({ lotsHeld: 11 }))).toThrow(GridError);
   });
 
-  it("indeks pita di luar rentang ditolak", () => {
-    expect(() => lihat(600n, state({ bandIndex: 10 }))).toThrow(GridError);
-    expect(() => lihat(600n, state({ bandIndex: -1 }))).toThrow(GridError);
+  it("rejects a band index outside the range", () => {
+    expect(() => observe(600n, state({ bandIndex: 10 }))).toThrow(GridError);
+    expect(() => observe(600n, state({ bandIndex: -1 }))).toThrow(GridError);
   });
 
-  it("hitungan pengamatan luar tanpa arah adalah state yang mustahil", () => {
-    expect(() => lihat(600n, state({ consecutiveOutside: 2, outsideSide: null }))).toThrow(GridError);
+  it("an outside-observation count with no direction is an impossible state", () => {
+    expect(() => observe(600n, state({ consecutiveOutside: 2, outsideSide: null }))).toThrow(GridError);
   });
 
-  it("buffer breakout yang lebih lebar daripada breakout keras ditolak", () => {
+  it("rejects a breakout buffer wider than the hard breakout", () => {
     expect(() =>
-      decide(grid, state(), { priceBase: usd(600n), blockNumber: 1n }, biaya, {
+      decide(grid, state(), { priceBase: usd(600n), blockNumber: 1n }, cost, {
         ...DEFAULT_GRID_THRESHOLDS,
         breakoutBufferBps: 2_000n,
       }),
     ).toThrow(GridError);
   });
 
-  it("pengali profit di bawah 1,00x ditolak — itu meresmikan grid yang merugi", () => {
+  it("rejects a profit multiple below 1.00x — that formalizes a loss-making grid", () => {
     expect(() =>
-      decide(grid, state(), { priceBase: usd(600n), blockNumber: 1n }, biaya, {
+      decide(grid, state(), { priceBase: usd(600n), blockNumber: 1n }, cost, {
         ...DEFAULT_GRID_THRESHOLDS,
         minProfitMultipleBps: 9_999n,
       }),

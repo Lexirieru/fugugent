@@ -39,7 +39,7 @@ export function stepBase(config: GridConfig): bigint {
 export function levelPriceBase(config: GridConfig, i: number): bigint {
   const intervals = intervalsOf(config);
   if (!Number.isInteger(i) || i < 0 || i > intervals) {
-    throw new GridError(`Indeks garis grid ${i} di luar rentang 0..${intervals}.`);
+    throw new GridError(`Grid line index ${i} is outside the range 0..${intervals}.`);
   }
   return config.lowerBase + ((config.upperBase - config.lowerBase) * BigInt(i)) / BigInt(intervals);
 }
@@ -71,7 +71,7 @@ export function lotValueBase(config: GridConfig): bigint {
 export function roundTripCostBps(lotValue: bigint, cost: CostModel): bigint {
   if (lotValue <= 0n) {
     throw new GridError(
-      `Nilai lot ${lotValue} tidak positif: modal grid terlalu kecil untuk jumlah level yang diminta.`,
+      `Lot value ${lotValue} is not positive: the grid capital is too small for the requested level count.`,
     );
   }
   const proporsional = 2n * (cost.swapFeeBps + cost.slippageBps);

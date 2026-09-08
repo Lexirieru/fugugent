@@ -46,29 +46,29 @@ import {
 function validateThresholds(t: GridThresholds): void {
   if (t.breakoutBufferBps <= 0n || t.breakoutBufferBps >= t.hardBreakoutBps) {
     throw new GridError(
-      `Ambang breakout tidak valid: buffer=${t.breakoutBufferBps} bps, keras=${t.hardBreakoutBps} bps. ` +
-        `Urutan yang benar adalah 0 < buffer < keras.`,
+      `Invalid breakout thresholds: buffer=${t.breakoutBufferBps} bps, hard=${t.hardBreakoutBps} bps. ` +
+        `The correct ordering is 0 < buffer < hard.`,
     );
   }
   if (t.hardBreakoutBps >= BPS_ONE) {
     throw new GridError(
-      `hardBreakoutBps=${t.hardBreakoutBps} mencapai 100%: batas bawah grid dikurangi angka ini menjadi nol atau negatif, ` +
-        `dan harga nol bukan harga.`,
+      `hardBreakoutBps=${t.hardBreakoutBps} reaches 100%: the grid's lower bound minus this number becomes zero or negative, ` +
+        `and a price of zero is not a price.`,
     );
   }
   if (!Number.isInteger(t.breakoutConfirmObservations) || t.breakoutConfirmObservations < 1) {
     throw new GridError(
-      `breakoutConfirmObservations=${t.breakoutConfirmObservations} harus bilangan bulat >= 1.`,
+      `breakoutConfirmObservations=${t.breakoutConfirmObservations} must be an integer >= 1.`,
     );
   }
   if (t.minProfitMultipleBps < BPS_ONE) {
     throw new GridError(
-      `minProfitMultipleBps=${t.minProfitMultipleBps} di bawah 10000 (1,00x): itu meresmikan grid yang ` +
-        `setiap putarannya merugi setelah ongkos.`,
+      `minProfitMultipleBps=${t.minProfitMultipleBps} is below 10000 (1.00x): that formalizes a grid that ` +
+        `loses money on every round trip once costs are paid.`,
     );
   }
   if (t.maxRangeRatioBps <= BPS_ONE) {
-    throw new GridError(`maxRangeRatioBps=${t.maxRangeRatioBps} harus lebih besar dari 10000 (1,00x).`);
+    throw new GridError(`maxRangeRatioBps=${t.maxRangeRatioBps} must be greater than 10000 (1.00x).`);
   }
 }
 
@@ -81,39 +81,39 @@ function validateThresholds(t: GridThresholds): void {
  */
 function validateConfig(config: GridConfig, cost: CostModel, t: GridThresholds): void {
   if (config.lowerBase <= 0n) {
-    throw new GridError(`Batas bawah ${config.lowerBase} tidak positif; harga nol bukan harga.`);
+    throw new GridError(`Lower bound ${config.lowerBase} is not positive; a price of zero is not a price.`);
   }
   if (config.upperBase <= config.lowerBase) {
     throw new GridError(
-      `Batas atas ${config.upperBase} tidak melebihi batas bawah ${config.lowerBase}.`,
+      `Upper bound ${config.upperBase} does not exceed lower bound ${config.lowerBase}.`,
     );
   }
   if (config.upperBase * BPS_ONE > config.lowerBase * t.maxRangeRatioBps) {
     throw new GridError(
-      `Rentang ${config.lowerBase}..${config.upperBase} melebihi batas ${t.maxRangeRatioBps} bps ` +
-        `(${t.maxRangeRatioBps / BPS_ONE}x). Pada grid aritmetik, rasio rentang SAMA DENGAN rasio antara ` +
-        `jarak persentase terlebar (di dasar) dan tersempit (di puncak).`,
+      `Range ${config.lowerBase}..${config.upperBase} exceeds the ${t.maxRangeRatioBps} bps limit ` +
+        `(${t.maxRangeRatioBps / BPS_ONE}x). On an arithmetic grid, the range ratio EQUALS the ratio between ` +
+        `the widest percentage step (at the bottom) and the narrowest (at the top).`,
     );
   }
   if (!Number.isInteger(config.levels) || config.levels < 3) {
     throw new GridError(
-      `levels=${config.levels} harus bilangan bulat >= 3. Dua garis hanya membentuk satu interval, ` +
-        `yaitu sepasang limit order — bukan grid.`,
+      `levels=${config.levels} must be an integer >= 3. Two lines form only one interval, ` +
+        `which is a pair of limit orders — not a grid.`,
     );
   }
   if (config.capitalBase <= 0n) {
-    throw new GridError(`Modal grid ${config.capitalBase} tidak positif.`);
+    throw new GridError(`Grid capital ${config.capitalBase} is not positive.`);
   }
   if (stepBase(config) <= 0n) {
     throw new GridError(
-      `Jarak antar-garis membulat menjadi nol: rentang terlalu sempit untuk ${config.levels} garis.`,
+      `The spacing between lines rounds to zero: the range is too narrow for ${config.levels} lines.`,
     );
   }
 
   const lot = lotValueBase(config);
   if (lot <= 0n) {
     throw new GridError(
-      `Nilai lot membulat menjadi nol: modal ${config.capitalBase} terlalu kecil untuk ${intervalsOf(config)} interval.`,
+      `The lot value rounds to zero: capital ${config.capitalBase} is too small for ${intervalsOf(config)} intervals.`,
     );
   }
 
@@ -121,9 +121,9 @@ function validateConfig(config: GridConfig, cost: CostModel, t: GridThresholds):
   const minimum = minProfitableStepBps(lot, cost, t.minProfitMultipleBps);
   if (step < minimum) {
     throw new GridError(
-      `Grid tidak bisa untung: jarak antar-garis tersempit ${step} bps, sedangkan satu putaran ` +
-        `beli-lalu-jual memerlukan minimal ${minimum} bps (ongkos putaran ${roundTripCostBps(lot, cost)} bps ` +
-        `dikali pengali ${t.minProfitMultipleBps} bps). Kurangi jumlah level, lebarkan rentang, atau tambah modal.`,
+      `This grid cannot turn a profit: the narrowest spacing between lines is ${step} bps, while one ` +
+        `buy-then-sell round trip needs at least ${minimum} bps (round-trip cost ${roundTripCostBps(lot, cost)} bps ` +
+        `times the ${t.minProfitMultipleBps} bps multiple). Reduce the level count, widen the range, or add capital.`,
     );
   }
 }
@@ -131,7 +131,7 @@ function validateConfig(config: GridConfig, cost: CostModel, t: GridThresholds):
 function validateCost(cost: CostModel): void {
   if (cost.swapFeeBps < 0n || cost.slippageBps < 0n || cost.gasCostBase < 0n) {
     throw new GridError(
-      `Model biaya negatif tidak mungkin: swapFeeBps=${cost.swapFeeBps}, ` +
+      `A negative cost model is impossible: swapFeeBps=${cost.swapFeeBps}, ` +
         `slippageBps=${cost.slippageBps}, gasCostBase=${cost.gasCostBase}.`,
     );
   }
@@ -140,20 +140,20 @@ function validateCost(cost: CostModel): void {
 function validateState(state: GridState, config: GridConfig): void {
   const intervals = intervalsOf(config);
   if (!Number.isInteger(state.bandIndex) || state.bandIndex < 0 || state.bandIndex > intervals - 1) {
-    throw new GridError(`bandIndex=${state.bandIndex} di luar rentang 0..${intervals - 1}.`);
+    throw new GridError(`bandIndex=${state.bandIndex} is outside the range 0..${intervals - 1}.`);
   }
   if (!Number.isInteger(state.lotsHeld) || state.lotsHeld < 0 || state.lotsHeld > intervals) {
-    throw new GridError(`lotsHeld=${state.lotsHeld} di luar rentang 0..${intervals}.`);
+    throw new GridError(`lotsHeld=${state.lotsHeld} is outside the range 0..${intervals}.`);
   }
   if (!Number.isInteger(state.consecutiveOutside) || state.consecutiveOutside < 0) {
-    throw new GridError(`consecutiveOutside=${state.consecutiveOutside} harus bilangan bulat >= 0.`);
+    throw new GridError(`consecutiveOutside=${state.consecutiveOutside} must be an integer >= 0.`);
   }
   // An impossible state: counting a breach without knowing its direction. If this got
   // through, observations above and below could stack into a "confirmation" that never
   // actually happened in either single direction.
   if ((state.consecutiveOutside > 0) !== (state.outsideSide !== null)) {
     throw new GridError(
-      `State tidak konsisten: consecutiveOutside=${state.consecutiveOutside} dengan outsideSide=${state.outsideSide}.`,
+      `Inconsistent state: consecutiveOutside=${state.consecutiveOutside} with outsideSide=${state.outsideSide}.`,
     );
   }
 }
@@ -161,7 +161,7 @@ function validateState(state: GridState, config: GridConfig): void {
 function validateObservation(obs: GridObservation): void {
   if (obs.priceBase <= 0n) {
     throw new GridError(
-      `Harga ${obs.priceBase} tidak positif. Itu pembacaan yang rusak, bukan aset yang menjadi gratis.`,
+      `Price ${obs.priceBase} is not positive. That is a broken reading, not an asset that became free.`,
     );
   }
 }
@@ -175,21 +175,21 @@ function buildReason(
   breakout: BreakoutStatus,
   confirmProgress: string,
 ): string {
-  const harga = formatPriceUsd8(priceBase);
-  const batas = lotsCapped ? " Jumlah lot dibatasi oleh modal atau persediaan yang tersedia." : "";
+  const price = formatPriceUsd8(priceBase);
+  const capNote = lotsCapped ? " The lot count was capped by the available capital or inventory." : "";
   switch (action) {
     case "IDLE":
-      return `Harga ${harga} masih di pita yang sama; tidak ada garis grid yang dilintasi.${batas}`;
+      return `Price ${price} is still in the same band; no grid line was crossed.${capNote}`;
     case "BUY":
-      return `Harga turun ke ${harga} dan melintasi ${lots} garis grid: membeli ${lots} lot senilai ${formatUsd8(notionalBase)}.${batas}`;
+      return `Price fell to ${price} and crossed ${lots} grid lines: buying ${lots} lots worth ${formatUsd8(notionalBase)}.${capNote}`;
     case "SELL":
-      return `Harga naik ke ${harga} dan melintasi ${lots} garis grid: menjual ${lots} lot senilai ${formatUsd8(notionalBase)}.${batas}`;
+      return `Price rose to ${price} and crossed ${lots} grid lines: selling ${lots} lots worth ${formatUsd8(notionalBase)}.${capNote}`;
     case "WATCH_BREAKOUT":
-      return `Harga ${harga} berada di luar rentang grid (${breakout === "WATCHING_ABOVE" ? "di atas" : "di bawah"}), ${confirmProgress}. Belum ada tindakan.`;
+      return `Price ${price} is outside the grid range (${breakout === "WATCHING_ABOVE" ? "above" : "below"}), ${confirmProgress}. No action yet.`;
     case "EXIT_ABOVE":
-      return `Harga ${harga} menembus ke atas rentang grid; grid tidak berlaku lagi. Membongkar ${lots} lot senilai ${formatUsd8(notionalBase)} dan berhenti.`;
+      return `Price ${price} broke out above the grid range; the grid no longer applies. Unwinding ${lots} lots worth ${formatUsd8(notionalBase)} and stopping.`;
     case "EXIT_BELOW":
-      return `Harga ${harga} menembus ke bawah rentang grid; grid tidak berlaku lagi dan posisinya sepenuhnya berarah. Membongkar ${lots} lot senilai ${formatUsd8(notionalBase)} dan berhenti.`;
+      return `Price ${price} broke out below the grid range; the grid no longer applies and the position is fully directional. Unwinding ${lots} lots worth ${formatUsd8(notionalBase)} and stopping.`;
   }
 }
 
@@ -212,7 +212,7 @@ export function decide(
   const step = minStepBps(config);
   const band = bandIndexOf(price, config);
 
-  const keluar = (action: "EXIT_ABOVE" | "EXIT_BELOW", side: "ABOVE" | "BELOW", hitungan: number): GridDecision => {
+  const exit = (action: "EXIT_ABOVE" | "EXIT_BELOW", side: "ABOVE" | "BELOW", count: number): GridDecision => {
     // Exiting ALWAYS unwinds the entire inventory. A grid that is no longer valid but
     // still holds lots is not a grid any more: it is a directional position with no exit
     // rule, which is exactly the state this whole module exists to avoid.
@@ -226,27 +226,27 @@ export function decide(
       breakout: side === "ABOVE" ? "WATCHING_ABOVE" : "WATCHING_BELOW",
       roundTripCostBps: rt,
       minStepBps: step,
-      nextState: { bandIndex: band, lotsHeld: 0, consecutiveOutside: hitungan, outsideSide: side },
+      nextState: { bandIndex: band, lotsHeld: 0, consecutiveOutside: count, outsideSide: side },
       reason: buildReason(action, price, lots, BigInt(lots) * lot, false, side === "ABOVE" ? "WATCHING_ABOVE" : "WATCHING_BELOW", ""),
     };
   };
 
   // --- layer 2: hard breakout, exit at once with no waiting for confirmation ---
-  if (price >= hardUpperBase(config, thresholds)) return keluar("EXIT_ABOVE", "ABOVE", state.consecutiveOutside + 1);
-  if (price <= hardLowerBase(config, thresholds)) return keluar("EXIT_BELOW", "BELOW", state.consecutiveOutside + 1);
+  if (price >= hardUpperBase(config, thresholds)) return exit("EXIT_ABOVE", "ABOVE", state.consecutiveOutside + 1);
+  if (price <= hardLowerBase(config, thresholds)) return exit("EXIT_BELOW", "BELOW", state.consecutiveOutside + 1);
 
   // --- layer 1: soft breakout, needs consecutive confirmation ---
-  const diAtas = price >= softUpperBase(config, thresholds);
-  const diBawah = price <= softLowerBase(config, thresholds);
-  const sisi: "ABOVE" | "BELOW" | null = diAtas ? "ABOVE" : diBawah ? "BELOW" : null;
+  const above = price >= softUpperBase(config, thresholds);
+  const below = price <= softLowerBase(config, thresholds);
+  const side: "ABOVE" | "BELOW" | null = above ? "ABOVE" : below ? "BELOW" : null;
 
   // Flipping direction RESETS the count: one observation above followed by one below is
   // not two observations pointing to the same conclusion, it is a market churning around
   // the range — precisely the condition this grid is built to serve.
-  const hitungan = sisi === null ? 0 : sisi === state.outsideSide ? state.consecutiveOutside + 1 : 1;
+  const count = side === null ? 0 : side === state.outsideSide ? state.consecutiveOutside + 1 : 1;
 
-  if (sisi !== null && hitungan >= thresholds.breakoutConfirmObservations) {
-    return keluar(sisi === "ABOVE" ? "EXIT_ABOVE" : "EXIT_BELOW", sisi, hitungan);
+  if (side !== null && count >= thresholds.breakoutConfirmObservations) {
+    return exit(side === "ABOVE" ? "EXIT_ABOVE" : "EXIT_BELOW", side, count);
   }
 
   // --- ordinary trading ---
@@ -262,25 +262,25 @@ export function decide(
   let capped = false;
 
   if (delta < 0) {
-    const diinginkan = -delta;
-    const kapasitas = intervals - state.lotsHeld;
-    lots = Math.min(diinginkan, kapasitas);
-    capped = lots < diinginkan;
-    action = lots > 0 ? "BUY" : sisi !== null ? "WATCH_BREAKOUT" : "IDLE";
+    const wanted = -delta;
+    const capacity = intervals - state.lotsHeld;
+    lots = Math.min(wanted, capacity);
+    capped = lots < wanted;
+    action = lots > 0 ? "BUY" : side !== null ? "WATCH_BREAKOUT" : "IDLE";
   } else if (delta > 0) {
-    const diinginkan = delta;
-    lots = Math.min(diinginkan, state.lotsHeld);
-    capped = lots < diinginkan;
-    action = lots > 0 ? "SELL" : sisi !== null ? "WATCH_BREAKOUT" : "IDLE";
+    const wanted = delta;
+    lots = Math.min(wanted, state.lotsHeld);
+    capped = lots < wanted;
+    action = lots > 0 ? "SELL" : side !== null ? "WATCH_BREAKOUT" : "IDLE";
   } else {
-    action = sisi !== null ? "WATCH_BREAKOUT" : "IDLE";
+    action = side !== null ? "WATCH_BREAKOUT" : "IDLE";
   }
 
-  const lotsHeldBerikutnya =
+  const nextLotsHeld =
     action === "BUY" ? state.lotsHeld + lots : action === "SELL" ? state.lotsHeld - lots : state.lotsHeld;
 
   const breakout: BreakoutStatus =
-    sisi === "ABOVE" ? "WATCHING_ABOVE" : sisi === "BELOW" ? "WATCHING_BELOW" : "NONE";
+    side === "ABOVE" ? "WATCHING_ABOVE" : side === "BELOW" ? "WATCHING_BELOW" : "NONE";
 
   return {
     action,
@@ -297,9 +297,9 @@ export function decide(
       // detected again on every following observation and the grid would retry the same
       // trade over and over, forever.
       bandIndex: band,
-      lotsHeld: lotsHeldBerikutnya,
-      consecutiveOutside: hitungan,
-      outsideSide: sisi,
+      lotsHeld: nextLotsHeld,
+      consecutiveOutside: count,
+      outsideSide: side,
     },
     reason: buildReason(
       action,
@@ -308,7 +308,7 @@ export function decide(
       BigInt(lots) * lot,
       capped,
       breakout,
-      `pengamatan ke-${hitungan} dari ${thresholds.breakoutConfirmObservations} yang dibutuhkan untuk memastikan breakout`,
+      `observation ${count} of the ${thresholds.breakoutConfirmObservations} needed to confirm a breakout`,
     ),
   };
 }

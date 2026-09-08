@@ -83,20 +83,20 @@ export function runBacktest(input: GridBacktestInput): GridBacktestResult {
   const thresholds = input.thresholds ?? DEFAULT_GRID_THRESHOLDS;
 
   if (series.length === 0) {
-    throw new GridError("Deret harga kosong: tidak ada yang bisa disimulasikan.");
+    throw new GridError("Empty price series: there is nothing to simulate.");
   }
   for (const [i, p] of series.entries()) {
     if (p <= 0n) {
       throw new GridError(
-        `Harga pada candle ${i} bernilai ${p}. Itu pembacaan rusak, bukan aset yang menjadi gratis.`,
+        `The price at candle ${i} is ${p}. That is a broken reading, not an asset that became free.`,
       );
     }
   }
 
   const lot = lotValueBase(config);
   const intervals = intervalsOf(config);
-  const hargaAwal = series[0]!;
-  const hargaAkhir = series[series.length - 1]!;
+  const openPrice = series[0]!;
+  const closePrice = series[series.length - 1]!;
 
   /**
    * The grid starts balanced around the opening price: one lot of inventory for every
@@ -105,19 +105,19 @@ export function runBacktest(input: GridBacktestInput): GridBacktestResult {
    * falls). A grid that starts 100% on one leg can only trade in one direction until the
    * price happens to turn around.
    */
-  const bandAwal = bandIndexOf(hargaAwal, config);
-  const lotsAwal = intervals - bandAwal;
+  const openBand = bandIndexOf(openPrice, config);
+  const openLots = intervals - openBand;
 
   let state: GridState = {
-    bandIndex: bandAwal,
-    lotsHeld: lotsAwal,
+    bandIndex: openBand,
+    lotsHeld: openLots,
     consecutiveOutside: 0,
     outsideSide: null,
   };
 
-  const tokenPerLotAwal = (lot * WAD) / hargaAwal;
-  const tumpukan: bigint[] = Array.from({ length: lotsAwal }, () => tokenPerLotAwal);
-  let quoteBase = config.capitalBase - BigInt(lotsAwal) * lot;
+  const openTokenPerLot = (lot * WAD) / openPrice;
+  const stack: bigint[] = Array.from({ length: openLots }, () => openTokenPerLot);
+  let quoteBase = config.capitalBase - BigInt(openLots) * lot;
 
   let buys = 0;
   let sells = 0;
@@ -134,36 +134,36 @@ export function runBacktest(input: GridBacktestInput): GridBacktestResult {
     const d = decide(config, state, { priceBase: price, blockNumber: BigInt(i) }, cost, thresholds);
 
     if (d.action === "BUY" && d.lots > 0) {
-      const belanja = BigInt(d.lots) * lot;
-      const fee = feeOf(belanja);
+      const spend = BigInt(d.lots) * lot;
+      const fee = feeOf(spend);
       // The proportional fee is embedded in the swap: the dollars spent stay at
-      // `belanja`, but the tokens received are reduced by that fee.
-      const tokenTotal = ((belanja - fee) * WAD) / price;
+      // `spend`, but the tokens received are reduced by that fee.
+      const tokenTotal = ((spend - fee) * WAD) / price;
       // Split evenly per lot so a later LIFO sale releases equal amounts. The remainder
       // (< one wei per lot, i.e. under 1e-18 tokens) is burned; chasing it would add wei
       // to one lot arbitrarily.
       const tokenPerLot = tokenTotal / BigInt(d.lots);
-      quoteBase -= belanja;
-      for (let k = 0; k < d.lots; k++) tumpukan.push(tokenPerLot);
+      quoteBase -= spend;
+      for (let k = 0; k < d.lots; k++) stack.push(tokenPerLot);
       feeBase += fee;
       gasBase += cost.gasCostBase;
       buys += 1;
     } else if (d.action === "SELL" && d.lots > 0) {
       let token = 0n;
-      for (let k = 0; k < d.lots; k++) token += tumpukan.pop()!;
-      const kotor = (token * price) / WAD;
-      const fee = feeOf(kotor);
-      quoteBase += kotor - fee;
+      for (let k = 0; k < d.lots; k++) token += stack.pop()!;
+      const gross = (token * price) / WAD;
+      const fee = feeOf(gross);
+      quoteBase += gross - fee;
       feeBase += fee;
       gasBase += cost.gasCostBase;
       sells += 1;
     } else if (d.action === "EXIT_ABOVE" || d.action === "EXIT_BELOW") {
       let token = 0n;
-      while (tumpukan.length > 0) token += tumpukan.pop()!;
+      while (stack.length > 0) token += stack.pop()!;
       if (token > 0n) {
-        const kotor = (token * price) / WAD;
-        const fee = feeOf(kotor);
-        quoteBase += kotor - fee;
+        const gross = (token * price) / WAD;
+        const fee = feeOf(gross);
+        quoteBase += gross - fee;
         feeBase += fee;
         gasBase += cost.gasCostBase;
         sells += 1;
@@ -180,14 +180,14 @@ export function runBacktest(input: GridBacktestInput): GridBacktestResult {
     state = d.nextState;
   }
 
-  let sisaToken = 0n;
-  for (const t of tumpukan) sisaToken += t;
+  let remainingToken = 0n;
+  for (const t of stack) remainingToken += t;
 
-  const finalValueBase = quoteBase + (sisaToken * hargaAkhir) / WAD - gasBase;
+  const finalValueBase = quoteBase + (remainingToken * closePrice) / WAD - gasBase;
 
-  const holdToken = (BigInt(lotsAwal) * lot * WAD) / hargaAwal;
+  const holdToken = (BigInt(openLots) * lot * WAD) / openPrice;
   const holdValueBase =
-    config.capitalBase - BigInt(lotsAwal) * lot + (holdToken * hargaAkhir) / WAD;
+    config.capitalBase - BigInt(openLots) * lot + (holdToken * closePrice) / WAD;
 
   return {
     candles: series.length,
