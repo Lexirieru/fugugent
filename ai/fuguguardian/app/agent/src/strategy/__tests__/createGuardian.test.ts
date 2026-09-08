@@ -1,9 +1,16 @@
-import { describe, expect, it, vi } from "vitest";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PublicClient } from "viem";
 import { GuardianConfigError, createGuardian, type GuardianConfig } from "../createGuardian.js";
 import { SessionPermissionError, type SessionCall } from "../chain/session.js";
 import { UnitConversionError } from "../units.js";
-import { createMemoryStateStore, initialExecuteState } from "../state/store.js";
+import {
+  createFileStateStore,
+  createMemoryStateStore,
+  initialExecuteState,
+} from "../state/store.js";
 import type { Logger } from "../guard.js";
 import type { ExecuteState } from "../execute.js";
 
@@ -99,6 +106,9 @@ function config(overrides: Partial<GuardianConfig> = {}): GuardianConfig {
       minIntervalSeconds: 0,
     },
     logger: silentLogger(),
+    // Store WAJIB — tidak ada lagi default memori diam-diam. Di test ia disebut
+    // eksplisit; di proses sungguhan yang disebut adalah `createFileStateStore`.
+    stateStore: createMemoryStateStore(),
     now: () => 1_700_000_000,
     ...overrides,
   };
@@ -301,5 +311,102 @@ describe("createGuardian — C2 lewat rantai lengkap", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("createGuardian — store berkas sungguhan melewati 'kematian proses'", () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await mkdtemp(path.join(tmpdir(), "fugu-guardian-"));
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("catatan menggantung sudah ada di BERKAS pada detik batch dikirim, bukan setelah siklus", async () => {
+    // `waitForTransactionReceipt` menunggu sampai 180 detik. Proses yang mati di
+    // dalam jendela itu tidak akan pernah menyelesaikan siklusnya, jadi apa pun
+    // yang disimpan "setelah siklus" tidak akan pernah tersimpan. Yang diuji di
+    // sini persis itu: siklusnya SENGAJA tidak pernah selesai.
+    const file = path.join(dir, "state.json");
+    const store = createFileStateStore(file);
+    let masukKirim!: () => void;
+    const sudahMasukKirim = new Promise<void>((r) => {
+      masukKirim = r;
+    });
+    const sendCalls = fakeSendCalls(() => {
+      masukKirim();
+      return new Promise(() => {}); // tidak pernah selesai = proses menggantung
+    });
+
+    const g = await createGuardian(config({ stateStore: store, sendCalls }));
+    void g.runOnce(); // sengaja TIDAK di-await: siklus ini tidak akan selesai
+    await sudahMasukKirim;
+
+    const isi = await store.load();
+    expect(isi).not.toBeNull();
+    expect(isi?.pendingRepay).not.toBeNull();
+    expect(isi?.spentTodayUsd8).toBeGreaterThan(0n);
+  });
+
+  it("restart setelah kegagalan tunggu-receipt TIDAK membayar lagi", async () => {
+    const file = path.join(dir, "state.json");
+
+    // Proses pertama: batch gagal dengan receipt timeout.
+    const sendCalls1 = fakeSendCalls(async () => {
+      throw new Error("waitForTransactionReceipt timeout setelah 180s");
+    });
+    const g1 = await createGuardian(
+      config({ stateStore: createFileStateStore(file), sendCalls: sendCalls1 }),
+    );
+    const { result } = await g1.runOnce();
+    expect(result.ok).toBe(false);
+    expect(sendCalls1).toHaveBeenCalledTimes(1);
+
+    // Proses KEDUA atas berkas yang sama — restart. Rantai belum menunjukkan
+    // hutang berkurang, jadi catatan menggantung masih berlaku.
+    const sendCalls2 = fakeSendCalls();
+    const g2 = await createGuardian(
+      config({ stateStore: createFileStateStore(file), sendCalls: sendCalls2 }),
+    );
+    const kedua = await g2.runOnce();
+
+    expect(sendCalls2).not.toHaveBeenCalled();
+    expect(kedua.result.ok).toBe(true);
+    expect(kedua.result.ok === true ? kedua.result.executeReason : "").toMatch(
+      /belum terbukti selesai/i,
+    );
+  });
+
+  it("restart membebaskan diri sendiri begitu rantai menunjukkan hutang turun sebesar yang dibayar", async () => {
+    const file = path.join(dir, "state.json");
+    const sendCalls1 = fakeSendCalls(async () => {
+      throw new Error("waitForTransactionReceipt timeout setelah 180s");
+    });
+    const g1 = await createGuardian(
+      config({ stateStore: createFileStateStore(file), sendCalls: sendCalls1 }),
+    );
+    await g1.runOnce();
+
+    const menggantung = (await createFileStateStore(file).load())?.pendingRepay;
+    expect(menggantung).toBeTruthy();
+
+    // Rantai kini melaporkan hutang berkurang PERSIS sebesar yang dibayar, pada
+    // blok yang lebih baru.
+    const { client } = fakeClient({
+      debtBase: HUTANG - menggantung!.amountUsd8,
+      blockNumber: 2_000n,
+    });
+    const sendCalls2 = fakeSendCalls();
+    const g2 = await createGuardian(
+      config({ client, stateStore: createFileStateStore(file), sendCalls: sendCalls2 }),
+    );
+    const kedua = await g2.runOnce();
+
+    expect(kedua.nextExecuteState.pendingRepay).toBeNull();
+    // Hutang sisa masih di zona berbahaya, jadi Guardian boleh bertindak lagi.
+    expect(sendCalls2).toHaveBeenCalledTimes(1);
   });
 });

@@ -314,10 +314,16 @@ export interface SessionRepayDeps {
   readonly permissions: SessionPermissions;
   /**
    * USD basis 8 desimal → unit token. Disuntik karena konversi (desimal token,
-   * harga feed, pemeriksaan bolak-balik) bukan urusan modul penandatanganan.
+   * harga feed) bukan urusan modul penandatanganan.
+   *
+   * **WAJIB bebas efek samping — hanya membaca.** Kegagalannya diperlakukan
+   * sebagai "belum menyentuh jaringan" (`neverSent`), sehingga anggaran tidak
+   * terpotong dan tidak ada catatan menggantung yang ditinggalkan. Implementasi
+   * yang mengirim transaksi di sini akan membuat asumsi itu bohong, dan bohong
+   * ke arah yang membayar dua kali.
    */
   readonly toTokenUnits: (asset: `0x${string}`, amountUsd8: bigint) => Promise<bigint> | bigint;
-  /** `allowance(owner, spender)` token saat ini. */
+  /** `allowance(owner, spender)` token saat ini. **WAJIB hanya membaca** — lihat `toTokenUnits`. */
   readonly readAllowance: (
     asset: `0x${string}`,
     owner: `0x${string}`,

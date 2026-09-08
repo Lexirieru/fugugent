@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   NeverSentError,
   RepaySendError,
+  asRepaySendFailure,
   clearPendingRepay,
   executeDecision,
   reconcilePendingRepay,
@@ -313,17 +314,60 @@ describe("executeDecision", () => {
 });
 
 describe("reconcilePendingRepay", () => {
-  it("hutang berkurang di blok yang lebih baru = terbukti mendarat -> catatan dibereskan", () => {
+  it("hutang berkurang PERSIS sebesar yang kita bayar, di blok lebih baru = terbukti mendarat", () => {
     const s = state({ spentTodayUsd8: 10_000_000_000n, pendingRepay: pending() });
     const sesudah = reconcilePendingRepay(s, {
       ...POS,
       blockNumber: POS.blockNumber + 1n,
-      debtBase: POS.debtBase - 1n,
+      debtBase: POS.debtBase - 10_000_000_000n, // = pending().amountUsd8
     });
 
     expect(sesudah.pendingRepay).toBeNull();
     // Anggaran yang sudah terpotong TIDAK dikembalikan: transaksinya memang jadi.
     expect(sesudah.spentTodayUsd8).toBe(10_000_000_000n);
+  });
+
+  it.each([
+    ["user membayar sendiri $1 selagi tx kita tersangkut", 100_000_000n],
+    ["likuidasi parsial pihak ketiga jauh lebih besar", 50_000_000_000n],
+    ["hanya berkurang satu unit (sisa pembulatan, bukan pembayaran kita)", 1n],
+  ])(
+    "hutang berkurang oleh SEBAB LAIN (%s) TIDAK dianggap bukti repay kita mendarat",
+    (_label, turun) => {
+      // Ini yang membedakan "hutang turun" dari "hutang turun sebesar yang kita
+      // bayar". Tanpa pembedaan itu, catatan kita dibereskan terlalu dini,
+      // Guardian bebas bertindak, lalu tx pertama mendarat -> dua pembayaran.
+      const s = state({ pendingRepay: pending() });
+      const sesudah = reconcilePendingRepay(s, {
+        ...POS,
+        blockNumber: POS.blockNumber + 10n,
+        debtBase: POS.debtBase - (turun as bigint),
+      });
+      expect(sesudah.pendingRepay).toEqual(pending());
+    },
+  );
+
+  it.each([-2n, -1n, 0n, 1n, 2n])(
+    "selisih pembulatan %s unit masih diterima (dua floor yang saling bebas)",
+    (geser) => {
+      const s = state({ pendingRepay: pending() });
+      const sesudah = reconcilePendingRepay(s, {
+        ...POS,
+        blockNumber: POS.blockNumber + 1n,
+        debtBase: POS.debtBase - (10_000_000_000n + (geser as bigint)),
+      });
+      expect(sesudah.pendingRepay).toBeNull();
+    },
+  );
+
+  it("selisih 3 unit sudah di luar toleransi dan ditolak", () => {
+    const s = state({ pendingRepay: pending() });
+    const sesudah = reconcilePendingRepay(s, {
+      ...POS,
+      blockNumber: POS.blockNumber + 1n,
+      debtBase: POS.debtBase - (10_000_000_000n + 3n),
+    });
+    expect(sesudah.pendingRepay).toEqual(pending());
   });
 
   it("hutang belum berkurang = belum terbukti -> catatan DIBIARKAN, walau blok sudah maju jauh", () => {
@@ -344,7 +388,7 @@ describe("reconcilePendingRepay", () => {
     const sesudah = reconcilePendingRepay(s, {
       ...POS,
       blockNumber: POS.blockNumber,
-      debtBase: POS.debtBase - 1n,
+      debtBase: POS.debtBase - 10_000_000_000n,
     });
 
     expect(sesudah.pendingRepay).toEqual(pending());
@@ -361,7 +405,7 @@ describe("reconcilePendingRepay", () => {
     const posBaru: Position = {
       ...POS,
       blockNumber: POS.blockNumber + 1n,
-      debtBase: POS.debtBase - 500_000_000n,
+      debtBase: POS.debtBase - 10_000_000_000n, // = pending().amountUsd8
     };
     const dep = deps();
 
@@ -380,5 +424,123 @@ describe("clearPendingRepay", () => {
 
     expect(sesudah.pendingRepay).toBeNull();
     expect(sesudah.spentTodayUsd8).toBe(10_000_000_000n);
+  });
+});
+
+describe("persistBeforeSend — catatan menggantung menyentuh disk SEBELUM tx berangkat", () => {
+  it("saat sendRepay dipanggil, state yang sudah tersimpan SUDAH memuat pendingRepay", async () => {
+    // Ini menyimulasikan kematian proses di dalam jendela tunggu-receipt 180
+    // detik: apa yang sudah tersimpan pada DETIK sendRepay dipanggil adalah
+    // persis apa yang akan ditemukan restart. Kalau `persistBeforeSend` tidak
+    // dipanggil sebelum kirim, yang terlihat di sini adalah `null` — dan
+    // restart akan membayar lagi.
+    const tersimpan: ExecuteState[] = [];
+    let terlihatSaatKirim: ExecuteState | undefined;
+    const d = decisionWith("PARTIAL_REPAY", 10_000_000_000n);
+    const dep = deps({
+      persistBeforeSend: (s) => {
+        tersimpan.push(s);
+      },
+      sendRepay: vi.fn(async () => {
+        terlihatSaatKirim = tersimpan.at(-1);
+        return "0xdeadbeef" as `0x${string}`;
+      }),
+      now: () => 1_000_500,
+    });
+
+    await executeDecision(d, POS, limits(), state(), dep);
+
+    expect(terlihatSaatKirim).toBeDefined();
+    expect(terlihatSaatKirim?.pendingRepay).not.toBeNull();
+    expect(terlihatSaatKirim?.pendingRepay?.amountUsd8).toBe(10_000_000_000n);
+    expect(terlihatSaatKirim?.spentTodayUsd8).toBe(10_000_000_000n);
+    expect(terlihatSaatKirim?.lastActionAt).toBe(1_000_500);
+  });
+
+  it("penyimpanan gagal -> TIDAK mengirim apa pun, dan galatnya bertanda neverSent", async () => {
+    // Gagal tertutup: mengirim tanpa jejak yang bisa menahan pembayaran kedua
+    // lebih buruk daripada tidak mengirim sama sekali.
+    const d = decisionWith("PARTIAL_REPAY", 10_000_000_000n);
+    const sendRepay = vi.fn(async () => "0xdeadbeef" as `0x${string}`);
+    const dep = deps({
+      persistBeforeSend: () => {
+        throw new Error("disk penuh");
+      },
+      sendRepay,
+    });
+
+    const err = await executeDecision(d, POS, limits(), state(), dep).catch((e: unknown) => e);
+
+    expect(sendRepay).not.toHaveBeenCalled();
+    expect(err).toBeInstanceOf(NeverSentError);
+    expect((err as NeverSentError).message).toContain("disk penuh");
+    expect(err).not.toBeInstanceOf(RepaySendError);
+  });
+
+  it("tanpa persistBeforeSend, pengiriman tetap jalan (kait ini opsional)", async () => {
+    const d = decisionWith("PARTIAL_REPAY", 10_000_000_000n);
+    const dep = deps();
+    const hasil = await executeDecision(d, POS, limits(), state(), dep);
+    expect(hasil.sent).toBe(true);
+  });
+});
+
+describe("asRepaySendFailure — pengenalan duck-typed, bukan instanceof", () => {
+  const contohState: ExecuteState = {
+    spentTodayUsd8: 10_000_000_000n,
+    dayStartedAt: 1_000_000,
+    lastActionAt: 1_000_500,
+    killed: false,
+    pendingRepay: {
+      asset: REPAY_ASSET,
+      amountUsd8: 10_000_000_000n,
+      startedAt: 1_000_500,
+      txHash: null,
+      debtBaseBeforeSend: POS.debtBase,
+      blockNumberBeforeSend: POS.blockNumber,
+    },
+  };
+
+  it("mengenali RepaySendError yang asli", () => {
+    const err = new RepaySendError("gagal", contohState);
+    expect(asRepaySendFailure(err)?.stateAfterSend).toEqual(contohState);
+  });
+
+  it("mengenali galat yang BUKAN instanceof tetapi membawa penanda yang sama", () => {
+    // Dua salinan modul `execute.js` di pohon dependensi menghasilkan persis ini:
+    // bentuknya benar, kelasnya bukan yang sama. `instanceof` akan meleset.
+    const asing = Object.assign(new Error("dari salinan modul lain"), {
+      repaySendFailure: true,
+      stateAfterSend: contohState,
+    });
+    expect(asing instanceof RepaySendError).toBe(false);
+    expect(asRepaySendFailure(asing)?.stateAfterSend).toEqual(contohState);
+  });
+
+  it("menelusuri rantai cause — pembungkus backend tidak menghilangkan state", () => {
+    const asli = new RepaySendError("gagal", contohState);
+    const dibungkus = new Error("gagal menjalankan siklus (telemetri)", { cause: asli });
+    expect(dibungkus instanceof RepaySendError).toBe(false);
+    expect(asRepaySendFailure(dibungkus)?.stateAfterSend).toEqual(contohState);
+  });
+
+  it.each([
+    ["galat biasa", new Error("RPC 502")],
+    ["null", null],
+    ["string", "gagal"],
+    ["penanda tanpa state", Object.assign(new Error("x"), { repaySendFailure: true })],
+    [
+      "penanda dengan state palsu",
+      Object.assign(new Error("x"), { repaySendFailure: true, stateAfterSend: { spentTodayUsd8: "10" } }),
+    ],
+  ])("mengembalikan null untuk %s — state lama yang berlaku", (_l, err) => {
+    expect(asRepaySendFailure(err)).toBeNull();
+  });
+
+  it("rantai cause melingkar tidak membuatnya berputar selamanya", () => {
+    const a: { cause?: unknown } = new Error("a");
+    const b: { cause?: unknown } = new Error("b", { cause: a });
+    a.cause = b;
+    expect(asRepaySendFailure(a)).toBeNull();
   });
 });

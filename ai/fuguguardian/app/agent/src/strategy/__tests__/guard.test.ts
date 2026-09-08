@@ -5,6 +5,7 @@ import {
   type CycleResult,
   type ExecuteFn,
   type GuardCycleDeps,
+  type GuardLoopHandle,
   type Logger,
 } from "../guard.js";
 import {
@@ -701,21 +702,24 @@ describe("C2 — kegagalan setelah transaksi mendarat tidak pernah membayar dua 
         executeDecision(decision, pos, theLimits, state, execDeps);
 
       // Siklus 1 membaca posisi apa adanya; siklus berikutnya membaca posisi
-      // dengan hutang yang SUDAH berkurang pada blok yang lebih baru — bukti
-      // on-chain bahwa transaksi yang tadi "gagal" sebenarnya mendarat.
-      let bacaanKe = 0;
+      // dengan hutang yang berkurang PERSIS sebesar yang kita bayar, pada blok
+      // yang lebih baru — bukti on-chain bahwa transaksi yang tadi "gagal"
+      // sebenarnya mendarat. Jumlahnya diambil dari catatan menggantung itu
+      // sendiri, bukan angka yang diketik ulang, supaya test ini tetap mengikat
+      // kalau ambang `decide` berubah.
+      let handle: GuardLoopHandle | undefined;
       const readPosition = vi.fn(async () => {
-        bacaanKe += 1;
-        if (bacaanKe === 1) return EMERGENCY_POSITION;
+        const menggantung = handle?.getExecuteState().pendingRepay;
+        if (!menggantung) return EMERGENCY_POSITION;
         return {
           ...EMERGENCY_POSITION,
           blockNumber: EMERGENCY_POSITION.blockNumber + 5n,
-          debtBase: EMERGENCY_POSITION.debtBase - 10_000_000_000n,
+          debtBase: EMERGENCY_POSITION.debtBase - menggantung.amountUsd8,
         };
       });
 
       const deps = baseDeps({ readPosition, executeDecision: execFn, now: () => 1_700_000_000 });
-      const handle = startGuardLoop(deps, 1_000, execState({ dayStartedAt: 1_700_000_000 }));
+      handle = startGuardLoop(deps, 1_000, execState({ dayStartedAt: 1_700_000_000 }));
 
       await vi.advanceTimersByTimeAsync(0);
       expect(sendRepay).toHaveBeenCalledTimes(1);
@@ -884,5 +888,56 @@ describe("C3 — kill switch punya tuas, dan state dipersist", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("guard mengenali kegagalan-setelah-kirim tanpa bergantung pada instanceof", () => {
+  it("galat pembungkus yang membawa penanda tetap memajukan state, bukan mengembalikan state lama", async () => {
+    // Skenario backend: `executeDecision` dibungkus untuk telemetri/retry, dan
+    // pembungkusnya melempar galat lain dengan `cause`. Kalau guard.ts memakai
+    // `instanceof`, galat ini jatuh ke cabang "state lama" — anggaran tidak
+    // bergerak, catatan menggantung hilang, dan bug C2 kembali diam-diam.
+    const stateSetelahKirim: ExecuteState = execState({
+      spentTodayUsd8: 42_000_000n,
+      lastActionAt: 1_700_000_000,
+      pendingRepay: {
+        asset: REPAY_ASSET,
+        amountUsd8: 42_000_000n,
+        startedAt: 1_700_000_000,
+        txHash: null,
+        debtBaseBeforeSend: EMERGENCY_POSITION.debtBase,
+        blockNumberBeforeSend: EMERGENCY_POSITION.blockNumber,
+      },
+    });
+    const asli = Object.assign(new Error("receipt timeout"), {
+      repaySendFailure: true,
+      stateAfterSend: stateSetelahKirim,
+    });
+    const deps = baseDeps({
+      readPosition: vi.fn(async () => EMERGENCY_POSITION),
+      executeDecision: vi.fn(async () => {
+        throw new Error("siklus gagal (pembungkus telemetri)", { cause: asli });
+      }),
+    });
+
+    const { result, nextExecuteState } = await runGuardCycle(deps, execState());
+
+    expectFail(result);
+    expect(nextExecuteState).toEqual(stateSetelahKirim);
+    expect(nextExecuteState.pendingRepay).not.toBeNull();
+  });
+
+  it("galat biasa tetap mengembalikan state lama — pembedaannya masih nyata", async () => {
+    const awal = execState({ spentTodayUsd8: 7_000_000n, lastActionAt: 42 });
+    const deps = baseDeps({
+      readPosition: vi.fn(async () => EMERGENCY_POSITION),
+      executeDecision: vi.fn(async () => {
+        throw new Error("RPC 502 sebelum apa pun dikirim");
+      }),
+    });
+
+    const { nextExecuteState } = await runGuardCycle(deps, awal);
+
+    expect(nextExecuteState).toEqual(awal);
   });
 });

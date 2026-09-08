@@ -23,9 +23,11 @@
  *      `cappedPerDay`; bila sisa nol, tidak mengirim.
  *   6. Masih dalam `minIntervalSeconds` sejak `lastActionAt` → tidak
  *      mengirim (cooldown).
- *   7. Anggaran dan cooldown dicatat SEBELUM `sendRepay` dipanggil, dan
- *      `pendingRepay` dibereskan hanya bila `sendRepay` benar-benar kembali
- *      dengan hash.
+ *   7. Anggaran, cooldown, dan catatan `pendingRepay` dicatat SEBELUM
+ *      `sendRepay` dipanggil — dan, bila `deps.persistBeforeSend` diisi,
+ *      DISIMPAN lebih dulu juga, sehingga proses yang mati selama menunggu
+ *      receipt tetap meninggalkan jejak. `pendingRepay` dibereskan hanya bila
+ *      `sendRepay` benar-benar kembali dengan hash.
  *
  * ## Kenapa kegagalan kirim justru MEMOTONG anggaran
  *
@@ -88,6 +90,28 @@ export interface ExecuteDeps {
   sendRepay: (asset: `0x${string}`, amount: bigint) => Promise<`0x${string}`>;
   /** Jam sekarang dalam detik epoch; disuntikkan agar waktu bisa dikontrol penuh saat test. */
   now: () => number;
+  /**
+   * Menyimpan state SEBELUM `sendRepay` dipanggil — termasuk catatan
+   * `pendingRepay`-nya.
+   *
+   * Tanpa kait ini, catatan menggantung baru menyentuh disk setelah siklus
+   * selesai, sementara `waitForTransactionReceipt` menunggu sampai 180 detik.
+   * Proses yang mati di dalam jendela 180 detik itu meninggalkan berkas state
+   * PRA-SIKLUS: anggaran lama, `lastActionAt` lama, `pendingRepay: null` —
+   * dan restart berikutnya membayar lagi. Itu bug C2 lewat pintu yang lebih
+   * sempit, dan kait ini menutupnya.
+   *
+   * GAGAL TERTUTUP: kalau penyimpanan gagal, transaksi TIDAK dikirim sama
+   * sekali dan galatnya bertanda `neverSent` — lebih baik tidak membayar
+   * daripada membayar tanpa jejak yang bisa menahan pembayaran kedua.
+   *
+   * Jendela yang tersisa, dinyatakan terbuka: proses bisa mati setelah
+   * penyimpanan berhasil tetapi sebelum panggilan jaringan berangkat. Yang
+   * tertinggal adalah catatan menggantung untuk transaksi yang tidak pernah
+   * ada — Guardian menahan diri sampai operator memanggil `clearPendingRepay`.
+   * Arah kegagalan itu disengaja.
+   */
+  persistBeforeSend?: (state: ExecuteState) => Promise<void> | void;
 }
 
 /**
@@ -177,12 +201,62 @@ export function wasNeverSent(err: unknown): boolean {
  * anggaran sudah terpotong dan `pendingRepay` sudah tercatat.
  */
 export class RepaySendError extends Error {
+  /**
+   * Penanda duck-typed, sengaja sama bentuknya dengan `neverSent`.
+   *
+   * `guard.ts` mengenali galat ini lewat `asRepaySendFailure()`, BUKAN
+   * `instanceof`. Alasannya bukan gaya: backend akan membungkus
+   * `executeDecision` (telemetri, retry, tracing), dan sebuah pembungkus yang
+   * melempar ulang galat lain — atau dua salinan modul ini di pohon
+   * dependensi — akan membuat `instanceof` gagal DIAM-DIAM. Yang terjadi
+   * kemudian adalah `guard.ts` jatuh ke cabang "state lama", anggaran tidak
+   * bergerak, dan bug C2 kembali tanpa satu test pun berteriak.
+   */
+  readonly repaySendFailure = true as const;
   readonly stateAfterSend: ExecuteState;
   constructor(message: string, stateAfterSend: ExecuteState, options?: { cause?: unknown }) {
     super(message, options);
     this.name = "RepaySendError";
     this.stateAfterSend = stateAfterSend;
   }
+}
+
+/** Kedalaman maksimum penelusuran rantai `cause` — pembungkus yang wajar tidak sedalam ini. */
+const MAX_CAUSE_DEPTH = 8;
+
+function looksLikeExecuteState(value: unknown): value is ExecuteState {
+  if (typeof value !== "object" || value === null) return false;
+  const s = value as Partial<ExecuteState>;
+  return typeof s.spentTodayUsd8 === "bigint" && typeof s.lastActionAt === "number";
+}
+
+/**
+ * Menemukan kegagalan-setelah-kirim di dalam `err` ATAU di dalam rantai
+ * `cause`-nya, dan mengembalikan state yang harus dipakai siklus berikutnya.
+ *
+ * Rantai `cause` ikut ditelusuri karena pembungkus yang benar
+ * (`new Error(msg, { cause })`) adalah cara paling wajar backend menambahkan
+ * konteks — dan kehilangan `stateAfterSend` di situ berarti membayar dua kali.
+ * `null` berarti "ini bukan kegagalan setelah kirim", dan pemanggil harus
+ * memperlakukan state lama sebagai yang berlaku.
+ */
+export function asRepaySendFailure(err: unknown): { stateAfterSend: ExecuteState } | null {
+  const terlihat = new Set<unknown>();
+  let current: unknown = err;
+  for (let i = 0; i < MAX_CAUSE_DEPTH && current !== null && current !== undefined; i++) {
+    if (terlihat.has(current)) break;
+    terlihat.add(current);
+    if (typeof current === "object") {
+      const c = current as { repaySendFailure?: unknown; stateAfterSend?: unknown; cause?: unknown };
+      if (c.repaySendFailure === true && looksLikeExecuteState(c.stateAfterSend)) {
+        return { stateAfterSend: c.stateAfterSend };
+      }
+      current = c.cause;
+      continue;
+    }
+    break;
+  }
+  return null;
 }
 
 function notSent(reason: string, state: ExecuteState): ExecuteResult {
@@ -202,11 +276,38 @@ function messageOf(err: unknown): string {
 }
 
 /**
+ * Toleransi pencocokan jumlah saat rekonsiliasi, dalam satuan USD basis 8 desimal.
+ *
+ * 2 unit = $0,00000002. Angkanya bukan kelonggaran melainkan konsekuensi dua
+ * pembulatan KE BAWAH yang saling bebas: USD8 → unit token saat mengirim, dan
+ * unit token → USD8 saat pool menghitung nilai hutang. Masing-masing kehilangan
+ * kurang dari satu unit. Ini toleransi yang sama yang dipakai skrip E2E untuk
+ * mencocokkan jumlah yang diklaim dengan selisih hutang on-chain, dan di sana
+ * selisih sungguhannya terukur **0**.
+ */
+export const RECONCILE_TOLERANCE_USD8 = 2n;
+
+/**
  * Membereskan `pendingRepay` bila posisi TERBARU membuktikan repay-nya mendarat.
  *
  * Buktinya dua-duanya wajib, dan keduanya dibaca dari rantai, bukan dari niat:
  *   1. posisi dibaca pada blok yang lebih baru daripada blok sebelum kirim, dan
- *   2. hutangnya BERKURANG dibanding nilai sebelum kirim.
+ *   2. hutangnya berkurang **sebesar yang kita bayar** — bukan sekadar berkurang.
+ *
+ * Syarat kedua sengaja diketatkan. "Hutang berkurang" saja bukan bukti bahwa
+ * transaksi KITA yang mendarat: user bisa membayar sendiri dari dompetnya
+ * selagi tx kita tersangkut di mempool, pihak ketiga bisa melikuidasi sebagian,
+ * dan `debtBase` adalah nilai USD sehingga harga aset hutang yang turun pun
+ * mengecilkannya. Ketiganya akan membereskan catatan kita terlalu dini,
+ * membebaskan Guardian bertindak, lalu tx pertama mendarat — dua pembayaran,
+ * persis kegagalan yang mekanisme ini ada untuk mencegahnya.
+ *
+ * Pencocokannya DUA SISI (`|selisih - amountUsd8| <= RECONCILE_TOLERANCE_USD8`),
+ * dan sisi atasnya juga disengaja: penurunan yang LEBIH BESAR daripada yang kita
+ * bayar berarti ada pembayar lain di posisi yang sama, dan pada saat itu kita
+ * tidak lagi bisa memisahkan "punya kita mendarat juga" dari "hanya punya dia".
+ * Arah kegagalannya aman — catatan tetap menggantung, Guardian menahan diri, dan
+ * operator yang membereskannya lewat `clearPendingRepay` setelah melihat rantai.
  *
  * Kalau hutang belum berkurang, `pendingRepay` sengaja DIBIARKAN. Transaksi yang
  * masih di mempool bisa mendarat kapan saja, jadi "belum terlihat" tidak pernah
@@ -228,9 +329,10 @@ export function reconcilePendingRepay(state: ExecuteState, pos: Position): Execu
   // sama sekali tidak punya field ini, dan `undefined` di sini tidak boleh
   // membuat rekonsiliasi melempar.
   if (pending == null) return state;
-  const landed =
-    pos.blockNumber > pending.blockNumberBeforeSend && pos.debtBase < pending.debtBaseBeforeSend;
-  if (!landed) return state;
+  if (pos.blockNumber <= pending.blockNumberBeforeSend) return state;
+  const turun = pending.debtBaseBeforeSend - pos.debtBase;
+  const beda = turun > pending.amountUsd8 ? turun - pending.amountUsd8 : pending.amountUsd8 - turun;
+  if (beda > RECONCILE_TOLERANCE_USD8) return state;
   return { ...state, pendingRepay: null };
 }
 
@@ -333,6 +435,23 @@ export async function executeDecision(
       blockNumberBeforeSend: pos.blockNumber,
     },
   };
+
+  if (deps.persistBeforeSend) {
+    try {
+      await deps.persistBeforeSend(stateAfterSend);
+    } catch (err) {
+      // GAGAL TERTUTUP. Mengirim tanpa jejak yang bisa menahan pembayaran kedua
+      // lebih buruk daripada tidak mengirim sama sekali: yang pertama berujung
+      // pada uang user yang terbayar dua kali, yang kedua hanya pada satu
+      // siklus yang terlewat. Bertanda `neverSent` karena memang belum ada
+      // apa pun yang dikirim.
+      throw new NeverSentError(
+        `Catatan repay menggantung gagal disimpan sebelum kirim; menolak mengirim apa pun. ` +
+          `Galat asli: ${messageOf(err)}`,
+        { cause: err },
+      );
+    }
+  }
 
   let txHash: `0x${string}`;
   try {

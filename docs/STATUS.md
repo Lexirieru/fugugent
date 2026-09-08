@@ -28,7 +28,9 @@ permintaan `negotiate` dijawab **quote bertanda tangan wallet** (0,1 U, lengkap 
 `negotiation_hash` dan `provider_sig`).
 
 ### Lapisan strategi Fugu Guardian
-223 test (`cd ai/fuguguardian/app/agent && corepack pnpm test`). Rumus health factor murni
+249 test (`cd ai/fuguguardian/app/agent && corepack pnpm test`); 245 di antaranya berjalan
+tanpa jaringan sama sekali, 4 sisanya (`chain.test.ts`, `testnet.test.ts`) memang memanggil
+RPC dan karena itu sebagian menyatakan keadaan testnet, bukan hanya keadaan kode. Rumus health factor murni
 dengan pembulatan yang sengaja diarahkan ke sisi aman, mesin keputusan deterministik yang
 gagal keras pada konfigurasi cacat, adapter yang terbukti membaca Aave v3 dari BSC mainnet
 (bacaannya ditambatkan ke satu blok, sehingga `Position.blockNumber` benar-benar blok tempat
@@ -47,7 +49,12 @@ mendarat. Anggaran, cooldown, dan sebuah catatan repay menggantung karena itu di
 (hutang berkurang pada blok yang lebih baru) tidak ada pengiriman baru yang diizinkan.
 Satu-satunya galat yang diperlakukan sebagai "tidak terjadi" adalah galat yang secara
 eksplisit menyatakan dirinya belum menyentuh jaringan, dan hanya `chain/session.ts` yang boleh
-menyatakannya. Konsekuensi yang dinyatakan terbuka: repay yang benar-benar tidak pernah
+menyatakannya. Catatan itu **disimpan ke berkas sebelum transaksi berangkat**, bukan setelah
+siklus selesai: `waitForTransactionReceipt` menunggu sampai 180 detik, dan proses yang mati di
+dalam jendela itu tidak boleh meninggalkan berkas state pra-siklus yang membuat restart
+membayar lagi. Rekonsiliasinya menuntut hutang turun **sebesar yang kita bayar** (toleransi 2
+unit basis 8 desimal untuk dua pembulatan), bukan sekadar turun — user yang membayar sendiri,
+likuidasi parsial, atau harga aset hutang yang jatuh tidak boleh membereskan catatan kita. Konsekuensi yang dinyatakan terbuka: repay yang benar-benar tidak pernah
 mendarat membuat Guardian **berhenti bertindak** sampai seorang operator membereskannya lewat
 `clearPendingRepay`. Itu pilihan sadar — Guardian yang diam adalah kegagalan yang terlihat.
 
@@ -90,20 +97,21 @@ Sesi itu hanya boleh memanggil **dua** hal: `MockLendingPool.repay(address,uint2
 `0x7a467115…`).
 
 Jalan yang berlaku adalah yang dijalankan setelah perakitan rantai dipindahkan ke composition
-root `createGuardian()` (Task 9). E2E **dijalankan ulang sungguhan** lewat jalur baru itu,
-karena bukti atas kode yang sudah tidak dipakai lagi bukan bukti:
+root `createGuardian()` **dan** state eksekusinya dipersist ke berkas sebelum transaksi
+berangkat (Task 9 + tindak lanjutnya). E2E **dijalankan ulang sungguhan** setiap kali jalur
+eksekusinya berubah, karena bukti atas kode yang sudah tidak dipakai lagi bukan bukti:
 
 | | |
 |---|---|
-| Tx repay lewat sesi (`approve` + `repay`, satu userOp) | [`0xd7acda4c…`](https://testnet.bscscan.com/tx/0xd7acda4cc6505da3ea9b89911b7fa8a884147f0e67e11e6fb9cc8d99d638d06e) (blok 129849537) |
+| Tx repay lewat sesi (`approve` + `repay`, satu userOp) | [`0x619cfbe3…`](https://testnet.bscscan.com/tx/0x619cfbe351703913ebafd0e76db86af0f90953bbff33335d78d8dbf1e41e08cc) (blok 129852222) |
 | `Repay.user` pada receipt | `0xbdc69c2d…` (wallet Altana) — **bukan** `0x56A2950d…` (EOA deployer) |
 | HF sebelum → sesudah | 1,14 → 1,50 |
-| Hutang | $22,53 → $17,27 (dibayar $5,25; selisih klaim vs rantai **0 unit**) |
+| Hutang | $17,27 → $13,24 (dibayar $4,03; selisih klaim vs rantai **0 unit**) |
 | Ongkos | 0,000041 tBNB (kedua sisi) |
 | Tx grant sesi | [`0x15e67a21…`](https://testnet.bscscan.com/tx/0x15e67a21e5ec25f8459ac2e83798033ca9afe5a14b41143aeb28fe2a47b64b52) |
 
-Empat jalan sebelumnya — termasuk jalan ke-4 (`0x3ec2818c…`, dibayar $6,85) yang sempat menjadi
-bukti utama dokumen ini — dipertahankan sebagai riwayat di
+Lima jalan sebelumnya — termasuk jalan ke-4 (`0x3ec2818c…`) dan ke-5 (`0xd7acda4c…`) yang
+sempat menjadi bukti utama dokumen ini — dipertahankan sebagai riwayat di
 `docs/e2e/2026-09-08-e2e-testnet.md` §"Riwayat jalan session key". Angkanya tetap benar;
 kodenya yang sudah tidak ada.
 
@@ -133,13 +141,19 @@ harian, cooldown, kill switch, repay menggantung) juga punya store yang disuntik
 (`state/store.ts`: berkas JSON atau memori; backend bisa menggantinya dengan Postgres), dan
 isi berkas yang rusak **ditolak** alih-alih diam-diam mereset seluruh batas.
 
+Jendela yang tersisa, dinyatakan terbuka: proses bisa mati setelah catatan tersimpan tetapi
+sebelum panggilan jaringan berangkat. Yang tertinggal adalah catatan menggantung untuk
+transaksi yang tidak pernah ada, dan Guardian menahan diri sampai operator membereskannya.
+Arah kegagalan itu disengaja.
+
 Yang **belum** ada, dan jangan diklaim: **tuas yang bisa ditekan user.** `kill()` adalah
 pemanggilan fungsi di dalam proses — belum ada tombol UI, perintah CLI, atau endpoint HTTP
 yang memanggilnya, karena strategi ini memang belum tersambung ke runtime mana pun (lihat
 "Yang BELUM ada" #1). Kalimat yang benar: *"kill switch punya jalur runtime dan state-nya
-bertahan melewati restart"*, bukan *"user bisa menghentikan agent kapan saja"*. Untuk alasan
-yang sama, tidak ada proses jangka panjang yang sungguhan memakai store berkas itu hari ini —
-yang ada adalah antarmuka, implementasi, dan test-nya.
+bertahan melewati restart"*, bukan *"user bisa menghentikan agent kapan saja"*. Store berkasnya sendiri sudah dipakai di jalur sungguhan: skrip E2E memasang
+`createFileStateStore` dan berkasnya terbukti terisi setelah jalan ke-6. Yang belum ada adalah
+proses jangka panjang yang hidup berhari-hari di atasnya — untuk itu runtime-nya harus
+tersambung lebih dulu.
 
 Batas kode (`execute.ts`: $2.000/hari) dan batas kriptografis (sesi: 100 mUSD/hari) belum
 disamakan. Yang mengikat adalah yang lebih ketat — cap sesi — dan itu arah yang benar, tetapi

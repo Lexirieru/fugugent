@@ -38,7 +38,7 @@
 import { decide } from "./decide.js";
 import { formatHf, formatUsd8 } from "./format.js";
 import type { Action, Decision, Position, Thresholds } from "./types.js";
-import { RepaySendError, type ExecuteResult, type ExecuteState } from "./execute.js";
+import { asRepaySendFailure, type ExecuteResult, type ExecuteState } from "./execute.js";
 
 export interface Logger {
   info(message: string, meta?: Record<string, unknown>): void;
@@ -156,7 +156,7 @@ function toMessage(err: unknown): string {
  * tidak pernah tercapai, sehingga loop mati diam-diam tanpa jejak sama
  * sekali — persis kegagalan yang task ini ada untuk mencegahnya.
  */
-function logInfo(logger: Logger, message: string, meta?: Record<string, unknown>): void {
+export function logInfo(logger: Logger, message: string, meta?: Record<string, unknown>): void {
   try {
     logger.info(message, meta);
   } catch {
@@ -164,7 +164,7 @@ function logInfo(logger: Logger, message: string, meta?: Record<string, unknown>
   }
 }
 
-function logError(logger: Logger, message: string, meta?: Record<string, unknown>): void {
+export function logError(logger: Logger, message: string, meta?: Record<string, unknown>): void {
   try {
     logger.error(message, meta);
   } catch {
@@ -246,7 +246,14 @@ export async function runGuardCycle(
     execResult = await deps.executeDecision(decision, pos, executeState);
   } catch (err) {
     const error = toMessage(err);
-    if (err instanceof RepaySendError) {
+    // Dikenali lewat penanda duck-typed, BUKAN `instanceof`: pembungkus
+    // `executeDecision` di backend (telemetri, retry, tracing) yang melempar
+    // ulang galat lain — atau dua salinan modul `execute.js` di pohon
+    // dependensi — akan membuat `instanceof` gagal DIAM-DIAM, dan cabang di
+    // bawah akan mengembalikan state lama. Itu bug C2 yang kembali tanpa satu
+    // test pun berteriak. `asRepaySendFailure` juga menelusuri rantai `cause`.
+    const kegagalanSetelahKirim = asRepaySendFailure(err);
+    if (kegagalanSetelahKirim !== null) {
       // Transaksinya MUNGKIN sudah mendarat — hanya pembacaan hasilnya yang
       // gagal. State yang dibawa galat ini sudah memotong anggaran, memulai
       // cooldown, dan mencatat repay menggantung; meneruskannya adalah
@@ -262,7 +269,7 @@ export async function runGuardCycle(
       });
       return {
         result: { ok: false, timestamp, account: deps.account, error },
-        nextExecuteState: err.stateAfterSend,
+        nextExecuteState: kegagalanSetelahKirim.stateAfterSend,
       };
     }
     logError(deps.logger, "guard: eksekusi gagal, siklus dilewati", {

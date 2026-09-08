@@ -63,6 +63,7 @@ import { bscTestnet } from "viem/chains";
 
 import {
   GUARDIAN_SESSION_FILE,
+  WORKSPACE_ROOT,
   armAltanaSdk,
   loadGuardianSession,
   relaySender,
@@ -83,6 +84,7 @@ import {
   REPAY_ASSET_ADDRESS,
 } from "../src/strategy/chain/testnet.js";
 import { createGuardian } from "../src/strategy/createGuardian.js";
+import { createFileStateStore } from "../src/strategy/state/store.js";
 import { decide } from "../src/strategy/decide.js";
 import { type Logger } from "../src/strategy/guard.js";
 import { type ExecuteLimits } from "../src/strategy/execute.js";
@@ -699,6 +701,32 @@ async function main(pemulihan: Pemulihan): Promise<void> {
    * pihak ketiga), dan pembungkusnya di bawah adalah tempat E2E menangkap
    * receipt yang dipakai LANGKAH 5 untuk membuktikan siapa yang membayar.
    */
+  // Store SUNGGUHAN, bukan memori. Skrip ini satu-satunya contoh pemanggilan
+  // `createGuardian` yang ada, jadi ia adalah yang akan disalin orang — dan
+  // contoh yang memakai store memori mewariskan C3 (anggaran, cooldown, kill
+  // switch, dan catatan repay menggantung hilang setiap restart) secara gratis
+  // kepada penyalin berikutnya. Berkasnya ada di `.studio/` yang gitignored,
+  // bersama file sesi.
+  const stateFile = process.env.GUARDIAN_STATE_FILE ?? path.join(WORKSPACE_ROOT, ".studio/guardian-state.json");
+  const stateStore = createFileStateStore(stateFile);
+  const stateSebelum = await stateStore.load();
+  console.log(`State eksekusi : ${stateFile}`);
+  console.log(
+    stateSebelum === null
+      ? "  (belum ada — jalan pertama, anggaran kosong)"
+      : `  dimuat: terpakai ${formatUsd8(stateSebelum.spentTodayUsd8)} hari ini · ` +
+          `aksi terakhir ${stateSebelum.lastActionAt} · killed=${stateSebelum.killed} · ` +
+          `menggantung=${stateSebelum.pendingRepay === null ? "tidak" : "YA"}`,
+  );
+  // Kalau ada catatan menggantung, siklus di bawah akan menolak mengirim — itu
+  // perilaku yang benar, tapi tanpa pesan ini ia terbaca seperti regresi.
+  wajib(
+    stateSebelum === null || stateSebelum.pendingRepay === null,
+    `Ada repay yang belum terbukti selesai di ${stateFile} (${formatUsd8(stateSebelum?.pendingRepay?.amountUsd8 ?? 0n)}). ` +
+      "Guardian menahan diri sampai rantai membuktikan hutang berkurang sebesar itu, atau sampai " +
+      "operator membereskannya. Periksa rantai lebih dulu; JANGAN hapus berkasnya begitu saja.",
+  );
+
   const guardian = await createGuardian({
     account: posisiAkun,
     client: publicClient,
@@ -707,6 +735,7 @@ async function main(pemulihan: Pemulihan): Promise<void> {
     permissions: izinSesi,
     limits: LIMITS,
     logger,
+    stateStore,
     explainDecision,
     now: () => Math.floor(Date.now() / 1000),
     log: (pesan) => console.log(`  ${pesan}`),

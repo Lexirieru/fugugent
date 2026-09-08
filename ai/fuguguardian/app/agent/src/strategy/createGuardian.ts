@@ -40,6 +40,8 @@ import {
   type ExecuteState,
 } from "./execute.js";
 import {
+  logError,
+  logInfo,
   runGuardCycle,
   startGuardLoop,
   type CycleResult,
@@ -50,7 +52,7 @@ import {
   type GuardLoopHandle,
   type Logger,
 } from "./guard.js";
-import { createMemoryStateStore, initialExecuteState, type ExecuteStateStore } from "./state/store.js";
+import { initialExecuteState, type ExecuteStateStore } from "./state/store.js";
 import type { Position, Thresholds } from "./types.js";
 import {
   assertFeedIsUsd8,
@@ -147,8 +149,18 @@ export interface GuardianConfig {
   sendCalls: SessionRepayDeps["sendCalls"];
   limits: ExecuteLimits;
   logger: Logger;
-  /** Persistensi state; default memori (batas hilang saat restart — sengaja harus dipilih). */
-  stateStore?: ExecuteStateStore;
+  /**
+   * Persistensi state. **WAJIB, dan sengaja tanpa default.**
+   *
+   * Default memori pernah ada di sini dan itu keliru: ia membuat pilihan paling
+   * berbahaya (batas harian, cooldown, kill switch, dan catatan repay
+   * menggantung hilang setiap restart) menjadi pilihan yang didapat orang tanpa
+   * mengetiknya. Sekarang setiap pemanggil harus menyebutkannya —
+   * `createFileStateStore(path)` untuk proses sungguhan,
+   * `createMemoryStateStore()` untuk test, dan yang kedua terbaca sebagai
+   * keputusan di tempat pemanggilan, bukan sebagai kelalaian.
+   */
+  stateStore: ExecuteStateStore;
   /** Jam dalam detik epoch; disuntikkan agar bisa dikontrol penuh saat test. */
   now?: () => number;
   /** Default: `decision.reason` apa adanya, TANPA LLM. */
@@ -197,7 +209,7 @@ function requireHexAddress(value: unknown, label: string): `0x${string}` {
 export async function createGuardian(config: GuardianConfig): Promise<Guardian> {
   const now = config.now ?? (() => Math.floor(Date.now() / 1000));
   const log = config.log ?? (() => {});
-  const store = config.stateStore ?? createMemoryStateStore();
+  const store = config.stateStore;
   const explain: ExplainFn = config.explainDecision ?? (async (_pos, decision) => decision.reason);
 
   // --- Konfigurasi aset repay, dibaca dari pool ------------------------------
@@ -301,11 +313,11 @@ export async function createGuardian(config: GuardianConfig): Promise<Guardian> 
   const tersimpan = await store.load();
   let currentState: ExecuteState = tersimpan ?? initialExecuteState(now());
   if (tersimpan === null) {
-    config.logger.info("guardian: tidak ada state tersimpan, memulai dari anggaran kosong", {
+    logInfo(config.logger, "guardian: tidak ada state tersimpan, memulai dari anggaran kosong", {
       account: config.account,
     });
   } else {
-    config.logger.info("guardian: state eksekusi dimuat dari store", {
+    logInfo(config.logger, "guardian: state eksekusi dimuat dari store", {
       account: config.account,
       spentTodayUsd8: tersimpan.spentTodayUsd8.toString(),
       killed: tersimpan.killed,
@@ -321,6 +333,14 @@ export async function createGuardian(config: GuardianConfig): Promise<Guardian> 
       repayAsset: config.repayAsset,
       sendRepay,
       now,
+      // Catatan menggantung disimpan SEBELUM transaksi berangkat, bukan setelah
+      // siklus selesai: `waitForTransactionReceipt` menunggu sampai 180 detik,
+      // dan proses yang mati di dalam jendela itu tidak boleh meninggalkan
+      // berkas state pra-siklus yang membuat restart membayar lagi.
+      persistBeforeSend: async (state) => {
+        await store.save(state);
+        currentState = state;
+      },
     });
 
   const cycleDeps: GuardCycleDeps = {
@@ -345,8 +365,10 @@ export async function createGuardian(config: GuardianConfig): Promise<Guardian> 
         await store.save(currentState);
       } catch (err) {
         // Sama seperti di dalam loop: kegagalan menyimpan dilaporkan, bukan
-        // dibiarkan menghentikan perlindungan posisi.
-        config.logger.error("guardian: gagal menyimpan state eksekusi", {
+        // dibiarkan menghentikan perlindungan posisi. Lewat `logError` yang
+        // membungkam exception logger — logger yang melempar di dalam `catch`
+        // ini akan membuat `runOnce()` melempar setelah state sudah maju.
+        logError(config.logger, "guardian: gagal menyimpan state eksekusi", {
           account: config.account,
           error: err instanceof Error ? err.message : String(err),
         });
