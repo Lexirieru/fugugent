@@ -4,7 +4,7 @@
 
 ### A marketplace of DeFi agents on BNB Chain where the fish puffs up as the risk does.
 
-Every agent is a cartoon pufferfish. Its **bloat level** is not decoration — it is a real risk
+Every agent is a cartoon pufferfish. Its **puff level** is not decoration — it is a real risk
 metric rendered as a shape. When the health factor of the position it guards falls, the fish
 gets rounder, spikier, and ringed in amber. Every number on a card comes from a contract call
 you can repeat yourself.
@@ -258,7 +258,7 @@ flowchart LR
 
     KS --> AG
     AG -->|approve + repay<br/>one atomic userOp| POOL[(Lending pool)]
-    POOL -->|new health factor| BLOAT[🎈 bloat level 1-5]
+    POOL -->|new health factor| BLOAT[🎈 puff level 1-5]
     BLOAT --> FE
 
     DEC -.->|after the fact,<br/>off the critical path| LLM[dGrid<br/>plain-language explanation]
@@ -317,7 +317,7 @@ sequenceDiagram
     R-->>X: debt $17.27 → $13.24 · HF = 1.50
     Note over X: assert on-chain Δdebt == claimed amount<br/>tolerance 2 units · actual 0
 
-    X-->>UI: bloat level 4 → 2
+    X-->>UI: puff level 4 → 2
     X->>G: explainDecision(facts)  %% only now
     G-->>UI: plain-language explanation
 
@@ -387,7 +387,7 @@ and they are the reason we believe the numbers the others produce.
 
 ---
 
-## 🎈 Bloat levels
+## 🎈 Puff levels
 
 Five levels — not four, not seven. Five because that is exactly enough to cover the Guardian's
 four decision thresholds (`WARN`, `PARTIAL_REPAY`, `DELEVERAGE`, `EMERGENCY`) plus one state
@@ -407,7 +407,7 @@ channel, required on every card and detail page.
 | 4 | Critical | — | — | see [`docs/brand/tingkat-kembung.md`](docs/brand/tingkat-kembung.md) |
 | 5 | Emergency | — | — | see [`docs/brand/tingkat-kembung.md`](docs/brand/tingkat-kembung.md) |
 
-**Absolute rule: the agent's body colour never changes with bloat level.** Only the body shape
+**Absolute rule: the agent's body colour never changes with puff level.** Only the body shape
 and the ring change. A Guardian in an emergency is still cobalt; it is just round, spiked, and
 ringed.
 
@@ -693,7 +693,7 @@ that work does not have to touch `docker-compose.yml` again.
 | [`docs/research/00-decisions.md`](docs/research/00-decisions.md) | 13 locked decisions + dGrid test results |
 | [`docs/e2e/2026-09-08-e2e-testnet.md`](docs/e2e/2026-09-08-e2e-testnet.md) | Every on-chain claim in this README, with its full working |
 | [`docs/research/05-competitive-landscape.md`](docs/research/05-competitive-landscape.md) | Virtuals, Olas, Almanak, Giza/ARMA, Agentverse — sourced |
-| [`docs/brand/tingkat-kembung.md`](docs/brand/tingkat-kembung.md) | The five bloat levels, all six visual channels |
+| [`docs/brand/tingkat-kembung.md`](docs/brand/tingkat-kembung.md) | The five puff levels, all six visual channels |
 | [`docs/setup/ENVIRONMENT.md`](docs/setup/ENVIRONMENT.md) | Credentials layout, verified addresses, network constants |
 
 *Most documents in `docs/` are written in Indonesian; identifiers and code are English.*

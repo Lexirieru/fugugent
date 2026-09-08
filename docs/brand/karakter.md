@@ -198,3 +198,13 @@ Spec `§8` specifies a fallback fugu coloured deterministically from the agent I
 - Hues in the 95°–150° (green) and 0°–20° (red) ranges are **skipped** — those two ranges
   belong to risk semantics, not to identity.
 - The fallback still follows the puff system: it puffs up too, because the metric is the same.
+
+## Terminology — one name, three spellings resolved
+
+Prose, UI copy, and the README all use **puff level** (the fugu *puffs up*). The five levels
+are **Calm · Watchful · Strained · Critical · Emergency**.
+
+The code field is still named `bloatLevel`, and the frozen image prompts in
+`prompt-gambar.md` say "bloat level". Those are deliberately left alone: renaming an
+identifier that generated assets are keyed to would break references for no reader benefit.
+When you meet `bloatLevel` in code, read it as *puff level*.

@@ -309,8 +309,17 @@ page and the fish in the app are the same fish.
 
 3. **Rebalancer, Grid, and Yield are not wired to on-chain execution.** What exists is a pure
    decision engine + backtest (A5). Not one transaction has ever been sent by any of the three.
-   The marketplace itself states that all three are "scaffold only, not registered in
-   FuguRegistry, cannot be rented yet", and gives them neither a price nor a hire button.
+   As of 2026-09-09 all three **are registered in `FuguRegistry`** and can be rented
+   (`listingCount() = 4`; every category holds exactly one listing). Their price is
+   `5000000` = $0.05 per 120-second period, deliberately half of Guardian's, and their
+   on-chain metadata carries `onchainExecution: false`. Registration transactions, all in
+   block 129903555: Rebalancer
+   [`0x858701b4…`](https://testnet.bscscan.com/tx/0x858701b4238910259427eda6181d5488c1d29bc72b33f3c957d58108694b29c1),
+   Grid
+   [`0x326c3c90…`](https://testnet.bscscan.com/tx/0x326c3c909d8e55a9b07d7886b5ef314fd652f62299d1854c687dd0f65143eafb),
+   Yield
+   [`0xf67c457f…`](https://testnet.bscscan.com/tx/0xf67c457f4a678dbbf0a62f101b6518ff8c2c42b83bbd2e7fe21d9b9d91683aa3).
+   Being rentable is not the same as being able to act: they still send no transactions.
 
 4. **The marketplace has never been run against a live backend.** `createHttpSource` is written
    out in full for all four endpoints, but the default is still `seedSource`; what has actually
@@ -333,9 +342,14 @@ page and the fish in the app are the same fish.
    but Venus provides neither a health factor nor an aggregate liquidation threshold, so building
    a `Position` from it needs per-market data that is not being fetched.
 
-9. **The contracts are not verified on BscScan** — `BSCSCAN_API_KEY` is not available yet. The
-   verification command is prepared. Until that is done, the contract source cannot be read from
-   the explorer.
+9. ~~**The contracts are not verified on BscScan.**~~ **Resolved 2026-09-09.** All four UUPS
+   implementations and every mock are source-verified. BscScan recognises each proxy as a proxy
+   and resolves its implementation, so the **Read/Write as Proxy** tab works — anyone can call
+   the contracts from a browser with no tooling. Status confirmed through the BscScan
+   `getsourcecode` API, not from a `forge` success message. See the "BscScan verification"
+   section of `docs/e2e/2026-09-08-e2e-testnet.md` for the address table. The `ERC1967Proxy`
+   source itself is still unverified; it is stock OpenZeppelin and is not needed for the proxy
+   tab to work.
 
 10. **There is no 8004scan API key.** The backend runs on the anonymous tier of **30
     requests/minute** (`SCAN8004_API_KEY` empty → `ANONYMOUS_RATE_LIMIT_PER_MINUTE`). All the
@@ -493,5 +507,5 @@ written or planned**, then withdrawn once the evidence was examined.
    with their cadence (B11).
 5. Reconcile the read network and the execution network (C2), or state the mock clearly as a
    product boundary.
-6. Verify the contracts on BscScan as soon as `BSCSCAN_API_KEY` is available (B9).
+6. ~~Verify the contracts on BscScan (B9).~~ **Done 2026-09-09.**
 7. On-chain execution strategy for Rebalancer, Grid, and Yield (B3).
