@@ -89,20 +89,23 @@ Sesi itu hanya boleh memanggil **dua** hal: `MockLendingPool.repay(address,uint2
 8 Oktober 2026, terdaftar publik di Keystore (`isValidKey` → `true` untuk keyHash
 `0x7a467115…`).
 
+Jalan yang berlaku adalah yang dijalankan setelah perakitan rantai dipindahkan ke composition
+root `createGuardian()` (Task 9). E2E **dijalankan ulang sungguhan** lewat jalur baru itu,
+karena bukti atas kode yang sudah tidak dipakai lagi bukan bukti:
+
 | | |
 |---|---|
-| Tx repay lewat sesi (`approve` + `repay`, satu userOp) | [`0x3ec2818c…`](https://testnet.bscscan.com/tx/0x3ec2818c148cf761f0fcaee4ad05ed9cbaeffd0a3ec6a6efcc1e1e47d7989a07) |
+| Tx repay lewat sesi (`approve` + `repay`, satu userOp) | [`0xd7acda4c…`](https://testnet.bscscan.com/tx/0xd7acda4cc6505da3ea9b89911b7fa8a884147f0e67e11e6fb9cc8d99d638d06e) (blok 129849537) |
 | `Repay.user` pada receipt | `0xbdc69c2d…` (wallet Altana) — **bukan** `0x56A2950d…` (EOA deployer) |
 | HF sebelum → sesudah | 1,14 → 1,50 |
-| Hutang | $29,38 → $22,53 (dibayar $6,85; selisih klaim vs rantai 0 unit) |
+| Hutang | $22,53 → $17,27 (dibayar $5,25; selisih klaim vs rantai **0 unit**) |
+| Ongkos | 0,000041 tBNB (kedua sisi) |
 | Tx grant sesi | [`0x15e67a21…`](https://testnet.bscscan.com/tx/0x15e67a21e5ec25f8459ac2e83798033ca9afe5a14b41143aeb28fe2a47b64b52) |
 
-Setelah perakitan rantai dipindahkan ke `createGuardian()` (Task 9), E2E **dijalankan ulang
-sungguhan** lewat composition root yang baru supaya klaim di atas tidak menjadi bukti atas
-kode yang sudah tidak dipakai lagi: repay
-[`0xd7acda4c…`](https://testnet.bscscan.com/tx/0xd7acda4cc6505da3ea9b89911b7fa8a884147f0e67e11e6fb9cc8d99d638d06e),
-HF 1,14 → 1,50, dibayar $5,25, selisih klaim vs rantai 0 unit, `Repay.user` tetap wallet
-Altana, kontrol negatif tetap ditolak `UnauthorizedCall`. Ongkosnya 0,000041 tBNB.
+Empat jalan sebelumnya — termasuk jalan ke-4 (`0x3ec2818c…`, dibayar $6,85) yang sempat menjadi
+bukti utama dokumen ini — dipertahankan sebagai riwayat di
+`docs/e2e/2026-09-08-e2e-testnet.md` §"Riwayat jalan session key". Angkanya tetap benar;
+kodenya yang sudah tidak ada.
 
 **Bukti yang lebih penting: batasnya nyata.** Sesi yang sama, sesaat setelah berhasil membayar,
 mencoba `mUSD.transfer(EOA deployer, 1 wei)` dan **ditolak** dengan `UnauthorizedCall` — custom
