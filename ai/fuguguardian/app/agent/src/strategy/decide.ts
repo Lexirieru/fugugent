@@ -1,5 +1,13 @@
 import { dropToLiquidationBps, repayToReachTarget } from "./healthFactor.js";
-import { DEFAULT_THRESHOLDS, HF_ONE, type Action, type Decision, type Position, type Thresholds } from "./types.js";
+import {
+  DEFAULT_THRESHOLDS,
+  HF_ONE,
+  PositionError,
+  type Action,
+  type Decision,
+  type Position,
+  type Thresholds,
+} from "./types.js";
 
 /**
  * Format health factor (basis 1e18) menjadi string dua desimal dengan koma,
@@ -54,12 +62,30 @@ function buildReason(action: Action, hf: bigint | null, dropBps: bigint | null):
 }
 
 /**
+ * Memastikan ambang terurut secara aman: warn > partialRepay > deleverage > HF_ONE.
+ * Ambang yang tidak terurut atau menyentuh/di bawah titik likuidasi (HF_ONE)
+ * membuat rantai pemeriksaan di `decide` menghasilkan keputusan yang tidak
+ * terdefinisi secara diam-diam — untuk agent yang membelanjakan uang user,
+ * ini harus gagal keras dan segera, bukan lolos tanpa terdeteksi.
+ */
+function validateThresholds(t: Thresholds): void {
+  if (t.warn <= t.partialRepay || t.partialRepay <= t.deleverage || t.deleverage <= HF_ONE) {
+    throw new PositionError(
+      `Ambang tidak valid: warn=${t.warn}, partialRepay=${t.partialRepay}, deleverage=${t.deleverage}. ` +
+        `Urutan yang benar adalah warn > partialRepay > deleverage > HF_ONE (${HF_ONE}).`,
+    );
+  }
+}
+
+/**
  * Mesin keputusan Guardian. Murni: tanpa network, Date.now(), process.env,
  * atau I/O apa pun. Memeriksa dari kondisi paling gawat ke paling ringan
  * supaya kasus batas (persis di suatu ambang) selalu jatuh ke tindakan yang
  * lebih aman, bukan yang lebih longgar.
  */
 export function decide(pos: Position, thresholds: Thresholds = DEFAULT_THRESHOLDS): Decision {
+  validateThresholds(thresholds);
+
   const hf = pos.healthFactor;
   const drop = dropToLiquidationBps(hf);
 
