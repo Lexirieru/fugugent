@@ -193,7 +193,7 @@ Nama project harus ≤23 char, alfanumerik, diawali huruf (aturan AgentCore):
 | Agent | Kategori | Protokol | Trigger | Aksi |
 |---|---|---|---|---|
 | **Fugu Rebalancer** | Rebalancing | PancakeSwap v3 | harga keluar range / deviasi / interval | hitung range baru, cek profitabilitas setelah gas+slippage+IL, `decreaseLiquidity`→`mint` |
-| **Fugu Grid** | Grid Trading | PancakeSwap v3 swap | harga melintasi level grid | eksekusi swap pada level, catat fill |
+| **Fugu Grid** | Grid Trading | PancakeSwap v3 swap | keeper memantau `slot0()`; harga melintasi level grid | eksekusi swap pada level, catat fill |
 | **Fugu Yield** | Yield Optimisation | Venus, Aave v3, Lista | selisih APR melebihi ambang biaya migrasi | pindahkan posisi ke pool ber-APR-tertimbang-risiko tertinggi |
 | **Fugu Guardian** | Health Factor | Venus, Aave v3 | HF turun di bawah ambang | partial repay / top-up collateral / alert |
 
@@ -212,6 +212,37 @@ Tiga jebakan yang sudah diketahui dan harus dihindari (dari riset Altana):
 2. USDT/USDC di BNB Chain **18 desimal**, bukan 6.
 3. Native spend cap juga membayar relay fee — cap terlalu kecil membuat semua
    eksekusi `FAILED` code 300.
+
+
+### 5.4 Catatan implementasi dari riset strategi
+
+Dari `docs/research/06-agent-strategies.md` — semua ditandai terverifikasi live:
+
+- **Grid butuh keeper sendiri.** PancakeSwap **tidak punya order-book on-chain**;
+  "limit order"-nya bergantung pada taker off-chain. Agent Grid harus memantau
+  `slot0()` pool dan mengeksekusi swap langsung. Strategi ini secara struktural
+  mean-reversion — **rugi di pasar trending, dan itu harus dinyatakan terbuka**
+  di halaman agent. Kejujuran ini menaikkan kredibilitas, bukan menurunkannya.
+- **Rebalance hanya dieksekusi bila `ΔFee − Gas − Slippage − ΔIL > 0`.** Lebar range
+  adalah fungsi realized volatility (±k·σ), bukan persen tetap. Trigger gabungan:
+  keluar-range + deviasi >70–80% dari pusat + cooldown agar tidak churn.
+- **Health factor punya ground truth.** `Venus.getAccountLiquidity()` di Comptroller
+  `0xfD36E2c2a6789Db23113685031d7F16329158384` dan `AaveV3Pool.getUserAccountData()`
+  di `0x6807dc923806fE8Fd134338EABCA509979a7e0cB` keduanya terverifikasi live.
+  Harga dari Chainlink BNB/USD `0x0567F2323251f0Aab15c8dFb1967E4e8A7D42aeE`
+  (decimals 8, terverifikasi). Ini sebabnya Guardian dibangun pertama — kebenarannya
+  bisa dibuktikan terhadap angka on-chain.
+- **APR yield** dari DefiLlama Yields API `https://yields.llama.fi/pools`
+  (chain `"BSC"`, slug `venus-core-pool`, `aave-v3`, `lista-lending` — semua ada).
+  **Tapi `pancakeswap-amm-v3` tidak mencakup BSC di DefiLlama** — fee APR PancakeSwap
+  v3 harus dihitung sendiri dari event on-chain.
+
+**Alamat yang TERBUKTI SALAH — jangan dipakai:** Aave PoolAddressesProvider
+`0xA97684ea...` tidak punya kode di BSC.
+
+**Masih perlu verifikasi:** alamat oracle internal Venus/Aave (berbeda dari feed
+Chainlink umum), endpoint subgraph PancakeSwap v3 BSC yang aktif (hosted service
+The Graph sudah deprecated).
 
 ---
 
