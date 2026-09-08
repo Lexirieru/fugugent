@@ -33,6 +33,7 @@ contract FuguPriceOracle is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 
     error TokenNotEnabled(address token);
     error StalePrice(address token, uint256 updatedAt);
+    error FuturePrice(address token, uint256 updatedAt);
     error InvalidPrice(int256 answer);
     error InvalidConfig();
 
@@ -74,6 +75,7 @@ contract FuguPriceOracle is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         IAggregatorV3 feed = IAggregatorV3(cfg.feed);
         (, int256 answer,, uint256 updatedAt,) = feed.latestRoundData();
         if (answer <= 0) revert InvalidPrice(answer);
+        if (updatedAt > block.timestamp) revert FuturePrice(token, updatedAt);
         if (block.timestamp - updatedAt > cfg.maxStaleness) revert StalePrice(token, updatedAt);
 
         uint256 feedDecimals = feed.decimals();

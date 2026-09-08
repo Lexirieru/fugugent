@@ -123,4 +123,16 @@ contract FuguPriceOracleTest is Test {
         vm.expectRevert();
         oracle.initialize(owner);
     }
+
+    function test_revertsOnFutureTimestamp() public {
+        bnbFeed.setUpdatedAt(block.timestamp + 1);
+        vm.expectRevert(abi.encodeWithSelector(FuguPriceOracle.FuturePrice.selector, address(0), block.timestamp + 1));
+        oracle.quote(address(0), 1e8);
+    }
+
+    function test_implementationCannotBeInitialized() public {
+        FuguPriceOracle impl = new FuguPriceOracle();
+        vm.expectRevert();
+        impl.initialize(owner);
+    }
 }
