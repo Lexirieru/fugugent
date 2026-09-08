@@ -11,7 +11,9 @@
     "dev": "tsx src/dualMain.ts",
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p tsconfig.scripts.json",
+    "e2e:testnet": "tsx scripts/e2e-guardian.ts"
   },
   "dependencies": {
     "@a2a-js/sdk": ">=0.3.14 <1.0",

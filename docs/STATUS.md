@@ -28,18 +28,41 @@ permintaan `negotiate` dijawab **quote bertanda tangan wallet** (0,1 U, lengkap 
 `negotiation_hash` dan `provider_sig`).
 
 ### Lapisan strategi Fugu Guardian
-77 test. Rumus health factor murni dengan pembulatan yang sengaja diarahkan ke sisi aman,
-mesin keputusan deterministik yang gagal keras pada konfigurasi cacat, adapter yang terbukti
-membaca Aave v3 dari BSC mainnet, dan lapisan penjelasan dGrid yang gagal dengan aman.
+114 test (`cd ai/fuguguardian/app/agent && corepack pnpm test`). Rumus health factor murni
+dengan pembulatan yang sengaja diarahkan ke sisi aman, mesin keputusan deterministik yang
+gagal keras pada konfigurasi cacat, adapter yang terbukti membaca Aave v3 dari BSC mainnet,
+loop pemantauan (`guard.ts`), jalur eksekusi dengan spend cap/cooldown/kill switch
+(`execute.ts`), dan lapisan penjelasan dGrid yang gagal dengan aman.
+
+### Guardian benar-benar menyelamatkan posisi — terbukti on-chain
+Bukan lagi test unit saja. Satu siklus Guardian dijalankan di BSC testnet terhadap posisi
+lending sungguhan: harga agunan diturunkan sampai **HF 1,14** (zona `PARTIAL_REPAY`), agent
+memutuskan sendiri, membayar **$729,16** hutang lewat transaksi nyata, dan **HF naik ke
+1,50** — dibaca ulang dari rantai, bukan dari log.
+
+| | |
+|---|---|
+| Tx repay | [`0x318d4709…`](https://testnet.bscscan.com/tx/0x318d4709a391db889c4f97e82bbd4a1ae57dd42a9434a44c32c1c572f849cf6e) |
+| HF sebelum → sesudah | 1,14 → 1,50 (**+0,35**) |
+| Hutang | $3.125,00 → $2.395,83 |
+| Biaya | 0,0000162 tBNB |
+
+Skrip buktinya, `ai/fuguguardian/app/agent/scripts/e2e-guardian.ts`, mengimpor modul
+strategi apa adanya dan **gagal dengan exit code bukan nol** begitu satu klaim tidak
+terbukti terhadap bacaan on-chain. Rinciannya di `docs/e2e/2026-09-08-e2e-testnet.md`.
 
 ## Yang BELUM ada — jangan diklaim
 
-1. **Lapisan strategi belum tersambung ke agent.** Tidak ada file di luar `src/strategy/`
-   yang mengimpornya. Belum ada loop pemantauan, belum ada jalur eksekusi transaksi, dan
-   spend cap session key belum ditegakkan di kode. Agent yang berjalan hari ini mengirim
-   teks sebagai deliverable, bukan melindungi posisi.
-   → Kalimat yang benar: *"kami punya adapter mainnet yang terbukti live dan mesin
-   keputusan yang teruji"*, bukan *"Guardian melindungi posisi Anda"*.
+1. **Strategi belum tersambung ke *runtime* agent, dan repay belum lewat session key.**
+   Rantai keputusan → eksekusi → bukti on-chain sudah terbukti (lihat di atas), tetapi
+   yang menjalankannya adalah skrip E2E, bukan agent A2A/MCP yang disajikan `bag dev`:
+   `dualMain.ts` dan `tools.ts` masih belum mengimpor `src/strategy/` sama sekali, jadi
+   agent yang berjalan hari ini tetap mengirim teks sebagai deliverable. Transaksi repay-nya
+   juga ditandatangani EOA deployer, bukan session key Altana — spend cap, cooldown, dan
+   kill switch ditegakkan di `execute.ts` dan diuji, tapi belum di sisi kunci on-chain.
+   → Kalimat yang benar: *"Guardian terbukti menaikkan HF posisi dari 1,14 ke 1,50 lewat
+   transaksi on-chain"*, bukan *"agent yang kami sajikan di marketplace sudah melindungi
+   posisi Anda secara otonom"*.
 2. **Baca mainnet, eksekusi testnet — dua dunia berbeda.** Adapter membaca posisi nyata di
    BSC mainnet karena Venus dan Aave hanya ada di sana; eksekusi agent di testnet.
    Keputusan atas posisi mainnet tidak bisa dieksekusi di testnet. Ini batasan, bukan fitur.
@@ -71,8 +94,8 @@ membaca Aave v3 dari BSC mainnet, dan lapisan penjelasan dGrid yang gagal dengan
 
 ## Urutan kerja berikutnya
 
-1. Sambungkan strategi Guardian ke runtime agent: loop pemantauan, jalur eksekusi lewat
-   session key, penegakan spend cap di kode, kill switch user.
+1. Sambungkan strategi Guardian ke runtime agent yang disajikan (`dualMain.ts`/`tools.ts`),
+   dan pindahkan penanda tangan repay dari EOA deployer ke session key Altana.
 2. Samakan jaringan baca dan eksekusi.
 3. Backend: BFF 8004scan, indexer, classifier 4 kategori, scheduler.
 4. Frontend marketplace: discovery → detail → hire → panel izin & revoke.
