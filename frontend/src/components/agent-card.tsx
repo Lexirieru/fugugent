@@ -50,7 +50,10 @@ export function AgentCard({ view }: { view: AgentView }) {
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <RiskChip reading={risk} size="sm" />
-            <HiredBadge agentId={record.id} />
+            <HiredBadge
+              agentId={record.id}
+              listingId={listing?.active ? listing.listingId.toString() : null}
+            />
           </div>
         </div>
       </div>

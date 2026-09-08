@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
+import { ConnectControl } from "@/components/wallet/connect-button";
+import { WalletProvider } from "@/components/wallet/provider";
 import { CHAIN, CONTRACT_LIST, addressUrl, shorten } from "@/lib/chain";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -36,9 +38,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col bg-bg text-fg">
-        <SiteHeader />
-        <main className="flex-1 pb-20">{children}</main>
-        <SiteFooter />
+        <WalletProvider>
+          <SiteHeader />
+          <main className="flex-1 pb-20">{children}</main>
+          <SiteFooter />
+        </WalletProvider>
       </body>
     </html>
   );
@@ -53,12 +57,13 @@ function SiteHeader() {
         </Link>
         <span className="hidden text-xs text-faint sm:inline">Marketplace</span>
         <span className="grow" />
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent-soft px-2.5 py-0.5 text-[11px] font-medium text-accent">
+        <span className="hidden items-center gap-1.5 rounded-full border border-accent/40 bg-accent-soft px-2.5 py-0.5 text-[11px] font-medium text-accent sm:inline-flex">
           {CHAIN.name}
         </span>
+        <ConnectControl />
         <a
           href="https://fugugent.xyz"
-          className="text-xs text-muted transition hover:text-fg"
+          className="hidden text-xs text-muted transition hover:text-fg sm:inline"
           target="_blank"
           rel="noreferrer noopener"
         >
@@ -99,9 +104,10 @@ function SiteFooter() {
           ))}
         </ul>
         <p className="mt-6 max-w-3xl text-xs leading-relaxed text-faint">
-          Testnet only. The contracts are deployed and exercised end to end, but their source is
-          not verified on BscScan yet, so the explorer shows bytecode rather than Solidity. Nothing
-          on this site is financial advice, and every strategy on it can lose money.
+          Testnet only. All four implementations are deployed, exercised end to end, and verified
+          on BscScan, so the explorer shows Solidity rather than bytecode — the links above go
+          straight to the source. Nothing on this site is financial advice, and every strategy on it
+          can lose money.
         </p>
       </div>
     </footer>

@@ -32,6 +32,10 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# Exactly one exception, and it holds no values: `.env.example` lists variable
+# NAMES so a fresh clone knows what to fill in. Everything that carries a real
+# value — `.env`, `.env.local` — stays ignored.
+!.env.example
 
 # vercel
 .vercel

@@ -1,25 +1,27 @@
 "use client";
 
 /**
- * Alur hire.
+ * The hire flow.
  *
- * Dua aturan yang membentuk seluruh komponen ini:
+ * Two rules shape this whole component:
  *
- * 1. **Estimasi biaya sebelum hire, bukan sekadar peringatan.** Angka totalnya
- *    dihitung dengan `bigint` basis USD8 — tidak ada satu pun nilai uang yang
- *    lewat `number` di jalur ini.
- * 2. **Jangan pernah mengirim kontrol setengah jadi.** Penandatanganan di dalam
- *    browser belum ada, jadi tidak ada tombol "Connect wallet" yang tidak
- *    menghubungkan apa pun. Yang diberikan adalah panggilan yang sama persis
- *    dengan yang akan dilakukan tombol itu nanti — bisa disalin, bisa dijalankan,
- *    dan menghasilkan transaksi sungguhan.
+ * 1. **A cost estimate before hiring, not merely a warning.** The total is computed
+ *    with `bigint` in USD8 base — no money value passes through `number` on this
+ *    path. Its tBNB equivalent is read from the oracle inside `HireAction`, so the
+ *    user sees both figures before signing anything.
+ * 2. **Never ship a half-finished control.** The signing button renders only when
+ *    this build genuinely carries Reown credentials; without them, what shows is
+ *    the `cast` path, which produces an equally real transaction. There is never a
+ *    Connect button that connects nothing.
  */
 
 import { useMemo, useState } from "react";
-import { CopyButton } from "@/components/copy-button";
-import { CHAIN, CONTRACTS, txUrl } from "@/lib/chain";
+import { HireCast } from "@/components/hire-cast";
+import { HireAction } from "@/components/wallet/hire-action";
+import { CHAIN, txUrl } from "@/lib/chain";
 import { useHires, isTxHash } from "@/lib/hired";
 import { estimateCost, formatDuration, formatUsd8, formatPeriod } from "@/lib/money";
+import { walletEnabled } from "@/lib/wallet/config";
 
 const PRESETS = [1, 10, 30, 60];
 
@@ -27,15 +29,18 @@ export function HirePanel({
   agentId,
   agentName,
   listingId,
-  /** String desimal USD8 — `bigint` tidak bisa menyeberang batas server/klien. */
+  /** USD8 as a decimal string — `bigint` cannot cross the server/client boundary. */
   priceUsd8,
   periodSeconds,
+  notShipped = null,
 }: {
   agentId: string;
   agentName: string;
   listingId: string;
   priceUsd8: string;
   periodSeconds: number;
+  /** What this agent still cannot do. Shown here, above the pay button, not only further up the page. */
+  notShipped?: string | null;
 }) {
   const [periods, setPeriods] = useState(10);
   const [hash, setHash] = useState("");
@@ -47,24 +52,6 @@ export function HirePanel({
     () => estimateCost(price, periodSeconds, periods),
     [price, periodSeconds, periods],
   );
-  const usdTotal8 = est.totalUsd8.toString();
-
-  const quoteCommand = `# 1. Ask the oracle what ${formatUsd8(est.totalUsd8)} costs in tBNB right now
-AMOUNT=$(cast call ${CONTRACTS.priceOracle} \\
-  'quote(address,uint256)(uint256)' \\
-  0x0000000000000000000000000000000000000000 ${usdTotal8} \\
-  --rpc-url ${CHAIN.rpc} | awk '{print $1}')
-
-# 2. Allow 1% of movement between the quote and the block that lands it.
-#    Never send type(uint256).max here — the contract's own NatSpec says the UI must not.
-MAX=$((AMOUNT + AMOUNT / 100))`;
-
-  const hireCommand = `cast send ${CONTRACTS.subscription} \\
-  'subscribe(uint256,uint32,address,uint256,uint256)' \\
-  ${listingId} ${est.periods} 0x0000000000000000000000000000000000000000 "$MAX" $(( $(date +%s) + 600 )) \\
-  --value "$AMOUNT" \\
-  --rpc-url ${CHAIN.rpc} \\
-  --private-key "$PRIVATE_KEY"`;
 
   return (
     <div className="rounded-2xl border border-line bg-surface p-5 sm:p-6">
@@ -103,7 +90,7 @@ MAX=$((AMOUNT + AMOUNT / 100))`;
         </div>
       </div>
 
-      {/* Estimasi biaya — inti panel ini. */}
+      {/* The cost estimate — the point of this panel. */}
       <dl className="mt-5 grid gap-px overflow-hidden rounded-xl border border-line bg-[var(--border)] sm:grid-cols-3">
         <div className="bg-bg-elev px-4 py-3">
           <dt className="text-[11px] uppercase tracking-[0.14em] text-faint">You pay</dt>
@@ -129,8 +116,8 @@ MAX=$((AMOUNT + AMOUNT / 100))`;
       <ul className="mt-4 space-y-2 text-sm leading-relaxed text-muted">
         <li>
           Priced in USD and settled in tBNB. The oracle converts at the block that lands your
-          transaction, so the tBNB figure is only final at signing — which is why the command
-          below quotes it first and caps the slippage.
+          transaction, so the tBNB figure is only final at signing — which is why the quote below
+          refreshes and the call carries a slippage cap and a deadline.
         </li>
         <li>
           The money sits in escrow on <span className="font-mono text-xs">FuguSubscription</span>{" "}
@@ -143,35 +130,63 @@ MAX=$((AMOUNT + AMOUNT / 100))`;
         </li>
       </ul>
 
-      {/* Kontrol yang jujur: perintah yang sama dengan yang akan dijalankan tombol nanti. */}
-      <div className="mt-6 rounded-xl border border-line bg-bg-elev">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2.5">
-          <span className="text-xs font-medium uppercase tracking-[0.14em] text-faint">
-            Step 1 — quote and cap
-          </span>
-          <CopyButton text={quoteCommand} />
+      {/* The limits of the claim, repeated where the money moves. Somebody who
+          scrolled straight to Hire must not miss what they are buying: "listed and
+          hireable" and "able to act on chain" are two different things. */}
+      {notShipped ? (
+        <div className="mt-5 rounded-xl border border-[var(--risk-3)] px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--risk-3)]">
+            Before you pay
+          </p>
+          <p className="mt-1.5 text-sm leading-relaxed text-fg">{notShipped}</p>
         </div>
-        <pre className="overflow-x-auto px-4 py-3 font-mono text-[11px] leading-relaxed text-muted">
-          {quoteCommand}
-        </pre>
-        <div className="flex flex-wrap items-center justify-between gap-2 border-y border-line px-4 py-2.5">
-          <span className="text-xs font-medium uppercase tracking-[0.14em] text-faint">
-            Step 2 — hire
-          </span>
-          <CopyButton text={hireCommand} />
+      ) : null}
+
+      {/* In-browser signing, when this build has Reown credentials. */}
+      {walletEnabled ? (
+        <HireAction
+          agentId={agentId}
+          agentName={agentName}
+          listingId={listingId}
+          periods={est.periods}
+          catalogPriceUsd8={priceUsd8}
+        />
+      ) : (
+        <div className="mt-6">
+          <p className="mb-3 text-sm leading-relaxed text-muted">
+            This build has no Reown project id, so there is no Connect button here that would do
+            nothing. The commands below are the same call the button makes — one signature, on{" "}
+            {CHAIN.name}, chain id {CHAIN.id}.
+          </p>
+          <HireCast
+            listingId={listingId}
+            periods={est.periods}
+            usdTotal8={est.totalUsd8.toString()}
+          />
         </div>
-        <pre className="overflow-x-auto px-4 py-3 font-mono text-[11px] leading-relaxed text-muted">
-          {hireCommand}
-        </pre>
-      </div>
+      )}
 
-      <p className="mt-3 text-xs leading-relaxed text-faint">
-        In-browser wallet signing is not built yet, so there is no Connect button here that would
-        do nothing. This is the same call that button will make — one signature, on{" "}
-        {CHAIN.name}, chain id {CHAIN.id}.
-      </p>
+      {/* The CLI path stays open: the same call, checkable without a wallet. */}
+      {walletEnabled ? (
+        <details className="mt-4 rounded-xl border border-line bg-bg-elev px-4 py-3">
+          <summary className="cursor-pointer text-xs font-medium uppercase tracking-[0.14em] text-faint">
+            Rather sign from a terminal? The same call, as two commands
+          </summary>
+          <p className="mt-3 text-xs leading-relaxed text-faint">
+            Identical arguments to the button above, including the 1% cap and the ten-minute
+            deadline. Useful for checking what the UI actually sends.
+          </p>
+          <div className="mt-3">
+            <HireCast
+              listingId={listingId}
+              periods={est.periods}
+              usdTotal8={est.totalUsd8.toString()}
+            />
+          </div>
+        </details>
+      ) : null}
 
-      {/* Badge Hired: dicatat oleh pengguna, dibuktikan oleh tx hash, bisa dihapus lagi. */}
+      {/* This device's hire note: for a payment made outside this tab. */}
       <div className="mt-6 border-t border-line pt-5">
         {existing ? (
           <div className="flex flex-wrap items-center gap-3">
@@ -209,12 +224,13 @@ MAX=$((AMOUNT + AMOUNT / 100))`;
             }}
           >
             <label htmlFor="txhash" className="text-xs uppercase tracking-[0.16em] text-faint">
-              Already paid? Record the transaction
+              Paid from a terminal or another device? Record the transaction
             </label>
             <p className="mt-1 text-xs leading-relaxed text-faint">
-              Stored in this browser only, so the marketplace can show a{" "}
-              <span className="text-fg">Hired</span> badge and stop you paying twice. The badge
-              links to the transaction, so anyone can check it.
+              Not needed when you hire with the button above — that records itself. This is for a
+              payment made elsewhere. Stored in this browser only; the badge links to the
+              transaction, so anyone can check it. Your live subscription state is read from the
+              contract, not from this note.
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <input

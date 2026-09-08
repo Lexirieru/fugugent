@@ -113,7 +113,10 @@ function AgentDetail({
               {meta ? <Badge>{meta.label}</Badge> : <Badge tone="quiet">Uncategorised</Badge>}
               {listing?.curated ? <Badge tone="accent">Curated</Badge> : null}
               <RiskChip reading={risk} />
-              <HiredBadge agentId={record.id} />
+              <HiredBadge
+                agentId={record.id}
+                listingId={listing?.active ? listing.listingId.toString() : null}
+              />
             </div>
             <p className="mt-4 max-w-3xl text-pretty text-base leading-relaxed text-muted">
               {record.description}
@@ -379,6 +382,7 @@ function AgentDetail({
                 listingId={listing.listingId.toString()}
                 priceUsd8={listing.priceUsd8PerPeriod.toString()}
                 periodSeconds={listing.periodSeconds}
+                notShipped={notShipped}
               />
             </>
           ) : (

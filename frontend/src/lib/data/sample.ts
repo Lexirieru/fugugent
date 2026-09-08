@@ -1,25 +1,34 @@
 /**
- * Sumber `seed` — data contoh yang dibundel bersama aplikasi.
+ * The `seed` source — sample data bundled with the app.
  *
- * Ini **bukan** simulasi backend yang berpura-pura hidup. Isinya adalah empat
- * agent yang benar-benar ada di repo ini, dengan status masing-masing dinyatakan
- * apa adanya: satu punya bukti on-chain, tiga lainnya belum punya strategi dan
- * belum terdaftar di FuguRegistry, jadi tiga-tiganya tidak bisa disewa.
+ * This is **not** a backend simulation pretending to be live. It is the four
+ * agents that actually exist in this repository, each with its real status stated
+ * plainly. All four are now listed on FuguRegistry and can be hired; what
+ * separates them is what happens after you pay. Fugu Guardian has moved money on
+ * chain and has the transactions to prove it. The other three ship a deterministic
+ * decision engine and a backtest and have **never sent an on-chain transaction** —
+ * their on-chain listing metadata says `onchainExecution: false`, and so does
+ * every card and page here.
  *
- * Setiap tx hash di bawah disalin dari `docs/STATUS.md` dan
- * `docs/e2e/2026-09-08-e2e-testnet.md` pada 2026-09-08. Tidak ada satu pun angka
- * di berkas ini yang tidak bisa dibuka di BscScan, kecuali yang secara eksplisit
- * menyatakan tidak punya blok untuk dibuka.
+ * That distinction is the one that decides whether somebody feels cheated after
+ * paying, so it is never left implied: "hireable" and "able to act" are written as
+ * two different claims.
  *
- * Aturan yang mengikat berkas ini: **tidak boleh ada agent karangan.** Kartu
- * kosong lebih jujur daripada marketplace yang terlihat ramai.
+ * Every tx hash below is copied from `docs/STATUS.md` and
+ * `docs/e2e/2026-09-08-e2e-testnet.md`; the registration hashes were verified
+ * against `FuguRegistry.getListing` on chain. Nothing in this file is a number
+ * that cannot be opened on BscScan, except where it says outright that there is no
+ * block to open.
+ *
+ * The binding rule for this file: **no invented agents.** An empty card is more
+ * honest than a marketplace that merely looks busy.
  */
 
 import type { AgentRecord, Category } from "@/lib/agent-types";
 import { CONTRACTS, CHAIN } from "@/lib/chain";
 import type { AgentView } from "@/lib/data/types";
 
-/** Waktu tetap: SSR harus deterministik, dan data contoh tidak boleh terlihat segar. */
+/** A fixed time: SSR must be deterministic, and sample data must not look fresh. */
 export const SEED_FETCHED_AT = "2026-09-08T00:00:00.000Z";
 
 const DEPLOYER = "0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E" as const;
@@ -161,84 +170,147 @@ const GUARDIAN: AgentView = {
 };
 
 /**
- * Tiga agent sisanya. Wallet dan session key ber-batas keempatnya memang
- * terdaftar di Keystore (`docs/STATUS.md`), tetapi strateginya belum ada dan
- * tidak satu pun terdaftar di FuguRegistry — jadi tidak ada harga, tidak ada
- * bacaan risiko, dan tidak ada tombol hire.
+ * The other three agents. All three are listed on FuguRegistry and hireable, at
+ * $0.05 per 120-second period — half of Guardian's price, deliberately, because
+ * each one ships a decision engine and a backtest and nothing that executes.
+ *
+ * What they do **not** have is an on-chain executor. Their listing metadata carries
+ * `onchainExecution: false`, they have never sent a transaction, and hiring one
+ * puts money into escrow without starting an autonomous loop. That sentence lives
+ * in `notShipped`, which the card, the detail page, and the hire panel all show —
+ * the last one directly above the pay button, where it still changes a decision.
  */
-function scaffold(
-  id: string,
-  tokenId: string,
-  name: string,
-  category: Category,
-  description: string,
-  tags: string[],
-): AgentView {
+function strategyAgent(args: {
+  id: string;
+  tokenId: string;
+  name: string;
+  category: Category;
+  description: string;
+  tags: string[];
+  /** `FuguRegistry` listing id, verified with `getListing` on chain. */
+  listingId: bigint;
+  erc8004AgentId: bigint;
+  agentWallet: `0x${string}`;
+  /** Registration transaction, block 129903555. */
+  listedTxHash: string;
+  /** How anyone can re-run this agent's own test suite. */
+  verifyCommand: string;
+}): AgentView {
   return {
     record: baseRecord({
-      id,
-      tokenId,
-      name,
-      description,
-      tags,
-      isActive: false,
-      // Kategorinya diketahui pasti — agent ini memang dibangun untuk kategori itu —
-      // tetapi tidak ada listing on-chain yang menyatakannya, jadi ia diletakkan di
-      // `classification`, tempat yang memang disediakan untuk kategori tanpa listing.
+      id: args.id,
+      tokenId: args.tokenId,
+      name: args.name,
+      description: args.description,
+      tags: args.tags,
+      isActive: true,
+      agentWallet: args.agentWallet,
       classification: {
-        category,
+        category: args.category,
         confidence: 1,
-        reason: "First-party agent built for this category; not listed on FuguRegistry yet.",
+        reason: "First-party agent built for this category, and listed on FuguRegistry.",
+      },
+      fuguListing: {
+        listingId: args.listingId,
+        erc8004AgentId: args.erc8004AgentId,
+        owner: DEPLOYER,
+        agentWallet: args.agentWallet,
+        category: args.category,
+        // USD, 8 decimals: 5_000_000 = $0.05. Half of Guardian, because half of the
+        // work is done — the decision, not the execution.
+        priceUsd8PerPeriod: 5_000_000n,
+        periodSeconds: 120,
+        active: true,
+        curated: false,
+        // The on-chain listing carries a base64 JSON blob (summary, limits, verify
+        // command, `onchainExecution: false`). It is not mirrored here: this sample
+        // exists so the UI can be built without a backend, not to duplicate chain
+        // state. `getListing` is the source, and the proof below opens it.
+        metadataURI: "",
       },
     }),
+    // No live reading: nothing runs, so the fish is drawn hollow rather than at a
+    // guessed level.
     risk: null,
     session: null,
-    proofs: [],
+    proofs: [
+      {
+        label: "Listed on FuguRegistry",
+        detail: `Listing #${args.listingId} — $0.05 per 2 minutes, category ${args.category}.`,
+        hash: args.listedTxHash,
+      },
+      {
+        label: "Never executed on chain",
+        detail: `This agent's wallet ${args.agentWallet} has sent no strategy transaction. ${args.verifyCommand}`,
+        hash: null,
+        noLinkReason:
+          "There is no transaction to open, which is the claim: the decision engine is tested, the executor is not built.",
+      },
+    ],
     notShipped:
-      "Scaffold only. It has a wallet and a capped session key registered in the Altana Keystore; it does not have a strategy, and it is not listed on FuguRegistry — so it cannot be hired yet.",
+      "Hireable, but it cannot act yet. This agent ships a deterministic decision engine and a backtest — its listing metadata says onchainExecution: false — and it has never sent an on-chain transaction. Hiring it places your payment in escrow and does not start an autonomous loop.",
     outcomes: [],
   };
 }
 
-const REBALANCER = scaffold(
-  "97:2",
-  "2",
-  "Fugu Rebalancer",
-  "REBALANCING",
-  "Keeps portfolio weights and PancakeSwap v3 LP ranges where you put them — and only moves when ΔFee − Gas − Slippage − ΔIL is positive, so tidying up never costs more than it saves.",
-  ["rebalancing", "pancakeswap v3", "liquidity"],
-);
+const REBALANCER = strategyAgent({
+  id: "97:2",
+  tokenId: "2",
+  name: "Fugu Rebalancer",
+  category: "REBALANCING",
+  description:
+    "Keeps portfolio weights and PancakeSwap v3 LP ranges where you put them — and only moves when ΔFee − Gas − Slippage − ΔIL is positive, so tidying up never costs more than it saves.",
+  tags: ["rebalancing", "pancakeswap v3", "liquidity"],
+  listingId: 2n,
+  erc8004AgentId: 8005n,
+  agentWallet: "0xb8f155D1278f0437b9De7c63911f2C0EDa485941",
+  listedTxHash: "0x858701b4238910259427eda6181d5488c1d29bc72b33f3c957d58108694b29c1",
+  verifyCommand: "cd ai/fugurebalancer/app/agent && corepack pnpm test  # 88 tests",
+});
 
-const GRID = scaffold(
-  "97:3",
-  "3",
-  "Fugu Grid",
-  "GRID",
-  "Grid trading on PancakeSwap v3, watching slot0() itself because there is no on-chain order book. Structurally mean-reverting, which means it loses money in a trending market — that is written on its page, not buried.",
-  ["grid", "pancakeswap v3", "mean reversion"],
-);
+const GRID = strategyAgent({
+  id: "97:3",
+  tokenId: "3",
+  name: "Fugu Grid",
+  category: "GRID",
+  description:
+    "Grid trading on PancakeSwap v3, watching slot0() itself because there is no on-chain order book. Structurally mean-reverting, which means it loses money in a trending market — that is written on its page, not buried.",
+  tags: ["grid", "pancakeswap v3", "mean reversion"],
+  listingId: 3n,
+  erc8004AgentId: 8006n,
+  agentWallet: "0x2AA59d5cf540c8f1b1CE4C667C2e745475d4EAd9",
+  listedTxHash: "0x326c3c909d8e55a9b07d7886b5ef314fd652f62299d1854c687dd0f65143eafb",
+  verifyCommand: "cd ai/fugugrid/app/agent && corepack pnpm test  # 99 tests",
+});
 
-const YIELD = scaffold(
-  "97:4",
-  "4",
-  "Fugu Yield",
-  "YIELD",
-  "Moves funds into the highest risk-adjusted APR pool it can verify across Venus, Aave v3 and Lista — and only when the APR difference beats the cost of migrating.",
-  ["yield", "venus", "aave", "lista"],
-);
+const YIELD = strategyAgent({
+  id: "97:4",
+  tokenId: "4",
+  name: "Fugu Yield",
+  category: "YIELD",
+  description:
+    "Moves funds into the highest risk-adjusted APR pool it can verify across Venus, Aave v3 and Lista — and only when the APR difference beats the cost of migrating.",
+  tags: ["yield", "venus", "aave", "lista"],
+  listingId: 4n,
+  erc8004AgentId: 8007n,
+  agentWallet: "0x15dE73F47Ca58a11A6Ef9dB24dfDc6F096b0a866",
+  listedTxHash: "0xf67c457f4a678dbbf0a62f101b6518ff8c2c42b83bbd2e7fe21d9b9d91683aa3",
+  verifyCommand: "cd ai/fuguyield/app/agent && corepack pnpm test  # 93 tests",
+});
 
-/** Empat agent, satu per kategori. Tidak lebih, karena tidak ada lebih. */
+/** Four agents, one per category. No more, because there are no more. */
 export const SEED_AGENTS: AgentView[] = [GUARDIAN, REBALANCER, GRID, YIELD];
 
 /**
- * Siklus hidup marketplace yang dijalankan di jaringan sungguhan. Ini bukan
- * milik satu agent — ini bukti bahwa kontraknya bekerja, dan dipakai halaman
- * hire untuk menjelaskan apa yang akan terjadi pada uang pembeli.
+ * The marketplace lifecycle, run on the real network. It belongs to no single
+ * agent — it is the evidence that the contracts work, and the hire page uses it to
+ * explain what is about to happen to a buyer's money.
  */
 export const MARKETPLACE_CYCLE = [
   {
     label: "An agent was listed — Health Factor category, $0.10 per 120 seconds",
-    detail: "listingCount = 1 · countByCategory(HEALTH_FACTOR) = 1",
+    detail:
+      "The first listing: listingCount went to 1, countByCategory(HEALTH_FACTOR) to 1. The registry now holds four, one per category.",
     hash: "0x590d2f13731bef32c6409d32c9f278af8b897766a0a82e0b504acf6799ffeab7",
   },
   {

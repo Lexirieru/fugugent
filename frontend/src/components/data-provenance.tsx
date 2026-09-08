@@ -78,13 +78,13 @@ export function DataProvenance({
       <div
         className={`rounded-xl border border-line border-l-2 border-l-[var(--risk-3)] bg-surface px-4 py-3 ${className}`}
       >
-        <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
           <span className="font-medium text-fg">Served from {label}</span>
           {age ? <span className="tnum text-muted">· {age}</span> : null}
           {provenance.stale ? (
             <span className="text-[var(--risk-3)]">· not confirmed fresh</span>
           ) : null}
-        </p>
+        </div>
         <p className="mt-1 text-sm leading-relaxed text-muted">
           {SOURCE_MEANING[provenance.source]}
           {provenance.reason ? ` ${provenance.reason}` : ""}
@@ -94,8 +94,11 @@ export function DataProvenance({
     );
   }
 
+  // `div`, not `p`: `Trail` renders a `<details>`, and `<details>` inside `<p>` is
+  // invalid HTML — the browser hoists it out during parsing, so hydration fails and
+  // React throws this whole tree away and redraws it.
   return (
-    <p className={`flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs text-faint ${className}`}>
+    <div className={`flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs text-faint ${className}`}>
       <span className="inline-flex items-center gap-1.5">
         <span
           aria-hidden
@@ -105,7 +108,7 @@ export function DataProvenance({
       </span>
       {age ? <span className="tnum">· {age}</span> : null}
       <Trail provenance={provenance} inline />
-    </p>
+    </div>
   );
 }
 
