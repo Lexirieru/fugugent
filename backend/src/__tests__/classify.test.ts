@@ -24,7 +24,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { classify } from "../classify.js";
+import { CLASSIFIER_THRESHOLDS, classify } from "../classify.js";
 import type { AgentRecord } from "../types.js";
 
 /** Bangun `AgentRecord` minimal; hanya field masukan classifier yang penting. */
@@ -470,6 +470,59 @@ describe("classify — ambang kepercayaan", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Plafon yang mengunci ambang
+// ---------------------------------------------------------------------------
+
+/**
+ * Ambang 0.55 diklaim sah karena terkurung dua plafon. Klaim seperti itu hanya
+ * berguna kalau angkanya benar-benar keluar dari kode — versi pertama komentar
+ * `MIN_CONFIDENCE` menyebut plafon imbang 0.375 padahal nilainya 0.35, dan tidak
+ * ada test yang bisa menangkapnya. Ketiga plafon dikunci di sini supaya komentar
+ * dan perilaku tidak bisa menyimpang lagi tanpa ada yang berteriak.
+ */
+describe("classify — plafon yang mengunci ambang", () => {
+  const { MIN_CONFIDENCE, SEPARATION_FLOOR } = CLASSIFIER_THRESHOLDS;
+
+  it("PLAFON BAWAH 0.375: satu isyarat SEDANG tanpa saingan, dan ambang ada di atasnya", () => {
+    const result = classify(
+      agent({ name: "Watcher", description: "Sends an alert on any liquidation event it sees." }),
+    );
+    expect(result.confidence).toBe(0.375);
+    expect(result.category).toBeNull();
+    expect(MIN_CONFIDENCE).toBeGreaterThan(0.375);
+  });
+
+  it("PLAFON ATAS 0.625: satu isyarat MENENTUKAN tanpa saingan, dan ambang ada di bawahnya", () => {
+    const result = classify(agent({ name: "Sentinel", description: "Monitors the health factor." }));
+    expect(result.confidence).toBe(0.625);
+    expect(result.category).toBe("HEALTH_FACTOR");
+    expect(MIN_CONFIDENCE).toBeLessThan(0.625);
+  });
+
+  it("PLAFON IMBANG 0.35: dua kategori tepat imbang dengan bukti jenuh berhenti persis di SEPARATION_FLOOR", () => {
+    // GRID 2.1 vs HEALTH_FACTOR 2.1 — keduanya di atas plafon bukti, jadi
+    // strength = 1 dan pemisahan = 0. Ini nilai TERTINGGI yang bisa dicapai
+    // sebuah hasil imbang sempurna, berapa pun banyaknya bukti.
+    const result = classify(
+      agent({
+        name: "Tie",
+        description:
+          "grid trading with range orders in a price range. health factor: liquidation on venus lending.",
+      }),
+    );
+    expect(result.confidence).toBe(SEPARATION_FLOOR);
+    expect(result.confidence).toBe(0.35);
+    expect(result.category).toBeNull();
+  });
+
+  it("plafon imbang berada DI BAWAH plafon bawah, jadi ia bukan batas yang mengikat", () => {
+    // Inilah koreksi terhadap komentar versi pertama: hanya ada SATU batas bawah
+    // (0.375), bukan dua yang kebetulan sama.
+    expect(SEPARATION_FLOOR).toBeLessThan(0.375);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Lapis kedua: OASF
 // ---------------------------------------------------------------------------
 
@@ -512,6 +565,47 @@ describe("classify — lapis kedua OASF", () => {
     );
     expect(denganPertanian.confidence).toBeLessThan(polos.confidence);
     expect(denganPertanian.category).toBeNull();
+  });
+
+  it("KEPUTUSAN SADAR: domain OASF tak berkaitan MENEKAN tapi tidak pernah memveto", () => {
+    // Agent HEALTH_FACTOR yang benar dan lolos hanya dengan satu frasa menentukan
+    // (0.625) tidak boleh dibatalkan hanya karena taksonomi upstream memuat satu
+    // token seperti "logistics" atau "education". Domain-domain itu tidak membuat
+    // homonim apa pun dengan kosakata kita, dan OASF — menurut temuan kita
+    // sendiri — tidak sanggup memilih kategori; ia tidak pantas memegang veto.
+    const base = { name: "Sentinel", description: "Monitors the health factor." };
+    const polos = classify(agent(base));
+    expect(polos.confidence).toBe(0.625);
+
+    for (const domain of ["transportation/logistics", "education/online_learning", "media_and_entertainment/gaming"]) {
+      const hasil = classify(agent({ ...base, domains: [domain] }));
+      expect(hasil.confidence).toBeLessThan(polos.confidence);
+      expect(hasil.category).toBe("HEALTH_FACTOR");
+      expect(hasil.confidence).toBeGreaterThanOrEqual(CLASSIFIER_THRESHOLDS.MIN_CONFIDENCE);
+    }
+  });
+
+  it("KEPUTUSAN SADAR: domain OASF yang berbenturan makna BOLEH memveto isyarat menentukan", () => {
+    // Kebalikannya, dan sengaja: tiga domain ini memproduksi persis homonim yang
+    // classifier ini dibangun untuk menahan — "crop yield", "health factor" medis,
+    // "power grid". Di sini veto memang yang diinginkan.
+    const base = { name: "Sentinel", description: "Monitors the health factor." };
+    for (const domain of ["agriculture/crop_management", "healthcare/medical_technology", "energy/utilities"]) {
+      const hasil = classify(agent({ ...base, domains: [domain] }));
+      expect(hasil.category).toBeNull();
+    }
+  });
+
+  it("satu sinyal DeFi membebaskan agent lintas bidang dari kedua penalti (GameFi)", () => {
+    const result = classify(
+      agent({
+        name: "Sentinel",
+        description: "Monitors the health factor.",
+        domains: ["media_and_entertainment/gaming", "technology/blockchain/defi"],
+      }),
+    );
+    expect(result.category).toBe("HEALTH_FACTOR");
+    expect(result.confidence).toBeGreaterThan(0.625);
   });
 
   it("OASF tidak pernah bisa mengklasifikasi sendiri tanpa kata kunci apa pun", () => {

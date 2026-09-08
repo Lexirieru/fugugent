@@ -157,21 +157,35 @@ const SEPARATION_FLOOR = 0.35;
 /**
  * Ambang penerimaan. **Ini konstanta terpenting di berkas ini.**
  *
- * Ia tidak dipilih dari selera, melainkan didefinisikan oleh perilaku: harus
- * berada **di atas** plafon "satu isyarat sedang" (0.375) dan plafon "dua
- * kategori bertarung imbang" (0.375), tetapi **di bawah** "satu isyarat
- * menentukan tanpa saingan" (0.625). Rentang yang memenuhi itu adalah
- * (0.375, 0.625); 0.55 diambil di sisi konservatifnya.
+ * Ia tidak dipilih dari selera, melainkan dikurung oleh dua plafon yang dihitung
+ * dari rumus di atas — dan ketiga angka di bawah ini **dikunci oleh test**
+ * (`describe("classify — plafon yang mengunci ambang")`), supaya komentar ini
+ * tidak bisa lagi menyimpang dari perilaku kode:
  *
- * Terjemahan ke bahasa manusia: **tiket masuk minimum adalah tepat satu frasa
+ * | Skenario | Nilai | Perannya |
+ * |---|---|---|
+ * | satu isyarat SEDANG, tanpa saingan | `0.6/1.6 × 1.0` = **0.375** | batas bawah — ambang harus DI ATAS ini |
+ * | satu isyarat MENENTUKAN, tanpa saingan | `1.0/1.6 × 1.0` = **0.625** | batas atas — ambang harus DI BAWAH ini |
+ * | dua kategori TEPAT imbang (`pemisahan` = 0) | `strength × SEPARATION_FLOOR` ≤ **0.35** | tidak mengikat (lihat di bawah) |
+ *
+ * Jadi rentang yang sah adalah **(0.375, 0.625)**; 0.55 diambil di sisi
+ * konservatifnya. Terjemahannya: **tiket masuk minimum adalah tepat satu frasa
  * yang tak bisa berarti lain.**
  *
- * Bila diturunkan ke 0.40, agent dengan satu kata "liquidation" akan muncul di
- * kategori Health Factor — pengguna melihat agent yang salah tempat. Bila
- * dinaikkan ke 0.70, "Automated portfolio rebalancing" (deskripsi lengkap satu
- * agent nyata di 8004scan, skor 0.78) masih lolos, tapi agent seperti
- * `Assay Health` (0.69) — yang jelas-jelas HEALTH_FACTOR — akan hilang dari
- * marketplace. Keduanya diuji.
+ * Catatan koreksi (temuan review): versi pertama komentar ini mengklaim plafon
+ * imbang juga 0.375 dan menyajikannya sebagai batas bawah kedua. Itu salah — dan
+ * salahnya bukan sekadar aritmetika, melainkan cara berargumen: angkanya disalin
+ * dari plafon pertama, bukan diturunkan dari rumus. Nilai sebenarnya adalah
+ * `SEPARATION_FLOOR` = 0.35 (dicapai persis saat bukti jenuh; pada kasus nyata
+ * "Omni DeFi Suite" hasilnya 0.3281 karena `strength` < 1). Karena 0.35 < 0.375,
+ * plafon imbang **tidak pernah menjadi batas yang mengikat** — ia sudah otomatis
+ * terpenuhi oleh batas bawah yang sesungguhnya. Hanya ada SATU batas bawah, bukan
+ * dua yang kebetulan sama.
+ *
+ * Akibat bila salah: pada 0.40 satu kata "liquidation" akan mengirim agent
+ * analitik LP mana pun ke Health Factor — pengguna melihat agent yang salah
+ * tempat. Pada 0.70 agent seperti `Assay Health` (0.69) — yang jelas-jelas
+ * HEALTH_FACTOR — hilang dari marketplace. Keduanya diuji.
  */
 const MIN_CONFIDENCE = 0.55;
 
@@ -188,16 +202,46 @@ const MIN_CONFIDENCE = 0.55;
 const OASF_DEFI_BONUS = 1.15;
 
 /**
- * Pengali saat OASF menyatakan domain di luar keuangan (pertanian, kesehatan,
- * logistik, …) dan tidak ada satu pun domain keuangan/blockchain.
+ * Pengali saat OASF menunjuk domain yang **berbenturan makna** dengan kosakata
+ * kategori kita — bukan sekadar domain lain, melainkan domain yang memproduksi
+ * persis homonim yang classifier ini dibangun untuk menahan:
  *
- * 0.5 dipilih agar cukup untuk **membatalkan satu isyarat menentukan**
- * (0.625 × 0.5 = 0.31 < 0.55). Itu memang yang diinginkan: agent yang mendaftarkan
- * dirinya di `agriculture/crop_management` dan menulis "yield" sedang bicara
- * hasil panen, bukan imbal hasil DeFi — seberapa pun meyakinkan kata kuncinya.
- * Bila dilonggarkan ke 0.8, agent panen itu lolos ke kategori Yield.
+ * | Domain OASF | Homonim yang ia buat |
+ * |---|---|
+ * | `agriculture` / `crop` | "crop **yield**" — hasil panen, bukan imbal hasil |
+ * | `healthcare` / `medical` | "**health** factor" dalam arti kesehatan |
+ * | `energy` / `utilities` | "power **grid**" — jaringan listrik, bukan grid trading |
+ *
+ * 0.5 dipilih supaya cukup **membatalkan satu isyarat menentukan**
+ * (0.625 × 0.5 = 0.31 < 0.55). Itu memang yang diinginkan: agent yang
+ * mendaftarkan dirinya di `agriculture/crop_management` dan menulis "yield"
+ * sedang bicara hasil panen — seberapa pun meyakinkan kata kuncinya. Bila
+ * dilonggarkan ke 0.8, agent panen itu lolos ke kategori Yield.
  */
-const OASF_OFF_DOMAIN_PENALTY = 0.5;
+const OASF_CONTRADICTING_PENALTY = 0.5;
+
+/**
+ * Pengali saat OASF hanya menunjuk domain yang **tidak berkaitan** (logistik,
+ * hukum, pendidikan, game, hiburan) tanpa satu pun sinyal keuangan/blockchain.
+ *
+ * Dipisahkan dari kasus di atas setelah temuan review: karena {@link MIN_CONFIDENCE}
+ * sengaja dipasang tepat di atas "satu isyarat menentukan sendirian" (0.625),
+ * pengali 0.5 akan **membatalkan agent yang benar** hanya karena taksonomi
+ * upstream kebetulan memuat satu token seperti `education` atau `logistics`.
+ * Itu keliru dua kali: (a) domain-domain ini tidak membuat homonim apa pun
+ * dengan kosakata kita, dan (b) bertentangan dengan temuan kita sendiri bahwa
+ * OASF "tidak sanggup memilih kategori" — sinyal selemah itu tidak pantas
+ * memegang hak veto. Agent GameFi yang melakukan yield farming sungguhan adalah
+ * kasus nyata, bukan hipotetis.
+ *
+ * 0.9 bukan angka bulat sembarangan: ia adalah nilai bulat terbesar yang
+ * **tidak sanggup membatalkan satu isyarat menentukan sendirian**. Syaratnya
+ * pengali > 0.55/0.625 = 0.88; 0.9 memenuhinya dengan margin tipis
+ * (0.625 × 0.9 = 0.5625 ≥ 0.55, tetap lolos). Yang bisa ia lakukan hanyalah
+ * menekan kasus yang sudah di ambang — persis peran yang jujur untuk isyarat
+ * lemah. Bila diturunkan ke 0.85, hak veto itu kembali secara diam-diam.
+ */
+const OASF_UNRELATED_PENALTY = 0.9;
 
 // ---------------------------------------------------------------------------
 // Tabel pola
@@ -343,10 +387,16 @@ const LABEL_ALIASES: Readonly<Record<string, Category>> = {
 const OASF_DEFI = /blockchain|crypto|defi|decentralized[_\s-]?finance|finance|investment|trading|market|risk[_\s-]?management|smart[_\s-]?contract/;
 
 /**
- * OASF menunjuk dunia lain. Hanya berlaku bila tidak ada satu pun sinyal DeFi —
- * agent lintas bidang (mis. logistik + blockchain) tidak dihukum.
+ * Domain OASF yang berbenturan makna dengan kosakata kategori kita. Hanya
+ * berlaku bila tidak ada satu pun sinyal DeFi — agent lintas bidang tidak dihukum.
  */
-const OASF_OFF_DOMAIN = /agricultur|crop|farming_practice|healthcare|medical|clinical|education|transportation|logistics|manufactur|robotics|energy|utilit|gaming|entertainment|legal|hospitality/;
+const OASF_CONTRADICTING = /agricultur|crop|farming_practice|horticultur|healthcare|medical|clinical|patient|energy|utilit|electric|power_grid/;
+
+/**
+ * Domain OASF yang sekadar tidak berkaitan: tidak membuat homonim dengan
+ * kosakata kita, jadi hanya menekan tipis dan tidak pernah memveto.
+ */
+const OASF_UNRELATED = /gaming|entertainment|media|legal|logistics|transportation|manufactur|robotics|education|hospitality|agriculture_business|sports|travel/;
 
 // ---------------------------------------------------------------------------
 // Pembantu
@@ -482,11 +532,16 @@ export function classify(agent: AgentRecord): AgentClassification {
   let oasfNote = "";
   if (oasf !== "") {
     if (OASF_DEFI.test(oasf)) {
+      // Diperiksa lebih dulu: satu sinyal keuangan/blockchain sudah cukup untuk
+      // membebaskan agent lintas bidang (mis. GameFi) dari kedua penalti.
       oasfMultiplier = OASF_DEFI_BONUS;
       oasfNote = `; OASF menegaskan konteks DeFi/keuangan (x${OASF_DEFI_BONUS})`;
-    } else if (OASF_OFF_DOMAIN.test(oasf)) {
-      oasfMultiplier = OASF_OFF_DOMAIN_PENALTY;
-      oasfNote = `; OASF menunjuk domain di luar keuangan (x${OASF_OFF_DOMAIN_PENALTY})`;
+    } else if (OASF_CONTRADICTING.test(oasf)) {
+      oasfMultiplier = OASF_CONTRADICTING_PENALTY;
+      oasfNote = `; OASF menunjuk domain yang berbenturan makna dengan kosakata kategori (x${OASF_CONTRADICTING_PENALTY})`;
+    } else if (OASF_UNRELATED.test(oasf)) {
+      oasfMultiplier = OASF_UNRELATED_PENALTY;
+      oasfNote = `; OASF menunjuk domain tak berkaitan (x${OASF_UNRELATED_PENALTY}, tidak pernah memveto)`;
     }
   }
 
@@ -534,5 +589,6 @@ export const CLASSIFIER_THRESHOLDS = {
   EVIDENCE_CAP,
   SEPARATION_FLOOR,
   OASF_DEFI_BONUS,
-  OASF_OFF_DOMAIN_PENALTY,
+  OASF_CONTRADICTING_PENALTY,
+  OASF_UNRELATED_PENALTY,
 } as const;
