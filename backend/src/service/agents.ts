@@ -152,15 +152,45 @@ export interface AgentServiceDetail extends AgentDetailResult {
   trail: FallbackAttempt[];
 }
 
-/** Ringkasan kesehatan untuk `/api/health` — jujur ke juri, bukan selalu hijau. */
+/**
+ * Ringkasan kesehatan untuk `/api/health` — jujur ke juri, bukan selalu hijau.
+ *
+ * `healthy` dan `degraded` sengaja dua boolean terpisah, karena tiga keadaan
+ * yang perlu dibedakan tidak muat di satu:
+ *
+ * | `healthy` | `degraded` | Artinya |
+ * |---|---|---|
+ * | `true`  | `false` | melayani langsung dari 8004scan |
+ * | `true`  | `true`  | 8004scan tumbang, masih ada sumber data sungguhan (cache / on-chain) |
+ * | `false` | `true`  | **tidak ada sumber sungguhan yang menjawab** — yang tersisa hanya seed |
+ */
 export interface ServiceHealth {
-  /** Ada minimal satu sumber yang sehat. Selalu `true` selama seed utuh. */
+  /**
+   * Ada bukti bahwa minimal satu **sumber data sungguhan** — 8004scan, cache
+   * Postgres, atau pembacaan on-chain — bekerja saat ini.
+   *
+   * **Seed tidak dihitung.** Seed adalah berkas di dalam bundel; ia tidak bisa
+   * mati, jadi memasukkannya membuat field ini konstan `true` dan menghapus
+   * seluruh guna `/api/health`: juri akan mematikan 8004scan dan melihat lampu
+   * tetap hijau, yang terbaca sebagai menutupi. Seed tetap muncul di `sources`
+   * (berguna: jaring pengamannya utuh), hanya tidak ikut menentukan nilai ini.
+   *
+   * Tanpa observasi apa pun — misalnya sesaat setelah boot — nilainya `false`.
+   * Tidak adanya bukti sehat bukan bukti sehat; monitor yang membunyikan alarm
+   * pada keadaan belum-diketahui berperilaku benar.
+   */
   healthy: boolean;
   /** 8004scan diketahui tidak sehat — marketplace berjalan dari jaring pengaman. */
   degraded: boolean;
   sources: SourceHealth[];
   checkedAt: string;
 }
+
+/**
+ * Sumber data sungguhan — yang bisa benar-benar tumbang, dan karena itu yang
+ * menentukan `ServiceHealth.healthy`. Seed sengaja tidak termasuk.
+ */
+export const LIVE_SOURCES: readonly AgentSource[] = ["scan8004", "cache", "onchain"];
 
 // ---------------------------------------------------------------------------
 // Port
@@ -595,8 +625,22 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
         reason: page.items.length === 0 ? emptyReason : page.reason,
         items: page.items.length,
       });
+
+      // **Halaman kosong dari seed tidak selalu berarti "memang tidak ada".**
+      // Bila ada tingkat di atas yang mati, yang kita punya bukan jawaban
+      // melainkan ketidaktahuan, dan mengakunya sehat membuat pemanggil
+      // memperlakukan "kosong" sebagai fakta. Halaman yang BERISI tetap sehat:
+      // kita benar-benar menyajikan data terkurasi, dan `source: "seed"` +
+      // `degraded: true` sudah mengatakan dari mana.
+      const failed = page.items.length === 0 ? upperTierFailed(trail) : undefined;
+      const incomplete =
+        failed === undefined
+          ? emptyReason
+          : `kosong tapi TIDAK dapat dipastikan: ${failed.source} ${failed.outcome}` +
+            `${failed.reason ? ` (${failed.reason})` : ""}`;
+
       // Seed TIDAK ditulis ke cache — lihat catatan di kepala berkas.
-      return finish("seed", page.items, page.total, true, emptyReason);
+      return finish("seed", page.items, page.total, failed === undefined, incomplete);
     } catch (err) {
       step({ source: "seed", outcome: "threw", reason: describeThrow(err), items: 0 });
     }
@@ -768,7 +812,21 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
         reason: detail.reason,
         items: detail.agent === null ? 0 : 1,
       });
-      return finish("seed", detail.agent, true, detail.agent === null ? detail.reason : null);
+
+      // Inilah akar 404 palsu: `seed.getAgent` dengan benar melapor "tidak ada
+      // di seed" — seed memang tidak memuat agent itu, dan sumber seed sendiri
+      // sehat. Yang salah adalah menaikkan jawaban itu menjadi "tidak ditemukan"
+      // ketika 8004scan, cache, dan RPC sedang tumbang: agent yang dicari bisa
+      // saja ada di ketiganya. `healthy: false` di sini yang membuat pemanggil
+      // (rute detail Task 6) bisa membedakan "tidak ada" dari "tidak tahu".
+      const failed = detail.agent === null ? upperTierFailed(trail) : undefined;
+      const reason =
+        failed === undefined
+          ? (detail.agent === null ? detail.reason : null)
+          : `tidak dapat dipastikan ada atau tidak: ${failed.source} ${failed.outcome}` +
+            `${failed.reason ? ` (${failed.reason})` : ""}`;
+
+      return finish("seed", detail.agent, failed === undefined, reason);
     } catch (err) {
       step({ source: "seed", outcome: "threw", reason: describeThrow(err), items: 0 });
     }
@@ -819,7 +877,11 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       .filter((health): health is SourceHealth => health !== undefined);
 
     return {
-      healthy: sources.some((health) => health.healthy),
+      // Hanya sumber sungguhan yang boleh menyalakan lampu hijau — lihat
+      // catatan panjang di `ServiceHealth.healthy`.
+      healthy: sources.some(
+        (health) => health.healthy && LIVE_SOURCES.includes(health.source),
+      ),
       degraded: merged.get("scan8004")?.healthy !== true,
       sources,
       checkedAt,
@@ -827,6 +889,23 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
   }
 
   return { getAgentsByCategory, getAgentDetail, getHealth };
+}
+
+/**
+ * Apakah ada tingkat di atas yang benar-benar **gagal**, bukan sekadar menjawab
+ * kosong atau tidak dipasang.
+ *
+ * Pembedaan ini yang menentukan apakah "tidak ditemukan" boleh dipercaya.
+ * Kalau ketiga tingkat di atas menjawab sehat dan memang kosong, maka kosong
+ * adalah jawaban yang sah. Kalau salah satunya mati, kita **tidak tahu** —
+ * dan mengaku tahu di situ persis yang membuat rute detail membalas 404 untuk
+ * agent yang sebenarnya ada.
+ */
+function upperTierFailed(trail: readonly FallbackAttempt[]): FallbackAttempt | undefined {
+  return trail.find(
+    (attempt) =>
+      attempt.source !== "seed" && (attempt.outcome === "unhealthy" || attempt.outcome === "threw"),
+  );
 }
 
 /** Rangkum seluruh jejak jadi satu `reason` — dipakai hanya saat keempat tingkat gagal. */

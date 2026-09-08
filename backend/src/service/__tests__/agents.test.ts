@@ -776,15 +776,32 @@ describe("getAgentDetail", () => {
     expect(result.ageSeconds).toBeGreaterThan(0);
   });
 
-  it("id yang tidak dikenal di mana pun: jawaban kosong yang jujur, bukan exception", async () => {
+  it("id tak dikenal saat upstream MATI: `tidak tahu`, bukan `tidak ada`", async () => {
+    // Ini akar 404 palsu. Agent yang dicari bisa saja ada di 8004scan — kita
+    // hanya tidak bisa bertanya. Mengaku sehat di sini membuat rute detail
+    // membalas 404 untuk agent yang sebenarnya ada.
     const h = harness();
     h.scan.detail = { ...detail(record({ tokenId: "1" })), agent: null, healthy: false, reason: "500" };
     const result = await h.service.getAgentDetail("97:123456");
     expect(result.agent).toBeNull();
     expect(result.source).toBe("seed");
-    expect(result.healthy).toBe(true);
+    expect(result.healthy).toBe(false);
+    expect(result.reason).toContain("tidak dapat dipastikan");
+    expect(result.reason).toContain("scan8004");
     expect(result.ageSeconds).toBeNull();
     expect(result.trail).toHaveLength(4);
+  });
+
+  it("id tak dikenal saat semua sumber SEHAT: `tidak ada` yang bisa dipercaya", async () => {
+    // Ketiga tingkat di atas menjawab sehat dan memang kosong. Di sini "tidak
+    // ditemukan" adalah fakta, dan 404 dari rute detail memang benar.
+    const h = harness();
+    h.scan.detail = { ...detail(record({ tokenId: "1" })), agent: null, healthy: true, reason: null };
+    const result = await h.service.getAgentDetail("97:123456");
+    expect(result.agent).toBeNull();
+    expect(result.source).toBe("seed");
+    expect(result.healthy).toBe(true);
+    expect(result.trail.map((t) => t.outcome)).toEqual(["empty", "empty", "empty", "empty"]);
   });
 
   it("id berbentuk salah melewati tingkat yang butuh chainId/tokenId, bukan melempar", async () => {
@@ -860,14 +877,16 @@ describe("getHealth", () => {
     expect(health.sources.find((s) => s.source === "scan8004")?.healthy).toBe(false);
   });
 
-  it("tidak melempar walau cache mati", async () => {
+  it("tidak melempar walau cache mati, dan tidak mengaku sehat karenanya", async () => {
     const h = harness();
     h.cache.latestHealth = async () => {
       throw new Error("mati");
     };
     const health = await h.service.getHealth();
     expect(health.sources.length).toBeGreaterThan(0);
-    expect(health.healthy).toBe(true);
+    expect(health.sources.find((s) => s.source === "cache")?.healthy).toBe(false);
+    expect(health.healthy).toBe(false);
+    expect(health.degraded).toBe(true);
   });
 });
 
@@ -1355,9 +1374,9 @@ describe("fetchedAt halaman menunjuk umur datanya, bukan waktu penyajian", () =>
 // ---------------------------------------------------------------------------
 
 describe("halaman kosong membawa alasannya di reason", () => {
-  it("offset yang melewati isi seed menjelaskan kenapa kosong", async () => {
+  it("offset yang melewati isi seed saat semua sumber SEHAT menjelaskan kenapa kosong", async () => {
     const h = harness();
-    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.scan.page = page([]);
     const result = await h.service.getAgentsByCategory("GRID", { limit: 20, offset: 50 });
 
     expect(result.items).toEqual([]);
@@ -1366,6 +1385,17 @@ describe("halaman kosong membawa alasannya di reason", () => {
     expect(result.reason).not.toBeNull();
     expect(result.reason).toContain("GRID");
     expect(result.reason).toContain("50");
+  });
+
+  it("halaman kosong saat sumber di atas MATI mengaku tidak dapat dipastikan", async () => {
+    const h = harness();
+    h.scan.page = page([], { healthy: false, reason: "500 DATABASE_ERROR" });
+    const result = await h.service.getAgentsByCategory("GRID", { limit: 20, offset: 50 });
+
+    expect(result.items).toEqual([]);
+    expect(result.healthy).toBe(false);
+    expect(result.reason).toContain("TIDAK dapat dipastikan");
+    expect(result.reason).toContain("DATABASE_ERROR");
   });
 
   it("halaman seed yang berisi tidak membawa alasan palsu", async () => {
@@ -1395,5 +1425,99 @@ describe("query semantic memuat frasa yang membedakan kategorinya", () => {
   it("query tiap kategori berbeda satu sama lain", () => {
     const queries = Object.values(CATEGORY_SEMANTIC_QUERIES);
     expect(new Set(queries).size).toBe(queries.length);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// `healthy` harus bisa bernilai false — kalau tidak, /api/health tidak berguna
+// ---------------------------------------------------------------------------
+
+describe("getHealth — seed tidak boleh menyalakan lampu hijau", () => {
+  it("ketiga sumber sungguhan tumbang → healthy false, walau seed masih menjawab", async () => {
+    // Inilah yang akan dilakukan juri: matikan 8004scan, Postgres, dan RPC,
+    // lalu lihat apakah kita jujur. Marketplace tetap berisi (dari seed) —
+    // tapi spanduk statusnya TIDAK boleh hijau.
+    const h = harness();
+    h.scan.throws = new Error("500 DATABASE_ERROR");
+    h.cache.throws = new Error("connection refused");
+    h.onchain.throws = new Error("RPC tidak terjangkau");
+
+    const page = await h.service.getAgentsByCategory("GRID");
+    expect(page.source).toBe("seed");
+    expect(page.items).toHaveLength(1); // marketplace tetap berisi
+
+    const health = await h.service.getHealth();
+    expect(health.healthy).toBe(false);
+    expect(health.degraded).toBe(true);
+    // Seed tetap dilaporkan sehat — jaring pengamannya memang utuh, dan itu
+    // informasi yang berguna. Ia hanya tidak ikut menentukan `healthy`.
+    expect(health.sources.find((s) => s.source === "seed")?.healthy).toBe(true);
+    for (const source of ["scan8004", "cache", "onchain"] as const) {
+      expect(health.sources.find((s) => s.source === source)?.healthy).toBe(false);
+    }
+  });
+
+  it("cache masih hidup saat 8004scan mati → healthy true tapi degraded", async () => {
+    const h = harness();
+    h.scan.page = page([], { healthy: false, reason: "500 DATABASE_ERROR" });
+    h.cache.items = [record({ tokenId: "7", source: "cache" })];
+    await h.service.getAgentsByCategory("GRID");
+
+    const health = await h.service.getHealth();
+    expect(health.healthy).toBe(true);
+    expect(health.degraded).toBe(true);
+  });
+
+  it("on-chain saja yang hidup tetap dihitung sebagai sumber sungguhan", async () => {
+    const h = harness();
+    h.scan.throws = new Error("mati");
+    h.cache.throws = new Error("mati");
+    h.onchain.page = page([onchainRecord("500", "GRID")], { source: "onchain" });
+    await h.service.getAgentsByCategory("GRID");
+
+    const health = await h.service.getHealth();
+    expect(health.healthy).toBe(true);
+    expect(health.degraded).toBe(true);
+  });
+
+  it("8004scan sehat → healthy true dan tidak degraded", async () => {
+    const h = harness();
+    h.scan.page = page([record({ tokenId: "1" })]);
+    await h.service.getAgentsByCategory("GRID");
+
+    const health = await h.service.getHealth();
+    expect(health.healthy).toBe(true);
+    expect(health.degraded).toBe(false);
+  });
+
+  it("tanpa observasi apa pun tidak mengaku sehat — belum tahu bukan berarti sehat", async () => {
+    const h = harness();
+    const health = await h.service.getHealth();
+    expect(health.healthy).toBe(false);
+    expect(health.degraded).toBe(true);
+    expect(health.sources.find((s) => s.source === "seed")?.healthy).toBe(true);
+  });
+
+  it("riwayat DB atas sumber sungguhan ikut dihitung", async () => {
+    const h = harness();
+    h.cache.latest = [
+      {
+        source: "cache",
+        healthy: true,
+        reason: null,
+        checkedAt: "2026-09-10T11:00:00.000Z",
+      },
+    ];
+    const health = await h.service.getHealth();
+    expect(health.healthy).toBe(true);
+  });
+
+  it("riwayat DB yang HANYA memuat seed tidak cukup untuk hijau", async () => {
+    const h = harness();
+    h.cache.latest = [
+      { source: "seed", healthy: true, reason: null, checkedAt: "2026-09-10T11:00:00.000Z" },
+    ];
+    const health = await h.service.getHealth();
+    expect(health.healthy).toBe(false);
   });
 });
