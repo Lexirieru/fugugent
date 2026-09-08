@@ -68,6 +68,7 @@ Model chosen: **`openai/gpt-5.6-luna`** (cheap).
   (not a cold start).
 
 **Implication:** this model must NOT sit on an agent's critical path. This validates
-decision #13 (financial decisions are deterministic, the LLM is only for explanations
-and research): explanations are produced asynchronously after the action has been
+the project's first binding rule — financial decisions are deterministic, the LLM is
+only for explanations and research (`CLAUDE.md` rule 1; this table holds 10 decisions,
+so the "#13" this paragraph used to cite never existed): explanations are produced asynchronously after the action has been
 executed, so 45 seconds of latency never delays protecting a user's position.

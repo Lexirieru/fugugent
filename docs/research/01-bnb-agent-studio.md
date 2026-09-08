@@ -664,7 +664,7 @@ recipes/runtimes/azure-foundry/   (same)
 Verified by a research sub-agent; confidence varies — **re-check before hardcoding**.
 
 **PancakeSwap v3** ✅
-- `NonfungiblePositionManager` (BSC 56): `0x46A15B0b27311cedF172ab29E4f4766fbE7F4364`
+- `NonfungiblePositionManager` (BSC 56): `0x46A15B0b27311cedF172AB29E4f4766fbE7F4364`
 - Official agent-specific guide: https://docs.pancakeswap.finance/trading-tools/building-trading-agents-on-pancakeswap-v3
 - Developer portal: https://developer.pancakeswap.finance/
 - 🟡 Subgraph endpoint: **sources conflict** (two different subgraph IDs found). For the hackathon it is safer to read LP positions directly on-chain via `positions(tokenId)`.

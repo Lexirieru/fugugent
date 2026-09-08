@@ -12,7 +12,7 @@ Domain: `hellofugu.xyz` (landing, sudah dibeli) · `app.hellofugu.xyz` (marketpl
 | File | Isi |
 |---|---|
 | `docs/specs/2026-09-08-fugugent-design.md` | Spec arsitektur — **otoritas yang mengikat** |
-| `docs/research/00-decisions.md` | 13 keputusan terkunci + hasil uji dGrid |
+| `docs/research/00-decisions.md` | 10 keputusan terkunci + hasil uji dGrid |
 | `docs/setup/ENVIRONMENT.md` | Kredensial, alamat kontrak terverifikasi, konstanta jaringan |
 | `docs/plans/` | Rencana implementasi per subsistem |
 | `docs/research/01`–`06` | Riset terverifikasi (Agent Studio, HelloMinds, Altana, 8004scan, kompetitor, strategi) |
