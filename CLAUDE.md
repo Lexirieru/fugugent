@@ -21,7 +21,7 @@ Domain: `fugugent.xyz` (landing) · `app.fugugent.xyz` (marketplace) · `api.fug
 | Folder | Isi | Status |
 |---|---|---|
 | `contracts/` | 4 kontrak UUPS (Foundry) | dikerjakan |
-| `ai/` | 4 agent Fugu (BNB Agent Studio, wallet Altana) | belum |
+| `ai/` | 4 agent Fugu (BNB Agent Studio, wallet Altana) | Guardian: lapisan strategi + eksekusi terbukti on-chain; 3 agent lain baru scaffold + session key |
 | `backend/` | Hono + Postgres + Redis: BFF, indexer, classifier, scheduler | belum |
 | `frontend/` | Next.js 16 marketplace | scaffold |
 | `landingpage/` | Next.js 16 landing | scaffold |

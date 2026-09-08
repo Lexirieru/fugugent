@@ -3,9 +3,12 @@
  *
  * Skrip ini TIDAK berisi logika strategi apa pun. Seluruh keputusan, batas
  * belanja, dan penjelasan datang dari modul yang sudah ada dan sudah diuji:
- * `createTestnetReader`, `decide` (lewat `runGuardCycle`), `executeDecision`,
- * dan `explainDecision` diimpor apa adanya. Yang ditambahkan di sini hanya
- * tiga hal yang memang milik sebuah skrip E2E:
+ * `createGuardian` (yang di dalamnya `createTestnetReader`, `decide`,
+ * `executeDecision`, `createSessionSendRepay`, dan konversi satuan) diimpor apa
+ * adanya. Sejak Task 9 skrip ini tidak lagi merakit rantai itu sendiri: seluruh
+ * perakitan tinggal di `src/strategy/createGuardian.ts`, dan yang dipanggil di
+ * sini persis composition root yang akan dipakai backend. Yang ditambahkan di
+ * sini hanya tiga hal yang memang milik sebuah skrip E2E:
  *
  *   1. memuat rahasia dari .env (tidak pernah mencetaknya),
  *   2. mengirim transaksi sungguhan (`setAnswer`, `approve`, `repay`),
@@ -18,7 +21,7 @@
  * `setAnswer` (menurunkan lalu memulihkan harga) ditandatangani **EOA deployer**
  * — ia pemilik feed, dan menurunkan harga memang peran "pasar", bukan peran
  * agent. `approve` + `repay` ditandatangani **session key Altana ber-batas**
- * atas wallet `0xbdc69c2d…`, lewat `createSessionSendRepay`. Session key itu
+ * atas wallet `0xbdc69c2d…`, lewat `createGuardian`/`createSessionSendRepay`. Session key itu
  * hanya boleh memanggil dua selector di dua kontrak, dengan spend cap dan
  * expiry yang ditegakkan kontrak akun Altana di rantai — bukan oleh kode ini.
  * Buktinya diperiksa di LANGKAH 5, dan ada dua bagian: (a) `Repay.user` pada
@@ -70,7 +73,6 @@ import {
   assertBoundedAllowlist,
   assertNativeSpendCap,
   assertSessionDenial,
-  createSessionSendRepay,
   requiredSessionCalls,
   type SessionPermissions,
 } from "../src/strategy/chain/session.js";
@@ -78,15 +80,12 @@ import {
   createTestnetReader,
   DEFAULT_BSC_TESTNET_RPC_URL,
   MOCK_LENDING_POOL_ADDRESS,
-} from "../src/strategy/chain/testnet.js";
-import { decide } from "../src/strategy/decide.js";
-import { runGuardCycle, type ExecuteFn, type Logger } from "../src/strategy/guard.js";
-import {
-  executeDecision,
   REPAY_ASSET_ADDRESS,
-  type ExecuteLimits,
-  type ExecuteState,
-} from "../src/strategy/execute.js";
+} from "../src/strategy/chain/testnet.js";
+import { createGuardian } from "../src/strategy/createGuardian.js";
+import { decide } from "../src/strategy/decide.js";
+import { type Logger } from "../src/strategy/guard.js";
+import { type ExecuteLimits } from "../src/strategy/execute.js";
 import { explainDecision } from "../src/strategy/explain.js";
 import { computeHealthFactor } from "../src/strategy/healthFactor.js";
 import { formatHf, formatUsd8 } from "../src/strategy/format.js";
@@ -157,19 +156,6 @@ const PRICE_FEED_ABI = [
 
 const POOL_ABI = [
   {
-    type: "function",
-    name: "assets",
-    stateMutability: "view",
-    inputs: [{ name: "asset", type: "address" }],
-    outputs: [
-      { name: "feed", type: "address" },
-      { name: "ltvBps", type: "uint16" },
-      { name: "liquidationThresholdBps", type: "uint16" },
-      { name: "tokenDecimals", type: "uint8" },
-      { name: "enabled", type: "bool" },
-    ],
-  },
-  {
     // Dipakai HANYA untuk bacaan tertambat blok (lihat `posisiPadaBlok`), sebagai
     // jangkar independen terhadap `readAavePosition`. Tidak ada logika yang
     // diduplikasi: yang dibaca fungsi view yang sama persis, lalu HASILNYA
@@ -187,16 +173,10 @@ const POOL_ABI = [
       { name: "healthFactor", type: "uint256" },
     ],
   },
-  {
-    type: "function",
-    name: "repay",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "asset", type: "address" },
-      { name: "amount", type: "uint256" },
-    ],
-    outputs: [],
-  },
+  // CATATAN: definisi `repay` SENGAJA tidak ada di sini. Satu-satunya sumber
+  // selector repay adalah `chain/session.ts`, yang memakai konstanta yang sama
+  // untuk allowlist DAN untuk memanggil. Salinan kedua di skrip ini akan
+  // membuat keduanya bisa menyimpang tanpa ada yang memperingatkan.
 ] as const;
 
 /** Event `Repay` pool — sumber tunggal untuk membuktikan SIAPA yang membayar. */
@@ -683,109 +663,53 @@ async function main(pemulihan: Pemulihan): Promise<void> {
   // --- 5. Satu siklus Guardian ---------------------------------------------
   judul("LANGKAH 3 — Satu siklus Guardian (decide → execute → explain)");
 
-  // Konfigurasi aset dibaca dari pool, bukan diasumsikan: dari sini datang
-  // desimal token dan feed harganya, yang dipakai mengubah USD basis 8 desimal
-  // (satuan `executeDecision`) menjadi satuan token mUSD.
-  const [feedRepay, , , desimalRepay, aktifRepay] = await publicClient.readContract({
-    address: MOCK_LENDING_POOL_ADDRESS,
-    abi: POOL_ABI,
-    functionName: "assets",
-    args: [REPAY_ASSET_ADDRESS],
-  });
-  wajib(aktifRepay, `Aset repay ${REPAY_ASSET_ADDRESS} tidak aktif di pool.`);
-
-  const [, hargaRepayRaw] = await publicClient.readContract({
-    address: feedRepay,
-    abi: PRICE_FEED_ABI,
-    functionName: "latestRoundData",
-  });
-  wajib(
-    hargaRepayRaw > 0n,
-    `Harga aset repay tidak masuk akal: ${formatUsd8(hargaRepayRaw)} (${hargaRepayRaw}).`,
-  );
-  const hargaRepay = hargaRepayRaw;
-  console.log(`Aset repay: desimal=${desimalRepay}, harga=${formatUsd8(hargaRepay)}, feed=${feedRepay}`);
-
   /** Tx repay yang benar-benar terkirim; dicatat untuk dicocokkan dengan hasil siklus. */
   const txRepayTercatat: TxTerkirim[] = [];
 
   /**
    * Toleransi pembulatan untuk mencocokkan jumlah, dalam satuan basis 8 desimal.
    * 2 unit = $0,00000002. Diperlukan karena ada DUA pembulatan ke bawah yang
-   * saling bebas: USD8 → unit token di `sendRepay`, dan unit token → USD8 di
-   * `MockLendingPool._valueUsd8`. Masing-masing kehilangan kurang dari satu
-   * unit, jadi selisih maksimum yang sah adalah 2. Lebih besar dari itu berarti
-   * konversinya memang salah, bukan sekadar dibulatkan.
+   * saling bebas: USD8 → unit token di `usd8ToTokenUnits`, dan unit token →
+   * USD8 di `MockLendingPool._valueUsd8`. Masing-masing kehilangan kurang dari
+   * satu unit, jadi selisih maksimum yang sah adalah 2. Lebih besar dari itu
+   * berarti konversinya memang salah, bukan sekadar dibulatkan.
    */
   const TOLERANSI_USD8 = 2n;
 
   /** Receipt transaksi `repay` yang benar-benar mendarat; dipakai membuktikan pengirimnya. */
   let receiptRepay: RelayResult["receipt"] = null;
 
-  /**
-   * Konversi satuan — SATU-SATUNYA bagian "jembatan" yang tetap tinggal di
-   * skrip ini. `createSessionSendRepay` sengaja tidak mengurusnya: modul itu
-   * hanya menandatangani dan mengirim, sementara desimal token, harga feed,
-   * dan pemeriksaan bolak-balik adalah urusan skenario ini.
-   */
-  const toTokenUnits = async (asset: `0x${string}`, amountUsd8: bigint): Promise<bigint> => {
-    const jumlahToken = (amountUsd8 * 10n ** BigInt(desimalRepay)) / hargaRepay;
-    console.log(
-      `\n  sendRepay: ${formatUsd8(amountUsd8)} → ${jumlahToken} unit token (${desimalRepay} desimal)`,
-    );
-    wajib(
-      jumlahToken > 0n,
-      `Konversi jumlah repay menghasilkan nol unit token dari ${formatUsd8(amountUsd8)} (${amountUsd8}).`,
-    );
-
-    // Konversi diperiksa BOLAK-BALIK sebelum sepeser pun dikirim. Inilah tempat
-    // kesalahan satu orde bisa masuk tanpa terlihat: kalau `desimalRepay`
-    // terbaca 17, atau `hargaRepay` datang dari feed yang salah, agent membayar
-    // sepersepuluh dari yang dilaporkannya — hutang tetap berkurang, HF tetap
-    // naik, dan tanpa pemeriksaan ini semua assert lain tetap lolos.
-    const balikanUsd8 = (jumlahToken * hargaRepay) / 10n ** BigInt(desimalRepay);
-    const selisihBalikan =
-      balikanUsd8 > amountUsd8 ? balikanUsd8 - amountUsd8 : amountUsd8 - balikanUsd8;
-    wajib(
-      selisihBalikan <= TOLERANSI_USD8,
-      `Konversi USD→token tidak bolak-balik: ${formatUsd8(amountUsd8)} → ${jumlahToken} unit → ` +
-        `${formatUsd8(balikanUsd8)} (selisih ${selisihBalikan} unit basis 8 desimal, ` +
-        `maksimum ${TOLERANSI_USD8}). Desimal atau feed harga aset repay kemungkinan salah.`,
-    );
-
-    const saldo = await publicClient.readContract({
-      address: asset,
-      abi: ERC20_ABI,
-      functionName: "balanceOf",
-      args: [posisiAkun],
-    });
-    wajib(
-      saldo >= jumlahToken,
-      `Saldo token repay kurang: ${saldo} unit < ${jumlahToken} unit yang dibutuhkan.`,
-    );
-
-    return jumlahToken;
+  const logger: Logger = {
+    info: (m, meta) => console.log(`  [guard] ${m}${meta ? ` ${JSON.stringify(meta, (_k, v) => (typeof v === "bigint" ? v.toString() : v))}` : ""}`),
+    error: (m, meta) => console.error(`  [guard] ERROR ${m}${meta ? ` ${JSON.stringify(meta, (_k, v) => (typeof v === "bigint" ? v.toString() : v))}` : ""}`),
   };
 
   /**
-   * Penanda tangan repay: **session key Altana ber-batas**, bukan EOA deployer.
-   * `createSessionSendRepay` memeriksa allowlist sesi lebih dulu dan menolak
-   * berjalan sama sekali kalau `calls`-nya kosong/hilang (= izin tanpa batas
-   * di Altana) atau lebih luas daripada `repay` + `approve`.
+   * SELURUH perakitan rantai sekarang datang dari `createGuardian` di `src/`,
+   * bukan dirakit ulang di skrip ini.
+   *
+   * Sampai putaran sebelumnya lima potongan hanya hidup di sini — konversi
+   * USD8 → unit token, pembacaan `assets()` + feed, cek saldo, pembuatan
+   * `ExecuteState` awal, dan penyusunan `sendRepay` — sehingga runtime
+   * berikutnya (backend) mau tidak mau akan menyalinnya dari sebuah skrip demo.
+   * Sekarang yang tinggal di skrip ini hanya tiga hal yang memang miliknya:
+   * memuat rahasia, mengirim transaksi harga, dan MEMBUKTIKAN klaimnya.
+   *
+   * `sendCalls` tetap disuntikkan dari sini karena ia jalur relay Altana (SDK
+   * pihak ketiga), dan pembungkusnya di bawah adalah tempat E2E menangkap
+   * receipt yang dipakai LANGKAH 5 untuk membuktikan siapa yang membayar.
    */
-  const sendRepay = createSessionSendRepay({
-    walletAddress: posisiAkun,
+  const guardian = await createGuardian({
+    account: posisiAkun,
+    client: publicClient,
     pool: MOCK_LENDING_POOL_ADDRESS,
     repayAsset: REPAY_ASSET_ADDRESS,
     permissions: izinSesi,
-    toTokenUnits,
-    readAllowance: (asset, owner, spender) =>
-      publicClient.readContract({
-        address: asset,
-        abi: ERC20_ABI,
-        functionName: "allowance",
-        args: [owner, spender],
-      }),
+    limits: LIMITS,
+    logger,
+    explainDecision,
+    now: () => Math.floor(Date.now() / 1000),
+    log: (pesan) => console.log(`  ${pesan}`),
     sendCalls: async (calls, description) => {
       const hasil = await kirimSesi(
         calls.map((call) => ({
@@ -813,39 +737,19 @@ async function main(pemulihan: Pemulihan): Promise<void> {
       }
       return { transactionHash: hasil.transactionHash, status: hasil.status };
     },
-    log: (pesan) => console.log(`  ${pesan}`),
   });
 
-  const sekarang = () => Math.floor(Date.now() / 1000);
-  const stateAwal: ExecuteState = {
-    spentTodayUsd8: 0n,
-    dayStartedAt: sekarang(),
-    lastActionAt: 0,
-    killed: false,
-  };
-
-  // `executeDecision` dipakai apa adanya; hanya `limits` dan `deps` yang
-  // di-partial-apply — `state` tetap mengalir eksplisit dari runGuardCycle.
-  const execFn: ExecuteFn = (decision, pos, state) =>
-    executeDecision(decision, pos, LIMITS, state, { sendRepay, now: sekarang });
-
-  const logger: Logger = {
-    info: (m, meta) => console.log(`  [guard] ${m}${meta ? ` ${JSON.stringify(meta, (_k, v) => (typeof v === "bigint" ? v.toString() : v))}` : ""}`),
-    error: (m, meta) => console.error(`  [guard] ERROR ${m}${meta ? ` ${JSON.stringify(meta, (_k, v) => (typeof v === "bigint" ? v.toString() : v))}` : ""}`),
-  };
+  console.log(
+    `Aset repay: desimal=${guardian.repayAsset.tokenDecimals}, feed=${guardian.repayAsset.feed}`,
+  );
+  console.log(
+    "  ✔ desimal aset dicocokkan antara konfigurasi pool dan kontrak tokennya sendiri, dan " +
+      "feed dituntut 8 desimal — dua sumber berbeda, bukan cek bolak-balik yang membandingkan " +
+      "sebuah angka dengan dirinya sendiri.",
+  );
 
   const t0 = Date.now();
-  const outcome = await runGuardCycle(
-    {
-      account: posisiAkun,
-      readPosition: reader.readPosition,
-      executeDecision: execFn,
-      explainDecision,
-      now: sekarang,
-      logger,
-    },
-    stateAwal,
-  );
+  const outcome = await guardian.runOnce();
   const durasi = Date.now() - t0;
 
   const hasil = outcome.result;
@@ -878,6 +782,14 @@ async function main(pemulihan: Pemulihan): Promise<void> {
   wajib(
     outcome.nextExecuteState.spentTodayUsd8 === hasil.amountSentUsd8,
     "Anggaran harian tidak bertambah sebesar jumlah yang dikirim.",
+  );
+  // Pembukuan C2 pada jalur SUNGGUHAN: repay yang selesai dengan hash tidak
+  // boleh meninggalkan catatan menggantung. Kalau ia tertinggal, siklus
+  // berikutnya akan menolak bertindak — kegagalan yang aman, tapi tetap salah.
+  wajib(
+    outcome.nextExecuteState.pendingRepay === null,
+    `Repay sudah selesai dengan hash ${hasil.txHash} tetapi catatan menggantung masih ada; ` +
+      "pembukuan idempotensi tidak dibereskan.",
   );
 
   // --- 5b. Siapa yang sebenarnya membayar ----------------------------------

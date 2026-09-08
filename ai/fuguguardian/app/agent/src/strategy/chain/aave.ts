@@ -32,7 +32,7 @@ const AAVE_POOL_ABI = [
 ] as const;
 
 /**
- * Membaca posisi Aave v3 satu akun pada blok terbaru mainnet.
+ * Membaca posisi Aave v3 satu akun, DITAMBATKAN ke satu tinggi blok.
  * `healthFactor` dinormalkan menjadi null bila sentinel 2^256-1 ATAU
  * tidak ada hutang sama sekali — seluruh lapisan strategi memperlakukan
  * null sebagai "tidak ada risiko", bukan angka besar yang harus dibandingkan.
@@ -61,18 +61,29 @@ export async function readAavePosition(
     throw new PositionError("Client viem tidak memiliki konfigurasi chain.");
   }
 
-  const [
-    [totalCollateralBase, totalDebtBase, , currentLiquidationThreshold, , healthFactorRaw],
-    blockNumber,
-  ] = await Promise.all([
-    client.readContract({
+  // Blok diambil LEBIH DULU, lalu bacaannya ditambatkan ke blok itu.
+  //
+  // Sebelumnya keduanya ditembakkan sebagai dua panggilan RPC independen di
+  // dalam `Promise.all`: `readContract` pada blok "latest" menurut node yang
+  // melayaninya, dan `getBlockNumber()` terpisah. Keduanya bisa jatuh di sisi
+  // berlawanan dari sebuah blok baru, sehingga `Position.blockNumber` hanya
+  // kira-kira blok datanya. Untuk E2E itu tidak terlihat (ia menambatkan
+  // bacaannya sendiri), tetapi indexer backend yang mewarisi adapter ini akan
+  // mencatat "blok X melaporkan hutang Y" yang meleset satu blok — bug diam
+  // yang tidak punya gejala sampai ada yang merekonsiliasi angkanya.
+  //
+  // Harganya satu panggilan RPC berurutan, bukan paralel. Node yang belum punya
+  // blok itu MELEMPAR ("header not found") alih-alih diam-diam menjawab dari
+  // masa lalu — arah kegagalan yang benar.
+  const blockNumber = await client.getBlockNumber();
+  const [totalCollateralBase, totalDebtBase, , currentLiquidationThreshold, , healthFactorRaw] =
+    await client.readContract({
       address: poolAddress,
       abi: AAVE_POOL_ABI,
       functionName: "getUserAccountData",
       args: [account],
-    }),
-    client.getBlockNumber(),
-  ]);
+      blockNumber,
+    });
 
   const healthFactor =
     healthFactorRaw === HF_SENTINEL_NO_DEBT || totalDebtBase === 0n ? null : healthFactorRaw;

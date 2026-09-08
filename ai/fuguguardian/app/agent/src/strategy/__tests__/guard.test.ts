@@ -17,6 +17,7 @@ import {
 import type { Decision, Position } from "../types.js";
 
 const ACCOUNT = "0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E" as const;
+const REPAY_ASSET = "0x932E82632E80b06318ca969e33F99A54F1a04b10" as const;
 
 const SAFE_POSITION: Position = {
   protocol: "aave",
@@ -62,6 +63,7 @@ function execState(overrides: Partial<ExecuteState> = {}): ExecuteState {
     dayStartedAt: 1_000_000,
     lastActionAt: 0,
     killed: false,
+    pendingRepay: null,
     ...overrides,
   };
 }
@@ -200,7 +202,7 @@ describe("runGuardCycle", () => {
 
   it("aksi NONE tidak pernah memanggil sendRepay (lewat executeDecision asli)", async () => {
     const sendRepay = vi.fn(async () => "0xabc" as `0x${string}`);
-    const execDeps: ExecuteDeps = { sendRepay, now: () => 1_700_000_000 };
+    const execDeps: ExecuteDeps = { repayAsset: REPAY_ASSET, sendRepay, now: () => 1_700_000_000 };
     const execFn: ExecuteFn = (decision, pos, state) =>
       executeDecision(decision, pos, limits(), state, execDeps);
 
@@ -268,7 +270,7 @@ describe("runGuardCycle", () => {
   it("dua siklus berturut-turut dengan executeDecision asli: siklus kedua ditolak oleh cooldown/anggaran, sendRepay hanya sekali", async () => {
     const sendRepay = vi.fn(async () => "0xdeadbeef" as `0x${string}`);
     let clock = 1_700_000_000;
-    const execDeps: ExecuteDeps = { sendRepay, now: () => clock };
+    const execDeps: ExecuteDeps = { repayAsset: REPAY_ASSET, sendRepay, now: () => clock };
     const theLimits = limits({
       maxPerActionUsd8: 100_000_000_000n, // $1000
       maxPerDayUsd8: 100_000_000_000n, // $1000/hari -- habis dalam satu kirim
@@ -343,7 +345,7 @@ describe("runGuardCycle", () => {
 
   it("catatan membedakan alasan keputusan dari alasan eksekusi (kill switch menolak EMERGENCY)", async () => {
     const sendRepay = vi.fn(async () => "0xabc" as `0x${string}`);
-    const execDeps: ExecuteDeps = { sendRepay, now: () => 1_700_000_000 };
+    const execDeps: ExecuteDeps = { repayAsset: REPAY_ASSET, sendRepay, now: () => 1_700_000_000 };
     const execFn: ExecuteFn = (decision, pos, state) =>
       executeDecision(decision, pos, limits(), state, execDeps);
 
@@ -510,7 +512,7 @@ describe("startGuardLoop", () => {
     vi.useFakeTimers();
     try {
       const sendRepay = vi.fn(async () => "0xdeadbeef" as `0x${string}`);
-      const execDeps: ExecuteDeps = { sendRepay, now: () => 1_700_000_000 };
+      const execDeps: ExecuteDeps = { repayAsset: REPAY_ASSET, sendRepay, now: () => 1_700_000_000 };
       const theLimits = limits({
         maxPerActionUsd8: 100_000_000_000n, // $1000
         maxPerDayUsd8: 100_000_000_000n, // $1000/hari -- habis dalam satu kirim
@@ -603,6 +605,280 @@ describe("startGuardLoop", () => {
       await vi.advanceTimersByTimeAsync(1_000);
       expect(readPosition).toHaveBeenCalledTimes(3);
       expect(handle.getLastResult()?.ok).toBe(false);
+
+      handle.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("C2 — kegagalan setelah transaksi mendarat tidak pernah membayar dua kali", () => {
+  it("runGuardCycle meneruskan state dari RepaySendError, bukan state lama", async () => {
+    // Bentuk kegagalan yang menjadi alasan aturan ini ada: transaksinya sudah
+    // mendarat di blok, yang gagal hanya `waitForTransactionReceipt`.
+    const sendRepay = vi.fn(async () => {
+      throw new Error("waitForTransactionReceipt timeout setelah 180s");
+    });
+    const execDeps: ExecuteDeps = { repayAsset: REPAY_ASSET, sendRepay, now: () => 1_700_000_000 };
+    const execFn: ExecuteFn = (decision, pos, state) =>
+      executeDecision(decision, pos, limits({ minIntervalSeconds: 0 }), state, execDeps);
+
+    const deps = baseDeps({
+      readPosition: vi.fn(async () => EMERGENCY_POSITION),
+      executeDecision: execFn,
+    });
+
+    const { result, nextExecuteState } = await runGuardCycle(deps, execState());
+
+    expectFail(result);
+    // Anggaran DAN cooldown bergerak walau siklusnya tercatat gagal...
+    expect(nextExecuteState.spentTodayUsd8).toBeGreaterThan(0n);
+    expect(nextExecuteState.lastActionAt).toBe(1_700_000_000);
+    // ...dan repay dicatat menggantung dengan jangkar rekonsiliasinya.
+    expect(nextExecuteState.pendingRepay).not.toBeNull();
+    expect(nextExecuteState.pendingRepay?.debtBaseBeforeSend).toBe(EMERGENCY_POSITION.debtBase);
+    expect(nextExecuteState.pendingRepay?.blockNumberBeforeSend).toBe(EMERGENCY_POSITION.blockNumber);
+  });
+
+  it("INTI TASK: sendRepay melempar setelah tx mendarat -> siklus berikutnya TIDAK mengirim ulang", async () => {
+    vi.useFakeTimers();
+    try {
+      // Satu-satunya hal yang boleh menahan siklus kedua di test ini adalah
+      // catatan repay menggantung: cooldown nol, anggaran harian jauh lebih
+      // besar daripada satu pembayaran, kill switch mati, dan posisi tetap
+      // berada di zona EMERGENCY sehingga `decide` tetap meminta bayar.
+      const sendRepay = vi.fn(async () => {
+        throw new Error("waitForTransactionReceipt timeout setelah 180s");
+      });
+      const execDeps: ExecuteDeps = { repayAsset: REPAY_ASSET, sendRepay, now: () => 1_700_000_000 };
+      const theLimits = limits({
+        maxPerActionUsd8: 100_000_000_000n,
+        maxPerDayUsd8: 100_000_000_000_000n, // tak akan habis oleh satu bayaran
+        minIntervalSeconds: 0,
+      });
+      const execFn: ExecuteFn = (decision, pos, state) =>
+        executeDecision(decision, pos, theLimits, state, execDeps);
+
+      // Rantai belum menunjukkan hutang berkurang (node basi / receipt belum
+      // terlihat) — persis keadaan di mana versi lama membayar untuk kedua kalinya.
+      const deps = baseDeps({
+        readPosition: vi.fn(async () => EMERGENCY_POSITION),
+        executeDecision: execFn,
+        now: () => 1_700_000_000,
+      });
+
+      const handle = startGuardLoop(deps, 1_000, execState({ dayStartedAt: 1_700_000_000 }));
+
+      await vi.advanceTimersByTimeAsync(0);
+      expect(sendRepay).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      await vi.advanceTimersByTimeAsync(1_000);
+      // Tiga siklus, satu pengiriman. Inilah yang dibeli oleh seluruh perubahan C2.
+      expect(sendRepay).toHaveBeenCalledTimes(1);
+      expect(handle.getExecuteState().pendingRepay).not.toBeNull();
+
+      handle.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("rantai membuktikan repay mendarat -> catatan dibereskan dan Guardian boleh bertindak lagi", async () => {
+    vi.useFakeTimers();
+    try {
+      const sendRepay = vi.fn(async () => {
+        throw new Error("waitForTransactionReceipt timeout setelah 180s");
+      });
+      const execDeps: ExecuteDeps = { repayAsset: REPAY_ASSET, sendRepay, now: () => 1_700_000_000 };
+      const theLimits = limits({
+        maxPerActionUsd8: 100_000_000_000n,
+        maxPerDayUsd8: 100_000_000_000_000n,
+        minIntervalSeconds: 0,
+      });
+      const execFn: ExecuteFn = (decision, pos, state) =>
+        executeDecision(decision, pos, theLimits, state, execDeps);
+
+      // Siklus 1 membaca posisi apa adanya; siklus berikutnya membaca posisi
+      // dengan hutang yang SUDAH berkurang pada blok yang lebih baru — bukti
+      // on-chain bahwa transaksi yang tadi "gagal" sebenarnya mendarat.
+      let bacaanKe = 0;
+      const readPosition = vi.fn(async () => {
+        bacaanKe += 1;
+        if (bacaanKe === 1) return EMERGENCY_POSITION;
+        return {
+          ...EMERGENCY_POSITION,
+          blockNumber: EMERGENCY_POSITION.blockNumber + 5n,
+          debtBase: EMERGENCY_POSITION.debtBase - 10_000_000_000n,
+        };
+      });
+
+      const deps = baseDeps({ readPosition, executeDecision: execFn, now: () => 1_700_000_000 });
+      const handle = startGuardLoop(deps, 1_000, execState({ dayStartedAt: 1_700_000_000 }));
+
+      await vi.advanceTimersByTimeAsync(0);
+      expect(sendRepay).toHaveBeenCalledTimes(1);
+      expect(handle.getExecuteState().pendingRepay).not.toBeNull();
+
+      // Siklus 2: rekonsiliasi membereskan catatan, dan karena posisinya masih
+      // di zona EMERGENCY, agent boleh mencoba lagi. Guardian tidak membeku
+      // selamanya hanya karena satu receipt hilang.
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(sendRepay).toHaveBeenCalledTimes(2);
+
+      handle.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("C3 — kill switch punya tuas, dan state dipersist", () => {
+  function killDeps(sendRepay: ReturnType<typeof vi.fn>, overrides: Partial<GuardCycleDeps> = {}) {
+    const execDeps: ExecuteDeps = {
+      repayAsset: REPAY_ASSET,
+      sendRepay: sendRepay as unknown as ExecuteDeps["sendRepay"],
+      now: () => 1_700_000_000,
+    };
+    const execFn: ExecuteFn = (decision, pos, state) =>
+      executeDecision(decision, pos, limits({ minIntervalSeconds: 0 }), state, execDeps);
+    return baseDeps({
+      readPosition: vi.fn(async () => EMERGENCY_POSITION),
+      executeDecision: execFn,
+      now: () => 1_700_000_000,
+      ...overrides,
+    });
+  }
+
+  it("kill() saat loop berjalan menghentikan pengiriman siklus berikutnya", async () => {
+    vi.useFakeTimers();
+    try {
+      const sendRepay = vi.fn(async () => "0xdeadbeef" as `0x${string}`);
+      const deps = killDeps(sendRepay);
+      const handle = startGuardLoop(deps, 1_000, execState({ dayStartedAt: 1_700_000_000 }));
+
+      await vi.advanceTimersByTimeAsync(0);
+      expect(sendRepay).toHaveBeenCalledTimes(1);
+      expect(handle.isKilled()).toBe(false);
+
+      handle.kill();
+      expect(handle.isKilled()).toBe(true);
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(sendRepay).toHaveBeenCalledTimes(1);
+      const terakhir = handle.getLastResult();
+      expect(terakhir?.ok).toBe(true);
+      expect(terakhir?.ok === true ? terakhir.executeReason : "").toMatch(/kill switch/i);
+
+      handle.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("kill() di TENGAH siklus tidak bisa dibatalkan oleh hasil siklus itu", async () => {
+    vi.useFakeTimers();
+    try {
+      let lepas!: (pos: Position) => void;
+      const tertunda = new Promise<Position>((resolve) => {
+        lepas = resolve;
+      });
+      let bacaanKe = 0;
+      const readPosition = vi.fn(async () => {
+        bacaanKe += 1;
+        return bacaanKe === 1 ? tertunda : EMERGENCY_POSITION;
+      });
+      const sendRepay = vi.fn(async () => "0xdeadbeef" as `0x${string}`);
+      const deps = killDeps(sendRepay, { readPosition });
+      const handle = startGuardLoop(deps, 1_000, execState({ dayStartedAt: 1_700_000_000 }));
+
+      await vi.advanceTimersByTimeAsync(0);
+      expect(readPosition).toHaveBeenCalledTimes(1);
+
+      // Kill ditarik selagi siklus 1 masih menunggu RPC. Siklus itu akan
+      // selesai membawa state dengan `killed: false` -- state itu TIDAK boleh
+      // membatalkan kill yang sudah ditarik.
+      handle.kill();
+      lepas(EMERGENCY_POSITION);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(handle.isKilled()).toBe(true);
+      expect(handle.getExecuteState().killed).toBe(true);
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      // Siklus 1 sempat mengirim (kill datang setelah ia lewat aturan 1);
+      // siklus 2 tidak boleh mengirim sama sekali.
+      expect(sendRepay).toHaveBeenCalledTimes(1);
+
+      handle.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("saveExecuteState dipanggil setiap siklus dan saat kill()", async () => {
+    vi.useFakeTimers();
+    try {
+      const tersimpan: ExecuteState[] = [];
+      const sendRepay = vi.fn(async () => "0xdeadbeef" as `0x${string}`);
+      const deps = killDeps(sendRepay);
+      const handle = startGuardLoop(deps, 1_000, execState({ dayStartedAt: 1_700_000_000 }), {
+        saveExecuteState: (s) => {
+          tersimpan.push(s);
+        },
+      });
+
+      await vi.advanceTimersByTimeAsync(0);
+      expect(tersimpan).toHaveLength(1);
+      expect(tersimpan[0].spentTodayUsd8).toBeGreaterThan(0n);
+
+      handle.kill();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(tersimpan.at(-1)?.killed).toBe(true);
+
+      handle.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("saveExecuteState yang melempar dicatat tetapi tidak mematikan loop", async () => {
+    vi.useFakeTimers();
+    try {
+      const readPosition = vi.fn(async () => SAFE_POSITION);
+      const logger = silentLogger();
+      const deps = baseDeps({ readPosition, logger });
+      const handle = startGuardLoop(deps, 1_000, execState(), {
+        saveExecuteState: () => {
+          throw new Error("disk penuh");
+        },
+      });
+
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(1_000);
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(readPosition).toHaveBeenCalledTimes(3);
+      expect(logger.error).toHaveBeenCalled();
+
+      handle.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("state awal yang sudah killed tetap dihormati dan tidak pernah lepas", async () => {
+    vi.useFakeTimers();
+    try {
+      const sendRepay = vi.fn(async () => "0xdeadbeef" as `0x${string}`);
+      const deps = killDeps(sendRepay);
+      const handle = startGuardLoop(deps, 1_000, execState({ killed: true }));
+
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(sendRepay).not.toHaveBeenCalled();
+      expect(handle.isKilled()).toBe(true);
 
       handle.stop();
     } finally {

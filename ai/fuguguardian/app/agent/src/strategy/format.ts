@@ -15,9 +15,11 @@
  * terakhir — persis digit yang menentukan berapa rupiah/dolar dibayar.
  */
 import { HF_ONE } from "./types.js";
-
-/** 1 USD dalam basis 8 desimal Aave (`*Base`). */
-const USD8_ONE = 100_000_000n;
+// Satu sumber untuk konstanta satuan: `units.ts` sudah memilikinya karena ia
+// yang mengonversi USD8 <-> unit token. Salinan lokal di sini pernah ada dan
+// tidak boleh kembali — dua definisi "satu dolar" adalah cara paling sunyi
+// untuk membuat angka di log berbeda dari angka yang dikirim.
+import { USD8_ONE } from "./units.js";
 
 /**
  * Format health factor (basis 1e18) menjadi string dua desimal dengan koma,

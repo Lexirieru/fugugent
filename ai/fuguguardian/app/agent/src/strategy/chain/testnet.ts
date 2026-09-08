@@ -17,6 +17,18 @@ export const DEFAULT_BSC_TESTNET_RPC_URL = "https://data-seed-prebsc-1-s1.bnbcha
 /** Alamat `MockLendingPool` di BSC testnet, terverifikasi live. */
 export const MOCK_LENDING_POOL_ADDRESS = "0xb3e1F06Ac529aded2aA20aA38F4C0b4AD317e5F5" as const;
 
+/**
+ * Alamat token hutang yang dibayar Guardian di testnet: `MockTokenUSD` (mUSD),
+ * 18 desimal, satu-satunya aset hutang pada `MockLendingPool`.
+ *
+ * Rumahnya di sini, bukan di `execute.ts`. Modul eksekusi murni dan bebas I/O;
+ * sebuah alamat rantai di dalamnya mengikatnya pada satu aset di satu chain,
+ * sehingga agent kedua, protokol kedua, atau mainnet tidak bisa memakainya
+ * tanpa mengedit file. `executeDecision` sekarang menerima asetnya lewat
+ * `ExecuteDeps.repayAsset`.
+ */
+export const REPAY_ASSET_ADDRESS = "0x932E82632E80b06318ca969e33F99A54F1a04b10" as const;
+
 export interface TestnetReader {
   client: PublicClient;
   readPosition(account: `0x${string}`): Promise<Position>;

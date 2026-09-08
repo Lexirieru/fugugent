@@ -28,11 +28,17 @@
  *    antara siklus. Ini memperbaiki cacat round pertama: closure pemanggil
  *    yang "harus ingat" menyimpan `execResult.state` membuat batas harian
  *    dan cooldown mati total begitu loop berjalan lebih dari satu siklus.
+ * 4. Eksekusi yang GAGAL SETELAH menyentuh jaringan (`RepaySendError`) TETAP
+ *    memajukan state. Putaran sebelumnya mengembalikan state lama di semua
+ *    jalur gagal — benar untuk kegagalan sebelum kirim, dan berbahaya untuk
+ *    kegagalan sesudahnya: receipt yang timeout membuat anggaran dan cooldown
+ *    tidak bergerak, dan siklus berikutnya membayar lagi. Lihat catatan
+ *    lengkapnya di kepala `execute.ts`.
  */
 import { decide } from "./decide.js";
 import { formatHf, formatUsd8 } from "./format.js";
 import type { Action, Decision, Position, Thresholds } from "./types.js";
-import type { ExecuteResult, ExecuteState } from "./execute.js";
+import { RepaySendError, type ExecuteResult, type ExecuteState } from "./execute.js";
 
 export interface Logger {
   info(message: string, meta?: Record<string, unknown>): void;
@@ -240,14 +246,33 @@ export async function runGuardCycle(
     execResult = await deps.executeDecision(decision, pos, executeState);
   } catch (err) {
     const error = toMessage(err);
+    if (err instanceof RepaySendError) {
+      // Transaksinya MUNGKIN sudah mendarat — hanya pembacaan hasilnya yang
+      // gagal. State yang dibawa galat ini sudah memotong anggaran, memulai
+      // cooldown, dan mencatat repay menggantung; meneruskannya adalah
+      // satu-satunya yang mencegah siklus berikutnya membayar untuk kedua
+      // kalinya. Mengembalikan `executeState` lama di sini adalah bug C2.
+      logError(deps.logger, "guard: pengiriman repay gagal SETELAH mungkin terkirim", {
+        account: deps.account,
+        action: decision.action,
+        error,
+        catatan:
+          "anggaran dan cooldown tetap dipotong; repay dicatat menggantung sampai " +
+          "rantai menunjukkan hutang berkurang",
+      });
+      return {
+        result: { ok: false, timestamp, account: deps.account, error },
+        nextExecuteState: err.stateAfterSend,
+      };
+    }
     logError(deps.logger, "guard: eksekusi gagal, siklus dilewati", {
       account: deps.account,
       action: decision.action,
       error,
     });
-    // `execute.ts` hanya mengubah state SETELAH kirim berhasil; bila
-    // `executeDecision` melempar, tidak ada state baru untuk dipakai —
-    // state lama diteruskan apa adanya, bukan diam-diam dianggap berubah.
+    // Kegagalan yang terjadi SEBELUM apa pun menyentuh jaringan (atau sebelum
+    // `executeDecision` sempat mengirim): tidak ada yang berubah di rantai,
+    // jadi state lama diteruskan apa adanya.
     return {
       result: { ok: false, timestamp, account: deps.account, error },
       nextExecuteState: executeState,
@@ -321,9 +346,46 @@ function logCycleResult(logger: Logger, result: CycleResult): void {
   });
 }
 
+export interface GuardLoopOptions {
+  /**
+   * Menyimpan `ExecuteState` setiap kali ia berubah — setelah setiap siklus DAN
+   * segera setelah `kill()`. Disuntikkan sebagai fungsi, bukan store konkret,
+   * supaya backend bisa memasang Postgres tanpa menyentuh modul ini
+   * (`state/store.ts` menyediakan implementasi berkas JSON dan memori).
+   *
+   * Kegagalannya dicatat lewat logger dan TIDAK PERNAH menghentikan loop:
+   * disk penuh tidak boleh membuat Guardian berhenti melindungi posisi. Ia
+   * dilaporkan, bukan disembunyikan.
+   */
+  saveExecuteState?: (state: ExecuteState) => Promise<void> | void;
+}
+
 export interface GuardLoopHandle {
   /** Menghentikan loop segera. Siklus yang sedang berjalan dibiarkan selesai, tetapi tidak ada siklus baru dijadwalkan sesudahnya. */
   stop: () => void;
+  /**
+   * Kill switch sebagai TUAS SUNGGUHAN, bukan sekadar field pada state awal.
+   *
+   * Sebelum ini `killed` hanya bisa bernilai true kalau ia SUDAH true sebelum
+   * loop dimulai — tidak ada jalan menariknya selagi agent berjalan, padahal
+   * dokumen produk menyebutnya "jalan keluar user". `kill()` menutup itu:
+   * ia langsung menyetel `killed`, mempersistkannya, dan sejak saat itu setiap
+   * siklus berikutnya ditolak `executeDecision` pada aturan pertama.
+   *
+   * Ini KAIT SATU ARAH. Sebuah siklus yang sedang berjalan saat `kill()`
+   * dipanggil akan selesai dengan state yang masih `killed: false`; hasil
+   * itu TIDAK boleh membatalkan kill. Karena itu kill dicatat terpisah dan
+   * di-OR-kan ke setiap state yang masuk.
+   *
+   * `kill()` tidak menghentikan loop: pemantauan dan pencatatan tetap jalan,
+   * yang berhenti adalah pengiriman transaksi. Untuk berhenti total panggil
+   * `stop()` juga.
+   */
+  kill: () => void;
+  /** Apakah kill switch sudah ditarik. */
+  isKilled: () => boolean;
+  /** State eksekusi terkini (anggaran, cooldown, kill switch, repay menggantung). */
+  getExecuteState: () => ExecuteState;
   /** Catatan siklus terakhir yang selesai, atau `null` bila belum ada satu pun yang selesai. */
   getLastResult: () => CycleResult | null;
 }
@@ -352,6 +414,7 @@ export function startGuardLoop(
   deps: GuardCycleDeps,
   intervalMs: number,
   initialExecuteState: ExecuteState,
+  options: GuardLoopOptions = {},
 ): GuardLoopHandle {
   if (!Number.isFinite(intervalMs) || intervalMs <= 0) {
     throw new Error(
@@ -361,8 +424,27 @@ export function startGuardLoop(
 
   let stopped = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
+  // Kait kill satu arah, terpisah dari state siklus: hasil siklus yang sudah
+  // berjalan sebelum `kill()` tidak boleh mengembalikan `killed` ke false.
+  let killLatched = initialExecuteState.killed;
   let currentExecuteState = initialExecuteState;
   let lastResult: CycleResult | null = null;
+
+  function withKillLatch(state: ExecuteState): ExecuteState {
+    return killLatched && !state.killed ? { ...state, killed: true } : state;
+  }
+
+  async function persist(state: ExecuteState): Promise<void> {
+    if (!options.saveExecuteState) return;
+    try {
+      await options.saveExecuteState(state);
+    } catch (err) {
+      logError(deps.logger, "guard: gagal menyimpan state eksekusi, loop tetap berjalan", {
+        account: deps.account,
+        error: toMessage(err),
+      });
+    }
+  }
 
   function scheduleNext(): void {
     if (stopped) return;
@@ -378,8 +460,9 @@ export function startGuardLoop(
   async function tick(): Promise<void> {
     if (stopped) return;
     try {
-      const outcome = await runGuardCycle(deps, currentExecuteState);
-      currentExecuteState = outcome.nextExecuteState;
+      const outcome = await runGuardCycle(deps, withKillLatch(currentExecuteState));
+      currentExecuteState = withKillLatch(outcome.nextExecuteState);
+      await persist(currentExecuteState);
       lastResult = outcome.result;
       logCycleResult(deps.logger, outcome.result);
       if (deps.onCycle) {
@@ -407,6 +490,18 @@ export function startGuardLoop(
         timer = null;
       }
     },
+    kill: () => {
+      killLatched = true;
+      currentExecuteState = withKillLatch(currentExecuteState);
+      logInfo(deps.logger, "guard: kill switch ditarik, tidak ada transaksi baru yang dikirim", {
+        account: deps.account,
+      });
+      // Dipersist di latar: `kill()` harus langsung berlaku di memori, dan
+      // penyimpanannya tidak boleh membuat pemanggil menunggu I/O.
+      void persist(currentExecuteState);
+    },
+    isKilled: () => killLatched,
+    getExecuteState: () => currentExecuteState,
     getLastResult: () => lastResult,
   };
 }

@@ -28,13 +28,28 @@ permintaan `negotiate` dijawab **quote bertanda tangan wallet** (0,1 U, lengkap 
 `negotiation_hash` dan `provider_sig`).
 
 ### Lapisan strategi Fugu Guardian
-135 test (`cd ai/fuguguardian/app/agent && corepack pnpm test`). Rumus health factor murni
+223 test (`cd ai/fuguguardian/app/agent && corepack pnpm test`). Rumus health factor murni
 dengan pembulatan yang sengaja diarahkan ke sisi aman, mesin keputusan deterministik yang
-gagal keras pada konfigurasi cacat, adapter yang terbukti membaca Aave v3 dari BSC mainnet,
-loop pemantauan (`guard.ts`), jalur eksekusi dengan spend cap/cooldown/kill switch
-(`execute.ts`), lapisan penjelasan dGrid yang gagal dengan aman, dan penandatangan repay lewat
-session key Altana yang menolak izin sesi terlalu longgar sebelum satu transaksi pun dikirim
-(`chain/session.ts`).
+gagal keras pada konfigurasi cacat, adapter yang terbukti membaca Aave v3 dari BSC mainnet
+(bacaannya ditambatkan ke satu blok, sehingga `Position.blockNumber` benar-benar blok tempat
+angkanya dibaca), loop pemantauan (`guard.ts`), jalur eksekusi dengan spend cap dan cooldown
+(`execute.ts`), jembatan satuan USD8 ↔ unit token dengan test sendiri (`units.ts`), lapisan
+penjelasan dGrid yang gagal dengan aman, dan penandatangan repay lewat session key Altana yang
+menolak izin sesi terlalu longgar sebelum satu transaksi pun dikirim (`chain/session.ts`).
+Perakitannya sekarang punya satu tempat, `createGuardian()` di `src/strategy/`, yang dipanggil
+skrip E2E dan siap dipanggil backend — bukan lagi ±200 baris perakitan yang hanya hidup di
+dalam skrip demo.
+
+**Repay tidak bisa terkirim dua kali.** Untuk pengiriman jaringan, "gagal" tidak berarti
+"tidak terjadi": `waitForTransactionReceipt` yang timeout melempar SETELAH transaksinya
+mendarat. Anggaran, cooldown, dan sebuah catatan repay menggantung karena itu dicatat
+**sebelum** transaksi dikirim, dan selama catatan itu belum dibereskan oleh bukti on-chain
+(hutang berkurang pada blok yang lebih baru) tidak ada pengiriman baru yang diizinkan.
+Satu-satunya galat yang diperlakukan sebagai "tidak terjadi" adalah galat yang secara
+eksplisit menyatakan dirinya belum menyentuh jaringan, dan hanya `chain/session.ts` yang boleh
+menyatakannya. Konsekuensi yang dinyatakan terbuka: repay yang benar-benar tidak pernah
+mendarat membuat Guardian **berhenti bertindak** sampai seorang operator membereskannya lewat
+`clearPendingRepay`. Itu pilihan sadar — Guardian yang diam adalah kegagalan yang terlihat.
 
 ### Guardian menaikkan health factor posisi — terbukti on-chain
 Bukan lagi test unit saja. Satu siklus Guardian dijalankan di BSC testnet terhadap posisi
@@ -82,6 +97,13 @@ Sesi itu hanya boleh memanggil **dua** hal: `MockLendingPool.repay(address,uint2
 | Hutang | $29,38 → $22,53 (dibayar $6,85; selisih klaim vs rantai 0 unit) |
 | Tx grant sesi | [`0x15e67a21…`](https://testnet.bscscan.com/tx/0x15e67a21e5ec25f8459ac2e83798033ca9afe5a14b41143aeb28fe2a47b64b52) |
 
+Setelah perakitan rantai dipindahkan ke `createGuardian()` (Task 9), E2E **dijalankan ulang
+sungguhan** lewat composition root yang baru supaya klaim di atas tidak menjadi bukti atas
+kode yang sudah tidak dipakai lagi: repay
+[`0xd7acda4c…`](https://testnet.bscscan.com/tx/0xd7acda4cc6505da3ea9b89911b7fa8a884147f0e67e11e6fb9cc8d99d638d06e),
+HF 1,14 → 1,50, dibayar $5,25, selisih klaim vs rantai 0 unit, `Repay.user` tetap wallet
+Altana, kontrol negatif tetap ditolak `UnauthorizedCall`. Ongkosnya 0,000041 tBNB.
+
 **Bukti yang lebih penting: batasnya nyata.** Sesi yang sama, sesaat setelah berhasil membayar,
 mencoba `mUSD.transfer(EOA deployer, 1 wei)` dan **ditolak** dengan `UnauthorizedCall` — custom
 error kontrak akun Altana, yang muncul saat relay mensimulasikan userOp, jadi transaksinya
@@ -99,6 +121,23 @@ on-chain; dan izin Altana mengikat kontrak + selector, **bukan nilai argumen** �
 bebas-spender hanya dinetralkan spend cap dan oleh perilaku Porto yang menolkan allowance di
 akhir userOp, perilaku pihak ketiga yang kami temukan secara empiris.
 
+### Kill switch dan persistensi state — sejauh mana ia benar-benar ada
+Sebelum ini `killed` hanya bisa bernilai true kalau ia **sudah** true sebelum loop dimulai:
+tidak ada jalan menariknya selagi agent berjalan, padahal dokumen ini mendaftarkannya sebagai
+kapabilitas. Sekarang `GuardLoopHandle` punya `kill()` yang berlaku seketika, tidak bisa
+dibatalkan oleh siklus yang sedang berjalan, dan langsung dipersist. `ExecuteState` (anggaran
+harian, cooldown, kill switch, repay menggantung) juga punya store yang disuntikkan
+(`state/store.ts`: berkas JSON atau memori; backend bisa menggantinya dengan Postgres), dan
+isi berkas yang rusak **ditolak** alih-alih diam-diam mereset seluruh batas.
+
+Yang **belum** ada, dan jangan diklaim: **tuas yang bisa ditekan user.** `kill()` adalah
+pemanggilan fungsi di dalam proses — belum ada tombol UI, perintah CLI, atau endpoint HTTP
+yang memanggilnya, karena strategi ini memang belum tersambung ke runtime mana pun (lihat
+"Yang BELUM ada" #1). Kalimat yang benar: *"kill switch punya jalur runtime dan state-nya
+bertahan melewati restart"*, bukan *"user bisa menghentikan agent kapan saja"*. Untuk alasan
+yang sama, tidak ada proses jangka panjang yang sungguhan memakai store berkas itu hari ini —
+yang ada adalah antarmuka, implementasi, dan test-nya.
+
 Batas kode (`execute.ts`: $2.000/hari) dan batas kriptografis (sesi: 100 mUSD/hari) belum
 disamakan. Yang mengikat adalah yang lebih ketat — cap sesi — dan itu arah yang benar, tetapi
 permintaan di atas cap akan gagal di relay sebagai error, bukan ditolak rapi oleh `execute.ts`.
@@ -109,7 +148,10 @@ permintaan di atas cap akan gagal di relay sebagai error, bukan ditolak rapi ole
    on-chain sudah terbukti, dan repay-nya sudah lewat session key ber-batas (lihat di atas),
    tetapi yang menjalankannya adalah skrip E2E, bukan agent A2A/MCP yang disajikan `bag dev`:
    `dualMain.ts` dan `tools.ts` masih belum mengimpor `src/strategy/` sama sekali, jadi agent
-   yang berjalan hari ini tetap mengirim teks sebagai deliverable.
+   yang berjalan hari ini tetap mengirim teks sebagai deliverable. Yang berubah sejak Task 9
+   hanyalah bahwa sambungannya kini punya satu titik masuk yang jelas — `createGuardian()` —
+   bukan lima potongan yang harus disalin dari skrip E2E. Titik masuk itu ada; yang
+   memanggilnya belum.
    → Kalimat yang benar: *"Guardian terbukti menaikkan HF posisi dari 1,14 ke 1,50 lewat
    transaksi on-chain yang ditandatangani session key ber-batas"*, bukan *"agent yang kami
    sajikan di marketplace sudah melindungi posisi Anda secara otonom"*.
@@ -158,8 +200,10 @@ permintaan di atas cap akan gagal di relay sebagai error, bukan ditolak rapi ole
 
 ## Urutan kerja berikutnya
 
-1. Sambungkan strategi Guardian ke runtime agent yang disajikan (`dualMain.ts`/`tools.ts`).
-   Penanda tangan repay sudah pindah ke session key Altana ber-batas.
+1. Sambungkan strategi Guardian ke runtime agent yang disajikan (`dualMain.ts`/`tools.ts`)
+   lewat `createGuardian()`. Penanda tangan repay sudah pindah ke session key Altana ber-batas,
+   dan perakitannya sudah punya rumah di `src/`. Sekalian: beri `kill()` sebuah tuas yang bisa
+   ditekan user.
 2. Samakan jaringan baca dan eksekusi.
 3. Backend: BFF 8004scan, indexer, classifier 4 kategori, scheduler.
 4. Frontend marketplace: discovery → detail → hire → panel izin & revoke.

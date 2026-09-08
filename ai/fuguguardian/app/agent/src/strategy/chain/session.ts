@@ -66,11 +66,23 @@ export const REPAY_SIGNATURE = "repay(address,uint256)";
 /** Selector `ERC20.approve` — dibutuhkan karena `repay` menarik lewat allowance. */
 export const APPROVE_SIGNATURE = "approve(address,uint256)";
 
-/** Kesalahan izin sesi: selalu berarti "jangan kirim apa pun". */
+/**
+ * Kesalahan izin sesi: selalu berarti "jangan kirim apa pun".
+ *
+ * `neverSent` menyatakan apakah galat ini terjadi SEBELUM apa pun menyentuh
+ * jaringan. Modul ini satu-satunya yang tahu di mana batas itu berada — semua
+ * yang terjadi sampai tepat sebelum `deps.sendCalls` terbukti belum mengirim
+ * apa-apa; apa pun sesudahnya tidak bisa dipastikan. `execute.ts` membacanya
+ * lewat `wasNeverSent()` untuk memutuskan apakah anggaran ikut terpotong
+ * (lihat catatan C2 di kepala `execute.ts`). Default-nya `false`: diam berarti
+ * "mungkin sudah terkirim", asumsi yang aman ke arah tidak membayar dua kali.
+ */
 export class SessionPermissionError extends Error {
-  constructor(message: string) {
+  readonly neverSent: boolean;
+  constructor(message: string, options: { neverSent?: boolean } = {}) {
     super(message);
     this.name = "SessionPermissionError";
+    this.neverSent = options.neverSent ?? false;
   }
 }
 
@@ -355,8 +367,32 @@ const ERC20_APPROVE_ABI = [
   },
 ] as const;
 
+/**
+ * Menjalankan sesuatu yang terjadi SEBELUM batch dikirim, dan menandai
+ * kegagalannya sebagai "belum menyentuh jaringan". Yang dibungkus di sini hanya
+ * pembacaan dan konversi; begitu `sendCalls` dipanggil, tidak ada lagi yang
+ * boleh mengklaim kepastian itu.
+ */
+async function tandaiBelumTerkirim<T>(jalankan: () => Promise<T> | T, label: string): Promise<T> {
+  try {
+    return await jalankan();
+  } catch (err) {
+    if (err instanceof SessionPermissionError && err.neverSent) throw err;
+    throw new SessionPermissionError(
+      `${label} gagal sebelum satu pun panggilan dikirim: ` +
+        `${err instanceof Error ? err.message : String(err)}`,
+      { neverSent: true },
+    );
+  }
+}
+
 function assertConfirmed(result: SessionSendResult, label: string): void {
   if (result.status !== 1) {
+    // SENGAJA tanpa `neverSent`: sampai di sini batch sudah dikirim dan punya
+    // hash. Status yang bukan 1 bisa berarti revert, bisa juga berarti receipt
+    // yang dibaca dari node basi — dan yang kedua berakhir dengan transaksi
+    // yang tetap mendarat. `execute.ts` harus memperlakukannya sebagai
+    // "mungkin terjadi", bukan "tidak terjadi".
     throw new SessionPermissionError(
       `Batch ${label} lewat sesi tidak sukses di rantai (status=${result.status}, ` +
         `tx=${result.transactionHash}).`,
@@ -383,23 +419,32 @@ export function createSessionSendRepay(deps: SessionRepayDeps): ExecuteDeps["sen
       throw new SessionPermissionError(
         `Aset repay ${asset} bukan aset yang di-allowlist sesi ini (${deps.repayAsset}); ` +
           "menolak mengirim apa pun.",
+        { neverSent: true },
       );
     }
     if (amountUsd8 <= 0n) {
       throw new SessionPermissionError(
         `Jumlah repay ${amountUsd8} bukan angka positif; menolak mengirim apa pun.`,
+        { neverSent: true },
       );
     }
 
-    const amountUnits = await deps.toTokenUnits(asset, amountUsd8);
+    const amountUnits = await tandaiBelumTerkirim(
+      () => deps.toTokenUnits(asset, amountUsd8),
+      "konversi USD basis 8 desimal ke unit token",
+    );
     if (amountUnits <= 0n) {
       throw new SessionPermissionError(
         `Konversi ${amountUsd8} (USD basis 8 desimal) menghasilkan ${amountUnits} unit token; ` +
           "tidak ada yang bisa dibayar.",
+        { neverSent: true },
       );
     }
 
-    const allowance = await deps.readAllowance(asset, deps.walletAddress, deps.pool);
+    const allowance = await tandaiBelumTerkirim(
+      () => deps.readAllowance(asset, deps.walletAddress, deps.pool),
+      "pembacaan allowance",
+    );
     const calls: SessionCall[] = [];
     if (allowance < amountUnits) {
       log(

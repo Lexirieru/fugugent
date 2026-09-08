@@ -35,8 +35,8 @@ import {
 import {
   DEFAULT_BSC_TESTNET_RPC_URL,
   MOCK_LENDING_POOL_ADDRESS,
+  REPAY_ASSET_ADDRESS,
 } from "../src/strategy/chain/testnet.js";
-import { REPAY_ASSET_ADDRESS } from "../src/strategy/execute.js";
 import {
   assertBoundedAllowlist,
   assertNativeSpendCap,

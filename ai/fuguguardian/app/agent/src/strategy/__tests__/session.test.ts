@@ -247,6 +247,96 @@ describe("createSessionSendRepay", () => {
 });
 
 /**
+ * Modul ini satu-satunya yang tahu di mana batas jaringan berada, jadi ia yang
+ * menyatakannya lewat `neverSent`. `execute.ts` membaca pernyataan itu untuk
+ * memutuskan apakah anggaran ikut terpotong: galat bertanda = "tidak terjadi",
+ * galat tanpa tanda = "mungkin sudah terjadi" (lihat catatan C2 di execute.ts).
+ * Salah menandai satu saja di sini akan membuat agent membayar dua kali.
+ */
+describe("penandaan batas jaringan (neverSent)", () => {
+  async function galatDari(jalankan: () => Promise<unknown>): Promise<SessionPermissionError> {
+    const err = await jalankan().then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(SessionPermissionError);
+    return err as SessionPermissionError;
+  }
+
+  it.each([
+    [
+      "aset di luar allowlist",
+      () =>
+        createSessionSendRepay(deps({ sendCalls: vi.fn() }))(
+          "0xF380E8B6803aD065EF0567dd20C894a55050737c",
+          100_000_000n,
+        ),
+    ],
+    ["jumlah nol", () => createSessionSendRepay(deps({ sendCalls: vi.fn() }))(MUSD, 0n)],
+    [
+      "konversi menghasilkan nol unit",
+      () => createSessionSendRepay(deps({ toTokenUnits: () => 0n, sendCalls: vi.fn() }))(MUSD, 100_000_000n),
+    ],
+    [
+      "konversi satuan melempar",
+      () =>
+        createSessionSendRepay(
+          deps({
+            toTokenUnits: () => {
+              throw new Error("feed harga tidak bisa dibaca");
+            },
+            sendCalls: vi.fn(),
+          }),
+        )(MUSD, 100_000_000n),
+    ],
+    [
+      "pembacaan allowance melempar",
+      () =>
+        createSessionSendRepay(
+          deps({
+            readAllowance: async () => {
+              throw new Error("RPC 502");
+            },
+            sendCalls: vi.fn(),
+          }),
+        )(MUSD, 100_000_000n),
+    ],
+  ])("kegagalan sebelum sendCalls ditandai neverSent (%s)", async (_label, jalankan) => {
+    const err = await galatDari(jalankan as () => Promise<unknown>);
+    expect(err.neverSent).toBe(true);
+  });
+
+  it("receipt yang bukan sukses TIDAK ditandai neverSent — batch sudah punya hash", async () => {
+    // Node basi yang melaporkan status salah tetap meninggalkan transaksi yang
+    // mendarat. Menandainya "tidak terjadi" akan mengembalikan bug bayar-ganda.
+    const err = await galatDari(() =>
+      createSessionSendRepay(
+        deps({
+          readAllowance: async () => 10n ** 30n,
+          sendCalls: async () => ({ transactionHash: `0x${"00".repeat(32)}`, status: 0 }),
+        }),
+      )(MUSD, 100_000_000n),
+    );
+    expect(err.neverSent).toBe(false);
+  });
+
+  it("sendCalls yang melempar (mis. receipt timeout) tidak ditandai neverSent sama sekali", async () => {
+    const sendRepay = createSessionSendRepay(
+      deps({
+        sendCalls: async () => {
+          throw new Error("waitForTransactionReceipt timeout setelah 180s");
+        },
+      }),
+    );
+    const err = await sendRepay(MUSD, 100_000_000n).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect((err as { neverSent?: unknown }).neverSent).not.toBe(true);
+  });
+});
+
+/**
  * Galat penolakan yang BENAR-BENAR dikembalikan relay Altana pada jalan
  * 2026-09-08 (disalin verbatim dari keluaran `probe-session-boundary.ts`).
  * Dipakai apa adanya supaya test ini menguji bentuk yang nyata, bukan bentuk

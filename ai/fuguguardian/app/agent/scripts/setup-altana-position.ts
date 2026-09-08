@@ -27,8 +27,8 @@ import { AGENT_ROOT, WORKSPACE_ROOT, adminProvider, armAltanaSdk, relaySender, t
 import {
   DEFAULT_BSC_TESTNET_RPC_URL,
   MOCK_LENDING_POOL_ADDRESS,
+  REPAY_ASSET_ADDRESS,
 } from "../src/strategy/chain/testnet.js";
-import { REPAY_ASSET_ADDRESS } from "../src/strategy/execute.js";
 import { formatHf, formatUsd8 } from "../src/strategy/format.js";
 
 const ALTANA_WALLET = "0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0" as const;
