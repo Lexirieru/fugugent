@@ -133,6 +133,30 @@ export interface AgentServicePage extends AgentListPage {
    * penyelidikan alih-alih janji.
    */
   total: number;
+  /**
+   * How many items on this page came from each source.
+   *
+   * The page-level `source` names the tier that answered the **discovery**
+   * query. It is not a claim about every item, because first-party
+   * `FuguRegistry` listings are merged in on top of whatever discovery
+   * returned (see {@link AgentServicePage.firstParty}). This census, together
+   * with each `AgentRecord.source`, is what keeps a mixed page honest: no
+   * single label is stretched to cover items it did not produce.
+   *
+   * Optional on the type only so that callers constructing a page literal stay
+   * valid; the service always fills it in.
+   */
+  itemSources?: Partial<Record<AgentSource, number>>;
+  /**
+   * State of the first-party overlay — our own `FuguRegistry` listings.
+   *
+   * These are the only agents that can actually be rented (they alone carry a
+   * price, a period, and a subscription contract), so they are **not** a
+   * fallback source: they are read on every request and merged into the result
+   * no matter how healthy 8004scan is. This field says how many made it onto
+   * the page and whether the overlay could be read at all.
+   */
+  firstParty?: FirstPartyReport;
   /** Umur item **tertua** di halaman ini, detik. `null` bila kosong. */
   ageSeconds: number | null;
   /** `true` bila data tidak bisa dipastikan segar (cache, seed, atau lewat TTL). */
@@ -143,12 +167,35 @@ export interface AgentServicePage extends AgentListPage {
   trail: FallbackAttempt[];
 }
 
+/**
+ * Health of the first-party overlay for one response.
+ *
+ * Deliberately kept out of `trail` and out of `source_health`: `trail` documents
+ * the four-tier fallback ladder, and duplicating on-chain entries there would
+ * make the ladder harder to read rather than easier. The overlay reports itself
+ * here instead — which is also the field a storefront needs in order to say
+ * "rentable agents are temporarily unavailable" rather than silently showing
+ * none.
+ */
+export interface FirstPartyReport {
+  /** Items on this page that carry a `FuguRegistry` listing. */
+  count: number;
+  /** `false` when the registry could not be read and no earlier read is held. */
+  healthy: boolean;
+  /** Why the overlay is unhealthy, or why it is being served from a held read. */
+  reason: string | null;
+  /** Age of the held registry read, seconds. `null` when never read. */
+  ageSeconds: number | null;
+}
+
 /** Satu agent lengkap dengan provenance-nya. */
 export interface AgentServiceDetail extends AgentDetailResult {
   ageSeconds: number | null;
   stale: boolean;
   degraded: boolean;
   maxAgeSeconds: number;
+  /** First-party listing attached to this agent, if the registry has one. */
+  firstParty?: FirstPartyReport;
   trail: FallbackAttempt[];
 }
 
@@ -388,6 +435,18 @@ export const DEFAULT_UPSTREAM_COOLDOWN_MS = 30_000;
  */
 export const DEFAULT_LOCAL_BUDGET_MS = 2_000;
 
+/**
+ * How long a `FuguRegistry` read is held before being refreshed.
+ *
+ * The overlay is read on every request, so without a hold every page view would
+ * pay an RPC round-trip — and the measured 0.57 s response while Postgres is
+ * down is a property worth keeping. The registry changes only when someone
+ * lists or delists an agent, which is rare and never urgent to the second, so a
+ * short hold costs nothing in accuracy: each record keeps its own `fetchedAt`,
+ * so `ageSeconds` stays truthful even while the hold is being served.
+ */
+export const DEFAULT_FIRST_PARTY_TTL_MS = 15_000;
+
 export const DEFAULT_PAGE_LIMIT = 20;
 export const MAX_PAGE_LIMIT = 100;
 /** Panjang maksimum sebuah `reason`. Log bukan tempat menumpuk stack trace viem. */
@@ -479,6 +538,14 @@ export interface AgentServiceDeps {
   now?: () => Date;
   /** Berapa banyak listing on-chain dibaca sekaligus sebelum disaring per kategori. */
   onchainScanLimit?: number;
+  /** How long a `FuguRegistry` read is held before refreshing. */
+  firstPartyTtlMs?: number;
+  /**
+   * Set `false` to switch the first-party overlay off entirely. Only useful for
+   * isolating the fallback ladder in tests; in production our own listings must
+   * always be visible.
+   */
+  firstPartyOverlay?: boolean;
   /** Tulis hasil tiap tingkat ke tabel `source_health`. Bawaan `true`. */
   persistHealth?: boolean;
   /** Umur maksimum observasi kesehatan yang masih boleh mengklaim sehat. */
@@ -564,6 +631,130 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
    */
   let upstreamBlockedUntil = 0;
 
+  const firstPartyTtlMs = deps.firstPartyTtlMs ?? DEFAULT_FIRST_PARTY_TTL_MS;
+  const firstPartyEnabled = (deps.firstPartyOverlay ?? true) && deps.onchain !== undefined;
+
+  /** Last successful `FuguRegistry` read, held for {@link DEFAULT_FIRST_PARTY_TTL_MS}. */
+  let heldListings: { items: AgentRecord[]; loadedAtMs: number } | undefined;
+  /** Until when the registry read is skipped after a failure. */
+  let registryBlockedUntil = 0;
+  let registryFailure: string | null = null;
+
+  /**
+   * Read our own `FuguRegistry` listings — the **first-party overlay**.
+   *
+   * This is not tier 3 of the fallback ladder. Tier 3 answers "8004scan is down,
+   * what else can we show?"; this answers "which agents can a user actually
+   * rent?" — and the answer must not depend on a third party being up. The four
+   * listings here are the only ones with a price, a period, and a subscription
+   * contract behind them, so leaving them out while 8004scan is healthy hid the
+   * only inventory the product can sell.
+   *
+   * Never throws, never blocks a request for long: budgeted, held between
+   * requests, and on failure it serves the last successful read rather than
+   * nothing. It deliberately does not touch `trail` or `source_health` — see
+   * {@link FirstPartyReport}.
+   */
+  async function readFirstParty(at: Date): Promise<AgentRecord[]> {
+    if (!firstPartyEnabled || deps.onchain === undefined) return [];
+
+    const held = heldListings;
+    if (held !== undefined && at.getTime() - held.loadedAtMs < firstPartyTtlMs) return held.items;
+    if (at.getTime() < registryBlockedUntil) return held?.items ?? [];
+
+    try {
+      const page = await withDeadline(
+        deps.onchain.readFuguListings({ limit: onchainScanLimit, offset: 0 }),
+        localBudgetMs,
+        "onchain",
+      );
+      if (!page.healthy) {
+        registryBlockedUntil = at.getTime() + upstreamCooldownMs;
+        registryFailure = redact(page.reason ?? "FuguRegistry read unhealthy without a reason");
+        return held?.items ?? [];
+      }
+      heldListings = { items: page.items, loadedAtMs: at.getTime() };
+      registryBlockedUntil = 0;
+      registryFailure = null;
+      return page.items;
+    } catch (err) {
+      registryBlockedUntil = at.getTime() + upstreamCooldownMs;
+      registryFailure =
+        err instanceof BudgetExceeded
+          ? `FuguRegistry read exceeded its ${err.waitedMs} ms budget`
+          : describeThrow(err);
+      return held?.items ?? [];
+    }
+  }
+
+  /** Describe the overlay for the response. `count` is filled in by the caller. */
+  function firstPartyReport(count: number, at: Date): FirstPartyReport | undefined {
+    if (!firstPartyEnabled) return undefined;
+    const ageSeconds =
+      heldListings === undefined
+        ? null
+        : Math.max(0, Math.floor((at.getTime() - heldListings.loadedAtMs) / 1000));
+    return {
+      count,
+      // Healthy means "we have listings to show", whether freshly read or held.
+      // A held read plus a live failure is still serving the truth, so it counts
+      // as healthy — `reason` says the registry could not be re-read.
+      healthy: registryFailure === null || heldListings !== undefined,
+      reason: registryFailure,
+      ageSeconds,
+    };
+  }
+
+  /** Count items per source, so a mixed page never hides behind one label. */
+  function censusOf(items: readonly AgentRecord[]): Partial<Record<AgentSource, number>> {
+    const census: Partial<Record<AgentSource, number>> = {};
+    for (const item of items) census[item.source] = (census[item.source] ?? 0) + 1;
+    return census;
+  }
+
+  /**
+   * Merge first-party listings into a discovery page.
+   *
+   * Rules, in order of importance:
+   *
+   * 1. **Rentable agents come first.** They are the only ones a user can act on.
+   * 2. **An agent present in both keeps its richer metadata and gains the
+   *    listing.** 8004scan knows its name, description and reputation; the
+   *    registry knows its price. Dropping either would make the card worse.
+   * 3. **Discovery paging is left untouched.** The overlay is added only on the
+   *    first page, so no discovery item is ever skipped or duplicated at a page
+   *    boundary. The page may therefore exceed `limit` by at most the overlay
+   *    size — dropping a rentable agent to respect a page-size hint would defeat
+   *    the entire point of this layer.
+   */
+  function mergeFirstParty(
+    listings: readonly AgentRecord[],
+    discovery: readonly AgentRecord[],
+    category: Category,
+    offset: number,
+  ): { items: AgentRecord[]; added: number; listed: number } {
+    const matching = listings.filter(
+      (item) => item.fuguListing?.category === category && item.fuguListing !== null,
+    );
+    if (matching.length === 0) return { items: [...discovery], added: 0, listed: 0 };
+
+    const byId = new Map(matching.map((item) => [item.id, item]));
+
+    // Rule 2: enrich in place, and remember which listings were consumed.
+    const enriched = discovery.map((item) => {
+      const listing = byId.get(item.id);
+      if (listing === undefined) return item;
+      byId.delete(item.id);
+      return item.fuguListing === null ? { ...item, fuguListing: listing.fuguListing } : item;
+    });
+
+    // Rule 3: only page 1 carries the leftover listings.
+    const prepend = offset === 0 ? [...byId.values()] : [];
+    const items = [...prepend, ...enriched];
+    const listed = items.filter((item) => item.fuguListing !== null).length;
+    return { items, added: prepend.length, listed };
+  }
+
   /**
    * Buka atau tutup gerbang tingkat 1 berdasarkan hasilnya.
    *
@@ -640,6 +831,10 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
     const maxAgeSeconds = opts.maxAgeSeconds ?? DEFAULT_MAX_AGE_SECONDS;
     const trail: FallbackAttempt[] = [];
 
+    // The first-party overlay is read for EVERY request, before the ladder runs,
+    // because our own rentable listings must not depend on 8004scan being up.
+    const listings = await readFirstParty(at);
+
     function step(attempt: FallbackAttempt): FallbackAttempt {
       trail.push(attempt);
       noteHealth(attempt, fetchedAt);
@@ -671,10 +866,27 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       healthy: boolean,
       reason: string | null,
     ): AgentServicePage {
-      const ageSeconds = oldestAgeSeconds(items, at);
+      // Merge the first-party overlay into whatever the ladder produced. Tier 3
+      // and tier 4 are exempt: tier 3 IS the registry (merging would duplicate
+      // every listing), and tier 4 seed records deliberately carry no listing.
+      const merged =
+        source === "onchain" || source === "seed"
+          ? {
+              items: [...items],
+              added: 0,
+              listed: items.filter((item) => item.fuguListing !== null).length,
+            }
+          : mergeFirstParty(listings, items, category, offset);
+      const served = merged.items;
+
+      const ageSeconds = oldestAgeSeconds(served, at);
       return {
-        items,
-        total,
+        items: served,
+        // `total` must keep meaning "items we can actually serve", so listings
+        // that discovery did not already contain are genuinely additional.
+        total: total + merged.added,
+        itemSources: censusOf(served),
+        firstParty: firstPartyReport(merged.listed, at),
         limit,
         offset,
         source,
@@ -686,7 +898,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
         // dengan `ageSeconds` ratusan ribu detik. Konsumen yang membaca
         // `fetchedAt` saja tetap mendapat angka yang benar, dan invariant
         // `ageSeconds === now - fetchedAt` berlaku di keempat tingkat.
-        fetchedAt: oldestFetchedAt(items) ?? fetchedAt,
+        fetchedAt: oldestFetchedAt(served) ?? fetchedAt,
         ageSeconds,
         stale: isStale(source, ageSeconds, maxAgeSeconds),
         degraded: source !== "scan8004",
@@ -895,6 +1107,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
     const fetchedAt = at.toISOString();
     const maxAgeSeconds = DEFAULT_MAX_AGE_SECONDS;
     const trail: FallbackAttempt[] = [];
+    const listings = await readFirstParty(at);
 
     function step(attempt: FallbackAttempt): void {
       trail.push(attempt);
@@ -924,16 +1137,28 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       healthy: boolean,
       reason: string | null,
     ): AgentServiceDetail {
-      const ageSeconds = agent === null ? null : oldestAgeSeconds([agent], at);
+      // Attach our own listing when the registry has one and the discovered
+      // record does not. Without this, the detail page of a rentable agent shows
+      // no price and no hire button whenever 8004scan answered first — which is
+      // the normal case.
+      let resolved = agent;
+      if (resolved !== null && resolved.fuguListing === null) {
+        const id = resolved.id;
+        const listing = listings.find((item) => item.id === id)?.fuguListing ?? null;
+        if (listing !== null) resolved = { ...resolved, fuguListing: listing };
+      }
+
+      const ageSeconds = resolved === null ? null : oldestAgeSeconds([resolved], at);
       return {
-        agent,
+        agent: resolved,
         source,
         healthy,
         reason,
+        firstParty: firstPartyReport(resolved?.fuguListing == null ? 0 : 1, at),
         // Sama seperti jalur daftar: `fetchedAt` menunjuk kapan DATANYA diambil.
-        fetchedAt: agent?.fetchedAt ?? fetchedAt,
+        fetchedAt: resolved?.fetchedAt ?? fetchedAt,
         ageSeconds,
-        stale: agent === null ? false : isStale(source, ageSeconds, maxAgeSeconds),
+        stale: resolved === null ? false : isStale(source, ageSeconds, maxAgeSeconds),
         degraded: source !== "scan8004",
         maxAgeSeconds,
         trail,

@@ -291,13 +291,17 @@ describe("getAgentsByCategory — tingkat 1: 8004scan", () => {
     const result = await h.service.getAgentsByCategory("GRID");
 
     expect(result.source).toBe("scan8004");
-    expect(result.items.map((i) => i.tokenId)).toEqual(["1", "2"]);
+    // Our own rentable listing leads, then the discovery results — the overlay
+    // is additive, not a replacement.
+    expect(result.items.map((i) => i.tokenId)).toEqual(["500", "1", "2"]);
     expect(result.healthy).toBe(true);
     expect(result.stale).toBe(false);
     expect(result.degraded).toBe(false);
     expect(result.ageSeconds).toBe(0);
     expect(trace).not.toContain("cache.getAgents");
-    expect(trace).not.toContain("onchain.readFuguListings");
+    // The registry IS read — that is the first-party overlay, not tier 3 — but
+    // the ladder itself never descends past tier 1.
+    expect(result.trail.map((t) => t.source)).toEqual(["scan8004"]);
   });
 
   it("mengirim query semantic milik kategori yang diminta", async () => {
@@ -361,7 +365,11 @@ describe("getAgentsByCategory — tingkat 2: cache Postgres", () => {
     expect(result.degraded).toBe(true);
     expect(result.healthy).toBe(true);
     expect(result.ageSeconds).toBe(300);
-    expect(trace).toEqual(["scan8004.semanticSearch", "cache.getAgents"]);
+    expect(trace).toEqual([
+      "onchain.readFuguListings", // first-party overlay, read on every request
+      "scan8004.semanticSearch",
+      "cache.getAgents",
+    ]);
   });
 
   it("alasan kegagalan tingkat 1 ikut terbawa di jejak, supaya bisa diperiksa", async () => {
@@ -409,9 +417,10 @@ describe("getAgentsByCategory — tingkat 3: on-chain FuguRegistry", () => {
     expect(result.ageSeconds).toBe(0);
     expect(result.stale).toBe(false);
     expect(trace).toEqual([
+      "onchain.readFuguListings", // overlay
       "scan8004.semanticSearch",
       "cache.getAgents",
-      "onchain.readFuguListings",
+      "onchain.readFuguListings", // tier 3
       "cache.saveAgents",
     ]);
   });
@@ -746,7 +755,11 @@ describe("getAgentDetail", () => {
     expect(result.agent?.tokenId).toBe("42");
     expect(result.ageSeconds).toBe(0);
     expect(result.stale).toBe(false);
-    expect(trace).toEqual(["scan8004.getAgent", "cache.saveAgents"]);
+    expect(trace).toEqual([
+      "onchain.readFuguListings", // overlay
+      "scan8004.getAgent",
+      "cache.saveAgents",
+    ]);
   });
 
   it("tingkat 2: cache, ditandai stale", async () => {
@@ -1040,7 +1053,9 @@ describe("invariant yang berlaku di semua tingkat", () => {
   });
 
   it("tidak pernah memanggil sumber setelah tingkat yang menjawab", async () => {
-    const h = harness();
+    // With the overlay disabled, the ladder must not touch tier 3 at all when
+    // tier 1 answered — the original claim, isolated from the overlay.
+    const h = harness({ firstPartyOverlay: false });
     h.scan.page = page([record({ tokenId: "1" })]);
     const spy = vi.spyOn(h.onchain, "readFuguListings");
     await h.service.getAgentsByCategory("GRID");
@@ -1176,18 +1191,23 @@ describe("filter yang benar-benar diterima tiap tingkat", () => {
     h.scan.page = page([], { healthy: false, reason: "mati" });
     h.onchain.page = page([onchainRecord("500", "GRID")], { source: "onchain" });
 
-    await h.service.getAgentsByCategory("GRID", { limit: 20, offset: 0 });
-    expect(h.onchain.reads[0]).toMatchObject({ limit: 100, offset: 0 });
+    // Overlay disabled so that `reads` contains only tier-3 windows.
+    const t3 = harness({ firstPartyOverlay: false });
+    t3.scan.page = page([], { healthy: false, reason: "mati" });
+    t3.onchain.page = page([onchainRecord("500", "GRID")], { source: "onchain" });
 
-    await h.service.getAgentsByCategory("GRID", { limit: 20, offset: 200 });
+    await t3.service.getAgentsByCategory("GRID", { limit: 20, offset: 0 });
+    expect(t3.onchain.reads[0]).toMatchObject({ limit: 100, offset: 0 });
+
+    await t3.service.getAgentsByCategory("GRID", { limit: 20, offset: 200 });
     // Jendela tetap 100 akan membuat halaman ini jatuh ke seed sementara
     // halaman 1 dilayani on-chain — sumber melompat tanpa sebab yang bisa
     // dijelaskan ke pengguna.
-    expect(h.onchain.reads[1]!.limit).toBe(220);
+    expect(t3.onchain.reads[1]!.limit).toBe(220);
 
-    await h.service.getAgentsByCategory("GRID", { limit: 100, offset: 100000 });
+    await t3.service.getAgentsByCategory("GRID", { limit: 100, offset: 100000 });
     // Tetap dibatasi ONCHAIN_MAX_LIMIT supaya satu permintaan tidak membanjiri RPC.
-    expect(h.onchain.reads[2]!.limit).toBe(500);
+    expect(t3.onchain.reads[2]!.limit).toBe(500);
   });
 });
 
@@ -1209,7 +1229,6 @@ describe("chainId tidak boleh dikendalikan pemanggil", () => {
     const result = await h.service.getAgentDetail("1:12345");
 
     expect(trace).not.toContain("scan8004.getAgent");
-    expect(trace).not.toContain("onchain.readFuguListings");
     expect(result.trail[0]).toMatchObject({ source: "scan8004", outcome: "unavailable" });
     expect(result.trail[0]!.reason).toContain("chain 1");
     expect(result.trail[0]!.reason).toContain("chain 97");
@@ -1707,7 +1726,8 @@ describe("anggaran waktu per tingkat", () => {
     h.onchain.readFuguListings = () => hangs();
 
     const pending = h.service.getAgentsByCategory("GRID");
-    await vi.advanceTimersByTimeAsync(2_000);
+    // 2 s for the overlay read plus 2 s for tier 3; neither may hold the request.
+    await vi.advanceTimersByTimeAsync(4_000);
     const result = await pending;
 
     expect(result.source).toBe("seed");
@@ -1721,7 +1741,7 @@ describe("anggaran waktu per tingkat", () => {
     h.onchain.readFuguListings = () => hangs();
 
     const pending = h.service.getAgentsByCategory("GRID");
-    await vi.advanceTimersByTimeAsync(3_000);
+    await vi.advanceTimersByTimeAsync(5_000);
     const result = await pending;
 
     expect(result.source).toBe("seed");
@@ -2057,5 +2077,307 @@ describe("getHealth — probe cache membaca hasil, bukan absennya exception", ()
     expect(seed?.healthy).toBe(true);
     expect(seed?.stale).toBe(false);
     expect(seed?.ageSeconds).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// First-party overlay: our own rentable listings are not a fallback
+// ---------------------------------------------------------------------------
+
+describe("first-party FuguRegistry overlay", () => {
+  /** One listing per category, as deployed: three at $0.05, Guardian at $0.10. */
+  function registry(): AgentListPage {
+    return page(
+      [
+        onchainRecord("41", "REBALANCING"),
+        onchainRecord("42", "GRID"),
+        onchainRecord("43", "YIELD"),
+        onchainRecord("44", "HEALTH_FACTOR"),
+      ],
+      { source: "onchain" },
+    );
+  }
+
+  it("listings appear while 8004scan is HEALTHY — the bug that hid all our inventory", async () => {
+    // Measured against the live API: 113 third-party agents, zero of ours, zero
+    // with `fuguListing`. Treating the registry as fallback tier 3 meant our own
+    // listings were never read in the normal case — and they are the only agents
+    // that can actually be rented.
+    const h = harness();
+    h.onchain.page = registry();
+    h.scan.page = page([record({ tokenId: "1" }), record({ tokenId: "2" })], { total: 113 });
+
+    const result = await h.service.getAgentsByCategory("GRID");
+
+    expect(result.source).toBe("scan8004");
+    expect(result.trail.map((t) => t.source)).toEqual(["scan8004"]);
+    const listed = result.items.filter((i) => i.fuguListing !== null);
+    expect(listed).toHaveLength(1);
+    expect(listed[0]!.tokenId).toBe("42");
+    expect(result.firstParty).toMatchObject({ count: 1, healthy: true });
+  });
+
+  it("rentable agents come first — they are the only ones a user can act on", async () => {
+    const h = harness();
+    h.onchain.page = registry();
+    h.scan.page = page([record({ tokenId: "1" }), record({ tokenId: "2" })]);
+
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.items[0]!.fuguListing).not.toBeNull();
+    expect(result.items.map((i) => i.tokenId)).toEqual(["42", "1", "2"]);
+  });
+
+  it("the category filter still applies to the overlay", async () => {
+    const h = harness();
+    h.onchain.page = registry();
+    h.scan.page = page([record({ tokenId: "1" })]);
+
+    for (const [category, tokenId] of [
+      ["REBALANCING", "41"],
+      ["GRID", "42"],
+      ["YIELD", "43"],
+      ["HEALTH_FACTOR", "44"],
+    ] as Array<[Category, string]>) {
+      const result = await h.service.getAgentsByCategory(category);
+      const listed = result.items.filter((i) => i.fuguListing !== null);
+      expect(listed.map((i) => i.tokenId)).toEqual([tokenId]);
+    }
+  });
+
+  it("money in the merged listing stays bigint", async () => {
+    const h = harness();
+    h.onchain.page = registry();
+    h.scan.page = page([record({ tokenId: "1" })]);
+
+    const result = await h.service.getAgentsByCategory("GRID");
+    const listing = result.items[0]!.fuguListing!;
+    expect(typeof listing.priceUsd8PerPeriod).toBe("bigint");
+    expect(typeof listing.listingId).toBe("bigint");
+  });
+
+  it("an agent found in BOTH keeps its richer metadata and gains the listing", async () => {
+    const h = harness();
+    h.onchain.page = registry();
+    // Same id as the GRID listing, but with the name/description 8004scan knows.
+    h.scan.page = page([
+      record({ tokenId: "42", name: "Grid Runner Pro", description: "Grid trading bot." }),
+    ]);
+
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.items).toHaveLength(1); // not duplicated
+    expect(result.items[0]!.name).toBe("Grid Runner Pro");
+    expect(result.items[0]!.fuguListing?.priceUsd8PerPeriod).toBe(1_500_000_000n);
+    expect(result.items[0]!.source).toBe("scan8004");
+  });
+
+  it("`total` counts the listings the discovery page did not already contain", async () => {
+    const h = harness();
+    h.onchain.page = registry();
+    h.scan.page = page([record({ tokenId: "1" }), record({ tokenId: "2" })], { total: 113 });
+
+    const result = await h.service.getAgentsByCategory("GRID");
+    // Two classified discovery items plus one additional listing.
+    expect(result.total).toBe(3);
+    expect(result.items).toHaveLength(3);
+    // The upstream figure stays where it belongs: evidence, not a promise.
+    expect(result.trail[0]!.upstreamTotal).toBe(113);
+  });
+
+  it("`total` does not double-count a listing discovery already returned", async () => {
+    const h = harness();
+    h.onchain.page = registry();
+    h.scan.page = page([record({ tokenId: "42" })], { total: 113 });
+
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.total).toBe(1);
+    expect(result.items).toHaveLength(1);
+  });
+
+  it("a mixed page reports each source honestly instead of one misleading label", async () => {
+    const h = harness();
+    h.onchain.page = registry();
+    h.scan.page = page([record({ tokenId: "1" }), record({ tokenId: "2" })]);
+
+    const result = await h.service.getAgentsByCategory("GRID");
+    // The page-level label names the DISCOVERY tier...
+    expect(result.source).toBe("scan8004");
+    // ...and the census plus each record's own source spell out the mixture.
+    expect(result.itemSources).toEqual({ onchain: 1, scan8004: 2 });
+    const census = result.items.reduce<Record<string, number>>((acc, item) => {
+      acc[item.source] = (acc[item.source] ?? 0) + 1;
+      return acc;
+    }, {});
+    expect(census).toEqual(result.itemSources);
+  });
+
+  it("the overlay only lands on page 1, so discovery paging is never disturbed", async () => {
+    const h = harness();
+    h.onchain.page = registry();
+    h.scan.page = page([record({ tokenId: "1" })]);
+
+    const first = await h.service.getAgentsByCategory("GRID", { limit: 20, offset: 0 });
+    expect(first.items.map((i) => i.tokenId)).toEqual(["42", "1"]);
+
+    const second = await h.service.getAgentsByCategory("GRID", { limit: 20, offset: 20 });
+    expect(second.items.map((i) => i.tokenId)).toEqual(["1"]);
+    expect(second.firstParty?.count).toBe(0);
+  });
+
+  it("tier 3 is not merged with itself — no duplicated listings", async () => {
+    const h = harness();
+    h.onchain.page = registry();
+    h.scan.page = page([], { healthy: false, reason: "500 DATABASE_ERROR" });
+    h.cache.items = [];
+
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.source).toBe("onchain");
+    expect(result.items.map((i) => i.tokenId)).toEqual(["42"]);
+    expect(result.total).toBe(1);
+  });
+
+  it("seed pages stay listing-free — seed deliberately claims no price", async () => {
+    const h = harness();
+    h.onchain.page = page([], { source: "onchain" });
+    h.scan.page = page([], { healthy: false, reason: "mati" });
+
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.source).toBe("seed");
+    expect(result.items[0]!.fuguListing).toBeNull();
+    expect(result.firstParty?.count).toBe(0);
+  });
+
+  it("a registry that cannot be read never breaks the page, and says so", async () => {
+    const h = harness();
+    h.onchain.readFuguListings = async () => {
+      throw new Error("HttpRequestError: RPC unreachable");
+    };
+    h.scan.page = page([record({ tokenId: "1" })]);
+
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.source).toBe("scan8004");
+    expect(result.items).toHaveLength(1);
+    expect(result.firstParty).toMatchObject({ count: 0, healthy: false });
+    expect(result.firstParty!.reason).toContain("RPC unreachable");
+  });
+
+  it("a failed refresh keeps serving the last read, with an honest reason", async () => {
+    const h = harness({ firstPartyTtlMs: 0 }); // force a refresh every request
+    h.onchain.page = registry();
+    h.scan.page = page([record({ tokenId: "1" })]);
+
+    const warm = await h.service.getAgentsByCategory("GRID");
+    expect(warm.firstParty?.count).toBe(1);
+
+    h.onchain.readFuguListings = async () => {
+      throw new Error("RPC unreachable");
+    };
+    const degradedRead = await h.service.getAgentsByCategory("GRID");
+    // Still rentable — the held read is real data, and its age is reported.
+    expect(degradedRead.firstParty).toMatchObject({ count: 1, healthy: true });
+    expect(degradedRead.firstParty!.reason).toContain("RPC unreachable");
+    expect(degradedRead.items[0]!.fuguListing).not.toBeNull();
+  });
+
+  it("the registry read is held between requests, so it is not paid every page view", async () => {
+    const h = harness({ firstPartyTtlMs: 15_000 });
+    h.onchain.page = registry();
+    h.scan.page = page([record({ tokenId: "1" })]);
+
+    // Three page views in a row; tier 1 answers every time, so the only registry
+    // read that can happen is the overlay's.
+    await h.service.getAgentsByCategory("GRID");
+    await h.service.getAgentsByCategory("GRID");
+    await h.service.getAgentsByCategory("GRID");
+    expect(h.onchain.reads).toHaveLength(1);
+  });
+
+  it("the overlay is budgeted — a hanging RPC cannot hold the storefront", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    try {
+      const h = harness({ localBudgetMs: 2_000 });
+      h.onchain.readFuguListings = () => new Promise<never>(() => undefined);
+      h.scan.page = page([record({ tokenId: "1" })]);
+
+      const pending = h.service.getAgentsByCategory("GRID");
+      await vi.advanceTimersByTimeAsync(2_000);
+      const result = await pending;
+
+      expect(result.source).toBe("scan8004");
+      expect(result.firstParty).toMatchObject({ count: 0, healthy: false });
+      expect(result.firstParty!.reason).toContain("budget");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("the fallback ladder is untouched: all four tiers still fire in order", async () => {
+    const h = harness({ upstreamCooldownMs: 0 });
+    h.onchain.page = registry();
+
+    h.scan.page = page([record({ tokenId: "1" })]);
+    const lvl1 = await h.service.getAgentsByCategory("GRID");
+
+    h.scan.page = page([], { healthy: false, reason: "500 DATABASE_ERROR" });
+    h.cache.items = [record({ tokenId: "7", source: "cache" })];
+    const lvl2 = await h.service.getAgentsByCategory("GRID");
+
+    h.cache.items = [];
+    const lvl3 = await h.service.getAgentsByCategory("GRID");
+
+    h.onchain.page = page([], { source: "onchain" });
+    const h2 = harness({ upstreamCooldownMs: 0 });
+    h2.scan.page = page([], { healthy: false, reason: "mati" });
+    h2.onchain.page = page([], { source: "onchain" });
+    const lvl4 = await h2.service.getAgentsByCategory("GRID");
+
+    expect([lvl1.source, lvl2.source, lvl3.source, lvl4.source]).toEqual([
+      "scan8004",
+      "cache",
+      "onchain",
+      "seed",
+    ]);
+  });
+
+  it("detail pages gain the listing too — otherwise the hire button never shows", async () => {
+    const h = harness();
+    h.onchain.page = registry();
+    h.scan.detail = {
+      agent: record({ tokenId: "42", name: "Grid Runner Pro" }),
+      source: "scan8004",
+      healthy: true,
+      reason: null,
+      fetchedAt: NOW.toISOString(),
+    };
+
+    const result = await h.service.getAgentDetail("97:42");
+    expect(result.source).toBe("scan8004");
+    expect(result.agent?.name).toBe("Grid Runner Pro");
+    expect(result.agent?.fuguListing).not.toBeNull();
+    expect(typeof result.agent!.fuguListing!.priceUsd8PerPeriod).toBe("bigint");
+    expect(result.firstParty?.count).toBe(1);
+  });
+
+  it("detail pages for an unlisted agent are left alone", async () => {
+    const h = harness();
+    h.onchain.page = registry();
+    h.scan.detail = {
+      agent: record({ tokenId: "999" }),
+      source: "scan8004",
+      healthy: true,
+      reason: null,
+      fetchedAt: NOW.toISOString(),
+    };
+
+    const result = await h.service.getAgentDetail("97:999");
+    expect(result.agent?.fuguListing).toBeNull();
+    expect(result.firstParty?.count).toBe(0);
+  });
+
+  it("a foreign-chain id is never handed a listing from our chain", async () => {
+    const h = harness();
+    h.onchain.page = registry();
+    const result = await h.service.getAgentDetail("1:42");
+    expect(result.agent).toBeNull();
   });
 });
