@@ -5,11 +5,11 @@
  */
 import { USD8_ONE, WAD } from "./types.js";
 
-function grupRibuan(n: bigint): string {
+function groupThousands(n: bigint): string {
   const s = n.toString();
   let out = "";
   for (let i = 0; i < s.length; i++) {
-    if (i > 0 && (s.length - i) % 3 === 0) out += ".";
+    if (i > 0 && (s.length - i) % 3 === 0) out += ",";
     out += s[i];
   }
   return out;
@@ -17,11 +17,11 @@ function grupRibuan(n: bigint): string {
 
 /** A money value on the 8-decimal basis -> dollars with two decimals. Fractions of a cent are TRUNCATED. */
 export function formatUsd8(v: bigint): string {
-  const negatif = v < 0n;
-  const abs = negatif ? -v : v;
-  const dolar = abs / USD8_ONE;
-  const sen = ((abs % USD8_ONE) * 100n) / USD8_ONE;
-  return `${negatif ? "-" : ""}$${grupRibuan(dolar)},${sen.toString().padStart(2, "0")}`;
+  const negative = v < 0n;
+  const abs = negative ? -v : v;
+  const dollars = abs / USD8_ONE;
+  const cents = ((abs % USD8_ONE) * 100n) / USD8_ONE;
+  return `${negative ? "-" : ""}$${groupThousands(dollars)}.${cents.toString().padStart(2, "0")}`;
 }
 
 /**
@@ -33,26 +33,26 @@ export function formatUsd8(v: bigint): string {
  * migration cost and the other does not.
  */
 export function formatApyBps(bps: bigint): string {
-  const negatif = bps < 0n;
-  const abs = negatif ? -bps : bps;
-  return `${negatif ? "-" : ""}${grupRibuan(abs / 100n)},${(abs % 100n).toString().padStart(2, "0")}%`;
+  const negative = bps < 0n;
+  const abs = negative ? -bps : bps;
+  return `${negative ? "-" : ""}${groupThousands(abs / 100n)}.${(abs % 100n).toString().padStart(2, "0")}%`;
 }
 
 /** An 18-decimal token amount -> six decimals, the remainder TRUNCATED. */
 export function formatToken18(v: bigint): string {
-  const negatif = v < 0n;
-  const abs = negatif ? -v : v;
-  const bulat = abs / WAD;
-  const pecahan = ((abs % WAD) * 1_000_000n) / WAD;
-  return `${negatif ? "-" : ""}${grupRibuan(bulat)},${pecahan.toString().padStart(6, "0")}`;
+  const negative = v < 0n;
+  const abs = negative ? -v : v;
+  const whole = abs / WAD;
+  const fraction = ((abs % WAD) * 1_000_000n) / WAD;
+  return `${negative ? "-" : ""}${groupThousands(whole)}.${fraction.toString().padStart(6, "0")}`;
 }
 
 /** bps -> a percentage with one decimal. */
 export function formatPercentFromBps(bps: bigint): string {
-  const negatif = bps < 0n;
-  const abs = negatif ? -bps : bps;
-  const persepuluh = abs / 10n;
-  return `${negatif ? "-" : ""}${persepuluh / 10n},${persepuluh % 10n}`;
+  const negative = bps < 0n;
+  const abs = negative ? -bps : bps;
+  const tenths = abs / 10n;
+  return `${negative ? "-" : ""}${tenths / 10n}.${tenths % 10n}`;
 }
 
 /** bps as-is with its unit, so it is never confused with a percentage. */

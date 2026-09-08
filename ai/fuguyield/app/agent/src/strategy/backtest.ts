@@ -30,7 +30,7 @@
  *
  * HOW CONFIRMATION IS COUNTED lives here too, and that is deliberate: `decide` is pure
  * and has no memory, so the scheduler in `backend/` MUST use exactly the same rule as
- * `jalankan()` below, otherwise production behavior will differ from what this backtest
+ * `run()` below, otherwise production behavior will differ from what this backtest
  * proves.
  * ============================================================================
  */
@@ -87,42 +87,42 @@ export interface YieldBacktestResult {
 
 function validate(input: YieldBacktestInput): void {
   if (input.startPrincipalBase <= 0n) {
-    throw new YieldError(`Pokok awal ${input.startPrincipalBase} tidak positif.`);
+    throw new YieldError(`The starting principal ${input.startPrincipalBase} is not positive.`);
   }
   if (input.daysPerCandle <= 0n) {
-    throw new YieldError(`daysPerCandle=${input.daysPerCandle} tidak positif.`);
+    throw new YieldError(`daysPerCandle=${input.daysPerCandle} is not positive.`);
   }
   if (input.pools.length === 0) {
-    throw new YieldError("Daftar pool kosong.");
+    throw new YieldError("The pool list is empty.");
   }
   if (input.apySeriesBps.length === 0) {
-    throw new YieldError("Deret APY kosong: tidak ada yang bisa disimulasikan.");
+    throw new YieldError("Empty APY series: there is nothing to simulate.");
   }
 
-  const dikenal = new Set(input.pools.map((p) => p.poolId));
-  if (dikenal.size !== input.pools.length) {
-    throw new YieldError("poolId duplikat di dalam daftar pool.");
+  const known = new Set(input.pools.map((p) => p.poolId));
+  if (known.size !== input.pools.length) {
+    throw new YieldError("Duplicate poolId inside the pool list.");
   }
-  if (!dikenal.has(input.startPoolId)) {
-    throw new YieldError(`startPoolId "${input.startPoolId}" tidak ada di dalam daftar pool.`);
+  if (!known.has(input.startPoolId)) {
+    throw new YieldError(`startPoolId "${input.startPoolId}" is not in the pool list.`);
   }
 
-  for (const [i, baris] of input.apySeriesBps.entries()) {
-    const terlihat = new Set<string>();
-    for (const titik of baris) {
-      if (!dikenal.has(titik.poolId)) {
-        throw new YieldError(`Candle ${i} menyebut pool tak dikenal "${titik.poolId}".`);
+  for (const [i, row] of input.apySeriesBps.entries()) {
+    const seen = new Set<string>();
+    for (const point of row) {
+      if (!known.has(point.poolId)) {
+        throw new YieldError(`Candle ${i} names an unknown pool "${point.poolId}".`);
       }
-      if (terlihat.has(titik.poolId)) {
-        throw new YieldError(`Candle ${i} menyebut pool "${titik.poolId}" dua kali.`);
+      if (seen.has(point.poolId)) {
+        throw new YieldError(`Candle ${i} names pool "${point.poolId}" twice.`);
       }
-      terlihat.add(titik.poolId);
+      seen.add(point.poolId);
     }
-    if (terlihat.size !== dikenal.size) {
+    if (seen.size !== known.size) {
       throw new YieldError(
-        `Candle ${i} memuat ${terlihat.size} pool, seharusnya ${dikenal.size}. ` +
-          `Setiap candle wajib menyebut APY SELURUH pool, termasuk pool yang sedang ditempati — ` +
-          `tanpa itu selisih tidak bisa dihitung.`,
+        `Candle ${i} carries ${seen.size} pools, and should carry ${known.size}. ` +
+          `Every candle must name the APY of EVERY pool, including the one currently held — ` +
+          `without that the spread cannot be computed.`,
       );
     }
   }
@@ -141,12 +141,12 @@ export function runBacktest(input: YieldBacktestInput): YieldBacktestResult {
   /** The complete pool set at one candle. Data is always treated as fresh in a backtest. */
   const poolsAt = (candle: number): Map<string, Pool> => {
     const m = new Map<string, Pool>();
-    for (const titik of input.apySeriesBps[candle]!) {
-      const p = meta.get(titik.poolId)!;
-      m.set(titik.poolId, {
+    for (const point of input.apySeriesBps[candle]!) {
+      const p = meta.get(point.poolId)!;
+      m.set(point.poolId, {
         poolId: p.poolId,
         protocol: p.protocol,
-        apyBps: titik.apyBps,
+        apyBps: point.apyBps,
         tvlBase: p.tvlBase,
         riskScore: p.riskScore,
         isActive: true,
@@ -158,7 +158,7 @@ export function runBacktest(input: YieldBacktestInput): YieldBacktestResult {
 
   type Mode = "disciplined" | "chaser" | "passive";
 
-  const jalankan = (mode: Mode): PolicyResult => {
+  const run = (mode: Mode): PolicyResult => {
     let principal = input.startPrincipalBase;
     let poolId = input.startPoolId;
     let migrations = 0;
@@ -167,8 +167,8 @@ export function runBacktest(input: YieldBacktestInput): YieldBacktestResult {
 
     // The confirmation memory. `decide` is pure and does not store it; the production
     // scheduler MUST use exactly the same rule as this block.
-    let favorit: string | null = null;
-    let berturut = 0;
+    let favorite: string | null = null;
+    let consecutive = 0;
 
     for (let i = 0; i < input.apySeriesBps.length; i++) {
       const pools = poolsAt(i);
@@ -187,15 +187,15 @@ export function runBacktest(input: YieldBacktestInput): YieldBacktestResult {
           thresholds,
         );
         if (probe.spreadQualifies && probe.targetPoolId !== null) {
-          berturut = probe.targetPoolId === favorit ? berturut + 1 : 1;
-          favorit = probe.targetPoolId;
+          consecutive = probe.targetPoolId === favorite ? consecutive + 1 : 1;
+          favorite = probe.targetPoolId;
         } else {
-          berturut = 0;
-          favorit = null;
+          consecutive = 0;
+          favorite = null;
         }
 
         const d = decide(
-          { position: { principalBase: principal, current }, candidates, consecutiveFavorable: berturut, blockNumber: BigInt(i) },
+          { position: { principalBase: principal, current }, candidates, consecutiveFavorable: consecutive, blockNumber: BigInt(i) },
           cost,
           thresholds,
         );
@@ -204,37 +204,37 @@ export function runBacktest(input: YieldBacktestInput): YieldBacktestResult {
         // metadata is fixed, so the safety gate never fires. That is part of the
         // limitations written at the top of this file.
       } else if (mode === "chaser") {
-        let terbaik: Pool | null = null;
+        let best: Pool | null = null;
         for (const c of candidates) {
-          if (terbaik === null || c.apyBps > terbaik.apyBps || (c.apyBps === terbaik.apyBps && c.poolId < terbaik.poolId)) {
-            terbaik = c;
+          if (best === null || c.apyBps > best.apyBps || (c.apyBps === best.apyBps && c.poolId < best.poolId)) {
+            best = c;
           }
         }
-        if (terbaik !== null && terbaik.apyBps > current.apyBps) target = terbaik.poolId;
+        if (best !== null && best.apyBps > current.apyBps) target = best.poolId;
       }
 
       if (target !== null) {
-        const biaya = switchCostBase(principal, cost);
-        principal -= biaya;
-        totalCostBase += biaya;
+        const switchCost = switchCostBase(principal, cost);
+        principal -= switchCost;
+        totalCostBase += switchCost;
         migrations += 1;
         if (firstMigrationCandle === null) firstMigrationCandle = i;
         poolId = target;
         // After migrating, the confirmation count no longer applies to the new pool.
-        berturut = 0;
-        favorit = null;
+        consecutive = 0;
+        favorite = null;
       }
 
-      const apySekarang = poolsAt(i).get(poolId)!.apyBps;
-      principal += yieldOverPeriodBase(principal, apySekarang, input.daysPerCandle);
+      const currentApy = poolsAt(i).get(poolId)!.apyBps;
+      principal += yieldOverPeriodBase(principal, currentApy, input.daysPerCandle);
     }
 
     return { finalPrincipalBase: principal, migrations, totalCostBase, firstMigrationCandle };
   };
 
-  const disciplined = jalankan("disciplined");
-  const chaser = jalankan("chaser");
-  const passive = jalankan("passive");
+  const disciplined = run("disciplined");
+  const chaser = run("chaser");
+  const passive = run("passive");
 
   return {
     candles: input.apySeriesBps.length,

@@ -9,11 +9,11 @@ import {
 } from "../types.js";
 
 const usd = (n: bigint) => n * 100_000_000n;
-const POKOK = usd(10_000n);
-const biaya: SwitchCostModel = { swapFeeBps: 5n, slippageBps: 10n, gasCostBase: usd(1n) };
+const PRINCIPAL = usd(10_000n);
+const cost: SwitchCostModel = { swapFeeBps: 5n, slippageBps: 10n, gasCostBase: usd(1n) };
 
 /** The required threshold for a $10,000 principal: 195 bps break-even, times 2.00x = 390 bps. */
-const AMBANG = 390n;
+const REQUIRED_BPS = 390n;
 
 function pool(over: Partial<Pool> & { poolId: string }): Pool {
   return {
@@ -29,7 +29,7 @@ function pool(over: Partial<Pool> & { poolId: string }): Pool {
 
 function obs(over: Partial<YieldObservation> = {}): YieldObservation {
   return {
-    position: { principalBase: POKOK, current: pool({ poolId: "venus-usdt", apyBps: 500n }) },
+    position: { principalBase: PRINCIPAL, current: pool({ poolId: "venus-usdt", apyBps: 500n }) },
     candidates: [],
     consecutiveFavorable: 3,
     blockNumber: 1n,
@@ -37,308 +37,308 @@ function obs(over: Partial<YieldObservation> = {}): YieldObservation {
   };
 }
 
-describe("decide — ambang selisih APY minimum", () => {
-  it("tanpa kandidat, tetap di tempat", () => {
-    const d = decide(obs(), biaya);
+describe("decide — the minimum APY spread threshold", () => {
+  it("with no candidate, stays put", () => {
+    const d = decide(obs(), cost);
     expect(d.action).toBe("STAY");
     expect(d.reasonCode).toBe("NO_CANDIDATE");
     expect(d.targetPoolId).toBeNull();
   });
 
-  it("melaporkan ambang impas dan ambang wajib yang diturunkan dari ongkos, bukan ditebak", () => {
-    const d = decide(obs(), biaya);
+  it("reports a break-even and a required threshold derived from the cost, not guessed", () => {
+    const d = decide(obs(), cost);
     expect(d.switchCostBase).toBe(usd(16n));
     expect(d.breakEvenSpreadBps).toBe(195n);
-    expect(d.requiredSpreadBps).toBe(AMBANG);
+    expect(d.requiredSpreadBps).toBe(REQUIRED_BPS);
   });
 
-  it("kandidat dengan APY lebih rendah tidak pernah menarik", () => {
-    const d = decide(obs({ candidates: [pool({ poolId: "aave-usdt", apyBps: 400n })] }), biaya);
+  it("a candidate with a lower APY is never attractive", () => {
+    const d = decide(obs({ candidates: [pool({ poolId: "aave-usdt", apyBps: 400n })] }), cost);
     expect(d.action).toBe("STAY");
     expect(d.reasonCode).toBe("NO_BETTER_POOL");
   });
 
-  it("APY tertinggi TIDAK cukup: selisih di bawah ambang wajib ditolak", () => {
-    const d = decide(obs({ candidates: [pool({ poolId: "aave-usdt", apyBps: 880n })] }), biaya);
+  it("the highest APY is NOT enough: a spread below the required threshold is rejected", () => {
+    const d = decide(obs({ candidates: [pool({ poolId: "aave-usdt", apyBps: 880n })] }), cost);
     expect(d.spreadBps).toBe(380n);
     expect(d.action).toBe("STAY");
     expect(d.reasonCode).toBe("SPREAD_BELOW_BREAKEVEN");
     expect(d.spreadQualifies).toBe(false);
   });
 
-  it("selisih tepat di ambang wajib sudah cukup", () => {
-    const d = decide(obs({ candidates: [pool({ poolId: "aave-usdt", apyBps: 500n + AMBANG })] }), biaya);
+  it("a spread exactly at the required threshold is enough", () => {
+    const d = decide(obs({ candidates: [pool({ poolId: "aave-usdt", apyBps: 500n + REQUIRED_BPS })] }), cost);
     expect(d.spreadQualifies).toBe(true);
     expect(d.action).toBe("MIGRATE");
   });
 
-  it("selisih besar dan terkonfirmasi menghasilkan perpindahan", () => {
-    const d = decide(obs({ candidates: [pool({ poolId: "aave-usdt", apyBps: 900n })] }), biaya);
+  it("a large, confirmed spread produces a migration", () => {
+    const d = decide(obs({ candidates: [pool({ poolId: "aave-usdt", apyBps: 900n })] }), cost);
     expect(d.action).toBe("MIGRATE");
     expect(d.reasonCode).toBe("MIGRATION_ECONOMIC");
     expect(d.targetPoolId).toBe("aave-usdt");
     expect(d.netGainBase).toBeGreaterThan(0n);
   });
 
-  it("selisih yang sama pada pokok kecil TIDAK cukup — gas tetap melahapnya", () => {
-    const kecil = obs({
+  it("the same spread on a small principal is NOT enough — the fixed gas eats it", () => {
+    const small = obs({
       position: { principalBase: usd(200n), current: pool({ poolId: "venus-usdt", apyBps: 500n }) },
       candidates: [pool({ poolId: "aave-usdt", apyBps: 900n, tvlBase: usd(1_000_000n) })],
     });
-    const d = decide(kecil, biaya);
+    const d = decide(small, cost);
     expect(d.requiredSpreadBps).toBeGreaterThan(400n);
     expect(d.action).toBe("STAY");
     expect(d.reasonCode).toBe("SPREAD_BELOW_BREAKEVEN");
   });
 });
 
-describe("decide — konfirmasi mencegah mengejar lonjakan sesaat", () => {
-  it("selisih layak tetapi baru satu pengamatan belum cukup", () => {
+describe("decide — confirmation prevents chasing a momentary spike", () => {
+  it("a qualifying spread on only one observation is not enough", () => {
     const d = decide(
       obs({ candidates: [pool({ poolId: "aave-usdt", apyBps: 900n })], consecutiveFavorable: 1 }),
-      biaya,
+      cost,
     );
     expect(d.action).toBe("STAY");
     expect(d.reasonCode).toBe("SPREAD_NOT_CONFIRMED");
     expect(d.spreadQualifies).toBe(true);
   });
 
-  it("dua pengamatan masih belum cukup, tiga cukup", () => {
-    const dua = decide(
+  it("two observations are still not enough, three are", () => {
+    const two = decide(
       obs({ candidates: [pool({ poolId: "aave-usdt", apyBps: 900n })], consecutiveFavorable: 2 }),
-      biaya,
+      cost,
     );
-    const tiga = decide(
+    const three = decide(
       obs({ candidates: [pool({ poolId: "aave-usdt", apyBps: 900n })], consecutiveFavorable: 3 }),
-      biaya,
+      cost,
     );
-    expect(dua.action).toBe("STAY");
-    expect(tiga.action).toBe("MIGRATE");
+    expect(two.action).toBe("STAY");
+    expect(three.action).toBe("MIGRATE");
   });
 
-  it("targetPoolId tetap dilaporkan walau belum dikonfirmasi, supaya pemanggil tahu apa yang dihitungnya", () => {
+  it("targetPoolId is still reported before confirmation, so the caller knows what was computed", () => {
     const d = decide(
       obs({ candidates: [pool({ poolId: "aave-usdt", apyBps: 900n })], consecutiveFavorable: 0 }),
-      biaya,
+      cost,
     );
     expect(d.targetPoolId).toBe("aave-usdt");
   });
 });
 
-describe("decide — gerbang risiko berjalan SEBELUM gerbang imbal hasil", () => {
-  it("APY tertinggi di pool yang terlalu kecil ditolak — deposit kita sendiri akan meruntuhkan APY-nya", () => {
+describe("decide — the risk gates run BEFORE the yield gates", () => {
+  it("the highest APY in a pool that is too small is rejected — our own deposit would collapse that APY", () => {
     const d = decide(
       obs({
         candidates: [
-          pool({ poolId: "kecil", apyBps: 5_000n, tvlBase: usd(50_000n) }),
-          pool({ poolId: "besar", apyBps: 900n }),
+          pool({ poolId: "small", apyBps: 5_000n, tvlBase: usd(50_000n) }),
+          pool({ poolId: "large", apyBps: 900n }),
         ],
       }),
-      biaya,
+      cost,
     );
-    expect(d.targetPoolId).toBe("besar");
-    expect(d.rejected.find((r) => r.poolId === "kecil")?.why).toBe("POOL_SHARE");
+    expect(d.targetPoolId).toBe("large");
+    expect(d.rejected.find((r) => r.poolId === "small")?.why).toBe("POOL_SHARE");
   });
 
-  it("APY yang mustahil ditolak sebagai data rusak, bukan dikejar", () => {
-    const d = decide(obs({ candidates: [pool({ poolId: "mirage", apyBps: 500_000n })] }), biaya);
+  it("an implausible APY is rejected as broken data, not chased", () => {
+    const d = decide(obs({ candidates: [pool({ poolId: "mirage", apyBps: 500_000n })] }), cost);
     expect(d.action).toBe("STAY");
     expect(d.rejected[0]!.why).toBe("IMPLAUSIBLE_APY");
   });
 
-  it("skor risiko di atas ambang ditolak berapa pun APY-nya", () => {
-    const d = decide(obs({ candidates: [pool({ poolId: "bahaya", apyBps: 9_000n, riskScore: 80 })] }), biaya);
+  it("a risk score above the threshold is rejected whatever the APY", () => {
+    const d = decide(obs({ candidates: [pool({ poolId: "dangerous", apyBps: 9_000n, riskScore: 80 })] }), cost);
     expect(d.action).toBe("STAY");
     expect(d.rejected[0]!.why).toBe("RISK_SCORE");
   });
 
-  it("pool yang tidak aktif ditolak", () => {
-    const d = decide(obs({ candidates: [pool({ poolId: "beku", apyBps: 9_000n, isActive: false })] }), biaya);
+  it("an inactive pool is rejected", () => {
+    const d = decide(obs({ candidates: [pool({ poolId: "frozen", apyBps: 9_000n, isActive: false })] }), cost);
     expect(d.rejected[0]!.why).toBe("INACTIVE");
   });
 
-  it("APY basi ditolak — bertindak atas angka satu jam lalu adalah bertindak atas angka yang sudah berubah", () => {
-    const d = decide(obs({ candidates: [pool({ poolId: "basi", apyBps: 9_000n, apyAgeSeconds: 7_200 })] }), biaya);
+  it("a stale APY is rejected — acting on an hour-old number is acting on a number that already changed", () => {
+    const d = decide(obs({ candidates: [pool({ poolId: "stale", apyBps: 9_000n, apyAgeSeconds: 7_200 })] }), cost);
     expect(d.rejected[0]!.why).toBe("STALE_DATA");
   });
 
-  it("pool yang sama dengan posisi sekarang tidak pernah jadi kandidat pindah", () => {
-    const d = decide(obs({ candidates: [pool({ poolId: "venus-usdt", apyBps: 900n })] }), biaya);
+  it("the pool the position already sits in is never a migration candidate", () => {
+    const d = decide(obs({ candidates: [pool({ poolId: "venus-usdt", apyBps: 900n })] }), cost);
     expect(d.action).toBe("STAY");
     expect(d.reasonCode).toBe("NO_CANDIDATE");
   });
 });
 
-describe("decide — keselamatan mengalahkan ekonomi", () => {
-  it("pool sekarang dibekukan: pindah walaupun selisihnya kecil", () => {
+describe("decide — safety beats economics", () => {
+  it("the current pool is frozen: migrate even when the spread is small", () => {
     const d = decide(
       obs({
-        position: { principalBase: POKOK, current: pool({ poolId: "venus-usdt", apyBps: 500n, isActive: false }) },
+        position: { principalBase: PRINCIPAL, current: pool({ poolId: "venus-usdt", apyBps: 500n, isActive: false }) },
         candidates: [pool({ poolId: "aave-usdt", apyBps: 510n })],
       }),
-      biaya,
+      cost,
     );
     expect(d.action).toBe("MIGRATE");
     expect(d.reasonCode).toBe("CURRENT_POOL_UNSAFE");
     expect(d.targetPoolId).toBe("aave-usdt");
   });
 
-  it("pool sekarang menyusut sampai pangsa kita terlalu besar: pindah", () => {
+  it("the current pool shrank until our share is too large: migrate", () => {
     const d = decide(
       obs({
-        position: { principalBase: POKOK, current: pool({ poolId: "venus-usdt", tvlBase: usd(20_000n) }) },
+        position: { principalBase: PRINCIPAL, current: pool({ poolId: "venus-usdt", tvlBase: usd(20_000n) }) },
         candidates: [pool({ poolId: "aave-usdt", apyBps: 500n })],
       }),
-      biaya,
+      cost,
     );
     expect(d.action).toBe("MIGRATE");
     expect(d.reasonCode).toBe("CURRENT_POOL_UNSAFE");
   });
 
-  it("pool sekarang tidak aman dan tidak ada tujuan yang lolos: keluar sepenuhnya", () => {
+  it("the current pool is unsafe and no destination clears the gates: exit entirely", () => {
     const d = decide(
       obs({
-        position: { principalBase: POKOK, current: pool({ poolId: "venus-usdt", isActive: false }) },
-        candidates: [pool({ poolId: "juga-bahaya", riskScore: 90 })],
+        position: { principalBase: PRINCIPAL, current: pool({ poolId: "venus-usdt", isActive: false }) },
+        candidates: [pool({ poolId: "also-dangerous", riskScore: 90 })],
       }),
-      biaya,
+      cost,
     );
     expect(d.action).toBe("EXIT");
     expect(d.reasonCode).toBe("NO_ELIGIBLE_POOL");
     expect(d.targetPoolId).toBeNull();
   });
 
-  it("perpindahan darurat tidak menunggu konfirmasi", () => {
+  it("an emergency migration does not wait for confirmation", () => {
     const d = decide(
       obs({
-        position: { principalBase: POKOK, current: pool({ poolId: "venus-usdt", isActive: false }) },
+        position: { principalBase: PRINCIPAL, current: pool({ poolId: "venus-usdt", isActive: false }) },
         candidates: [pool({ poolId: "aave-usdt", apyBps: 500n })],
         consecutiveFavorable: 0,
       }),
-      biaya,
+      cost,
     );
     expect(d.action).toBe("MIGRATE");
   });
 
-  it("data APY posisi sekarang basi: menolak menghitung selisih dan tetap diam", () => {
+  it("the current position's APY data is stale: refuses to compute a spread and stays put", () => {
     const d = decide(
       obs({
-        position: { principalBase: POKOK, current: pool({ poolId: "venus-usdt", apyAgeSeconds: 7_200 }) },
+        position: { principalBase: PRINCIPAL, current: pool({ poolId: "venus-usdt", apyAgeSeconds: 7_200 }) },
         candidates: [pool({ poolId: "aave-usdt", apyBps: 900n })],
       }),
-      biaya,
+      cost,
     );
     expect(d.action).toBe("STAY");
     expect(d.reasonCode).toBe("CURRENT_DATA_STALE");
   });
 
-  it("tidak aman mengalahkan basi: pool yang dibekukan tetap ditinggalkan walau datanya basi", () => {
+  it("unsafe beats stale: a frozen pool is left even when its data is stale", () => {
     const d = decide(
       obs({
         position: {
-          principalBase: POKOK,
+          principalBase: PRINCIPAL,
           current: pool({ poolId: "venus-usdt", isActive: false, apyAgeSeconds: 7_200 }),
         },
         candidates: [pool({ poolId: "aave-usdt", apyBps: 500n })],
       }),
-      biaya,
+      cost,
     );
     expect(d.action).toBe("MIGRATE");
     expect(d.reasonCode).toBe("CURRENT_POOL_UNSAFE");
   });
 });
 
-describe("decide — determinisme dan kemurnian", () => {
-  it("dua panggilan identik menghasilkan keputusan identik", () => {
+describe("decide — determinism and purity", () => {
+  it("two identical calls produce identical decisions", () => {
     const o = obs({ candidates: [pool({ poolId: "a", apyBps: 900n }), pool({ poolId: "b", apyBps: 900n })] });
-    expect(decide(o, biaya)).toEqual(decide(o, biaya));
+    expect(decide(o, cost)).toEqual(decide(o, cost));
   });
 
-  it("APY seri dipecah oleh poolId secara alfabetis, bukan oleh urutan masukan", () => {
-    const naik = decide(
+  it("an APY tie is broken by poolId alphabetically, not by input order", () => {
+    const ascending = decide(
       obs({ candidates: [pool({ poolId: "aaa", apyBps: 900n }), pool({ poolId: "zzz", apyBps: 900n })] }),
-      biaya,
+      cost,
     );
-    const turun = decide(
+    const descending = decide(
       obs({ candidates: [pool({ poolId: "zzz", apyBps: 900n }), pool({ poolId: "aaa", apyBps: 900n })] }),
-      biaya,
+      cost,
     );
-    expect(naik.targetPoolId).toBe("aaa");
-    expect(turun.targetPoolId).toBe("aaa");
+    expect(ascending.targetPoolId).toBe("aaa");
+    expect(descending.targetPoolId).toBe("aaa");
   });
 
-  it("tidak memutasi pengamatan masukan", () => {
+  it("does not mutate the input observation", () => {
     const o = obs({ candidates: [pool({ poolId: "z", apyBps: 900n }), pool({ poolId: "a", apyBps: 400n })] });
-    const urutanAwal = o.candidates.map((c) => c.poolId);
-    decide(o, biaya);
-    expect(o.candidates.map((c) => c.poolId)).toEqual(urutanAwal);
+    const initialOrder = o.candidates.map((c) => c.poolId);
+    decide(o, cost);
+    expect(o.candidates.map((c) => c.poolId)).toEqual(initialOrder);
   });
 });
 
-describe("decide — penjelasan", () => {
-  it("alasan memakai angka terformat, bukan basis 8 desimal mentah", () => {
-    const d = decide(obs({ candidates: [pool({ poolId: "aave-usdt", apyBps: 900n })] }), biaya);
+describe("decide — the explanation", () => {
+  it("the reason uses formatted numbers, not the raw 8-decimal basis", () => {
+    const d = decide(obs({ candidates: [pool({ poolId: "aave-usdt", apyBps: 900n })] }), cost);
     expect(d.reason).toContain("%");
     expect(d.reason).not.toContain("1000000000000");
   });
 
-  it("alasan menolak pindah menyebut ambang yang tidak tercapai", () => {
-    const d = decide(obs({ candidates: [pool({ poolId: "aave-usdt", apyBps: 880n })] }), biaya);
+  it("the reason for refusing to migrate names the threshold that was not reached", () => {
+    const d = decide(obs({ candidates: [pool({ poolId: "aave-usdt", apyBps: 880n })] }), cost);
     expect(d.reason).toContain("390");
   });
 });
 
-describe("decide — gagal keras pada masukan tak masuk akal", () => {
-  it("pokok nol ditolak", () => {
-    expect(() => decide(obs({ position: { principalBase: 0n, current: pool({ poolId: "x" }) } }), biaya)).toThrow(YieldError);
+describe("decide — hard failure on nonsensical input", () => {
+  it("rejects a zero principal", () => {
+    expect(() => decide(obs({ position: { principalBase: 0n, current: pool({ poolId: "x" }) } }), cost)).toThrow(YieldError);
   });
 
-  it("APY negatif ditolak", () => {
-    expect(() => decide(obs({ candidates: [pool({ poolId: "x", apyBps: -1n })] }), biaya)).toThrow(YieldError);
+  it("rejects a negative APY", () => {
+    expect(() => decide(obs({ candidates: [pool({ poolId: "x", apyBps: -1n })] }), cost)).toThrow(YieldError);
   });
 
-  it("TVL nol ditolak", () => {
-    expect(() => decide(obs({ candidates: [pool({ poolId: "x", tvlBase: 0n })] }), biaya)).toThrow(YieldError);
+  it("rejects a zero TVL", () => {
+    expect(() => decide(obs({ candidates: [pool({ poolId: "x", tvlBase: 0n })] }), cost)).toThrow(YieldError);
   });
 
-  it("skor risiko di luar 0..100 ditolak", () => {
-    expect(() => decide(obs({ candidates: [pool({ poolId: "x", riskScore: 101 })] }), biaya)).toThrow(YieldError);
-    expect(() => decide(obs({ candidates: [pool({ poolId: "x", riskScore: -1 })] }), biaya)).toThrow(YieldError);
+  it("rejects a risk score outside 0..100", () => {
+    expect(() => decide(obs({ candidates: [pool({ poolId: "x", riskScore: 101 })] }), cost)).toThrow(YieldError);
+    expect(() => decide(obs({ candidates: [pool({ poolId: "x", riskScore: -1 })] }), cost)).toThrow(YieldError);
   });
 
-  it("umur data negatif ditolak", () => {
-    expect(() => decide(obs({ candidates: [pool({ poolId: "x", apyAgeSeconds: -1 })] }), biaya)).toThrow(YieldError);
+  it("rejects a negative data age", () => {
+    expect(() => decide(obs({ candidates: [pool({ poolId: "x", apyAgeSeconds: -1 })] }), cost)).toThrow(YieldError);
   });
 
-  it("poolId kandidat yang duplikat ditolak — pilihan menjadi ambigu", () => {
+  it("rejects a duplicate candidate poolId — the choice becomes ambiguous", () => {
     expect(() =>
-      decide(obs({ candidates: [pool({ poolId: "x" }), pool({ poolId: "x", apyBps: 900n })] }), biaya),
+      decide(obs({ candidates: [pool({ poolId: "x" }), pool({ poolId: "x", apyBps: 900n })] }), cost),
     ).toThrow(YieldError);
   });
 
-  it("hitungan konfirmasi negatif ditolak", () => {
-    expect(() => decide(obs({ consecutiveFavorable: -1 }), biaya)).toThrow(YieldError);
+  it("rejects a negative confirmation count", () => {
+    expect(() => decide(obs({ consecutiveFavorable: -1 }), cost)).toThrow(YieldError);
   });
 
-  it("horizon nol hari ditolak — seluruh ambang impas dibagi angka itu", () => {
+  it("rejects a zero-day horizon — the whole break-even threshold is divided by that number", () => {
     expect(() =>
-      decide(obs(), biaya, { ...DEFAULT_YIELD_THRESHOLDS, expectedHoldingDays: 0n }),
+      decide(obs(), cost, { ...DEFAULT_YIELD_THRESHOLDS, expectedHoldingDays: 0n }),
     ).toThrow(YieldError);
   });
 
-  it("pengali keamanan di bawah 1,00x ditolak — itu meresmikan pindah yang merugi", () => {
+  it("rejects a safety multiple below 1.00x — that formalizes a loss-making migration", () => {
     expect(() =>
-      decide(obs(), biaya, { ...DEFAULT_YIELD_THRESHOLDS, spreadSafetyMultipleBps: 9_999n }),
+      decide(obs(), cost, { ...DEFAULT_YIELD_THRESHOLDS, spreadSafetyMultipleBps: 9_999n }),
     ).toThrow(YieldError);
   });
 
-  it("pangsa pool maksimum 100% ditolak — menjadi seluruh pool berarti APY-nya cerminan diri sendiri", () => {
+  it("rejects a 100% maximum pool share — being the whole pool means its APY reflects only ourselves", () => {
     expect(() =>
-      decide(obs(), biaya, { ...DEFAULT_YIELD_THRESHOLDS, maxPoolShareBps: 10_000n }),
+      decide(obs(), cost, { ...DEFAULT_YIELD_THRESHOLDS, maxPoolShareBps: 10_000n }),
     ).toThrow(YieldError);
   });
 
-  it("biaya pindah negatif ditolak", () => {
-    expect(() => decide(obs(), { ...biaya, gasCostBase: -1n })).toThrow(YieldError);
+  it("rejects a negative migration cost", () => {
+    expect(() => decide(obs(), { ...cost, gasCostBase: -1n })).toThrow(YieldError);
   });
 });

@@ -23,7 +23,7 @@ const ceilDiv = (a: bigint, b: bigint): bigint => (a + b - 1n) / b;
 /** The one-off cost of moving pools: proportional on the principal + fixed gas. */
 export function switchCostBase(principalBase: bigint, cost: SwitchCostModel): bigint {
   if (principalBase <= 0n) {
-    throw new YieldError(`Pokok ${principalBase} tidak positif: tidak ada yang bisa dipindahkan.`);
+    throw new YieldError(`Principal ${principalBase} is not positive: there is nothing to move.`);
   }
   return ceilDiv(principalBase * (cost.swapFeeBps + cost.slippageBps), BPS_ONE) + cost.gasCostBase;
 }
@@ -48,11 +48,11 @@ export function breakEvenSpreadBps(
   days: bigint,
 ): bigint {
   if (principalBase <= 0n) {
-    throw new YieldError(`Pokok ${principalBase} tidak positif.`);
+    throw new YieldError(`Principal ${principalBase} is not positive.`);
   }
   if (days <= 0n) {
     throw new YieldError(
-      `Horizon ${days} hari tidak positif: pertanyaan "apakah pindah ini sepadan" tidak punya jawaban tanpa horizon.`,
+      `A horizon of ${days} days is not positive: the question "is this move worth it" has no answer without a horizon.`,
     );
   }
   return ceilDiv(switchCost * BPS_ONE * DAYS_PER_YEAR, principalBase * days);
@@ -81,7 +81,7 @@ export function netGainBase(
 /** Our share of the pool, rounded up. */
 export function poolShareBps(principalBase: bigint, tvlBase: bigint): bigint {
   if (tvlBase <= 0n) {
-    throw new YieldError(`TVL ${tvlBase} tidak positif: itu bukan pool, itu pembacaan yang gagal.`);
+    throw new YieldError(`TVL ${tvlBase} is not positive: that is not a pool, it is a failed reading.`);
   }
   return ceilDiv(principalBase * BPS_ONE, tvlBase);
 }

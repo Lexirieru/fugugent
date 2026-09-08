@@ -45,14 +45,14 @@ import {
 function validateCost(cost: SwitchCostModel): void {
   if (cost.swapFeeBps < 0n || cost.slippageBps < 0n || cost.gasCostBase < 0n) {
     throw new YieldError(
-      `Model biaya negatif tidak mungkin: swapFeeBps=${cost.swapFeeBps}, ` +
+      `A negative cost model is impossible: swapFeeBps=${cost.swapFeeBps}, ` +
         `slippageBps=${cost.slippageBps}, gasCostBase=${cost.gasCostBase}.`,
     );
   }
   if (cost.swapFeeBps + cost.slippageBps >= BPS_ONE) {
     throw new YieldError(
-      `Biaya proporsional ${cost.swapFeeBps + cost.slippageBps} bps mencapai 100%: ` +
-        `perpindahan seperti itu tidak menyisakan pokok.`,
+      `A proportional cost of ${cost.swapFeeBps + cost.slippageBps} bps reaches 100%: ` +
+        `a move like that leaves no principal behind.`,
     );
   }
 }
@@ -60,33 +60,33 @@ function validateCost(cost: SwitchCostModel): void {
 function validateThresholds(t: YieldThresholds): void {
   if (t.expectedHoldingDays <= 0n) {
     throw new YieldError(
-      `expectedHoldingDays=${t.expectedHoldingDays} tidak positif. Seluruh ambang impas dibagi angka ini; ` +
-        `tanpa horizon, "apakah pindah ini sepadan" tidak punya jawaban.`,
+      `expectedHoldingDays=${t.expectedHoldingDays} is not positive. The whole break-even threshold is divided by this number; ` +
+        `without a horizon, "is this move worth it" has no answer.`,
     );
   }
   if (t.spreadSafetyMultipleBps < BPS_ONE) {
     throw new YieldError(
-      `spreadSafetyMultipleBps=${t.spreadSafetyMultipleBps} di bawah 10000 (1,00x): itu meresmikan ` +
-        `perpindahan yang bahkan tidak menutup ongkosnya sendiri.`,
+      `spreadSafetyMultipleBps=${t.spreadSafetyMultipleBps} is below 10000 (1.00x): that formalizes ` +
+        `a move that does not even cover its own cost.`,
     );
   }
   if (t.maxPoolShareBps <= 0n || t.maxPoolShareBps >= BPS_ONE) {
     throw new YieldError(
-      `maxPoolShareBps=${t.maxPoolShareBps} di luar rentang 1..9999. Pangsa 100% berarti APY yang dikejar ` +
-        `sepenuhnya pantulan modal kita sendiri.`,
+      `maxPoolShareBps=${t.maxPoolShareBps} is outside the range 1..9999. A 100% share means the APY being chased ` +
+        `is entirely a reflection of our own capital.`,
     );
   }
   if (t.maxPlausibleApyBps <= 0n) {
-    throw new YieldError(`maxPlausibleApyBps=${t.maxPlausibleApyBps} tidak positif.`);
+    throw new YieldError(`maxPlausibleApyBps=${t.maxPlausibleApyBps} is not positive.`);
   }
   if (!Number.isInteger(t.maxRiskScore) || t.maxRiskScore < 0 || t.maxRiskScore > 100) {
-    throw new YieldError(`maxRiskScore=${t.maxRiskScore} di luar rentang 0..100.`);
+    throw new YieldError(`maxRiskScore=${t.maxRiskScore} is outside the range 0..100.`);
   }
   if (!Number.isInteger(t.maxApyAgeSeconds) || t.maxApyAgeSeconds < 0) {
-    throw new YieldError(`maxApyAgeSeconds=${t.maxApyAgeSeconds} harus bilangan bulat >= 0.`);
+    throw new YieldError(`maxApyAgeSeconds=${t.maxApyAgeSeconds} must be an integer >= 0.`);
   }
   if (!Number.isInteger(t.minConsecutiveFavorable) || t.minConsecutiveFavorable < 1) {
-    throw new YieldError(`minConsecutiveFavorable=${t.minConsecutiveFavorable} harus bilangan bulat >= 1.`);
+    throw new YieldError(`minConsecutiveFavorable=${t.minConsecutiveFavorable} must be an integer >= 1.`);
   }
 }
 
@@ -97,38 +97,38 @@ function validateThresholds(t: YieldThresholds): void {
  */
 function validatePool(p: Pool, label: string): void {
   if (p.apyBps < 0n) {
-    throw new YieldError(`APY negatif pada ${label} "${p.poolId}": ${p.apyBps} bps.`);
+    throw new YieldError(`Negative APY on ${label} "${p.poolId}": ${p.apyBps} bps.`);
   }
   if (p.tvlBase <= 0n) {
-    throw new YieldError(`TVL ${p.tvlBase} pada ${label} "${p.poolId}" tidak positif.`);
+    throw new YieldError(`TVL ${p.tvlBase} on ${label} "${p.poolId}" is not positive.`);
   }
   if (!Number.isInteger(p.riskScore) || p.riskScore < 0 || p.riskScore > 100) {
-    throw new YieldError(`riskScore=${p.riskScore} pada ${label} "${p.poolId}" di luar rentang 0..100.`);
+    throw new YieldError(`riskScore=${p.riskScore} on ${label} "${p.poolId}" is outside the range 0..100.`);
   }
   if (!Number.isInteger(p.apyAgeSeconds) || p.apyAgeSeconds < 0) {
     throw new YieldError(
-      `apyAgeSeconds=${p.apyAgeSeconds} pada ${label} "${p.poolId}" harus bilangan bulat >= 0.`,
+      `apyAgeSeconds=${p.apyAgeSeconds} on ${label} "${p.poolId}" must be an integer >= 0.`,
     );
   }
 }
 
 function validateObservation(o: YieldObservation): void {
   if (o.position.principalBase <= 0n) {
-    throw new YieldError(`Pokok ${o.position.principalBase} tidak positif: tidak ada posisi untuk dikelola.`);
+    throw new YieldError(`Principal ${o.position.principalBase} is not positive: there is no position to manage.`);
   }
-  validatePool(o.position.current, "posisi sekarang");
+  validatePool(o.position.current, "the current position");
 
-  const terlihat = new Set<string>();
+  const seen = new Set<string>();
   for (const c of o.candidates) {
-    if (terlihat.has(c.poolId)) {
-      throw new YieldError(`poolId kandidat duplikat "${c.poolId}": pilihan terbaik menjadi ambigu.`);
+    if (seen.has(c.poolId)) {
+      throw new YieldError(`Duplicate candidate poolId "${c.poolId}": the best choice becomes ambiguous.`);
     }
-    terlihat.add(c.poolId);
-    validatePool(c, "kandidat");
+    seen.add(c.poolId);
+    validatePool(c, "a candidate");
   }
 
   if (!Number.isInteger(o.consecutiveFavorable) || o.consecutiveFavorable < 0) {
-    throw new YieldError(`consecutiveFavorable=${o.consecutiveFavorable} harus bilangan bulat >= 0.`);
+    throw new YieldError(`consecutiveFavorable=${o.consecutiveFavorable} must be an integer >= 0.`);
   }
 }
 
@@ -173,28 +173,28 @@ function buildReason(
   netGain: bigint,
   days: bigint,
 ): string {
-  const sekarang = `APY sekarang ${formatApyBps(currentApyBps)}`;
-  const terbaik =
-    bestApyBps === null ? "" : ` Kandidat terbaik "${targetPoolId}" ${formatApyBps(bestApyBps)}, selisih ${formatBps(spreadBps)}.`;
-  const ambang = ` Ambang wajib ${formatBps(requiredBps)} pada ongkos pindah ${formatUsd8(switchCost)} dan horizon ${days} hari.`;
+  const now = `Current APY ${formatApyBps(currentApyBps)}`;
+  const best =
+    bestApyBps === null ? "" : ` Best candidate "${targetPoolId}" at ${formatApyBps(bestApyBps)}, a spread of ${formatBps(spreadBps)}.`;
+  const threshold = ` The required threshold is ${formatBps(requiredBps)} at a migration cost of ${formatUsd8(switchCost)} over a ${days}-day horizon.`;
 
   switch (code) {
     case "NO_CANDIDATE":
-      return `${sekarang}. Tidak ada pool alternatif yang diberikan.`;
+      return `${now}. No alternative pool was given.`;
     case "NO_ELIGIBLE_POOL":
-      return `${sekarang}. Pool sekarang tidak lagi aman dan tidak ada tujuan yang lolos gerbang risiko: menarik seluruh posisi.`;
+      return `${now}. The current pool is no longer safe and no destination clears the risk gates: withdrawing the entire position.`;
     case "NO_BETTER_POOL":
-      return `${sekarang}.${terbaik} Tidak ada yang lebih tinggi; tetap di tempat.`;
+      return `${now}.${best} Nothing is higher; staying put.`;
     case "SPREAD_BELOW_BREAKEVEN":
-      return `${sekarang}.${terbaik}${ambang} Selisihnya belum menutup ongkos pindah, jadi APY yang lebih tinggi itu bukan pilihan yang lebih baik.`;
+      return `${now}.${best}${threshold} The spread does not yet cover the migration cost, so that higher APY is not the better choice.`;
     case "SPREAD_NOT_CONFIRMED":
-      return `${sekarang}.${terbaik}${ambang} Selisihnya cukup tetapi belum bertahan cukup lama; lonjakan sesaat tidak dikejar.`;
+      return `${now}.${best}${threshold} The spread is large enough but has not persisted long enough; a momentary spike is not chased.`;
     case "MIGRATION_ECONOMIC":
-      return `${sekarang}.${terbaik}${ambang} Taksiran keuntungan bersih ${formatUsd8(netGain)} selama horizon: berpindah.`;
+      return `${now}.${best}${threshold} Estimated net gain over the horizon ${formatUsd8(netGain)}: migrating.`;
     case "CURRENT_POOL_UNSAFE":
-      return `${sekarang}. Pool sekarang tidak lagi memenuhi gerbang risiko (dijeda, skor risiko naik, atau TVL menyusut sampai pangsa kita terlalu besar).${terbaik} Berpindah tanpa menunggu ambang selisih: keselamatan mengalahkan ekonomi.`;
+      return `${now}. The current pool no longer clears the risk gates (paused, its risk score rose, or its TVL shrank until our share is too large).${best} Migrating without waiting for the spread threshold: safety beats economics.`;
     case "CURRENT_DATA_STALE":
-      return `${sekarang} sudah terlalu basi untuk dipercaya. Selisih tidak bisa dihitung dengan jujur, jadi tidak ada yang dipindahkan.`;
+      return `${now} is too stale to be trusted. The spread cannot be computed honestly, so nothing is moved.`;
   }
 }
 
@@ -211,9 +211,9 @@ export function decide(
   const principal = position.principalBase;
   const current = position.current;
 
-  const biayaPindah = switchCostBase(principal, cost);
-  const impas = breakEvenSpreadBps(principal, biayaPindah, thresholds.expectedHoldingDays);
-  const wajib = requiredSpreadBps(impas, thresholds.spreadSafetyMultipleBps);
+  const switchCost = switchCostBase(principal, cost);
+  const breakEven = breakEvenSpreadBps(principal, switchCost, thresholds.expectedHoldingDays);
+  const required = requiredSpreadBps(breakEven, thresholds.spreadSafetyMultipleBps);
 
   // --- gate 3: filter candidates on risk, before looking at any APY ---
   const rejected: RejectedPool[] = [];
@@ -223,35 +223,35 @@ export function decide(
       rejected.push({ poolId: c.poolId, why: "SAME_POOL" });
       continue;
     }
-    const alasan = rejectionOf(c, principal, thresholds);
-    if (alasan === null) eligible.push(c);
-    else rejected.push({ poolId: c.poolId, why: alasan });
+    const why = rejectionOf(c, principal, thresholds);
+    if (why === null) eligible.push(c);
+    else rejected.push({ poolId: c.poolId, why });
   }
 
   // Deterministic ordering: APY descending, then poolId ascending. Without a strict
   // tiebreaker, two pools with equal APY would be picked by input order — and the input
   // order comes from an indexer, which is not guaranteed to be stable. A decision about
   // money must not depend on which row happened to come first.
-  const urut = [...eligible].sort((a, b) =>
+  const sorted = [...eligible].sort((a, b) =>
     a.apyBps === b.apyBps ? (a.poolId < b.poolId ? -1 : a.poolId > b.poolId ? 1 : 0) : a.apyBps > b.apyBps ? -1 : 1,
   );
-  const best = urut[0] ?? null;
+  const best = sorted[0] ?? null;
 
   const spread = best === null ? 0n : best.apyBps - current.apyBps;
-  const spreadQualifies = best !== null && spread >= wajib;
-  const netGain = best === null ? 0n : netGainBase(principal, spread, thresholds.expectedHoldingDays, biayaPindah);
+  const spreadQualifies = best !== null && spread >= required;
+  const netGain = best === null ? 0n : netGainBase(principal, spread, thresholds.expectedHoldingDays, switchCost);
 
-  const hasil = (action: YieldDecision["action"], code: YieldReasonCode, target: string | null): YieldDecision => ({
+  const result = (action: YieldDecision["action"], code: YieldReasonCode, target: string | null): YieldDecision => ({
     action,
     reasonCode: code,
     targetPoolId: target,
     currentApyBps: current.apyBps,
     bestApyBps: best?.apyBps ?? null,
     spreadBps: spread,
-    breakEvenSpreadBps: impas,
-    requiredSpreadBps: wajib,
+    breakEvenSpreadBps: breakEven,
+    requiredSpreadBps: required,
     spreadQualifies,
-    switchCostBase: biayaPindah,
+    switchCostBase: switchCost,
     netGainBase: netGain,
     rejected,
     reason: buildReason(
@@ -260,8 +260,8 @@ export function decide(
       best?.apyBps ?? null,
       best?.poolId ?? null,
       spread,
-      wajib,
-      biayaPindah,
+      required,
+      switchCost,
       netGain,
       thresholds.expectedHoldingDays,
     ),
@@ -269,27 +269,27 @@ export function decide(
 
   // --- gate 1: the current position's safety beats all economics ---
   if (currentPoolIsUnsafe(current, principal, thresholds)) {
-    if (best === null) return hasil("EXIT", "NO_ELIGIBLE_POOL", null);
+    if (best === null) return result("EXIT", "NO_ELIGIBLE_POOL", null);
     // No waiting for confirmation: waiting means leaving the money in a place already
     // judged unsafe for several more observations.
-    return hasil("MIGRATE", "CURRENT_POOL_UNSAFE", best.poolId);
+    return result("MIGRATE", "CURRENT_POOL_UNSAFE", best.poolId);
   }
 
   // --- gate 2: the current position's data must be fresh enough to compare against ---
   if (current.apyAgeSeconds > thresholds.maxApyAgeSeconds) {
-    return hasil("STAY", "CURRENT_DATA_STALE", best?.poolId ?? null);
+    return result("STAY", "CURRENT_DATA_STALE", best?.poolId ?? null);
   }
 
-  if (best === null) return hasil("STAY", "NO_CANDIDATE", null);
-  if (spread <= 0n) return hasil("STAY", "NO_BETTER_POOL", best.poolId);
+  if (best === null) return result("STAY", "NO_CANDIDATE", null);
+  if (spread <= 0n) return result("STAY", "NO_BETTER_POOL", best.poolId);
 
   // --- gate 4: economics ---
-  if (!spreadQualifies) return hasil("STAY", "SPREAD_BELOW_BREAKEVEN", best.poolId);
+  if (!spreadQualifies) return result("STAY", "SPREAD_BELOW_BREAKEVEN", best.poolId);
 
   // --- gate 5: confirmation ---
   if (consecutiveFavorable < thresholds.minConsecutiveFavorable) {
-    return hasil("STAY", "SPREAD_NOT_CONFIRMED", best.poolId);
+    return result("STAY", "SPREAD_NOT_CONFIRMED", best.poolId);
   }
 
-  return hasil("MIGRATE", "MIGRATION_ECONOMIC", best.poolId);
+  return result("MIGRATE", "MIGRATION_ECONOMIC", best.poolId);
 }
