@@ -4,7 +4,8 @@ Marketplace agent DeFi di BNB Chain untuk hackathon BNB Chain "The Smart Money E
 Setiap agent adalah karakter kartun ikan fugu; **fugu mengembang seiring beban risiko**
 — metrik risiko nyata divisualisasikan sebagai tingkat kembung.
 
-Domain: `fugugent.xyz` (landing) · `app.fugugent.xyz` (marketplace) · `api.fugugent.xyz`
+Domain: `hellofugu.xyz` (landing, sudah dibeli) · `app.hellofugu.xyz` (marketplace) · `api.hellofugu.xyz`
+**Belum ada yang di-deploy ke domain ini.**
 
 ## Dokumen wajib baca sebelum mengubah apa pun
 
@@ -52,5 +53,8 @@ bag --help                          # BNB Agent Studio CLI
 
 ## Gaya
 
-- Bahasa Indonesia untuk komunikasi dan dokumentasi; identifier kode tetap bahasa Inggris.
-- Commit message bahasa Indonesia, format conventional (`feat:`, `fix:`, `docs:`, `chore:`).
+- **English for all documentation, code comments, and commit messages.** Code identifiers
+  stay in English as always.
+- Conversation with the repo owner is in Bahasa Indonesia; everything written into the repo
+  is in English.
+- Conventional commit format (`feat:`, `fix:`, `docs:`, `chore:`).
