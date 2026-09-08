@@ -1,14 +1,15 @@
 /**
- * **Cermin** dari `backend/src/types.ts` — satu sumber kebenaran ada di backend,
- * berkas ini hanya salinan supaya frontend bisa dibangun sebelum backend selesai.
- * Kalau backend mengubah bentuknya, berkas ini yang menyesuaikan, bukan sebaliknya.
+ * A **mirror** of `backend/src/types.ts` — the single source of truth lives in the
+ * backend, this file is only a copy so the frontend can be built before the backend is
+ * finished. If the backend changes the shape, this file is the one that follows, never
+ * the other way round.
  *
- * Dua aturan dari sumbernya yang paling mudah dilanggar dan paling mahal:
+ * The two rules from the source that are easiest to break and most expensive to get wrong:
  *
- * 1. **Uang tidak pernah `number`.** `priceUsd8PerPeriod` bertipe `bigint` dengan
- *    basis 8 desimal: `12345678n` berarti $0.12, bukan dua belas juta. Karena itu
- *    `AgentRecord` tidak JSON-serializable apa adanya — lihat `lib/data/wire.ts`.
- * 2. **Field yang tidak diketahui bernilai `null`, bukan dihilangkan.**
+ * 1. **Money is never a `number`.** `priceUsd8PerPeriod` is a `bigint` in 8-decimal
+ *    base: `12345678n` means $0.12, not twelve million. That is why `AgentRecord` is
+ *    not JSON-serializable as it stands — see `lib/data/wire.ts`.
+ * 2. **An unknown field is `null`, not omitted.**
  */
 
 export const CATEGORIES = ["REBALANCING", "GRID", "YIELD", "HEALTH_FACTOR"] as const;
@@ -40,7 +41,7 @@ export interface FuguListing {
   owner: Address;
   agentWallet: Address;
   category: Category;
-  /** USD basis 8 desimal. `1_500_000_000n` = $15. */
+  /** USD in 8-decimal base. `1_500_000_000n` = $15. */
   priceUsd8PerPeriod: bigint;
   periodSeconds: number;
   active: boolean;
@@ -100,14 +101,14 @@ export interface AgentListPage {
   offset: number;
   source: AgentSource;
   /**
-   * `false` bila sumber gagal ATAU membalas bentuk yang tidak dikenali.
-   * Daftar kosong yang sah tetap `healthy: true`, begitu juga jawaban
-   * "tidak ditemukan" — agent yang memang tidak ada bukan tanda upstream sakit.
+   * `false` when the source failed OR replied with a shape we do not recognise.
+   * A legitimately empty list is still `healthy: true`, and so is a "not found"
+   * answer — an agent that genuinely does not exist is no sign of a sick upstream.
    */
   healthy: boolean;
   /**
-   * Keterangan keadaan sumber; tidak pernah memuat kredensial. Boleh terisi meski
-   * `healthy: true`. `healthy` adalah penentu, `reason` hanya menjelaskan.
+   * A note on the state of the source; never carries credentials. It may be filled in
+   * even when `healthy: true`. `healthy` decides, `reason` only explains.
    */
   reason: string | null;
   fetchedAt: string;

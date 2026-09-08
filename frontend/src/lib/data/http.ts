@@ -1,21 +1,21 @@
 /**
- * Implementasi `MarketplaceSource` di atas backend sungguhan.
+ * The `MarketplaceSource` implementation on top of a real backend.
  *
- * Endpoint yang disepakati (`backend/src/routes/agents.ts`):
+ * The agreed endpoints (`backend/src/routes/agents.ts`):
  *   GET /api/agents?category=&limit=&offset=
  *   GET /api/agents/:id
  *   GET /api/categories
  *   GET /api/health
  *
- * **Tidak pernah melempar.** Setiap kegagalan — jaringan mati, JSON asing, bentuk
- * yang tidak dikenali — menjadi `healthy: false` dengan alasan yang bisa dibaca.
- * Halaman yang gagal tetap punya bentuk, dan pengguna diberi tahu apa yang terjadi
- * alih-alih melihat daftar kosong yang menyamar sebagai "belum ada agent".
+ * **It never throws.** Every failure — a dead network, unfamiliar JSON, a shape we do
+ * not recognise — becomes `healthy: false` with a readable reason. A page that failed
+ * still has a shape, and the user is told what happened instead of seeing an empty list
+ * masquerading as "no agents yet".
  *
- * Amplop backend membawa `source`, `ageSeconds`, `stale`, `degraded`, dan `trail`.
- * Kelimanya diteruskan apa adanya ke `Provenance` dan **tidak** dihitung ulang:
- * backend yang tahu tangga mana yang benar-benar ditempuh, dan hanya ia yang
- * boleh menyatakan sebuah jawaban tidak bisa dipastikan segar.
+ * The backend envelope carries `source`, `ageSeconds`, `stale`, `degraded`, and
+ * `trail`. All five are passed through to `Provenance` unchanged and are **not**
+ * recomputed: the backend is the one that knows which rung it actually walked, and it is
+ * the only one allowed to declare an answer impossible to confirm fresh.
  */
 
 import type { AgentSource, SourceHealth } from "@/lib/agent-types";
@@ -62,7 +62,7 @@ function parseTrail(v: unknown): TrailStep[] {
   });
 }
 
-/** Amplop -> `Provenance`. Satu tempat, dipakai daftar, detail, dan kategori. */
+/** Envelope -> `Provenance`. One place, used by the list, the detail, and the categories. */
 function parseProvenance(o: Record<string, unknown>, now: string): Provenance {
   return {
     source: asSource(o.source, "cache"),
@@ -92,10 +92,10 @@ function failedProvenance(reason: string, now: string): Provenance {
 }
 
 /**
- * Record dari backend belum membawa risiko, izin sesi, atau bukti — bentuk
- * `AgentRecord` memang belum memuatnya. Kolom itu dibiarkan kosong, yang membuat
- * fugu digambar berlubang: tidak ada bacaan segar, jadi tidak ada tingkat yang
- * ditebak. Begitu backend menyajikannya, hanya fungsi ini yang berubah.
+ * A record from the backend does not carry risk, session permissions, or proof yet —
+ * the `AgentRecord` shape genuinely does not hold them. Those fields are left empty,
+ * which makes the fugu draw hollow: no fresh reading, so no guessed level. Once the
+ * backend serves them, this function is the only thing that changes.
  */
 function toView(record: ReturnType<typeof parseAgentRecord>): AgentView {
   return { record, risk: null, session: null, proofs: [], notShipped: null, outcomes: [] };

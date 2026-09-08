@@ -3,10 +3,10 @@
 /*
   Fugugent — marketplace (app.fugugent.xyz).
 
-  Tema dan token dasar sengaja disamakan dengan `landingpage/src/app/globals.css`
-  supaya landing dan aplikasi terasa satu produk. Yang ditambahkan di sini adalah
-  token risiko dan token identitas agent dari `docs/brand/palette.md`, karena hanya
-  aplikasi yang menampilkan tingkat kembung sesungguhnya.
+  The theme and the base tokens are deliberately identical to
+  `landingpage/src/app/globals.css`, so the landing page and the app feel like one
+  product. What is added here are the risk tokens and the agent identity tokens from
+  `docs/brand/palette.md`, because the app is the only one that shows a real puff level.
 */
 
 :root {
@@ -23,18 +23,18 @@
   --fg-muted: #96a7bf;
   --fg-faint: #6b7e97;
 
-  /* Kuning BNB Chain — hanya aksi dan penekanan, tidak pernah di komponen risiko. */
+  /* BNB Chain yellow — actions and emphasis only, never inside a risk component. */
   --accent: #f0b90b;
   --accent-soft: rgba(240, 185, 11, 0.14);
 
-  /* docs/brand/palette.md §5 — hanya boleh muncul di dalam komponen risiko. */
+  /* docs/brand/palette.md §5 — may only appear inside a risk component. */
   --risk-1: #009e73;
   --risk-2: #f0e442;
   --risk-3: #e69f00;
   --risk-4: #d55e00;
   --risk-5: #a4210e;
 
-  /* docs/brand/palette.md §4 — identitas agent, tidak pernah berubah karena risiko. */
+  /* docs/brand/palette.md §4 — agent identity, never changed by risk. */
   --agent-guardian: #0072b2;
   --agent-rebalancer: #cc79a7;
   --agent-grid: #56b4e9;
@@ -76,19 +76,19 @@ body {
   background-color: var(--bg);
   color: var(--fg);
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  /* Tidak pernah ada scroll horizontal di body. */
+  /* The body never scrolls horizontally. */
   overflow-x: hidden;
 }
 
-/* Setiap angka metrik memakai angka tabular — lebar tidak boleh bergoyang. */
+/* Every metric number uses tabular figures — the width must not wobble. */
 .tnum {
   font-variant-numeric: tabular-nums;
 }
 
 /*
-  Napas fugu. docs/brand/puff-levels.md §1: tingkat 1–2 mengambang, tingkat 3
-  bergetar saat data baru, tingkat 4 berdenyut, dan tingkat 5 SENGAJA DIAM.
-  Perubahan dari bergerak ke berhenti adalah sinyalnya sendiri.
+  The fugu's breathing. docs/brand/puff-levels.md §1: levels 1–2 float, level 3
+  trembles when new data arrives, level 4 pulses, and level 5 IS DELIBERATELY STILL.
+  The change from moving to stopping is a signal in its own right.
 */
 @keyframes fugu-float {
   0%,

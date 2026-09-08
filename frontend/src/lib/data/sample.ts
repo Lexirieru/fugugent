@@ -78,7 +78,7 @@ function baseRecord(over: Partial<AgentRecord> & Pick<AgentRecord, "id" | "token
   };
 }
 
-/** Perintah verifikasi session key. Satu `eth_call`, tanpa API key. */
+/** The session key verification command. One `eth_call`, no API key. */
 const VERIFY_SESSION = `cast call --rpc-url ${CHAIN.rpc} \\
   ${ALTANA_KEYSTORE} \\
   'isValidKey(address,bytes32)(bool)' \\
@@ -103,7 +103,7 @@ const GUARDIAN: AgentView = {
       owner: DEPLOYER,
       agentWallet: ALTANA_WALLET,
       category: "HEALTH_FACTOR",
-      // USD 8 desimal: 10_000_000 = $0.10. Bukan sepuluh juta.
+      // USD, 8 decimals: 10_000_000 = $0.10. Not ten million.
       priceUsd8PerPeriod: 10_000_000n,
       periodSeconds: 120,
       active: true,
@@ -118,7 +118,7 @@ const GUARDIAN: AgentView = {
     companion: "Collateral can fall 79.9% before liquidation.",
     observedAt: SEED_FETCHED_AT,
     blockNumber: null,
-    // Bacaan terakhir: harga testnet dikembalikan ke $750 setelah jalan pembuktian.
+    // The last reading: the testnet price was restored to $750 after the proof run.
     proofTxHash: "0xb704b385cc5a298821cd7f2cad71542032a3b7b2e786de08df0f24bf82481b0a",
   },
   session: {

@@ -1,20 +1,20 @@
 /**
- * Karakter fugu sebagai markup SVG.
+ * The fugu characters as SVG markup.
  *
- * Ini **port langsung** dari `docs/brand/generate-svg.py` — generator yang sama
- * yang membuat aset di `landingpage/public/brand/`. Alasannya: aset statis itu
- * hanya ada pada satu tingkat kembung untuk tiga dari empat karakter, sedangkan
- * marketplace harus bisa menggambar kombinasi karakter x tingkat mana pun.
- * Karena geometrinya sama persis, fugu di aplikasi dan fugu di landing page
- * adalah ikan yang sama.
+ * This is a **direct port** of `docs/brand/generate-svg.py` — the same generator that
+ * produced the assets in `landingpage/public/brand/`. The reason: those static assets
+ * exist at a single puff level only, for three of the four characters, whereas the
+ * marketplace has to be able to draw any character x level combination. Because the
+ * geometry is identical, the fugu in the app and the fugu on the landing page are
+ * the same fish.
  *
- * Keluarannya string, bukan JSX, supaya satu fungsi ini bisa dipakai dua tempat:
- * komponen React dan generator OG image (`ImageResponse` tidak menggambar
- * `<svg>` bersarang, tetapi menerimanya sebagai data URI di `<img>`).
+ * The output is a string rather than JSX, so this one function serves two places: a
+ * React component and the OG image generator (`ImageResponse` does not draw a nested
+ * `<svg>`, but it does accept one as a data URI in an `<img>`).
  *
- * Aturan brand yang ditegakkan kode ini, bukan sekadar didokumentasikan:
- * warna badan menyatakan SIAPA agent itu dan tidak pernah berubah karena risiko;
- * bentuk badan dan cincin menyatakan SEBERAPA BERAT risikonya.
+ * The brand rules this code enforces rather than merely documents: the body colour says
+ * WHO the agent is and never changes because of risk; the body shape and the ring say
+ * HOW HEAVY the risk is.
  */
 
 import type { BloatLevel } from "@/lib/risk";
@@ -64,10 +64,10 @@ const CY = 54;
 const f = (n: number) => n.toFixed(2);
 
 /**
- * Warna fugu pihak ketiga: hue deterministik dari id agent, saturasi dan
- * lightness DIKUNCI (`characters.md` §7) supaya tidak pernah ada kartu yang menyala
- * lebih terang daripada agent terkurasi. Rentang hijau (95–150) dan merah (0–20)
- * dilewati — dua rentang itu milik semantik risiko, bukan milik identitas.
+ * The colour of a third-party fugu: a deterministic hue from the agent id, with
+ * saturation and lightness LOCKED (`characters.md` §7) so no card ever glows brighter
+ * than a curated agent. The green range (95–150) and the red range (0–20) are skipped —
+ * those two belong to the risk semantics, not to identity.
  */
 export function fallbackChar(seed: string): CharSpec {
   let h = 2166136261;
@@ -110,7 +110,7 @@ function spikes(rx: number, ry: number, ext: number, secondary: boolean): string
     const tx = -ny;
     const ty = nx;
     const hw = 3.8 * (sec ? 0.6 : 1);
-    const tipw = ext < 0.5 ? 2.2 : 0; // tumpul di tingkat 2
+    const tipw = ext < 0.5 ? 2.2 : 0; // blunt at level 2
     const p1 = [bx + tx * hw, by + ty * hw];
     const p2 = [bx - tx * hw, by - ty * hw];
     if (tipw > 0) {
@@ -211,16 +211,17 @@ function mouth(rx: number, ry: number, level: BloatLevel): string {
 }
 
 /**
- * Properti khas tiap karakter — perisai, segitiga tegak, daun, lengan timbangan.
- * Satu fungsi untuk dua penyaji (badan berisi dan siluet berlubang), supaya
- * siluet "tanpa bacaan" tidak pernah kehilangan identitas agent-nya.
+ * Each character's distinguishing prop — shield, upright triangle, leaf, scale arms.
+ * One function for both renderers (the filled body and the hollow silhouette), so that
+ * the "no reading" silhouette never loses the agent's identity.
  */
 function dorsal(kind: FuguKind, rx: number, ry: number, body: string, hollow: boolean): string {
   const fill = (c: string) => (hollow ? "none" : c);
   const out: string[] = [];
 
   if (kind === "guardian") {
-    // Perisai punggung — tepi atas siluet menjadi lurus. Pembeda 48 px Guardian.
+    // The dorsal shield — it makes the top edge of the silhouette straight. Guardian's
+    // 48 px differentiator.
     const sw = rx * 1.58;
     const sh = ry * 0.62;
     const sx = CX - sw / 2;
@@ -260,13 +261,13 @@ function polar(r: number, deg: number): [number, number] {
 }
 
 /**
- * Cincin risiko. **Polanya** yang membawa pesan, bukan warnanya — inilah yang
- * membuat tingkat tetap terbaca dalam grayscale 48 piksel.
+ * The risk ring. It is the **pattern** that carries the message, not the colour — that
+ * is what keeps the level readable in grayscale at 48 pixels.
  *
- * Berbeda tipis dari generator Python pada tingkat 2: takik jam 12 di sana
- * ditutup persegi berwarna latar, yang hanya benar kalau latarnya diketahui.
- * Di sini takik itu adalah celah busur sungguhan, jadi cincinnya benar di atas
- * latar apa pun.
+ * One small difference from the Python generator, at level 2: there, the twelve o'clock
+ * notch is covered by a rectangle painted in the background colour, which is only
+ * correct when the background is known. Here the notch is a real gap in the arc, so the
+ * ring is correct over any background.
  */
 function rim(level: BloatLevel, uid: string): string {
   if (level === 1) {
@@ -297,14 +298,14 @@ function rim(level: BloatLevel, uid: string): string {
 
 export interface FuguOptions {
   kind: FuguKind;
-  /** `null` = tidak ada bacaan segar. Digambar berlubang, bukan ditebak. */
+  /** `null` = no fresh reading. Drawn hollow rather than guessed. */
   level: BloatLevel | null;
-  /** Seed warna untuk `kind: "fallback"`. */
+  /** The colour seed for `kind: "fallback"`. */
   seed?: string;
-  /** Id unik supaya `clipPath`/`pattern` tidak bertabrakan saat banyak fugu sekaligus. */
+  /** A unique id so `clipPath`/`pattern` do not collide when many fugu render at once. */
   uid?: string;
   withRim?: boolean;
-  /** Warna latar kotak; `null` berarti transparan. */
+  /** The background colour of the box; `null` means transparent. */
   background?: string | null;
 }
 
@@ -313,15 +314,14 @@ function charFor(kind: FuguKind, seed: string): CharSpec {
 }
 
 /**
- * Keadaan "tidak ada bacaan segar": siluet berlubang, tanpa isi, tanpa duri,
- * tanpa cincin. `puff-levels.md` §3 — menebak tingkat dari data lama adalah
- * kebohongan yang paling mahal di produk ini, jadi kita menggambar ketidaktahuan
- * apa adanya.
+ * The "no fresh reading" state: a hollow silhouette, no fill, no spikes, no ring.
+ * `puff-levels.md` §3 — guessing a level from stale data is the most expensive lie this
+ * product could tell, so we draw the not-knowing exactly as it is.
  */
 function hollowBody(kind: FuguKind, c: CharSpec): string {
   const color = c.body;
   const [w, h] = LEVEL_WH[2];
-  // Proporsi karakternya dipertahankan, supaya lengan Rebalancer tetap muat di kotak.
+  // The character's proportions are kept, so the Rebalancer's arms still fit the box.
   const rx = (w * c.ws) / 2;
   const ry = (h * c.hs) / 2;
   const bx = CX - rx * 0.92;
@@ -330,8 +330,9 @@ function hollowBody(kind: FuguKind, c: CharSpec): string {
   const ny = CY - 0.34 * ry;
   const nearx = CX + 0.42 * rx;
   const farx = nearx - 2.15 * er;
-  // Identitas tetap terbaca — siluet dan properti khasnya tidak ikut hilang.
-  // Yang hilang adalah persis kanal-kanal risiko: isi badan, duri, dan cincin.
+  // Identity stays readable — the silhouette and the distinguishing prop do not
+  // disappear with it. What disappears is exactly the risk channels: the body fill,
+  // the spikes, and the ring.
   return (
     `<g fill="none" stroke="${color}" stroke-width="3" stroke-linejoin="round" stroke-dasharray="5 4" opacity="0.8">` +
     `<path d="M${f(bx)},${f(by - 7)} L${f(bx - 17)},${f(by - 15)} L${f(bx - 12)},${f(by - 4)} L${f(bx - 19)},${f(by)} L${f(bx - 12)},${f(by + 4)} L${f(bx - 17)},${f(by + 15)} L${f(bx)},${f(by + 7)} Z"/>` +
@@ -345,7 +346,7 @@ function hollowBody(kind: FuguKind, c: CharSpec): string {
   );
 }
 
-/** Isi kotak 100x100 — tanpa elemen `<svg>` pembungkus. */
+/** The contents of the 100x100 box — without a wrapping `<svg>` element. */
 export function fuguInner(opts: FuguOptions): string {
   const { kind, level, seed = kind, withRim = true, background = null } = opts;
   const uid = opts.uid ?? `${kind}-${level ?? "none"}`;
@@ -376,7 +377,7 @@ export function fuguInner(opts: FuguOptions): string {
 
   const g: string[] = [`<g stroke="${OUTLINE}" stroke-width="3" stroke-linejoin="round">`];
 
-  // --- di belakang badan ---------------------------------------------------
+  // --- behind the body -----------------------------------------------------
   const bx = CX - rx * 0.92;
   const by = CY + ry * 0.08;
   g.push(
@@ -387,7 +388,7 @@ export function fuguInner(opts: FuguOptions): string {
 
   g.push(`<g fill="${c.body}">${spikes(rx, ry, ext, level === 5)}</g>`);
 
-  // --- badan ---------------------------------------------------------------
+  // --- the body ------------------------------------------------------------
   g.push(`<path d="${body}" fill="${c.body}"/>`);
   g.push(`<g clip-path="url(#cp-${uid})" stroke="none">`);
   g.push(
@@ -420,7 +421,7 @@ export function fuguInner(opts: FuguOptions): string {
   );
 
   if (kind === "guardian") {
-    // Bilah meteran health factor di tepi perisai — terisi penuh saat tenang.
+    // The health factor gauge bar on the edge of the shield — full when calm.
     const fill: Record<BloatLevel, number> = { 1: 1, 2: 0.75, 3: 0.5, 4: 0.3, 5: 0.08 };
     const gx = CX + rx * 0.6;
     const gy = CY - ry - 3.5;
@@ -451,14 +452,14 @@ export function fuguInner(opts: FuguOptions): string {
   return s.join("");
 }
 
-/** SVG lengkap sebagai string. Dipakai OG image dan komponen React. */
+/** A complete SVG as a string. Used by the OG image and by the React component. */
 export function fuguSvg(opts: FuguOptions & { size?: number }): string {
   const size = opts.size;
   const dim = size ? ` width="${size}" height="${size}"` : "";
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"${dim}>${fuguInner(opts)}</svg>`;
 }
 
-/** Data URI — satu-satunya cara memasukkan fugu ke dalam `ImageResponse`. */
+/** A data URI — the only way to get a fugu into an `ImageResponse`. */
 export function fuguDataUri(opts: FuguOptions & { size?: number }): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(fuguSvg(opts))}`;
 }

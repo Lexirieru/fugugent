@@ -4,12 +4,12 @@ import type { Category } from "@/lib/agent-types";
 import type { CategoryCount } from "@/lib/data/types";
 
 /**
- * Penyaring kategori kelas satu.
+ * A first-class category filter.
  *
- * Ini tautan ber-URL, bukan state klien: `?category=GRID` bisa dibagikan,
- * di-bookmark, dan dirender di server. Ia juga menampilkan jumlahnya apa adanya,
- * termasuk nol — kategori yang kosong tidak disembunyikan, karena menyembunyikannya
- * berarti berbohong soal kedalaman katalog.
+ * These are links with URLs, not client state: `?category=GRID` can be shared,
+ * bookmarked, and rendered on the server. It also shows the counts exactly as they are,
+ * zero included — an empty category is not hidden, because hiding it would be lying
+ * about the depth of the catalogue.
  */
 export function CategoryTabs({
   counts,

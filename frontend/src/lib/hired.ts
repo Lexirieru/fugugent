@@ -1,21 +1,21 @@
 "use client";
 
 /**
- * Catatan hire milik perangkat ini.
+ * This device's hire notes.
  *
- * Kenapa lokal, dan kenapa dinyatakan begitu di UI: sumber kebenaran hire adalah
- * `FuguSubscription` on-chain, dan aplikasi ini belum punya jalur baca wallet.
- * Menampilkan badge `Hired` berdasarkan tebakan akan menjadi persis jenis angka
- * tak-terperiksa yang kami janjikan untuk tidak pernah tampilkan.
+ * Why local, and why the UI says so: the source of truth for a hire is
+ * `FuguSubscription` on chain, and this note exists for a payment made where the app
+ * cannot see it. Showing a `Hired` badge on a guess would be exactly the kind of
+ * uncheckable number we promised never to display.
  *
- * Jalan tengahnya: pengguna menyimpan **tx hash sungguhan** setelah membayar, dan
- * badge itu menjadi tautan ke transaksi tersebut. Badge-nya jadi bisa diperiksa
- * siapa pun, tetap mencegah bayar dua kali, dan bisa dihapus sendiri oleh
- * pengguna — setiap aksi di Fugugent harus reversibel.
+ * The middle path: the user records the **real tx hash** after paying, and the badge
+ * becomes a link to that transaction. The badge is then checkable by anyone, it still
+ * stops a second payment, and the user can delete it themselves — every action in
+ * Fugugent must be reversible.
  *
- * Dibaca lewat `useSyncExternalStore`, bukan `useEffect`: `localStorage` adalah
- * external store, dan snapshot server yang kosong membuat render pertama selalu
- * cocok dengan HTML yang dikirim server.
+ * Read through `useSyncExternalStore`, not `useEffect`: `localStorage` is an external
+ * store, and an empty server snapshot makes the first render always match the HTML the
+ * server sent.
  */
 
 import { useCallback, useSyncExternalStore } from "react";
@@ -25,7 +25,7 @@ const EVENT = "fugugent:hires";
 
 export interface HireRecord {
   agentId: string;
-  /** Tx hash yang dimasukkan pengguna. Selalu ada — tanpa itu tidak ada yang bisa diperiksa. */
+  /** The tx hash the user entered. Always present — without it there is nothing to check. */
   txHash: string;
   periods: number;
   recordedAt: string;
@@ -33,7 +33,7 @@ export interface HireRecord {
 
 const EMPTY: HireRecord[] = [];
 
-/** Cache supaya `getSnapshot` mengembalikan referensi stabil selama isinya sama. */
+/** A cache so `getSnapshot` returns a stable reference while the contents are unchanged. */
 let cachedRaw: string | null = null;
 let cachedRows: HireRecord[] = EMPTY;
 
@@ -58,7 +58,7 @@ function rawValue(): string | null {
   try {
     return window.localStorage.getItem(KEY);
   } catch {
-    // Penyimpanan bisa ditolak (mode privat). Badge hilang, tidak ada yang rusak.
+    // Storage can be refused (private mode). The badge disappears; nothing breaks.
     return null;
   }
 }
@@ -100,7 +100,7 @@ export function isTxHash(value: string): boolean {
 
 export function useHires() {
   const rows = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-  /** `false` di server dan pada render hidrasi pertama. */
+  /** `false` on the server and on the first hydration render. */
   const ready = useSyncExternalStore(
     subscribe,
     () => true,

@@ -1,16 +1,15 @@
 /**
- * Asal dan umur data, sebagaimana dilaporkan backend.
+ * Where the data came from and how old it is, as reported by the backend.
  *
- * Backend menempuh tangga jatuh: 8004scan -> cache Postgres -> baca on-chain ->
- * seed terkurasi, dan setiap jawaban membawa `source`, `ageSeconds`, `stale`,
- * `degraded`, serta `trail` berisi tiap tingkat yang ditempuh beserta alasannya.
- * Seluruh rantai itu dibangun supaya UI **bisa** jujur; berkas ini yang membuat
- * kejujuran itu benar-benar sampai ke layar.
+ * The backend walks a fallback ladder: 8004scan -> the Postgres cache -> an on-chain
+ * read -> the curated seed, and every answer carries `source`, `ageSeconds`, `stale`,
+ * `degraded`, and a `trail` holding each rung it walked and why. That whole chain was
+ * built so the UI **can** be honest; this file is what gets that honesty onto the screen.
  *
- * Aturannya sama dengan tingkat kembung: **frontend tidak menghitung ulang.**
- * `stale` berarti "tidak bisa dipastikan segar", bukan "lebih tua dari X" —
- * cache selalu stale karena kita hanya sampai ke sana setelah upstream gagal
- * menjawab. Yang memutuskan itu backend; kita menampilkannya.
+ * The rule is the same as for the puff level: **the frontend does not recompute.**
+ * `stale` means "cannot be confirmed fresh", not "older than X" — the cache is always
+ * stale because we only reach it after the upstream failed to answer. The backend
+ * decides that; we display it.
  */
 
 import type { AgentSource } from "@/lib/agent-types";
@@ -29,14 +28,14 @@ export interface Provenance {
   healthy: boolean;
   reason: string | null;
   fetchedAt: string;
-  /** Umur item tertua, detik. `null` bila tidak berlaku. */
+  /** The age of the oldest item, in seconds. `null` when it does not apply. */
   ageSeconds: number | null;
-  /** "Tidak bisa dipastikan segar" — keputusan backend, bukan hitungan kita. */
+  /** "Cannot be confirmed fresh" — the backend's decision, not our arithmetic. */
   stale: boolean;
-  /** Jawabannya datang dari tingkat di bawah sumber utama. */
+  /** The answer came from a rung below the primary source. */
   degraded: boolean;
   maxAgeSeconds: number | null;
-  /** Tangga yang benar-benar ditempuh. Inilah yang membuat klaim bisa diperiksa. */
+  /** The ladder actually walked. This is what makes the claim checkable. */
   trail: TrailStep[];
 }
 
@@ -67,7 +66,7 @@ export function outcomeLabel(outcome: string): string {
   return OUTCOME_LABEL[outcome] ?? outcome;
 }
 
-/** Umur dalam kata. `null` masuk, `null` keluar — umur yang tidak berlaku tidak dikarang. */
+/** An age in words. `null` in, `null` out — an age that does not apply is not invented. */
 export function formatAge(seconds: number | null): string | null {
   if (seconds === null || !Number.isFinite(seconds) || seconds < 0) return null;
   if (seconds < 5) return "just now";
@@ -78,11 +77,11 @@ export function formatAge(seconds: number | null): string | null {
 }
 
 /**
- * Cap waktu UTC yang deterministik.
+ * A deterministic UTC stamp.
  *
- * Sengaja tidak memakai umur relatif di sini: "read 4m ago" menuntut `Date.now()`
- * saat render, yang tidak murni dan berbeda antara server dan klien. Umur relatif
- * datang dari `ageSeconds` yang dihitung backend; yang ini menyebut waktunya.
+ * Deliberately not a relative age: "read 4m ago" needs `Date.now()` at render time,
+ * which is impure and differs between server and client. The relative age comes from
+ * `ageSeconds`, computed by the backend; this one names the time.
  */
 export function formatUtc(iso: string): string | null {
   const ms = Date.parse(iso);
@@ -90,7 +89,7 @@ export function formatUtc(iso: string): string | null {
   return `${new Date(ms).toISOString().slice(0, 16).replace("T", " ")} UTC`;
 }
 
-/** Seberapa keras baris asal-data harus berbicara. */
+/** How loudly the provenance row has to speak. */
 export type ProvenanceWeight = "quiet" | "attention" | "failure";
 
 export function weightOf(p: Provenance): ProvenanceWeight {
@@ -100,7 +99,7 @@ export function weightOf(p: Provenance): ProvenanceWeight {
   return "quiet";
 }
 
-/** Amplop untuk sumber yang tidak melaporkan apa pun (mis. data contoh lokal). */
+/** An envelope for a source that reports nothing (e.g. local sample data). */
 export function unknownProvenance(source: AgentSource, fetchedAt: string): Provenance {
   return {
     source,

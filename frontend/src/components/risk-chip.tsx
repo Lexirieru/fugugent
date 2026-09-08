@@ -1,11 +1,11 @@
 /**
- * Chip angka risiko — kanal keenam dari `docs/brand/puff-levels.md` §0, dan
- * satu-satunya yang tidak ambigu. Karena itu ia wajib ada di kartu maupun detail,
- * dan tidak boleh dihilangkan pada ukuran apa pun yang menampilkan tingkat 4–5.
+ * The numeric risk chip — the sixth channel from `docs/brand/puff-levels.md` §0, and the
+ * only unambiguous one. That is why it is required on both the card and the detail page,
+ * and must never be dropped at any size that shows levels 4–5.
  *
- * Tingkat 5 selalu blok isi + teks putih + huruf kapital, di mode terang maupun
- * gelap: `#A4210E` sebagai teks di atas latar gelap hanya 2,53:1 — keadaan paling
- * gawat justru menjadi paling sulit dibaca. Blok isi memberi 7,49:1.
+ * Level 5 is always a filled block + white text + uppercase, in light mode and dark
+ * alike: `#A4210E` as text on a dark background is only 2.53:1 — which would make the
+ * gravest state the hardest one to read. The filled block gives 7.49:1.
  */
 
 import { BLOAT, type RiskReading } from "@/lib/risk";

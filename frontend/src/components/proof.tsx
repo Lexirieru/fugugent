@@ -1,10 +1,10 @@
 /**
- * Satu baris bukti.
+ * One proof row.
  *
- * Kalau ada tx hash, seluruh baris menjadi tautan ke BscScan. Kalau tidak ada,
- * alasannya dinyatakan terbuka — bukan disembunyikan. Ini menjawab kegagalan
- * nyata pasar: Giza/ARMA ditutup Februari 2026 setelah dashboard-nya menampilkan
- * angka besar yang tidak bisa diperiksa siapa pun.
+ * When there is a tx hash, the whole row becomes a link to BscScan. When there is not,
+ * the reason is stated openly — never hidden. This answers a real market failure:
+ * Giza/ARMA shut down in February 2026 after its dashboard showed large numbers that
+ * nobody could check.
  */
 
 import { txUrl, type Proof } from "@/lib/chain";
@@ -66,7 +66,7 @@ export function ProofList({ proofs, numbered = true }: { proofs: Proof[]; number
   );
 }
 
-/** Angka + tautan ke transaksi yang membuktikannya. Angka tanpa bukti ditandai apa adanya. */
+/** A number + a link to the transaction that proves it. An unproven number is marked as such. */
 export function VerifiableNumber({
   value,
   caption,
@@ -76,7 +76,7 @@ export function VerifiableNumber({
   value: string;
   caption: string;
   hash?: string | null;
-  /** Dipakai bila memang tidak ada bukti. Wajib menjelaskan, bukan mengosongkan. */
+  /** Used when there genuinely is no proof. It must explain, not leave a blank. */
   unproven?: string;
 }) {
   const body = (

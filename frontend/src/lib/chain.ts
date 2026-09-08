@@ -1,18 +1,18 @@
 /**
- * Konstanta rantai untuk marketplace. Disalin apa adanya dari
- * `contracts/deployments/bsc-testnet.json`, `docs/setup/ENVIRONMENT.md`, dan
+ * Chain constants for the marketplace. Copied verbatim from
+ * `contracts/deployments/bsc-testnet.json`, `docs/setup/ENVIRONMENT.md`, and
  * `docs/e2e/2026-09-08-e2e-testnet.md`.
  *
- * Aturan yang mengikat: **setiap angka yang tampil di UI harus bisa diklik ke
- * bukti**. Kalau sebuah angka tidak punya tx hash atau perintah verifikasi,
- * angka itu ditandai terbuka sebagai tanpa bukti — bukan disembunyikan.
+ * The binding rule: **every number shown in the UI must be clickable through to its
+ * proof**. If a number has no tx hash and no verification command, it is marked openly
+ * as unproven — never hidden.
  */
 
 export const CHAIN = {
   id: 97,
   name: "BNB Smart Chain Testnet",
   explorer: "https://testnet.bscscan.com",
-  /** `binance.org` diblokir dari Indonesia — selalu override RPC. */
+  /** `binance.org` is blocked from Indonesia — always override the RPC. */
   rpc: "https://data-seed-prebsc-1-s1.bnbchain.org:8545",
 } as const;
 
@@ -24,7 +24,7 @@ export function addressUrl(address: string): string {
   return `${CHAIN.explorer}/address/${address}`;
 }
 
-/** Potong hash/alamat panjang supaya tidak memaksa scroll horizontal. */
+/** Truncate a long hash or address so it does not force a horizontal scroll. */
 export function shorten(value: string, head = 10, tail = 6): string {
   if (value.length <= head + tail + 1) return value;
   return `${value.slice(0, head)}…${value.slice(-tail)}`;
@@ -61,14 +61,14 @@ export const CONTRACT_LIST = [
 ] as const;
 
 /**
- * Bukti tunggal: satu baris yang bisa diklik ke BscScan, atau satu baris yang
- * menyatakan terbuka kenapa tidak ada tautan. Tidak ada bentuk ketiga.
+ * A single proof: one row that clicks through to BscScan, or one row that states
+ * openly why there is no link. There is no third form.
  */
 export type Proof = {
   label: string;
   detail: string;
-  /** `null` bila memang tidak ada blok yang bisa dibuka. */
+  /** `null` when there genuinely is no block to open. */
   hash: string | null;
-  /** Wajib saat `hash` null. */
+  /** Required when `hash` is null. */
   noLinkReason?: string;
 };

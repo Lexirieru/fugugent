@@ -1,6 +1,6 @@
 # frontend — Fugugent marketplace
 
-`app.fugugent.xyz`. Next.js 16 + React 19 + Tailwind v4, dijalankan dengan **bun**.
+`app.fugugent.xyz`. Next.js 16 + React 19 + Tailwind v4, run with **bun**.
 
 ```bash
 bun --cwd frontend dev
@@ -8,23 +8,23 @@ bun --cwd frontend run build
 bun --cwd frontend run lint
 ```
 
-## Lapisan data — cara menukarnya ke backend sungguhan
+## The data layer — how to swap it for a real backend
 
-Tidak ada satu pun komponen yang memanggil `fetch`. Semua halaman berbicara dengan
-satu antarmuka, `MarketplaceSource` (`src/lib/data/types.ts`), dan memilih
-implementasinya lewat `source()` di `src/lib/data/index.ts`:
+Not one component calls `fetch`. Every page talks to a single interface,
+`MarketplaceSource` (`src/lib/data/types.ts`), and picks its implementation
+through `source()` in `src/lib/data/index.ts`:
 
-| Implementasi | Berkas | Dipakai kapan |
+| Implementation | File | Used when |
 |---|---|---|
-| `seedSource` | `src/lib/data/seed.ts` | default — data contoh yang dibundel |
-| `createHttpSource(base)` | `src/lib/data/http.ts` | begitu `NEXT_PUBLIC_API_BASE_URL` diisi |
+| `seedSource` | `src/lib/data/seed.ts` | the default — the sample data bundled with this build |
+| `createHttpSource(base)` | `src/lib/data/http.ts` | as soon as `NEXT_PUBLIC_API_BASE_URL` is set |
 
 ```bash
-# .env.local  (jangan pernah di-commit)
+# .env.local  (never commit this)
 NEXT_PUBLIC_API_BASE_URL=https://api.fugugent.xyz
 ```
 
-Endpoint yang dipanggil implementasi HTTP:
+The endpoints the HTTP implementation calls:
 
 ```
 GET /api/agents?category=&limit=&offset=
@@ -33,25 +33,27 @@ GET /api/categories
 GET /api/health
 ```
 
-Tiga hal yang membuat pertukaran itu tidak menyentuh UI:
+Three things keep that swap from touching the UI:
 
-1. **Amplopnya sama dengan `AgentListPage` di `backend/src/types.ts`.** Kegagalan
-   diwakili `healthy: false` + `reason`, tidak pernah exception, sehingga halaman
-   yang gagal tetap punya bentuk dan spanduk kejujurannya muncul sendiri.
-2. **`bigint` diterjemahkan di satu tempat.** `src/lib/data/wire.ts` mengubah string
-   desimal dari HTTP menjadi `bigint`, dan menolak `number` untuk nilai uang.
-   `src/lib/money.ts` adalah satu-satunya tempat USD8 boleh menjadi teks.
-3. **Risiko, izin sesi, dan bukti disimpan di `AgentView`, bukan di `AgentRecord`.**
-   Bentuk `AgentRecord` sudah final di backend dan belum memuat ketiganya; saat
-   backend menyajikannya, yang berubah hanya `toView()` di `http.ts`.
+1. **The envelope is the same as `AgentListPage` in `backend/src/types.ts`.** Failure is
+   represented by `healthy: false` + `reason`, never by an exception, so a page that
+   failed still has a shape and its honesty banner appears on its own.
+2. **`bigint` is translated in exactly one place.** `src/lib/data/wire.ts` turns the
+   decimal strings from HTTP into `bigint`, and rejects `number` for money values.
+   `src/lib/money.ts` is the only place USD8 is allowed to become text.
+3. **Risk, session permissions, and proof live on `AgentView`, not on `AgentRecord`.**
+   The shape of `AgentRecord` is final in the backend and does not carry those three
+   yet; when the backend does serve them, the only thing that changes is `toView()` in
+   `http.ts`.
 
-`src/lib/agent-types.ts` adalah **cermin** `backend/src/types.ts`. Kalau backend
-berubah, berkas itu yang menyesuaikan — bukan sebaliknya.
+`src/lib/agent-types.ts` is a **mirror** of `backend/src/types.ts`. If the backend
+changes, that file is the one that follows — never the other way round.
 
 ## Fugu
 
-`src/lib/fugu.ts` adalah port TypeScript dari `docs/brand/generate-svg.py`, generator
-yang sama yang membuat aset di `landingpage/public/brand/`. Aset statis itu hanya
-tersedia pada satu tingkat kembung untuk tiga dari empat karakter, sedangkan
-marketplace harus bisa menggambar kombinasi karakter x tingkat mana pun. Keluarannya
-string SVG supaya bisa dipakai komponen React **dan** `ImageResponse` (OG image).
+`src/lib/fugu.ts` is a TypeScript port of `docs/brand/generate-svg.py`, the same
+generator that produced the assets in `landingpage/public/brand/`. Those static assets
+exist at a single puff level only, for three of the four characters, whereas the
+marketplace has to be able to draw any character x level combination. The output is an
+SVG string so it can be used by a React component **and** by `ImageResponse` (the OG
+image).

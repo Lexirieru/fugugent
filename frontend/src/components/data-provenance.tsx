@@ -9,18 +9,17 @@ import {
 } from "@/lib/provenance";
 
 /**
- * Dari mana angka di halaman ini datang, dan seberapa tua.
+ * Where the numbers on this page came from, and how old they are.
  *
- * Backend menempuh tangga jatuh 8004scan -> cache -> on-chain -> seed, dan setiap
- * jawabannya membawa tangga yang benar-benar ditempuh. Menampilkannya bukan
- * hiasan: saat 8004scan tumbang dan kita melayani dari cache, halaman yang tampak
- * normal membiarkan pengguna salah paham — dan dashboard yang tidak bisa diperiksa
- * itulah yang menutup Giza/ARMA.
+ * The backend walks a fallback ladder 8004scan -> cache -> on-chain -> seed, and every
+ * answer carries the ladder it actually walked. Showing it is not decoration: when
+ * 8004scan is down and we serve from the cache, a page that looks normal lets the user
+ * misunderstand — and an uncheckable dashboard is what closed Giza/ARMA.
  *
- * Bobotnya menyesuaikan keadaan, karena peringatan yang selalu berteriak berhenti
- * didengar: sehat dan segar = satu baris redup; tidak bisa dipastikan segar atau
- * turun tingkat = strip yang terlihat; gagal = blok merah. Tangga penuhnya selalu
- * ada di balik satu klik, di ketiga bobot.
+ * The weight adapts to the situation, because a warning that always shouts stops being
+ * heard: healthy and fresh = one dim line; not confirmed fresh or degraded = a visible
+ * stripe; failed = a red block. The full ladder is always one click away, at all three
+ * weights.
  */
 export function DataProvenance({
   provenance,
@@ -28,7 +27,7 @@ export function DataProvenance({
   className = "",
 }: {
   provenance: Provenance;
-  /** Alamat backend, atau keterangan sumber lokal. */
+  /** The backend address, or a description of the local source. */
   origin: string;
   className?: string;
 }) {
@@ -113,9 +112,8 @@ export function DataProvenance({
 }
 
 /**
- * Tangga yang ditempuh, di balik satu klik. Ia ada di ketiga bobot — klaim
- * ketahanan yang tidak bisa diperiksa tidak lebih baik daripada klaim AUM yang
- * tidak bisa diperiksa.
+ * The ladder that was walked, one click away. It is present at all three weights — an
+ * uncheckable resilience claim is no better than an uncheckable AUM claim.
  */
 function Trail({ provenance, inline = false }: { provenance: Provenance; inline?: boolean }) {
   if (provenance.trail.length === 0) return null;

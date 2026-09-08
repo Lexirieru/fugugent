@@ -1,9 +1,9 @@
 /**
- * Fugu sebagai komponen React. Geometrinya datang dari `lib/fugu.ts`, yang
- * adalah port langsung generator brand — jadi ikan di sini dan ikan di
- * `landingpage/public/brand/` benar-benar ikan yang sama.
+ * The fugu as a React component. Its geometry comes from `lib/fugu.ts`, which is a
+ * direct port of the brand generator — so the fish here and the fish in
+ * `landingpage/public/brand/` really are the same fish.
  *
- * Komponen ini murni dan aman di server: tidak ada state, tidak ada efek.
+ * This component is pure and safe on the server: no state, no effects.
  */
 
 import { fuguInner, type FuguKind } from "@/lib/fugu";
@@ -18,17 +18,17 @@ export function Fugu({
   animated = true,
 }: {
   kind: FuguKind;
-  /** `null` = tidak ada bacaan segar; fugu digambar berlubang. */
+  /** `null` = no fresh reading; the fugu is drawn hollow. */
   level: BloatLevel | null;
   seed?: string;
-  /** Kalimat penuh. Tanpa ini SVG diperlakukan sebagai dekorasi. */
+  /** A full sentence. Without it the SVG is treated as decoration. */
   label?: string;
   className?: string;
   animated?: boolean;
 }) {
   const uid = `${kind}-${level ?? "hollow"}`;
-  // Tingkat 3 dan 5 sengaja tidak punya animasi berulang: tingkat 5 DIAM, dan
-  // perubahan dari bergerak ke berhenti adalah sinyalnya sendiri.
+  // Levels 3 and 5 deliberately have no repeating animation: level 5 IS STILL, and the
+  // change from moving to stopping is a signal in its own right.
   const motion = animated && level ? BLOAT[level].motionClass : null;
 
   return (

@@ -1,10 +1,10 @@
 /**
- * Satu-satunya pintu ke data. Halaman memanggil `source()`, bukan `fetch`.
+ * The only door to the data. Pages call `source()`, never `fetch`.
  *
- * Menukar data contoh dengan backend sungguhan = mengisi `NEXT_PUBLIC_API_BASE_URL`.
- * Tidak ada komponen yang perlu diubah, karena tidak ada komponen yang tahu dari
- * mana datanya datang — mereka hanya membaca `source` dan `healthy` pada amplop,
- * lalu menampilkannya apa adanya kepada pengguna.
+ * Swapping the sample data for a real backend = setting `NEXT_PUBLIC_API_BASE_URL`.
+ * No component needs changing, because no component knows where its data came from —
+ * they only read `source` and `healthy` off the envelope and show them to the user
+ * exactly as they are.
  */
 
 import { createHttpSource } from "@/lib/data/http";

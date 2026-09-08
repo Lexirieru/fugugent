@@ -8,13 +8,13 @@ import { formatPricePerPeriod } from "@/lib/money";
 import { riskAriaLabel } from "@/lib/risk";
 
 /**
- * Kartu agent.
+ * The agent card.
  *
- * Empat hal wajib terbaca sebelum seseorang memutuskan membuka detailnya:
- * siapa agent itu (siluet + nama + kategori), seberapa berat risikonya sekarang
- * (fugu + chip), apa yang sudah pernah ia lakukan (kalimat hasil berangka), dan
- * berapa harganya. Yang **tidak** ada di kartu ini adalah metrik yang belum kami
- * ukur — kolom kosong lebih jujur daripada nol yang terlihat seperti hasil.
+ * Four things must be readable before somebody decides to open the detail page: who the
+ * agent is (silhouette + name + category), how heavy its risk is right now (the fugu +
+ * the chip), what it has actually done (an outcome sentence with numbers in it), and what
+ * it costs. What is **not** on this card is a metric we have not measured — an empty
+ * field is more honest than a zero that looks like a result.
  */
 export function AgentCard({ view }: { view: AgentView }) {
   const { record, risk, outcomes, notShipped } = view;
@@ -70,7 +70,7 @@ export function AgentCard({ view }: { view: AgentView }) {
         <p className="mt-3 text-xs leading-relaxed text-faint">Not shipped: {notShipped}</p>
       ) : null}
 
-      {/* Pendorong: baris harga selalu duduk di dasar kartu, jadi tinggi kartu seragam. */}
+      {/* Spacer: the price row always sits at the foot of the card, so card heights match. */}
       <div className="grow" />
 
       <div className="mt-5 flex flex-wrap items-baseline justify-between gap-2 border-t border-line pt-4">

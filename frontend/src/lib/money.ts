@@ -1,19 +1,18 @@
 /**
- * Uang di Fugugent selalu `bigint` basis 8 desimal (USD8). Modul ini adalah
- * **satu-satunya** tempat nilai itu boleh berubah menjadi teks.
+ * Money in Fugugent is always a `bigint` in 8-decimal base (USD8). This module is the
+ * **only** place such a value is allowed to become text.
  *
- * Kenapa keras begini: `12345678` berarti $0.12. Satu `Number()` yang lolos di
- * jalur ini akan menampilkan "12.345.678" kepada seseorang yang sedang memutuskan
- * apakah akan membayar. Tidak ada satu pun fungsi di sini yang menerima `number`
- * sebagai nilai uang.
+ * Why so strict: `12345678` means $0.12. A single `Number()` slipping through this path
+ * would show "12,345,678" to somebody who is deciding whether to pay. Not one function
+ * here accepts a `number` as a money value.
  */
 
-/** 10^8 — satu dolar dalam basis USD8. */
+/** 10^8 — one dollar in USD8 base. */
 export const USD8 = 100_000_000n;
 
-/** Bagi dengan pembulatan ke atas. Ongkos selalu dibulatkan ke sisi yang merugikan kita. */
+/** Divide, rounding up. A cost is always rounded towards the side that costs us. */
 function divCeil(a: bigint, b: bigint): bigint {
-  if (b === 0n) throw new Error("pembagi nol");
+  if (b === 0n) throw new Error("division by zero");
   return (a + b - 1n) / b;
 }
 
@@ -22,11 +21,11 @@ function abs(v: bigint): bigint {
 }
 
 /**
- * Format USD8 menjadi teks dolar.
+ * Format USD8 as dollar text.
  *
- * Dua desimal untuk nilai biasa. Kalau nilainya bukan nol tetapi membulat menjadi
- * `$0.00`, presisinya ditambah sampai angkanya terlihat — menampilkan "$0.00" untuk
- * harga yang sebenarnya ada adalah kebohongan yang paling mudah dilakukan di sini.
+ * Two decimals for ordinary values. When a value is non-zero but rounds to `$0.00`,
+ * the precision is increased until the figure becomes visible — showing "$0.00" for a
+ * price that really exists is the easiest lie to tell here.
  */
 export function formatUsd8(value: bigint, opts: { minDecimals?: number } = {}): string {
   const min = opts.minDecimals ?? 2;
@@ -47,7 +46,7 @@ export function formatUsd8(value: bigint, opts: { minDecimals?: number } = {}): 
   return "$0.00";
 }
 
-/** Durasi periode langganan dalam kata-kata. Detik masuk, kalimat keluar. */
+/** The subscription period in words. Seconds in, a phrase out. */
 export function formatPeriod(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds <= 0) return "unknown period";
   const units: Array<[number, string]> = [
@@ -65,24 +64,24 @@ export function formatPeriod(seconds: number): string {
   return `${seconds} seconds`;
 }
 
-/** Harga per periode, siap ditempel di kartu: `$0.10 / 2 minutes`. */
+/** The price per period, ready to drop on a card: `$0.10 / 2 minutes`. */
 export function formatPricePerPeriod(priceUsd8: bigint, periodSeconds: number): string {
   return `${formatUsd8(priceUsd8)} / ${formatPeriod(periodSeconds)}`;
 }
 
 export interface CostEstimate {
   periods: number;
-  /** Total dalam USD8. Perkalian bigint — tidak pernah lewat `number`. */
+  /** The total in USD8. Bigint multiplication — never through `number`. */
   totalUsd8: bigint;
-  /** Lama langganan dalam detik. */
+  /** How long the subscription lasts, in seconds. */
   durationSeconds: number;
-  /** Setara per hari, USD8, dibulatkan ke atas. */
+  /** The per-day equivalent, USD8, rounded up. */
   perDayUsd8: bigint;
 }
 
 /**
- * Estimasi biaya SEBELUM hire — bukan sekadar peringatan.
- * `periods` adalah bilangan bulat; sisanya aritmetika bigint.
+ * A cost estimate BEFORE hiring — not merely a warning.
+ * `periods` is an integer; everything else is bigint arithmetic.
  */
 export function estimateCost(
   priceUsd8PerPeriod: bigint,
@@ -99,7 +98,7 @@ export function estimateCost(
   return { periods: n, totalUsd8, durationSeconds, perDayUsd8 };
 }
 
-/** Durasi total dalam kalimat: "10 periods ≈ 20 minutes". */
+/** The total duration as a phrase: "10 periods ≈ 20 minutes". */
 export function formatDuration(seconds: number): string {
   if (seconds <= 0) return "0 seconds";
   const days = Math.floor(seconds / 86_400);

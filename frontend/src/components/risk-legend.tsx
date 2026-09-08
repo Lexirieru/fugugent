@@ -2,15 +2,15 @@ import { Fugu } from "@/components/fugu";
 import { BLOAT, BLOAT_LEVELS } from "@/lib/risk";
 
 /**
- * Cara membaca ikannya.
+ * How to read the fish.
  *
- * Ini legenda, bukan klaim: tidak ada satu pun angka agent di sini. Ia ada karena
- * tingkat kembung adalah mekanik inti produk, dan sebuah mekanik yang harus
- * dijelaskan di paragraf terpisah sudah kalah sebelum mulai.
+ * This is a legend, not a claim: there is not a single agent number in it. It exists
+ * because the puff level is the core mechanic of the product, and a mechanic that has to
+ * be explained in a separate paragraph has already lost before it starts.
  *
- * Yang membawa pesan adalah **pola cincin dan lebar badan**, bukan warnanya —
- * karena itu legenda ini tetap terbaca pada layar monokrom, pada cetakan
- * hitam-putih, dan bagi pembaca yang tidak membedakan merah dan hijau.
+ * What carries the message is the **ring pattern and the body width**, not the colour —
+ * which is why this legend stays readable on a monochrome screen, in a black-and-white
+ * print, and for a reader who does not distinguish red from green.
  */
 export function RiskLegend() {
   return (

@@ -77,9 +77,10 @@ function AgentDetail({
   const meta = category ? CATEGORY_META[category] : null;
   const listing = record.fuguListing;
   const spec = risk ? BLOAT[risk.level] : null;
-  // Asal record itu sendiri bisa berbeda dari asal amplop: satu halaman bisa
-  // dilayani dari cache sementara isinya berasal dari 8004scan, atau sebaliknya.
-  // Umur relatifnya sudah ada di spanduk (dihitung backend); yang ini menyebut waktunya.
+  // A record's own provenance can differ from the envelope's: one page may be served
+  // from the cache while its contents came from 8004scan, or the other way round.
+  // The relative age is already in the banner (computed by the backend); this one names
+  // the time.
   const recordFetchedAt = formatUtc(record.fetchedAt);
 
   return (
@@ -93,7 +94,7 @@ function AgentDetail({
         </div>
       </Section>
 
-      {/* Kepala halaman */}
+      {/* Page head */}
       <Section className="pt-6">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
           <div className="shrink-0">
@@ -139,7 +140,7 @@ function AgentDetail({
         </div>
       </Section>
 
-      {/* Batas klaim, dinyatakan lebih dulu daripada apa pun yang menyanjung. */}
+      {/* The limits of the claim, stated before anything that flatters. */}
       {notShipped ? (
         <Section className="pt-8">
           <div className="rounded-2xl border border-line bg-surface px-5 py-4">
@@ -151,7 +152,7 @@ function AgentDetail({
         </Section>
       ) : null}
 
-      {/* Risiko */}
+      {/* Risk */}
       <Section className="pt-8">
         <h2 className="text-lg font-semibold tracking-tight text-fg">Risk right now</h2>
         <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
@@ -219,7 +220,7 @@ function AgentDetail({
         </div>
       </Section>
 
-      {/* Hasil berangka, past tense */}
+      {/* Outcomes with numbers in them, past tense */}
       <Section className="pt-10">
         <h2 className="text-lg font-semibold tracking-tight text-fg">What it has actually done</h2>
         {outcomes.length > 0 ? (
@@ -251,7 +252,7 @@ function AgentDetail({
         )}
       </Section>
 
-      {/* Panel izin — ditampilkan ke calon pembeli SEBELUM hire. */}
+      {/* The permissions panel — shown to a prospective buyer BEFORE hiring. */}
       <Section className="pt-10">
         <h2 className="text-lg font-semibold tracking-tight text-fg">
           What this agent is allowed to do with money
@@ -340,7 +341,7 @@ function AgentDetail({
         </div>
       </Section>
 
-      {/* Bukti */}
+      {/* Proof */}
       <Section className="pt-10">
         <h2 className="text-lg font-semibold tracking-tight text-fg">On-chain proof</h2>
         {proofs.length > 0 ? (
@@ -402,7 +403,7 @@ function AgentDetail({
         </div>
       </Section>
 
-      {/* Review */}
+      {/* Reviews */}
       <Section className="pt-10">
         <h2 className="text-lg font-semibold tracking-tight text-fg">Reviews</h2>
         <div className="mt-4">

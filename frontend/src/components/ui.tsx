@@ -66,7 +66,7 @@ export function Badge({
   );
 }
 
-/** Tombol utama. Selalu tautan — setiap aksi di produk ini menuju suatu tempat. */
+/** The primary button. Always a link — every action in this product goes somewhere. */
 export function ButtonLink({
   href,
   children,
@@ -101,8 +101,8 @@ export function ButtonLink({
 }
 
 /**
- * Empty state. Tidak ada bentuk lain di aplikasi ini: setiap keadaan kosong
- * menyebut aksinya dan menyediakan tombolnya. Juri menguji ini secara eksplisit.
+ * The empty state. There is no other form of it in this app: every empty state names
+ * its action and gives you the button for it. The judges test this explicitly.
  */
 export function EmptyState({
   title,

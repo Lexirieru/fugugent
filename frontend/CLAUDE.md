@@ -4,24 +4,24 @@
 
 Next.js 16 + React 19 + Tailwind v4, package manager **bun**.
 
-Baca `../CLAUDE.md` dan `../docs/specs/2026-09-08-fugugent-design.md` (§7 dan §8)
-sebelum membangun UI.
+Read `../CLAUDE.md` and `../docs/specs/2026-09-08-fugugent-design.md` (§7 and §8)
+before building any UI.
 
-## Aturan UI yang ditegakkan
+## Enforced UI rules
 
-- **Tanpa dead end.** Setiap empty state menyebut aksi dan menyediakan tombolnya.
-  Juri menguji ini secara eksplisit.
-- **Detail agent = halaman ber-URL**, bukan modal. Bisa di-share, punya OG image fugu.
-- **Estimasi biaya sebelum hire**, bukan sekadar peringatan.
-- **Badge `Hired`** untuk mencegah user membayar dua kali.
-- **Jangan pernah mengirim kontrol setengah jadi.** Lebih baik hilangkan elemennya
-  daripada menampilkannya rusak.
-- **Setiap angka bisa diverifikasi** — klik menuju tx hash di BscScan. Ini menjawab
-  kegagalan nyata pasar: Giza/ARMA ditutup Feb 2026 setelah dashboard-nya menampilkan
-  AUM besar sementara pengukuran on-chain menunjukkan posisi nyaris nol.
-- **Fugu mengembang seiring risiko** — tingkat kembung dipetakan dari metrik risiko nyata.
+- **No dead ends.** Every empty state names an action and gives you the button for it.
+  The judges test this explicitly.
+- **Agent detail is a page with a URL**, not a modal. Shareable, with its own fugu OG image.
+- **A cost estimate before hiring**, not merely a warning.
+- **A `Hired` badge**, to stop a user paying twice.
+- **Never ship a half-finished control.** Better to leave the element out
+  than to show it broken.
+- **Every number is verifiable** — a click leads to the tx hash on BscScan. This answers
+  a real market failure: Giza/ARMA shut down in February 2026 after its dashboard showed
+  a large AUM while on-chain measurement showed positions close to zero.
+- **The fugu puffs up as risk grows** — the puff level is mapped from real risk metrics.
 
-## Perintah
+## Commands
 
 ```bash
 bun dev

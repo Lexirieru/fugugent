@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-/** Menyalin teks apa adanya. Perintah verifikasi tidak ada gunanya kalau harus diketik ulang. */
+/** Copies text verbatim. A verification command is useless if it has to be retyped. */
 export function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
 

@@ -1,13 +1,13 @@
 /**
- * Implementasi `MarketplaceSource` di atas data contoh yang dibundel.
+ * The `MarketplaceSource` implementation on top of the bundled sample data.
  *
- * Tidak pernah gagal, dan selalu mengaku apa adanya: `source: "seed"` dengan
- * `degraded: true`, karena seed memang tingkat paling bawah tangga jatuh —
- * lantai terakhir sebelum halaman kosong, bukan sumber utama yang sehat.
+ * It never fails, and it always admits what it is: `source: "seed"` with
+ * `degraded: true`, because the seed really is the bottom rung of the fallback ladder —
+ * the last floor before an empty page, not a healthy primary source.
  *
- * `ageSeconds: null` bukan kelalaian. Data ini ikut ke dalam bundel saat build,
- * jadi umurnya adalah umur build, bukan umur pembacaan; melaporkan angka detik
- * di sini justru akan mengarang kesegaran yang tidak ada.
+ * `ageSeconds: null` is not an oversight. This data goes into the bundle at build time,
+ * so its age is the age of the build and not the age of a reading; reporting a number of
+ * seconds here would invent a freshness that does not exist.
  */
 
 import type { SourceHealth } from "@/lib/agent-types";

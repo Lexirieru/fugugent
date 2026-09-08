@@ -1,14 +1,14 @@
 /**
- * Bentuk kabel (JSON) dari `AgentRecord`, dan penerjemahnya.
+ * The wire (JSON) shape of `AgentRecord`, and its translator.
  *
- * `AgentRecord` memuat `bigint` dan karena itu **tidak** JSON-serializable apa
- * adanya — `backend/src/types.ts` menyatakan aturan ini di kepala berkasnya:
- * lapisan yang menulis ke HTTP wajib mengubah bigint menjadi string desimal
- * secara eksplisit. Berkas ini adalah sisi frontend dari kesepakatan itu.
+ * `AgentRecord` carries `bigint` and is therefore **not** JSON-serializable as it
+ * stands — `backend/src/types.ts` states this rule at the top of the file: the layer
+ * that writes to HTTP must turn every bigint into a decimal string explicitly. This
+ * file is the frontend half of that agreement.
  *
- * Parser-nya sengaja rewel. Backend belum ada; kalau nanti ia mengirim bentuk
- * yang sedikit berbeda, kita ingin tahu lewat `healthy: false` yang jujur, bukan
- * lewat `NaN` yang diam-diam tampil sebagai harga.
+ * The parser is fussy on purpose. The backend does not exist yet; if it later sends a
+ * slightly different shape, we want to hear about it through an honest `healthy: false`,
+ * not through a `NaN` that quietly renders as a price.
  */
 
 import type {
@@ -26,7 +26,7 @@ export interface WireFuguListing {
   owner: string;
   agentWallet: string;
   category: string;
-  /** String desimal USD8. `"10000000"` = $0.10. Tidak pernah `number`. */
+  /** A USD8 decimal string. `"10000000"` = $0.10. Never a `number`. */
   priceUsd8PerPeriod: string;
   periodSeconds: number;
   active: boolean;
@@ -49,8 +49,8 @@ function asRecord(v: unknown, at: string): Record<string, unknown> {
 
 function bigintFromDecimal(v: unknown, at: string): bigint {
   if (typeof v !== "string" || !/^-?\d+$/.test(v)) {
-    // Menolak `number` di sini adalah inti berkas ini: uang yang lewat `number`
-    // kehilangan presisi jauh sebelum seseorang melihatnya salah di layar.
+    // Rejecting `number` here is the whole point of this file: money that passes
+    // through `number` loses precision long before anyone sees it wrong on screen.
     throw new WireError(`${at}: expected a decimal string, got ${typeof v}`);
   }
   return BigInt(v);
@@ -92,7 +92,7 @@ function nullableNumber(v: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
-/** Satu record dari kabel ke bentuk domain. Melempar `WireError` bila bentuknya asing. */
+/** One record, from the wire to the domain shape. Throws `WireError` on an unfamiliar shape. */
 export function parseAgentRecord(v: unknown, at = "agent"): AgentRecord {
   const o = asRecord(v, at);
   if (typeof o.id !== "string" || !o.id) throw new WireError(`${at}.id: required`);
@@ -154,7 +154,7 @@ export function parseAgentRecord(v: unknown, at = "agent"): AgentRecord {
   };
 }
 
-/** Arah sebaliknya — dipakai kalau frontend perlu meneruskan record apa adanya. */
+/** The other direction — used when the frontend has to pass a record along unchanged. */
 export function toWire(record: AgentRecord): WireAgentRecord {
   const { fuguListing, ...rest } = record;
   return {

@@ -3,8 +3,8 @@ import { fuguDataUri, type FuguKind } from "@/lib/fugu";
 import type { BloatLevel } from "@/lib/risk";
 
 /**
- * OG image marketplace. Empat karakter pada empat tingkat kembung berbeda —
- * satu gambar yang menjelaskan mekanik inti produk tanpa satu kalimat pun.
+ * The marketplace OG image. Four characters at four different puff levels — one picture
+ * that explains the core mechanic of the product without a single sentence.
  */
 
 export const alt = "Fugugent — a marketplace of DeFi agents that swell as their risk grows";

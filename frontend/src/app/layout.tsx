@@ -75,8 +75,8 @@ function SiteHeader() {
 }
 
 /**
- * Footer memuat keempat alamat kontrak, bukan sebagai hiasan: siapa pun yang
- * ingin memeriksa klaim di halaman ini bisa mulai dari sini tanpa bertanya.
+ * The footer carries all four contract addresses, and not as decoration: anyone who
+ * wants to check a claim on this page can start here without having to ask.
  */
 function SiteFooter() {
   return (

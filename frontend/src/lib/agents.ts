@@ -1,13 +1,13 @@
 /**
- * Pemetaan tampilan untuk empat kategori Fugugent.
+ * The presentation mapping for the four Fugugent categories.
  *
- * Kategori terkunci di `contracts/src/types/FuguTypes.sol` dan `backend/src/types.ts`.
- * Yang ada di sini hanyalah cara menampilkannya — nama untuk manusia, karakter fugu,
- * dan **metrik risiko utama** kategori itu.
+ * The categories are locked in `contracts/src/types/FuguTypes.sol` and
+ * `backend/src/types.ts`. All that lives here is how to show them — a name for humans,
+ * the fugu character, and the category's **primary risk metric**.
  *
- * Metrik yang berbeda per kategori adalah pilihan sadar, bukan kelalaian:
- * health factor tidak boleh dipaksa dinilai dengan APR. Inilah yang membuat empat
- * kategori benar-benar setara dalam, bukan sekadar empat tab (spec §7.5 poin 8).
+ * A different metric per category is a deliberate choice, not an oversight: a health
+ * factor must not be forced to be judged by APR. That is what makes the four categories
+ * genuinely equal in depth, rather than merely four tabs (spec §7.5, point 8).
  */
 
 import type { AgentRecord, Category } from "@/lib/agent-types";
@@ -17,9 +17,9 @@ export interface CategoryMeta {
   category: Category;
   label: string;
   kind: FuguKind;
-  /** Apa yang dikerjakan agent kategori ini. */
+  /** What an agent in this category does. */
   blurb: string;
-  /** Metrik yang memetakan ke tingkat kembung. Sumber: docs/brand/puff-levels.md §3–4. */
+  /** The metric that maps to the puff level. Source: docs/brand/puff-levels.md §3–4. */
   riskMetric: string;
 }
 
@@ -54,14 +54,14 @@ export const CATEGORY_META: Record<Category, CategoryMeta> = {
   },
 };
 
-/** Urutan tab. Sama dengan urutan enum on-chain. */
+/** The tab order. The same as the on-chain enum order. */
 export const CATEGORY_ORDER: Category[] = ["REBALANCING", "GRID", "YIELD", "HEALTH_FACTOR"];
 
 /**
- * Id agent first-party kami. Hanya keempat ini yang boleh memakai properti khas
- * (perisai, visor, daun, lengan timbangan) — `docs/brand/characters.md` §7. Agent
- * pihak ketiga selalu mendapat siluet netral berwarna deterministik, supaya empat
- * agent kami terbaca sebagai lantai kualitas, bukan sekadar empat dari 309 ribu.
+ * The ids of our first-party agents. Only these four may carry a distinguishing prop
+ * (shield, visor, leaf, scale arms) — `docs/brand/characters.md` §7. A third-party agent
+ * always gets a neutral silhouette in a deterministic colour, so that our four read as a
+ * quality floor rather than as four out of 309 thousand.
  */
 export const FIRST_PARTY: Record<string, FuguKind> = {
   "97:1": "guardian",
@@ -74,7 +74,7 @@ export function fuguKindFor(record: AgentRecord): FuguKind {
   return FIRST_PARTY[record.id] ?? "fallback";
 }
 
-/** Kategori yang berlaku: listing on-chain lebih dulu, lalu hasil classifier. */
+/** The category that applies: the on-chain listing first, then the classifier's result. */
 export function categoryOf(record: AgentRecord): Category | null {
   return record.fuguListing?.category ?? record.classification?.category ?? null;
 }

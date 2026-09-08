@@ -5,15 +5,15 @@ import { fuguDataUri } from "@/lib/fugu";
 import { BLOAT } from "@/lib/risk";
 
 /**
- * OG image halaman agent — fugu-nya sendiri, bukan kartu generik.
+ * The agent page OG image — its own fugu, not a generic card.
  *
- * Alasan halaman detail berupa URL dan bukan modal ada di sini: sebuah agent
- * adalah aset, jadi ia harus bisa dibagikan, di-bookmark, dan terlihat sebagai
- * dirinya sendiri saat ditempel di mana pun.
+ * This is where the reason the detail page is a URL and not a modal shows itself: an
+ * agent is an asset, so it has to be shareable, bookmarkable, and recognisable as itself
+ * wherever it is pasted.
  *
- * Satori tidak menggambar `<svg>` bersarang, tetapi menerima data URI di `<img>` —
- * jadi fugu di sini dibangun oleh fungsi yang sama persis dengan yang dipakai
- * halaman. Satu geometri, dua penyaji.
+ * Satori does not draw a nested `<svg>`, but it does accept a data URI in an `<img>` — so
+ * the fugu here is built by exactly the same function the page uses. One geometry, two
+ * renderers.
  */
 
 export const alt = "A Fugugent agent — the pufferfish swells as its risk grows";
