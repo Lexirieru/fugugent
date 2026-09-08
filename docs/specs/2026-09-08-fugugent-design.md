@@ -218,7 +218,12 @@ Anti-sybil reviews.
 
 - Proxy: ERC1967 via `UUPSUpgradeable`. `_authorizeUpgrade` is guarded by `onlyOwner`.
 - Initial owner = deployer EOA; note the plan to move to a multisig after the hackathon.
-- **Storage gap `uint256[45] __gap`** in every contract.
+- **No storage gaps.** This spec originally called for `uint256[45] __gap` in every
+  contract. That was written before we pinned OpenZeppelin 5.7.0, which uses ERC-7201
+  namespaced storage: each contract keeps its state in a struct at a fixed, collision-free
+  slot, so a trailing gap buys nothing. The deployed contracts carry no `__gap`, and the
+  implementation plan forbids adding one. Verify with `grep -c __gap contracts/src/*.sol`
+  — the answer is 0.
 - Scripts in `contracts/script/`: `Deploy.s.sol` (deploy proxy + impl), `Upgrade.s.sol`.
 - Required tests: the initializer cannot be called twice; an upgrade preserves
   storage; a non-owner cannot upgrade; pro-rata claims are correct at period
