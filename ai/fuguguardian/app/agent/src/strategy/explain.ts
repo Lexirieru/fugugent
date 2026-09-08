@@ -13,27 +13,12 @@
  */
 import { generateText } from "ai";
 import { buildModel } from "../model.js";
-import { HF_ONE, type Decision, type Position } from "./types.js";
+import { formatHf, formatPercentFromBps, formatUsd8 } from "./format.js";
+import { type Decision, type Position } from "./types.js";
 
 export type GenerateFn = (prompt: string) => Promise<string>;
 
 const TIMEOUT_MS = 20_000;
-
-/** Format health factor (basis 1e18) sebagai string dua desimal berkoma, mis. "1,60". */
-function formatHf(hf: bigint): string {
-  const bulat = hf / HF_ONE;
-  const sisa = hf % HF_ONE;
-  const desimal = (sisa * 100n) / HF_ONE;
-  return `${bulat},${desimal.toString().padStart(2, "0")}`;
-}
-
-/** Format basis point (basis 10_000) sebagai persen satu desimal berkoma, mis. "37,5". */
-function formatPercentFromBps(bps: bigint): string {
-  const persepuluhPersen = bps / 10n;
-  const bulat = persepuluhPersen / 10n;
-  const desimal = persepuluhPersen % 10n;
-  return `${bulat},${desimal}`;
-}
 
 function buildPrompt(pos: Position, decision: Decision): string {
   const hfStr = decision.healthFactor === null ? "tidak ada (tanpa hutang)" : formatHf(decision.healthFactor);
@@ -41,9 +26,13 @@ function buildPrompt(pos: Position, decision: Decision): string {
     decision.dropToLiquidationBps === null
       ? "tidak berlaku"
       : `${formatPercentFromBps(decision.dropToLiquidationBps)}%`;
+  // `suggestedRepayBase` adalah USD dalam basis 8 desimal Aave. Menyodorkannya
+  // mentah ke prompt (dan lewat prompt, ke mata user) pernah membuat 12345678
+  // — yang artinya $0,12 — terbaca sebagai belasan juta dolar. Selalu lewat
+  // `formatUsd8`, dan satuannya disebut eksplisit supaya model tidak menebak.
   const repayLine =
     decision.suggestedRepayBase > 0n
-      ? `Jumlah yang disarankan dibayar: ${decision.suggestedRepayBase.toString()} (base unit protokol).`
+      ? `Jumlah yang disarankan dibayar: ${formatUsd8(decision.suggestedRepayBase)} (dalam dolar AS).`
       : "Tidak ada pembayaran yang disarankan saat ini.";
 
   return [

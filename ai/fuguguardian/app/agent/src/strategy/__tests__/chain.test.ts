@@ -26,7 +26,10 @@ describe("adapter Venus (BSC mainnet, read-only)", () => {
   it("membaca likuiditas akun tanpa melempar", { timeout: 30_000 }, async () => {
     const r = createReader();
     const v = await readVenusLiquidity(r.client, AKUN_KOSONG);
-    expect(v.shortfallBase).toBe(0n);
+    // Nama field menyebut skalanya sendiri (1e18), berbeda dari `*Base`
+    // milik Position yang berbasis 8 desimal Aave.
+    expect(v.shortfallUsd18).toBe(0n);
+    expect(v.liquidityUsd18).toBe(0n);
     expect(v.blockNumber).toBeGreaterThan(0n);
   });
 });

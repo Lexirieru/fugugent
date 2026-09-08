@@ -4,6 +4,17 @@
  * jadi pembacaan ini sengaja menyasar mainnet. Read-only lewat `eth_call`,
  * tidak ada transaksi dan tidak berbiaya. Eksekusi transaksi agent tetap
  * berjalan di testnet — hanya pembacaan posisi ini yang lintas ke mainnet.
+ *
+ * BELUM TERHUBUNG KE `decide()` — dan itu disengaja. `decide()` bekerja di atas
+ * `Position`, yang butuh health factor dan satu ambang likuidasi agregat.
+ * Comptroller Venus tidak menyediakan keduanya: `getAccountLiquidity` hanya
+ * memberi selisih likuiditas/shortfall dalam USD, tanpa health factor dan
+ * tanpa collateral factor gabungan. Untuk menyusun `Position` dari Venus,
+ * kita harus mengambil data PER-MARKET (daftar vToken lewat `getAssetsIn`,
+ * `markets(vToken).collateralFactorMantissa`, saldo snapshot tiap vToken, dan
+ * harga tiap aset dari oracle) lalu menjumlahkannya sendiri — data yang belum
+ * diambil sama sekali oleh adapter ini. Sampai itu ada, angka Venus di sini
+ * hanya untuk pemantauan/diagnostik, BUKAN masukan keputusan.
  */
 import type { PublicClient } from "viem";
 import { PositionError } from "../types.js";
@@ -25,9 +36,22 @@ const VENUS_COMPTROLLER_ABI = [
   },
 ] as const;
 
+/**
+ * PERHATIAN SATUAN: skala di sini BERBEDA dari `Position`.
+ *
+ * Semua field `*Base` pada `Position` memakai basis 8 desimal Aave (1e8 = $1),
+ * sedangkan Venus mengembalikan nilai USD dalam mantissa 1e18 (1e18 = $1) —
+ * selisihnya 10^10. Karena itu field di bawah TIDAK memakai sufiks `Base`:
+ * nama `liquidityBase` sebelumnya membuat nilai ini tampak bisa langsung
+ * dibandingkan atau dijumlahkan dengan `collateralBase`/`debtBase`, padahal
+ * hasilnya akan meleset sepuluh miliar kali lipat. Konversi eksplisit
+ * (bagi 10^10) wajib dilakukan sebelum nilai ini bertemu angka bergaya Aave.
+ */
 export interface VenusLiquidity {
-  liquidityBase: bigint;
-  shortfallBase: bigint;
+  /** Sisa likuiditas akun dalam USD, mantissa 1e18 (bukan basis 8 desimal Aave). */
+  liquidityUsd18: bigint;
+  /** Kekurangan agunan akun dalam USD, mantissa 1e18; > 0 berarti sudah bisa dilikuidasi. */
+  shortfallUsd18: bigint;
   blockNumber: bigint;
 }
 
@@ -56,8 +80,8 @@ export async function readVenusLiquidity(
   }
 
   return {
-    liquidityBase: liquidity,
-    shortfallBase: shortfall,
+    liquidityUsd18: liquidity,
+    shortfallUsd18: shortfall,
     blockNumber,
   };
 }

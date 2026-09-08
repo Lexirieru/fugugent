@@ -97,4 +97,88 @@ describe("runBacktest", () => {
     expect(negatif.humanLiquidations).toBe(takPernahSempatBertindak.humanLiquidations);
     expect(negatif.liquidationsAvoided).toBe(takPernahSempatBertindak.liquidationsAvoided);
   });
+
+  it("anggaran agent yang habis menghentikan intervensi", () => {
+    // Deret yang sama dengan skenario unggulan di atas. Tanpa anggaran, agent
+    // membayar 1267 lalu 800 dan selamat. Dengan anggaran 1000 — lebih kecil
+    // daripada intervensi pertama yang dibutuhkan — agent tidak bisa bertindak
+    // sama sekali dan ikut terlikuidasi persis seperti manusia yang lambat.
+    const seri = [10_000n, 7_000n, 5_500n, 5_400n, 5_300n, 5_200n];
+    const r = runBacktest({
+      ...dasar,
+      priceSeriesBps: seri,
+      humanReactionCandles: 5,
+      agentBudgetBase: 1_000n,
+    });
+    expect(r.agentBudgetExhausted).toBe(true);
+    expect(r.agentInterventions).toBe(0);
+    expect(r.agentLiquidations).toBe(1);
+    // Keunggulan agent lenyap begitu modalnya dibatasi: inilah yang
+    // disembunyikan oleh backtest tanpa anggaran.
+    expect(r.liquidationsAvoided).toBe(0);
+  });
+
+  it("anggaran yang hanya cukup untuk satu intervensi berhenti setelah intervensi itu", () => {
+    // 1267 adalah persis biaya intervensi pertama; intervensi kedua (800)
+    // tidak muat lagi, jadi agent lumpuh sesudahnya. Tidak ada pembayaran
+    // sebagian dari sisa anggaran (sisa 0).
+    const seri = [10_000n, 7_000n, 5_500n, 5_400n, 5_300n, 5_200n];
+    const r = runBacktest({
+      ...dasar,
+      priceSeriesBps: seri,
+      humanReactionCandles: 5,
+      agentBudgetBase: 1_267n,
+    });
+    expect(r.agentInterventions).toBe(1);
+    expect(r.agentBudgetExhausted).toBe(true);
+  });
+
+  it("tanpa anggaran, agent bertindak tanpa batas", () => {
+    // Field agentBudgetBase dibiarkan kosong: agent boleh membayar berapa pun,
+    // sesering apa pun. Ini yang membuat angka keunggulan agent harus dibaca
+    // sebagai batas atas, bukan hasil yang bisa dijanjikan.
+    const seri = [10_000n, 7_000n, 5_500n, 5_400n, 5_300n, 5_200n];
+    const r = runBacktest({ ...dasar, priceSeriesBps: seri, humanReactionCandles: 5 });
+    expect(r.agentBudgetExhausted).toBe(false);
+    expect(r.agentInterventions).toBeGreaterThan(1);
+    expect(r.agentLiquidations).toBe(0);
+
+    // Anggaran yang sangat besar berperilaku identik dengan tanpa anggaran.
+    const berlimpah = runBacktest({
+      ...dasar,
+      priceSeriesBps: seri,
+      humanReactionCandles: 5,
+      agentBudgetBase: 1_000_000_000n,
+    });
+    expect(berlimpah.agentInterventions).toBe(r.agentInterventions);
+    expect(berlimpah.agentLiquidations).toBe(r.agentLiquidations);
+    expect(berlimpah.agentBudgetExhausted).toBe(false);
+  });
+
+  it("anggaran nol berarti agent tidak pernah bisa bertindak", () => {
+    const r = runBacktest({
+      ...dasar,
+      priceSeriesBps: [10_000n, 7_000n, 5_500n],
+      humanReactionCandles: 999_999,
+      agentBudgetBase: 0n,
+    });
+    expect(r.agentInterventions).toBe(0);
+    expect(r.agentBudgetExhausted).toBe(true);
+    expect(r.agentLiquidations).toBe(r.humanLiquidations);
+  });
+
+  it("liquidationsAvoided satu run selalu di rentang -1..1", () => {
+    // Dokumentasi eksekutabel untuk komentar pada field itu: satu run hanya
+    // bisa membandingkan satu nasib lawan satu nasib.
+    const kasus = [
+      { priceSeriesBps: [10_000n, 10_050n], humanReactionCandles: 0 },
+      { priceSeriesBps: [10_000n, 7_000n, 5_500n, 5_400n, 5_300n, 5_200n], humanReactionCandles: 5 },
+      { priceSeriesBps: [10_000n, 4_000n, 3_000n, 2_000n, 1_000n], humanReactionCandles: 2 },
+    ];
+    for (const k of kasus) {
+      const r = runBacktest({ ...dasar, ...k });
+      expect(r.liquidationsAvoided).toBeGreaterThanOrEqual(-1);
+      expect(r.liquidationsAvoided).toBeLessThanOrEqual(1);
+    }
+  });
 });

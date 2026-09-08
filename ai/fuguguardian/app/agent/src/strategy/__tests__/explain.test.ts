@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { decide } from "../decide.js";
 import { explainDecision } from "../explain.js";
 import { HF_ONE, type Decision, type Position } from "../types.js";
 
@@ -74,5 +75,54 @@ describe("explainDecision", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("jumlah repay muncul sebagai dolar terbaca, bukan angka basis mentah", async () => {
+    // 12345678 basis 8 desimal = $0,12. Sebelum perbaikan, angka mentah ini
+    // masuk ke prompt apa adanya dan bisa dibacakan ke user sebagai belasan
+    // juta dolar.
+    const keputusanRepay: Decision = {
+      action: "PARTIAL_REPAY",
+      healthFactor: 1_150_000_000_000_000_000n,
+      dropToLiquidationBps: 1304n,
+      reason: "Health factor 1,15.",
+      suggestedRepayBase: 12_345_678n,
+    };
+    let promptTertangkap = "";
+    await explainDecision(pos, keputusanRepay, {
+      generate: async (p) => {
+        promptTertangkap = p;
+        return "ok";
+      },
+    });
+    expect(promptTertangkap).toContain("$0,12");
+    expect(promptTertangkap).not.toContain("12345678");
+    expect(promptTertangkap.toLowerCase()).toContain("dolar as");
+  });
+
+  it("angka di prompt identik dengan angka di reason deterministik", async () => {
+    // Kedua sisi memakai satu-satunya sumber format (src/strategy/format.ts),
+    // sehingga user tidak mungkin melihat dua versi angka yang sama.
+    const p: Position = {
+      protocol: "aave",
+      account: "0x0000000000000000000000000000000000000001",
+      collateralBase: 10_000n,
+      debtBase: 6_400n,
+      liquidationThresholdBps: 8000n,
+      healthFactor: HF_ONE * 125n / 100n,
+      blockNumber: 1n,
+    };
+    const d = decide(p);
+    let promptTertangkap = "";
+    await explainDecision(p, d, {
+      generate: async (teks) => {
+        promptTertangkap = teks;
+        return "ok";
+      },
+    });
+    expect(d.reason).toContain("1,25");
+    expect(promptTertangkap).toContain("1,25");
+    expect(d.reason).toContain("20,0%");
+    expect(promptTertangkap).toContain("20,0%");
   });
 });

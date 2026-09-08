@@ -1,4 +1,5 @@
 import { dropToLiquidationBps, repayToReachTarget } from "./healthFactor.js";
+import { formatHf, formatPercentFromBps } from "./format.js";
 import {
   DEFAULT_THRESHOLDS,
   HF_ONE,
@@ -10,29 +11,6 @@ import {
 } from "./types.js";
 
 /**
- * Format health factor (basis 1e18) menjadi string dua desimal dengan koma,
- * mis. 1_300_000_000_000_000_000n -> "1,30". Murni aritmetika bigint, tanpa
- * floating point supaya tidak ada kehilangan presisi.
- */
-function formatHf(hf: bigint): string {
-  const bulat = hf / HF_ONE;
-  const sisa = hf % HF_ONE;
-  const desimal = (sisa * 100n) / HF_ONE;
-  return `${bulat},${desimal.toString().padStart(2, "0")}`;
-}
-
-/**
- * Format basis point (basis 10_000 = 100%) menjadi persen satu desimal
- * dengan koma, mis. 2000n -> "20,0".
- */
-function formatPercentFromBps(bps: bigint): string {
-  const persepuluhPersen = bps / 10n; // bps/10 = persentase dikali 10
-  const bulat = persepuluhPersen / 10n;
-  const desimal = persepuluhPersen % 10n;
-  return `${bulat},${desimal}`;
-}
-
-/**
  * Menyusun kalimat penjelasan dari angka-angka keputusan. Kode ini, bukan
  * LLM, yang menentukan isi kalimat — modul penjelasan LLM (task terpisah)
  * hanya boleh memperindah kalimat ini, tidak pernah mengubah angkanya.
@@ -42,9 +20,19 @@ function buildReason(action: Action, hf: bigint | null, dropBps: bigint | null):
     return "Tidak ada hutang sehingga tidak ada risiko likuidasi.";
   }
 
+  // `dropBps` di sini TIDAK PERNAH null: `dropToLiquidationBps` hanya
+  // mengembalikan null untuk hf === null, dan kasus itu sudah keluar di atas.
+  // Dulu tempat ini punya cabang fallback "0,0" yang tidak pernah tercapai —
+  // cabang mati seperti itu menyamarkan pelanggaran invarian jadi kalimat yang
+  // terlihat normal ("boleh turun 0,0%"). Sekarang ia gagal keras dan terlihat.
+  if (dropBps === null) {
+    throw new PositionError(
+      `Invariant dilanggar: dropToLiquidationBps null padahal health factor ${hf} bukan null.`,
+    );
+  }
+
   const hfStr = formatHf(hf);
-  const dropStr = dropBps === null ? "0,0" : formatPercentFromBps(dropBps);
-  const jarak = `Agunan boleh turun ${dropStr}% sebelum likuidasi.`;
+  const jarak = `Agunan boleh turun ${formatPercentFromBps(dropBps)}% sebelum likuidasi.`;
 
   switch (action) {
     case "EMERGENCY":
@@ -78,6 +66,35 @@ function validateThresholds(t: Thresholds): void {
 }
 
 /**
+ * Memastikan `Position` masuk akal sebelum dipakai menghitung apa pun.
+ *
+ * `decide` sebelumnya memvalidasi ambang tetapi mempercayai `Position` bulat-
+ * bulat. Akibatnya `liquidationThresholdBps: 0n` — nilai yang muncul dari
+ * pembacaan on-chain yang gagal sebagian, mock test yang lupa diisi, atau
+ * pasar yang di-freeze — menghasilkan HF 0 sehingga posisi yang sebenarnya
+ * sehat dinilai EMERGENCY dan disarankan melunasi SELURUH hutang. Untuk agent
+ * yang membelanjakan uang user, input tak masuk akal harus gagal keras di
+ * pintu masuk, bukan berubah jadi saran pembayaran maksimal.
+ *
+ * Ambang likuidasi valid adalah 0 < bps ≤ 10000 (10000 bps = 100%, batas atas
+ * fisik: agunan tidak bisa menjamin lebih dari nilainya sendiri).
+ */
+function validatePosition(pos: Position): void {
+  if (pos.liquidationThresholdBps <= 0n || pos.liquidationThresholdBps > 10_000n) {
+    throw new PositionError(
+      `Ambang likuidasi tidak masuk akal: ${pos.liquidationThresholdBps} bps. ` +
+        `Nilai valid adalah 0 < bps <= 10000.`,
+    );
+  }
+  if (pos.collateralBase < 0n || pos.debtBase < 0n) {
+    throw new PositionError(
+      `Nilai posisi negatif tidak mungkin: collateralBase=${pos.collateralBase}, ` +
+        `debtBase=${pos.debtBase}.`,
+    );
+  }
+}
+
+/**
  * Mesin keputusan Guardian. Murni: tanpa network, Date.now(), process.env,
  * atau I/O apa pun. Memeriksa dari kondisi paling gawat ke paling ringan
  * supaya kasus batas (persis di suatu ambang) selalu jatuh ke tindakan yang
@@ -85,6 +102,7 @@ function validateThresholds(t: Thresholds): void {
  */
 export function decide(pos: Position, thresholds: Thresholds = DEFAULT_THRESHOLDS): Decision {
   validateThresholds(thresholds);
+  validatePosition(pos);
 
   const hf = pos.healthFactor;
   const drop = dropToLiquidationBps(hf);

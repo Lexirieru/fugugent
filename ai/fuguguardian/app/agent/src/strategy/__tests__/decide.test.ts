@@ -104,4 +104,33 @@ describe("decide", () => {
     // sampai partialRepay 1,2), bukan tepat di salah satu ambangnya.
     expect(decide(posWithHf(115n * HF_ONE / 100n)).action).toBe("PARTIAL_REPAY");
   });
+
+  it("posisi dengan ambang likuidasi tidak masuk akal ditolak", () => {
+    const dasar = posWithHf(2n * HF_ONE);
+
+    // 0 bps: dulu ini menghasilkan HF 0 sehingga posisi sehat dinilai
+    // EMERGENCY dan agent disarankan melunasi SELURUH hutang.
+    expect(() => decide({ ...dasar, liquidationThresholdBps: 0n, healthFactor: 0n })).toThrow(
+      PositionError,
+    );
+    // Di atas 100%: agunan tidak bisa menjamin lebih dari nilainya sendiri.
+    expect(() => decide({ ...dasar, liquidationThresholdBps: 10_001n })).toThrow(PositionError);
+    // Negatif jelas mustahil.
+    expect(() => decide({ ...dasar, liquidationThresholdBps: -1n })).toThrow(PositionError);
+    // Tepat 100% masih sah (batas atas fisik).
+    expect(() => decide({ ...dasar, liquidationThresholdBps: 10_000n })).not.toThrow();
+  });
+
+  it("nilai agunan atau hutang negatif ditolak", () => {
+    const dasar = posWithHf(2n * HF_ONE);
+    expect(() => decide({ ...dasar, collateralBase: -1n })).toThrow(PositionError);
+    expect(() => decide({ ...dasar, debtBase: -1n })).toThrow(PositionError);
+  });
+
+  it("posisi tanpa hutang yang ambangnya tidak masuk akal tetap ditolak", () => {
+    // Validasi berjalan sebelum jalur "tidak ada hutang", jadi input rusak
+    // tidak bisa lolos hanya karena kebetulan tidak berhutang.
+    const p = { ...posWithHf(0n), liquidationThresholdBps: 0n };
+    expect(() => decide(p)).toThrow(PositionError);
+  });
 });
