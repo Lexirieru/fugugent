@@ -45,19 +45,19 @@ import {
 function validateThresholds(t: RebalanceThresholds, cost: CostModel): void {
   if (t.watchBandBps <= 0n || t.rebalanceBandBps <= t.watchBandBps) {
     throw new PortfolioError(
-      `Ambang tidak valid: watchBandBps=${t.watchBandBps}, rebalanceBandBps=${t.rebalanceBandBps}. ` +
-        `Urutan yang benar adalah 0 < watchBandBps < rebalanceBandBps.`,
+      `Invalid thresholds: watchBandBps=${t.watchBandBps}, rebalanceBandBps=${t.rebalanceBandBps}. ` +
+        `The correct ordering is 0 < watchBandBps < rebalanceBandBps.`,
     );
   }
   if (t.rebalanceBandBps > BPS_ONE) {
     throw new PortfolioError(
-      `rebalanceBandBps=${t.rebalanceBandBps} melebihi 10000 bps; penyimpangan bobot tidak bisa melampaui 100%.`,
+      `rebalanceBandBps=${t.rebalanceBandBps} exceeds 10000 bps; a weight deviation cannot exceed 100%.`,
     );
   }
   if (minEconomicTurnoverBase(cost, t.maxRebalanceCostBps) === null) {
     throw new PortfolioError(
-      `Anggaran biaya ${t.maxRebalanceCostBps} bps tidak melebihi biaya proporsional ` +
-        `${cost.swapFeeBps + cost.slippageBps} bps: tidak ada ukuran turnover mana pun yang bisa lolos gerbang biaya.`,
+      `A cost budget of ${t.maxRebalanceCostBps} bps does not exceed the proportional cost of ` +
+        `${cost.swapFeeBps + cost.slippageBps} bps: no turnover size whatsoever can clear the cost gate.`,
     );
   }
 }
@@ -65,14 +65,14 @@ function validateThresholds(t: RebalanceThresholds, cost: CostModel): void {
 function validateCostModel(cost: CostModel): void {
   if (cost.swapFeeBps < 0n || cost.slippageBps < 0n || cost.gasCostBase < 0n) {
     throw new PortfolioError(
-      `Model biaya negatif tidak mungkin: swapFeeBps=${cost.swapFeeBps}, ` +
+      `A negative cost model is impossible: swapFeeBps=${cost.swapFeeBps}, ` +
         `slippageBps=${cost.slippageBps}, gasCostBase=${cost.gasCostBase}.`,
     );
   }
   if (cost.swapFeeBps + cost.slippageBps >= BPS_ONE) {
     throw new PortfolioError(
-      `Biaya proporsional ${cost.swapFeeBps + cost.slippageBps} bps mencapai atau melebihi 100%; ` +
-        `transaksi seperti itu tidak menyisakan apa pun.`,
+      `A proportional cost of ${cost.swapFeeBps + cost.slippageBps} bps reaches or exceeds 100%; ` +
+        `a trade like that leaves nothing behind.`,
     );
   }
 }
@@ -86,42 +86,42 @@ function validateCostModel(cost: CostModel): void {
 function validatePortfolio(p: Portfolio): void {
   if (p.assets.length < 2) {
     throw new PortfolioError(
-      `Portofolio berisi ${p.assets.length} aset. Rebalancing butuh minimal 2 aset — ` +
-        `dengan satu aset tidak ada bobot yang bisa digeser.`,
+      `The portfolio holds ${p.assets.length} assets. Rebalancing needs at least 2 — ` +
+        `with a single asset there is no weight to shift.`,
     );
   }
 
-  const terlihat = new Set<string>();
-  let jumlahTarget = 0n;
+  const seen = new Set<string>();
+  let targetSum = 0n;
   for (const a of p.assets) {
-    if (terlihat.has(a.symbol)) {
+    if (seen.has(a.symbol)) {
       throw new PortfolioError(
-        `Simbol duplikat "${a.symbol}": bobot target menjadi ambigu dan transaksi bisa dihitung dua kali.`,
+        `Duplicate symbol "${a.symbol}": the target weight becomes ambiguous and a trade could be counted twice.`,
       );
     }
-    terlihat.add(a.symbol);
+    seen.add(a.symbol);
 
     if (a.valueBase < 0n) {
-      throw new PortfolioError(`Nilai aset negatif tidak mungkin: ${a.symbol}=${a.valueBase}.`);
+      throw new PortfolioError(`A negative asset value is impossible: ${a.symbol}=${a.valueBase}.`);
     }
     if (a.targetWeightBps < 0n || a.targetWeightBps > BPS_ONE) {
       throw new PortfolioError(
-        `Bobot target ${a.symbol}=${a.targetWeightBps} bps di luar rentang 0..10000.`,
+        `Target weight ${a.symbol}=${a.targetWeightBps} bps is outside the range 0..10000.`,
       );
     }
-    jumlahTarget += a.targetWeightBps;
+    targetSum += a.targetWeightBps;
   }
 
-  if (jumlahTarget !== BPS_ONE) {
+  if (targetSum !== BPS_ONE) {
     throw new PortfolioError(
-      `Jumlah bobot target adalah ${jumlahTarget} bps, seharusnya tepat 10000 bps.`,
+      `The target weights sum to ${targetSum} bps, and should sum to exactly 10000 bps.`,
     );
   }
 
   if (totalValueBase(p.assets) <= 0n) {
     throw new PortfolioError(
-      `Portofolio bernilai nol tidak punya bobot. Ini bukan portofolio yang seimbang sempurna, ` +
-        `melainkan pembacaan yang gagal atau posisi yang sudah kosong.`,
+      `A portfolio worth zero has no weights. This is not a perfectly balanced portfolio, ` +
+        `it is a failed reading or a position that is already empty.`,
     );
   }
 }
@@ -135,23 +135,23 @@ function buildReason(
   maxCostBps: bigint,
   bandBps: bigint,
 ): string {
-  const dev = `Penyimpangan bobot terbesar ${formatPercentFromBps(maxDeviationBps)}%`;
+  const dev = `The largest weight deviation is ${formatPercentFromBps(maxDeviationBps)}%`;
   switch (action) {
     case "NONE":
-      return `${dev}, masih di dalam toleransi. Tidak ada yang perlu dipindahkan.`;
+      return `${dev}, still within tolerance. There is nothing to move.`;
     case "WATCH":
-      return `${dev}, sudah melewati pita pengamatan tetapi belum mencapai pita rebalance ${formatPercentFromBps(bandBps)}%. Diamati, belum ada transaksi.`;
+      return `${dev}, past the watch band but not yet at the ${formatPercentFromBps(bandBps)}% rebalance band. Watching, no trade yet.`;
     case "REBALANCE":
       return (
-        `${dev} melewati pita rebalance ${formatPercentFromBps(bandBps)}%. ` +
-        `Memindahkan ${formatUsd8(turnover)} dengan taksiran biaya ${formatUsd8(costBase)} ` +
-        `(${formatBps(costBps)} dari nilai yang dipindahkan, anggaran ${formatBps(maxCostBps)}).`
+        `${dev}, past the ${formatPercentFromBps(bandBps)}% rebalance band. ` +
+        `Moving ${formatUsd8(turnover)} at an estimated cost of ${formatUsd8(costBase)} ` +
+        `(${formatBps(costBps)} of the value moved, against a budget of ${formatBps(maxCostBps)}).`
       );
     case "BLOCKED_BY_COST":
       return (
-        `${dev} sudah melewati pita rebalance, tetapi memindahkan ${formatUsd8(turnover)} ` +
-        `akan menghabiskan ${formatUsd8(costBase)} yaitu ${formatBps(costBps)} dari nilai yang dipindahkan — ` +
-        `melampaui anggaran ${formatBps(maxCostBps)}. Menyeimbangkan sekarang justru merugi karena ongkos.`
+        `${dev}, past the rebalance band, but moving ${formatUsd8(turnover)} ` +
+        `would spend ${formatUsd8(costBase)}, which is ${formatBps(costBps)} of the value moved — ` +
+        `beyond the ${formatBps(maxCostBps)} budget. Rebalancing now would lose money to costs.`
       );
   }
 }
@@ -176,7 +176,7 @@ export function decide(
   const total = totalValueBase(portfolio.assets);
   const maxDev = maxAbsDeviationBps(portfolio.assets, total);
 
-  const kosong = (action: RebalanceAction): RebalanceDecision => ({
+  const empty = (action: RebalanceAction): RebalanceDecision => ({
     action,
     totalValueBase: total,
     maxDeviationBps: maxDev,
@@ -187,8 +187,8 @@ export function decide(
     reason: buildReason(action, maxDev, 0n, 0n, 0n, thresholds.maxRebalanceCostBps, thresholds.rebalanceBandBps),
   });
 
-  if (maxDev < thresholds.watchBandBps) return kosong("NONE");
-  if (maxDev < thresholds.rebalanceBandBps) return kosong("WATCH");
+  if (maxDev < thresholds.watchBandBps) return empty("NONE");
+  if (maxDev < thresholds.rebalanceBandBps) return empty("WATCH");
 
   const trades = computeTrades(portfolio.assets, total);
   const turnover = turnoverBase(trades);
@@ -199,8 +199,8 @@ export function decide(
   // `computeTrades` and we MUST see it, not quietly return "nothing to do".
   if (turnover <= 0n) {
     throw new PortfolioError(
-      `Invarian dilanggar: penyimpangan ${maxDev} bps mencapai pita rebalance ` +
-        `${thresholds.rebalanceBandBps} bps tetapi tidak ada kaki jual yang dihasilkan.`,
+      `Invariant violated: a deviation of ${maxDev} bps reaches the ${thresholds.rebalanceBandBps} bps ` +
+        `rebalance band but no sell leg was produced.`,
     );
   }
 

@@ -28,7 +28,7 @@ export function totalValueBase(assets: readonly Asset[]): bigint {
 export function weightBps(valueBase: bigint, totalBase: bigint): bigint {
   if (totalBase <= 0n) {
     throw new PortfolioError(
-      `Bobot tidak terdefinisi pada portofolio bernilai ${totalBase}. Nilai total wajib > 0.`,
+      `Weights are undefined on a portfolio worth ${totalBase}. The total value must be > 0.`,
     );
   }
   return (valueBase * BPS_ONE) / totalBase;
@@ -46,13 +46,13 @@ export function weightBps(valueBase: bigint, totalBase: bigint): bigint {
 export function absDeviationBps(valueBase: bigint, targetWeightBps: bigint, totalBase: bigint): bigint {
   if (totalBase <= 0n) {
     throw new PortfolioError(
-      `Penyimpangan tidak terdefinisi pada portofolio bernilai ${totalBase}. Nilai total wajib > 0.`,
+      `Deviation is undefined on a portfolio worth ${totalBase}. The total value must be > 0.`,
     );
   }
-  const aktual = valueBase * BPS_ONE;
+  const actual = valueBase * BPS_ONE;
   const target = totalBase * targetWeightBps;
-  const selisih = aktual > target ? aktual - target : target - aktual;
-  return selisih / totalBase;
+  const difference = actual > target ? actual - target : target - actual;
+  return difference / totalBase;
 }
 
 export function maxAbsDeviationBps(assets: readonly Asset[], totalBase: bigint): bigint {
@@ -88,15 +88,15 @@ export function targetValueBase(totalBase: bigint, targetWeightBps: bigint): big
  * another rebalance immediately — the churn we are trying to avoid.
  */
 export function computeTrades(assets: readonly Asset[], totalBase: bigint): Trade[] {
-  const jual: Trade[] = [];
-  const beli: Trade[] = [];
+  const sells: Trade[] = [];
+  const buys: Trade[] = [];
   for (const a of assets) {
     const target = targetValueBase(totalBase, a.targetWeightBps);
     const delta = a.valueBase - target;
-    if (delta > 0n) jual.push({ symbol: a.symbol, side: "SELL", valueBase: delta });
-    else if (delta < 0n) beli.push({ symbol: a.symbol, side: "BUY", valueBase: -delta });
+    if (delta > 0n) sells.push({ symbol: a.symbol, side: "SELL", valueBase: delta });
+    else if (delta < 0n) buys.push({ symbol: a.symbol, side: "BUY", valueBase: -delta });
   }
-  return [...jual, ...beli];
+  return [...sells, ...buys];
 }
 
 /**
@@ -129,7 +129,7 @@ export function estimateCostBase(turnover: bigint, cost: CostModel): bigint {
 export function costBpsOfTurnover(costBase: bigint, turnover: bigint): bigint {
   if (turnover <= 0n) {
     throw new PortfolioError(
-      "Biaya relatif tidak terdefinisi ketika tidak ada nilai yang dipindahkan (turnover 0).",
+      "A relative cost is undefined when no value is moved (turnover 0).",
     );
   }
   return ceilDiv(costBase * BPS_ONE, turnover);

@@ -100,7 +100,7 @@ export interface BacktestResult {
   bandedBeatsAlways: boolean;
 }
 
-const AKUN = "0x0000000000000000000000000000000000000000" as const;
+const ACCOUNT = "0x0000000000000000000000000000000000000000" as const;
 
 /**
  * A position is expressed as "units at the starting price": the value at candle t is
@@ -128,36 +128,36 @@ function snapshot(holdings: readonly Holding[], prices: readonly bigint[]): Asse
 
 /** Resets every weight to target after paying `costBase`. */
 function applyRebalance(holdings: Holding[], assets: readonly Asset[], prices: readonly bigint[], costBase: bigint): void {
-  const totalSetelahBiaya = totalValueBase(assets) - costBase;
-  if (totalSetelahBiaya <= 0n) {
+  const totalAfterCost = totalValueBase(assets) - costBase;
+  if (totalAfterCost <= 0n) {
     throw new PortfolioError(
-      `Biaya rebalance ${costBase} menghabiskan seluruh nilai portofolio. Model biaya tidak masuk akal.`,
+      `A rebalance cost of ${costBase} consumes the entire portfolio value. The cost model makes no sense.`,
     );
   }
   for (let i = 0; i < holdings.length; i++) {
-    const target = targetValueBase(totalSetelahBiaya, holdings[i]!.targetWeightBps);
+    const target = targetValueBase(totalAfterCost, holdings[i]!.targetWeightBps);
     holdings[i]!.units = unitsFromValue(target, prices[i]!);
   }
 }
 
 function validate(input: BacktestInput): void {
   if (input.startAssets.length < 2) {
-    throw new PortfolioError(`Backtest butuh minimal 2 aset, diberi ${input.startAssets.length}.`);
+    throw new PortfolioError(`A backtest needs at least 2 assets, and was given ${input.startAssets.length}.`);
   }
   if (input.priceSeriesBps.length === 0) {
-    throw new PortfolioError("Deret harga kosong: tidak ada yang bisa disimulasikan.");
+    throw new PortfolioError("Empty price series: there is nothing to simulate.");
   }
-  for (const [i, baris] of input.priceSeriesBps.entries()) {
-    if (baris.length !== input.startAssets.length) {
+  for (const [i, row] of input.priceSeriesBps.entries()) {
+    if (row.length !== input.startAssets.length) {
       throw new PortfolioError(
-        `Baris harga ke-${i} berisi ${baris.length} harga untuk ${input.startAssets.length} aset.`,
+        `Price row ${i} holds ${row.length} prices for ${input.startAssets.length} assets.`,
       );
     }
-    for (const [j, p] of baris.entries()) {
+    for (const [j, p] of row.entries()) {
       if (p <= 0n) {
         throw new PortfolioError(
-          `Harga ke-${j} pada candle ${i} bernilai ${p}. Harga nol atau negatif adalah data rusak, ` +
-            `bukan aset yang kehilangan seluruh nilainya.`,
+          `Price ${j} at candle ${i} is ${p}. A zero or negative price is broken data, ` +
+            `not an asset that lost all of its value.`,
         );
       }
     }
@@ -174,19 +174,19 @@ export function runBacktest(input: BacktestInput): BacktestResult {
   const cost = input.cost ?? DEFAULT_COST_MODEL;
   const thresholds = input.thresholds ?? DEFAULT_THRESHOLDS;
   const series = input.priceSeriesBps;
-  const hargaAwal = series[0]!;
+  const openPrices = series[0]!;
 
-  const buatHoldings = (): Holding[] =>
+  const makeHoldings = (): Holding[] =>
     input.startAssets.map((a, i) => ({
       symbol: a.symbol,
       targetWeightBps: a.targetWeightBps,
-      units: unitsFromValue(a.startValueBase, hargaAwal[i]!),
+      units: unitsFromValue(a.startValueBase, openPrices[i]!),
     }));
 
   type Mode = "banded" | "always" | "never";
 
-  const jalankan = (mode: Mode): PolicyResult => {
-    const holdings = buatHoldings();
+  const run = (mode: Mode): PolicyResult => {
+    const holdings = makeHoldings();
     let rebalances = 0;
     let totalCostBase = 0n;
     let maxDeviationBps = 0n;
@@ -202,7 +202,7 @@ export function runBacktest(input: BacktestInput): BacktestResult {
       if (mode === "never") continue;
 
       if (mode === "banded") {
-        const d = decide({ account: AKUN, assets, blockNumber: 0n }, cost, thresholds);
+        const d = decide({ account: ACCOUNT, assets, blockNumber: 0n }, cost, thresholds);
         if (d.action !== "REBALANCE") continue;
         rebalances += 1;
         totalCostBase += d.estimatedCostBase;
@@ -215,24 +215,24 @@ export function runBacktest(input: BacktestInput): BacktestResult {
       // and no transaction is sent — not a policy exception, just nothing to send.
       const turnover = turnoverBase(computeTrades(assets, total));
       if (turnover <= 0n) continue;
-      const biaya = estimateCostBase(turnover, cost);
+      const costOfMove = estimateCostBase(turnover, cost);
       rebalances += 1;
-      totalCostBase += biaya;
-      applyRebalance(holdings, assets, prices, biaya);
+      totalCostBase += costOfMove;
+      applyRebalance(holdings, assets, prices, costOfMove);
     }
 
-    const hargaAkhir = series[series.length - 1]!;
+    const closePrices = series[series.length - 1]!;
     return {
-      finalValueBase: totalValueBase(snapshot(holdings, hargaAkhir)),
+      finalValueBase: totalValueBase(snapshot(holdings, closePrices)),
       rebalances,
       totalCostBase,
       maxDeviationBps,
     };
   };
 
-  const banded = jalankan("banded");
-  const always = jalankan("always");
-  const never = jalankan("never");
+  const banded = run("banded");
+  const always = run("always");
+  const never = run("never");
 
   return {
     candles: series.length,
