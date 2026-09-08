@@ -130,23 +130,34 @@ def mouth(rx, ry, level):
 
 
 def rim(level):
-    if level == 1:
+    """Puff-level ring around each character. Each of the five levels (Calm,
+    Watchful, Strained, Critical, Emergency) is encoded by a distinct STROKE
+    PATTERN — an open arc, a solid circle, a dashed circle, a double ring, a
+    hazard-striped ring — never by color alone. RISK[level] still tints the
+    ring for sighted users, but the pattern is what actually carries the
+    signal: the whole point is that the puff level must survive the 48px
+    grayscale test and stay readable for colorblind users, where two similar
+    hues collapse to the same gray. Do not "simplify" this into color-only
+    styling — that would silently break the accessibility guarantee."""
+    if level == 1:  # Calm — open arc (partial ring, largest gap)
         r = 45.0
         a0, a1 = math.radians(198), math.radians(342)
         x0, y0 = 50 + r * math.cos(a0), 50 + r * math.sin(a0)
         x1, y1 = 50 + r * math.cos(a1), 50 + r * math.sin(a1)
         return (f'<path d="M{x0:.2f},{y0:.2f} A{r},{r} 0 0,1 {x1:.2f},{y1:.2f}" '
                 f'fill="none" stroke="{RISK[1]}" stroke-width="2" stroke-linecap="round"/>')
-    if level == 2:
+    if level == 2:  # Watchful — solid closed circle with a small notch cut into it
         return (f'<circle cx="50" cy="50" r="45" fill="none" stroke="{RISK[2]}" '
                 f'stroke-width="3"/>'
                 f'<rect x="46" y="2" width="8" height="7" fill="{BG}"/>')
-    if level == 3:
+    if level == 3:  # Strained — dashed circle
         return (f'<circle cx="50" cy="50" r="45" fill="none" stroke="{RISK[3]}" '
                 f'stroke-width="3" stroke-dasharray="6 4"/>')
-    if level == 4:
+    if level == 4:  # Critical — double concentric ring
         return (f'<circle cx="50" cy="50" r="46" fill="none" stroke="{RISK[4]}" stroke-width="2"/>'
                 f'<circle cx="50" cy="50" r="42" fill="none" stroke="{RISK[4]}" stroke-width="2"/>')
+    # Emergency — hazard-stripe ring, the busiest pattern, bracketed by two
+    # thin plain rings so it still reads as a single ring at a glance
     return ('<circle cx="50" cy="50" r="45" fill="none" stroke="url(#hazard)" stroke-width="8"/>'
             '<circle cx="50" cy="50" r="49" fill="none" stroke="' + OUTLINE + '" stroke-width="1"/>'
             '<circle cx="50" cy="50" r="41" fill="none" stroke="' + OUTLINE + '" stroke-width="1"/>')
@@ -281,8 +292,11 @@ fav = character("maskot", 2, with_rim=False, bgcolor="#05121A")
 write("favicon-src.svg", svg100(fav, 256))
 
 # --- OG image 1200x630 ---------------------------------------------------
-# NOTE: the text drawn into this SVG (title, tagline) is rendered output
-# content, not a code comment — kept in Indonesian on purpose, unchanged.
+# NOTE: og.svg is the preview image shown when this project's link is shared
+# (Twitter, Slack, etc.), so its title/tagline text is in English like the
+# rest of the product. Text sits at fixed coordinates in a fixed-size (1200x630)
+# canvas — if you lengthen either string, re-render and check it isn't
+# clipped or overlapping the character row above it.
 row = []
 xs = [(680, 1), (830, 2), (980, 4), (1130, 5)]
 kinds = ["guardian", "rebalancer", "grid", "yield"]
@@ -298,9 +312,9 @@ og = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="120
       + '<text x="72" y="286" font-family="system-ui,-apple-system,Helvetica,Arial,sans-serif" '
         'font-size="76" font-weight="700" fill="#F4F8F9">Fugugent</text>'
       + '<text x="74" y="336" font-family="system-ui,-apple-system,Helvetica,Arial,sans-serif" '
-        'font-size="27" font-weight="500" fill="#5FD4DC">Agent DeFi di BNB Chain</text>'
+        'font-size="27" font-weight="500" fill="#5FD4DC">DeFi Agent Marketplace on BNB Chain</text>'
       + '<text x="74" y="378" font-family="system-ui,-apple-system,Helvetica,Arial,sans-serif" '
-        'font-size="23" font-weight="400" fill="#9FB9C4">Fugu mengembang seiring beban risiko</text>'
+        'font-size="23" font-weight="400" fill="#9FB9C4">The fugu\'s puff level rises with risk load</text>'
       + '</svg>')
 write("og.svg", og)
 
