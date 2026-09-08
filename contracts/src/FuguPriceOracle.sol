@@ -4,6 +4,7 @@ pragma solidity ^0.8.30;
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IAggregatorV3} from "./interfaces/IAggregatorV3.sol";
 
 /// @title FuguPriceOracle
@@ -30,12 +31,18 @@ contract FuguPriceOracle is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     mapping(address token => TokenConfig) private _tokens;
 
     event TokenConfigured(address indexed token, PriceSourceKind kind, address feed, bool enabled);
+    /// @notice Token tidak mengekspos `decimals()` yang bisa dibaca, jadi nilai
+    ///         `tokenDecimals` yang dideklarasikan owner diterima tanpa verifikasi.
+    event DecimalsUnverified(address indexed token);
+    /// @notice Token dinonaktifkan lewat `disableToken`.
+    event TokenDisabled(address indexed token);
 
     error TokenNotEnabled(address token);
     error StalePrice(address token, uint256 updatedAt);
     error FuturePrice(address token, uint256 updatedAt);
     error InvalidPrice(int256 answer);
     error InvalidConfig();
+    error DecimalsMismatch(uint8 declared, uint8 actual);
 
     constructor() {
         _disableInitializers();
@@ -45,6 +52,13 @@ contract FuguPriceOracle is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         __Ownable_init(owner_);
     }
 
+    /// @notice Konfigurasikan sumber harga untuk sebuah token pembayaran.
+    /// @dev `cfg.tokenDecimals` masuk langsung ke rumus `quote()`, jadi salah satu digit
+    ///      di sini menggeser harga 10x. Karena itu untuk token ERC-20 (bukan native)
+    ///      nilai yang dideklarasikan owner **dicocokkan dengan `decimals()` on-chain**
+    ///      dan revert `DecimalsMismatch` bila berbeda. Bila token tidak mengekspos
+    ///      `decimals()` (panggilan gagal / bukan kontrak), nilai owner tetap diterima
+    ///      tapi kontrak memancarkan `DecimalsUnverified` supaya jejaknya terlihat.
     function setToken(address token, TokenConfig calldata cfg) external onlyOwner {
         if (cfg.kind == PriceSourceKind.CHAINLINK) {
             if (cfg.feed == address(0) || cfg.maxStaleness == 0) revert InvalidConfig();
@@ -55,8 +69,31 @@ contract FuguPriceOracle is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         }
         if (cfg.tokenDecimals == 0 || cfg.tokenDecimals > 36) revert InvalidConfig();
 
+        // address(0) = native coin (tBNB): tidak punya `decimals()` untuk dicocokkan.
+        if (token != address(0)) {
+            if (token.code.length == 0) {
+                emit DecimalsUnverified(token);
+            } else {
+                try IERC20Metadata(token).decimals() returns (uint8 actual) {
+                    if (actual != cfg.tokenDecimals) revert DecimalsMismatch(cfg.tokenDecimals, actual);
+                } catch {
+                    emit DecimalsUnverified(token);
+                }
+            }
+        }
+
         _tokens[token] = cfg;
         emit TokenConfigured(token, cfg.kind, cfg.feed, cfg.enabled);
+    }
+
+    /// @notice Matikan sebuah token pembayaran tanpa harus menyusun ulang config lengkap.
+    /// @dev Jalur darurat: bila feed sebuah token bermasalah, owner harus bisa
+    ///      menonaktifkannya seketika. `setToken` menuntut config yang lolos seluruh
+    ///      validasi, yang justru menghalangi saat config lama sudah tidak valid.
+    ///      Sisa config dibiarkan apa adanya supaya bisa dihidupkan lagi lewat `setToken`.
+    function disableToken(address token) external onlyOwner {
+        _tokens[token].enabled = false;
+        emit TokenDisabled(token);
     }
 
     function tokenConfig(address token) external view returns (TokenConfig memory) {

@@ -100,4 +100,24 @@ contract FuguReputationTest is Test {
         vm.expectRevert();
         rep.setSubscriptions(address(0x1234));
     }
+
+    // ---------------------------------------------------------------------
+    // Butir 6 — validasi alamat nol
+    // ---------------------------------------------------------------------
+
+    /// @notice `subscriptions` yang nol akan membuat seluruh `review()` revert tanpa
+    ///         penjelasan; tolak sejak awal.
+    function test_rejectsZeroAddresses() public {
+        FuguReputation impl = new FuguReputation();
+
+        vm.expectRevert(FuguReputation.ZeroAddress.selector);
+        new ERC1967Proxy(address(impl), abi.encodeCall(FuguReputation.initialize, (owner, address(0))));
+
+        vm.prank(owner);
+        vm.expectRevert(FuguReputation.ZeroAddress.selector);
+        rep.setSubscriptions(address(0));
+
+        // alamat lama tetap terpasang
+        assertEq(address(rep.subscriptions()), address(stub));
+    }
 }

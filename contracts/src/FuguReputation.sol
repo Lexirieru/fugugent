@@ -7,8 +7,16 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {IFuguSubscription} from "./interfaces/IFuguSubscription.sol";
 
 /// @title FuguReputation
-/// @notice Review yang hanya bisa ditulis wallet yang terbukti pernah berlangganan.
-///         Rating anti-sybil — memalsukannya berarti benar-benar harus membayar.
+/// @notice Review yang hanya bisa ditulis wallet yang sudah membayar agent dalam jumlah
+///         berarti.
+/// @dev **Apa yang gate ini benar-benar jamin — dan apa yang tidak.**
+///      Hak review terbuka setelah agent benar-benar MENERIMA setidaknya sekian persen
+///      dari harga satu periode penuh (default 50%, lihat
+///      `FuguSubscription.minPaidBpsOfPeriod`). Ini ambang ekonomi, bukan bukti
+///      identitas: sybil tetap mungkin bagi siapa pun yang bersedia membayar setengah
+///      periode untuk tiap wallet. Yang dijamin hanyalah bahwa setiap review punya biaya
+///      nyata yang tidak bisa ditekan mendekati nol, sehingga membanjiri rating jadi
+///      mahal dan uangnya jatuh ke agent yang direview.
 /// @dev Trust boundary: The anti-sybil gate applies to end users. The contract owner
 ///      is a trusted entity who can bypass the gate by calling setSubscriptions() to
 ///      point to a malicious subscription contract, or by upgrading the contract logic
@@ -28,6 +36,7 @@ contract FuguReputation is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     error NotASubscriber();
     error InvalidScore(uint8 score);
     error AlreadyReviewed();
+    error ZeroAddress();
 
     constructor() {
         _disableInitializers();
@@ -35,6 +44,7 @@ contract FuguReputation is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 
     function initialize(address owner_, address subscriptions_) external initializer {
         __Ownable_init(owner_);
+        if (subscriptions_ == address(0)) revert ZeroAddress();
         subscriptions = IFuguSubscription(subscriptions_);
     }
 
@@ -42,9 +52,11 @@ contract FuguReputation is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     /// @param listingId ID agent yang direview.
     /// @param score Skor 1-5.
     /// @param uri IPFS URI atau metadata URI.
-    /// @dev Hanya wallet yang sudah terbukti membayar agent (hasSubscribed = true)
-    ///      yang bisa menulis review. Berlangganan lalu langsung batal tidak memberi hak —
-    ///      hanya ketika agent menarik pembayaran, nilai hasSubscribed menjadi true.
+    /// @dev Hanya wallet yang sudah membayar agent dalam jumlah berarti
+    ///      (`hasSubscribed == true`) yang bisa menulis review: agent harus benar-benar
+    ///      sudah menerima setidaknya `minPaidBpsOfPeriod` bps — default 50% — dari harga
+    ///      satu periode penuh. Berlangganan lalu langsung batal tidak memberi hak, dan
+    ///      begitu pula membayar "debu" (subscribe, maju satu detik, claim, cancel).
     ///      Satu wallet hanya bisa review sekali per agent.
     function review(uint256 listingId, uint8 score, string calldata uri) external {
         if (score == 0 || score > 5) revert InvalidScore(score);
@@ -71,6 +83,7 @@ contract FuguReputation is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     }
 
     function setSubscriptions(address subscriptions_) external onlyOwner {
+        if (subscriptions_ == address(0)) revert ZeroAddress();
         subscriptions = IFuguSubscription(subscriptions_);
     }
 

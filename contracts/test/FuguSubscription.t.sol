@@ -9,6 +9,7 @@ import {FuguSubscription} from "../src/FuguSubscription.sol";
 import {Category} from "../src/types/FuguTypes.sol";
 import {MockAggregator} from "./mocks/MockAggregator.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
+import {MockERC20Decimals} from "./mocks/MockERC20Decimals.sol";
 
 contract FuguSubscriptionTest is Test {
     FuguRegistry registry;
@@ -73,7 +74,7 @@ contract FuguSubscriptionTest is Test {
 
     function _subscribeOnePeriod() internal returns (uint256) {
         vm.prank(user);
-        return subs.subscribe(listingId, 1, address(usdt));
+        return subs.subscribe(listingId, 1, address(usdt), type(uint256).max, block.timestamp + 1 hours);
     }
 
     function test_subscribePullsCorrectTokenAmount() public {
@@ -170,7 +171,7 @@ contract FuguSubscriptionTest is Test {
         registry.setActive(listingId, false);
         vm.prank(user);
         vm.expectRevert(FuguSubscription.ListingInactive.selector);
-        subs.subscribe(listingId, 1, address(usdt));
+        subs.subscribe(listingId, 1, address(usdt), type(uint256).max, block.timestamp + 1 hours);
     }
 
     function test_nativeSubscriptionRequiresExactValue() public {
@@ -191,10 +192,10 @@ contract FuguSubscriptionTest is Test {
         vm.deal(user, 1 ether);
         vm.prank(user);
         vm.expectRevert(abi.encodeWithSelector(FuguSubscription.WrongNativeAmount.selector, needed, needed - 1));
-        subs.subscribe{value: needed - 1}(listingId, 1, address(0));
+        subs.subscribe{value: needed - 1}(listingId, 1, address(0), type(uint256).max, block.timestamp + 1 hours);
 
         vm.prank(user);
-        uint256 id = subs.subscribe{value: needed}(listingId, 1, address(0));
+        uint256 id = subs.subscribe{value: needed}(listingId, 1, address(0), type(uint256).max, block.timestamp + 1 hours);
         assertEq(subs.getSub(id).deposited, needed);
     }
 
@@ -211,7 +212,7 @@ contract FuguSubscriptionTest is Test {
 
     function test_multiplePeriodsScaleDeposit() public {
         vm.prank(user);
-        uint256 id = subs.subscribe(listingId, 3, address(usdt));
+        uint256 id = subs.subscribe(listingId, 3, address(usdt), type(uint256).max, block.timestamp + 1 hours);
         assertEq(subs.getSub(id).deposited, 30e18);
         assertEq(subs.getSub(id).endsAt - subs.getSub(id).startedAt, 90 days);
     }
@@ -219,7 +220,7 @@ contract FuguSubscriptionTest is Test {
     function test_zeroPeriodsReverts() public {
         vm.prank(user);
         vm.expectRevert(FuguSubscription.ZeroPeriods.selector);
-        subs.subscribe(listingId, 0, address(usdt));
+        subs.subscribe(listingId, 0, address(usdt), type(uint256).max, block.timestamp + 1 hours);
     }
 
     /// @notice Kontrak tidak pernah membayar lebih (atau kurang, secara total) dari yang
@@ -230,7 +231,7 @@ contract FuguSubscriptionTest is Test {
         skipTime2 = uint64(bound(skipTime2, 0, 400 days));
 
         vm.prank(user);
-        uint256 id = subs.subscribe(listingId, periods, address(usdt));
+        uint256 id = subs.subscribe(listingId, periods, address(usdt), type(uint256).max, block.timestamp + 1 hours);
         uint256 deposited = subs.getSub(id).deposited;
 
         vm.warp(block.timestamp + skipTime1);
@@ -294,7 +295,7 @@ contract FuguSubscriptionTest is Test {
         uint256 needed = oracle.quote(address(0), 10_00000000);
         vm.deal(user, needed);
         vm.prank(user);
-        uint256 id = subs.subscribe{value: needed}(nativeListingId, 1, address(0));
+        uint256 id = subs.subscribe{value: needed}(nativeListingId, 1, address(0), type(uint256).max, block.timestamp + 1 hours);
 
         vm.warp(block.timestamp + 30 days);
 
@@ -315,7 +316,7 @@ contract FuguSubscriptionTest is Test {
         vm.deal(user, 1 ether);
         vm.prank(user);
         vm.expectRevert(abi.encodeWithSelector(FuguSubscription.WrongNativeAmount.selector, 0, 1));
-        subs.subscribe{value: 1}(listingId, 1, address(usdt));
+        subs.subscribe{value: 1}(listingId, 1, address(usdt), type(uint256).max, block.timestamp + 1 hours);
     }
 
     function test_onlyOwnerCanSetTreasuryAndFee() public {
@@ -344,6 +345,292 @@ contract FuguSubscriptionTest is Test {
         // Tetap dihitung dengan fee 5% yang berlaku saat subscribe, bukan 20% saat ini.
         assertEq(usdt.balanceOf(treasury), 0.5e18);
         assertEq(usdt.balanceOf(creator), 9.5e18);
+    }
+
+    // ---------------------------------------------------------------------
+    // Butir 1 — slippage guard pada subscribe()
+    // ---------------------------------------------------------------------
+
+    /// @notice Reproduksi serangan front-run: user menyiapkan tx dengan `maxAmount`
+    ///         wajar, pemilik listing menaikkan harga 100x lebih dulu, dan tx user
+    ///         harus revert alih-alih menguras seluruh allowance-nya.
+    function test_subscribeRevertsWhenPriceMovesAboveMax() public {
+        // User bersedia membayar paling banyak 10 USDT untuk satu periode ($10).
+        uint256 maxAmount = 10e18;
+        uint256 balanceBefore = usdt.balanceOf(user);
+
+        // Pemilik listing mem-front-run: $10 -> $1000 per periode.
+        vm.prank(creator);
+        registry.updateListing(listingId, 1000_00000000, 30 days, "");
+
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(FuguSubscription.AmountExceedsMax.selector, 1000e18, maxAmount));
+        subs.subscribe(listingId, 1, address(usdt), maxAmount, block.timestamp + 1 hours);
+
+        // Tidak sepeser pun berpindah: pemeriksaan terjadi sebelum safeTransferFrom.
+        assertEq(usdt.balanceOf(user), balanceBefore);
+        assertEq(usdt.balanceOf(address(subs)), 0);
+    }
+
+    /// @notice Guard yang sama berlaku ketika yang bergerak adalah harga oracle,
+    ///         bukan harga listing.
+    function test_subscribeRevertsWhenOraclePriceMovesAboveMax() public {
+        // maxAmount dihitung pada peg $1 = 10 token.
+        uint256 maxAmount = 10e18;
+        // Depeg: 1 USDT tiba-tiba dihargai $0,10, jadi butuh 100 token untuk $10.
+        usdtFeed.setPrice(10_000_000); // $0,10 dalam USD8
+
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(FuguSubscription.AmountExceedsMax.selector, 100e18, maxAmount));
+        subs.subscribe(listingId, 1, address(usdt), maxAmount, block.timestamp + 1 hours);
+    }
+
+    /// @notice Jalur native memakai guard yang sama, dan tidak ada ETH yang tertinggal.
+    function test_nativeSubscribeRevertsWhenAmountExceedsMax() public {
+        _enableNative();
+        uint256 needed = oracle.quote(address(0), 10_00000000);
+
+        vm.deal(user, needed);
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(FuguSubscription.AmountExceedsMax.selector, needed, needed - 1));
+        subs.subscribe{value: needed}(listingId, 1, address(0), needed - 1, block.timestamp + 1 hours);
+
+        assertEq(user.balance, needed);
+    }
+
+    /// @notice Batas persis sama dengan harga harus lolos — guard ini `>`, bukan `>=`.
+    function test_subscribeAcceptsAmountExactlyAtMax() public {
+        vm.prank(user);
+        uint256 id = subs.subscribe(listingId, 1, address(usdt), 10e18, block.timestamp + 1 hours);
+        assertEq(subs.getSub(id).deposited, 10e18);
+    }
+
+    function test_subscribeRevertsAfterDeadline() public {
+        uint256 deadline = block.timestamp - 1;
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(FuguSubscription.DeadlinePassed.selector, deadline));
+        subs.subscribe(listingId, 1, address(usdt), type(uint256).max, deadline);
+    }
+
+    /// @notice `deadline == block.timestamp` masih sah (guard-nya `>`, bukan `>=`).
+    function test_subscribeAcceptsDeadlineAtCurrentBlock() public {
+        vm.prank(user);
+        uint256 id = subs.subscribe(listingId, 1, address(usdt), type(uint256).max, block.timestamp);
+        assertEq(subs.getSub(id).deposited, 10e18);
+    }
+
+    /// @notice Deadline diperiksa sebelum apa pun yang menyentuh dana.
+    function test_deadlineCheckedBeforeAnyTransfer() public {
+        uint256 balanceBefore = usdt.balanceOf(user);
+        vm.warp(block.timestamp + 2 hours);
+        vm.prank(user);
+        vm.expectRevert();
+        subs.subscribe(listingId, 1, address(usdt), type(uint256).max, block.timestamp - 1 hours);
+        assertEq(usdt.balanceOf(user), balanceBefore);
+    }
+
+    // ---------------------------------------------------------------------
+    // Butir 2 — ambang anti-sybil pada hak review
+    // ---------------------------------------------------------------------
+
+    function test_defaultMinPaidBpsIsHalfPeriod() public view {
+        assertEq(subs.minPaidBpsOfPeriod(), 5000);
+    }
+
+    /// @notice Reproduksi PoC sybil: subscribe, maju 1 detik, claim, cancel.
+    ///         Total yang dibayar ~0,0000039 USDT — jauh di bawah ambang 50%,
+    ///         jadi hak review TIDAK boleh terbuka.
+    function test_reviewGateRejectsDustPayment() public {
+        uint256 id = _subscribeOnePeriod();
+
+        vm.warp(block.timestamp + 1);
+        subs.claim(id);
+        vm.prank(user);
+        subs.cancel(id);
+
+        // Pembayaran memang terjadi — tapi jumlahnya debu.
+        uint256 paid = subs.paidToAgent(listingId, user);
+        assertGt(paid, 0);
+        assertLt(paid, 1e13); // < 0,00001 USDT
+        assertFalse(subs.hasSubscribed(listingId, user));
+    }
+
+    /// @notice Membayar melewati separuh periode membuka hak review.
+    function test_reviewGateAcceptsRealPayment() public {
+        uint256 id = _subscribeOnePeriod();
+
+        vm.warp(block.timestamp + 15 days + 1);
+        subs.claim(id);
+
+        assertGe(subs.paidToAgent(listingId, user), 5e18);
+        assertTrue(subs.hasSubscribed(listingId, user));
+    }
+
+    /// @notice Tepat 50% adalah ambang yang lolos (perbandingannya `>=`).
+    function test_reviewGateAcceptsExactlyHalfPeriod() public {
+        uint256 id = _subscribeOnePeriod();
+        vm.warp(block.timestamp + 15 days);
+        subs.claim(id);
+        assertEq(subs.paidToAgent(listingId, user), 5e18);
+        assertTrue(subs.hasSubscribed(listingId, user));
+    }
+
+    /// @notice Sedikit di bawah separuh periode belum cukup.
+    function test_reviewGateRejectsJustUnderHalfPeriod() public {
+        uint256 id = _subscribeOnePeriod();
+        vm.warp(block.timestamp + 15 days - 1);
+        subs.claim(id);
+        assertFalse(subs.hasSubscribed(listingId, user));
+    }
+
+    /// @notice Berlangganan 3 periode: penyebutnya tetap harga SATU periode, jadi
+    ///         separuh periode pertama sudah cukup.
+    function test_reviewGateUsesOnePeriodAsDenominator() public {
+        vm.prank(user);
+        uint256 id = subs.subscribe(listingId, 3, address(usdt), type(uint256).max, block.timestamp + 1 hours);
+        assertEq(subs.periodPriceRef(listingId, user), 10e18);
+
+        vm.warp(block.timestamp + 15 days);
+        subs.claim(id);
+        assertTrue(subs.hasSubscribed(listingId, user));
+    }
+
+    /// @notice `_periodPriceRef` dikunci pada langganan pertama: pemilik listing tidak
+    ///         bisa menaikkan harga belakangan untuk mencabut hak review yang hampir
+    ///         diperoleh.
+    function test_periodPriceRefLockedOnFirstSubscribe() public {
+        _subscribeOnePeriod();
+        assertEq(subs.periodPriceRef(listingId, user), 10e18);
+
+        vm.prank(creator);
+        registry.updateListing(listingId, 100_00000000, 30 days, "");
+
+        vm.prank(user);
+        subs.subscribe(listingId, 1, address(usdt), type(uint256).max, block.timestamp + 1 hours);
+
+        // Tetap 10e18, bukan 100e18.
+        assertEq(subs.periodPriceRef(listingId, user), 10e18);
+    }
+
+    function test_hasSubscribedFalseWithoutAnySubscription() public view {
+        assertFalse(subs.hasSubscribed(listingId, address(0xDEAD)));
+    }
+
+    function test_setMinPaidBpsOfPeriodChangesGate() public {
+        uint256 id = _subscribeOnePeriod();
+        vm.warp(block.timestamp + 1 days);
+        subs.claim(id);
+        // 1/30 periode < 50% -> masih tertutup
+        assertFalse(subs.hasSubscribed(listingId, user));
+
+        // Turunkan ambang ke 3% dari satu periode -> terbuka.
+        vm.prank(owner);
+        subs.setMinPaidBpsOfPeriod(300);
+        assertTrue(subs.hasSubscribed(listingId, user));
+    }
+
+    function test_onlyOwnerCanSetMinPaidBps() public {
+        vm.expectRevert();
+        subs.setMinPaidBpsOfPeriod(1);
+    }
+
+    // ---------------------------------------------------------------------
+    // Butir 6 — validasi alamat nol
+    // ---------------------------------------------------------------------
+
+    function test_rejectsZeroAddresses() public {
+        FuguSubscription impl = new FuguSubscription();
+
+        vm.expectRevert(FuguSubscription.ZeroAddress.selector);
+        new ERC1967Proxy(
+            address(impl),
+            abi.encodeCall(FuguSubscription.initialize, (owner, address(0), address(oracle), treasury, 500))
+        );
+
+        vm.expectRevert(FuguSubscription.ZeroAddress.selector);
+        new ERC1967Proxy(
+            address(impl),
+            abi.encodeCall(FuguSubscription.initialize, (owner, address(registry), address(0), treasury, 500))
+        );
+
+        vm.expectRevert(FuguSubscription.ZeroAddress.selector);
+        new ERC1967Proxy(
+            address(impl),
+            abi.encodeCall(FuguSubscription.initialize, (owner, address(registry), address(oracle), address(0), 500))
+        );
+
+        vm.prank(owner);
+        vm.expectRevert(FuguSubscription.ZeroAddress.selector);
+        subs.setTreasury(address(0));
+    }
+
+    // ---------------------------------------------------------------------
+    // Butir 7 — jumlah nol ditolak simetris di kedua jalur pembayaran
+    // ---------------------------------------------------------------------
+
+    /// @notice Harga yang membulat ke nol harus revert dengan error yang SAMA pada
+    ///         jalur native maupun ERC-20 — sebelumnya jalur native diam-diam
+    ///         menerima langganan kosong senilai 0.
+    function test_zeroQuoteRevertsOnBothPaymentPaths() public {
+        // Token 6 desimal berharga $1.000.000 per unit: $0,00000001 membulat ke 0 unit.
+        MockERC20Decimals pricey = new MockERC20Decimals("Pricey", "PRC", 6);
+        MockAggregator priceyFeed = new MockAggregator(8, 1_000_000_00000000);
+        vm.startPrank(owner);
+        oracle.setToken(
+            address(pricey),
+            FuguPriceOracle.TokenConfig({
+                kind: FuguPriceOracle.PriceSourceKind.CHAINLINK,
+                feed: address(priceyFeed),
+                maxStaleness: 90000,
+                tokenDecimals: 6,
+                fixedPriceUsd8: 0,
+                enabled: true
+            })
+        );
+        // Native juga dihargai sangat tinggi.
+        MockAggregator nativeFeed = new MockAggregator(8, 1_000_000_00000000);
+        oracle.setToken(
+            address(0),
+            FuguPriceOracle.TokenConfig({
+                kind: FuguPriceOracle.PriceSourceKind.CHAINLINK,
+                feed: address(nativeFeed),
+                maxStaleness: 3600,
+                tokenDecimals: 6,
+                fixedPriceUsd8: 0,
+                enabled: true
+            })
+        );
+        vm.stopPrank();
+
+        // Listing $0,000001 per periode -> quote membulat ke 0 pada kedua token.
+        vm.prank(creator);
+        uint256 cheapId = registry.list(777, address(0xA6E17), Category.GRID, 1, 30 days, "");
+
+        assertEq(oracle.quote(address(0), 1), 0);
+
+        vm.prank(user);
+        vm.expectRevert(FuguSubscription.ZeroAmountReceived.selector);
+        subs.subscribe(cheapId, 1, address(pricey), type(uint256).max, block.timestamp + 1 hours);
+
+        vm.prank(user);
+        vm.expectRevert(FuguSubscription.ZeroAmountReceived.selector);
+        subs.subscribe{value: 0}(cheapId, 1, address(0), type(uint256).max, block.timestamp + 1 hours);
+    }
+
+    function _enableNative() internal {
+        MockAggregator bnbFeed = new MockAggregator(8, 754_46000000);
+        vm.prank(owner);
+        oracle.setToken(
+            address(0),
+            FuguPriceOracle.TokenConfig({
+                kind: FuguPriceOracle.PriceSourceKind.CHAINLINK,
+                feed: address(bnbFeed),
+                maxStaleness: 3600,
+                tokenDecimals: 18,
+                fixedPriceUsd8: 0,
+                enabled: true
+            })
+        );
     }
 }
 

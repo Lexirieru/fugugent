@@ -25,6 +25,8 @@ contract Upgrade is Script {
     error ZeroAddress(string label);
     error NoCode(string label, address addr);
     error WrongChain(uint256 expected, uint256 actual);
+    error NotUUPSImplementation(address newImpl);
+    error WrongProxiableUUID(address newImpl, bytes32 got, bytes32 expected);
 
     function run() external {
         if (block.chainid != EXPECTED_CHAIN_ID) revert WrongChain(EXPECTED_CHAIN_ID, block.chainid);
@@ -37,6 +39,13 @@ contract Upgrade is Script {
         if (newImpl == address(0)) revert ZeroAddress("NEW_IMPL");
         if (proxy.code.length == 0) revert NoCode("PROXY", proxy);
         if (newImpl.code.length == 0) revert NoCode("NEW_IMPL", newImpl);
+
+        // Sanity check ERC-1822: implementasi UUPS yang benar menjawab `proxiableUUID()`
+        // dengan slot implementasi ERC-1967. Kontrak yang salah tempel (mis. alamat proxy
+        // lain, kontrak non-UUPS, atau library) akan gagal di sini alih-alih mem-BRICK
+        // proxy secara permanen — setelah `upgradeToAndCall` ke implementasi tanpa
+        // `_authorizeUpgrade`/`proxiableUUID`, tidak ada jalan upgrade kembali.
+        _assertUUPSImplementation(newImpl);
 
         address oldImpl = address(uint160(uint256(vm.load(proxy, IMPLEMENTATION_SLOT))));
 
@@ -54,5 +63,15 @@ contract Upgrade is Script {
         console.log("== Upgrade result ==");
         console.log("proxy            ", proxy);
         console.log("implementation (now active)", confirmedImpl);
+    }
+
+    /// @notice Revert kecuali `impl` benar-benar sebuah implementasi UUPS (ERC-1822).
+    /// @dev `staticcall` mentah dipakai supaya kontrak yang sama sekali tidak punya
+    ///      fungsi ini menghasilkan pesan kita sendiri, bukan revert tanpa penjelasan.
+    function _assertUUPSImplementation(address impl) internal view {
+        (bool ok, bytes memory ret) = impl.staticcall(abi.encodeWithSignature("proxiableUUID()"));
+        if (!ok || ret.length != 32) revert NotUUPSImplementation(impl);
+        bytes32 uuid = abi.decode(ret, (bytes32));
+        if (uuid != IMPLEMENTATION_SLOT) revert WrongProxiableUUID(impl, uuid, IMPLEMENTATION_SLOT);
     }
 }

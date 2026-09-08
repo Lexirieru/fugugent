@@ -122,7 +122,7 @@ contract UpgradeTest is Test {
 
         // Subscribe untuk 1 periode (30 hari, $10 = 10 token)
         vm.prank(user);
-        uint256 subId = subs.subscribe(listingId, 1, address(usdt));
+        uint256 subId = subs.subscribe(listingId, 1, address(usdt), type(uint256).max, block.timestamp + 1 hours);
 
         // Majukan waktu ke separuh periode (15 hari)
         vm.warp(block.timestamp + 15 days);
@@ -186,5 +186,89 @@ contract UpgradeTest is Test {
         vm.prank(stranger);
         vm.expectRevert();
         subs.upgradeToAndCall(address(v2impl), "");
+    }
+
+    // ---------------------------------------------------------------------
+    // Variabel state baru dari perbaikan review akhir — append-only
+    // ---------------------------------------------------------------------
+
+    /// @notice Variabel state yang ditambahkan pada perbaikan review akhir
+    ///         (`minPaidBpsOfPeriod`, `_periodPriceRef`, `listingByAgentId`) diletakkan
+    ///         di AKHIR daftar state, sehingga slot lama tidak bergeser dan `extraField`
+    ///         milik V2 tetap dimulai dari nol.
+    function test_newStateVarsAppendOnlyAcrossUpgrade() public {
+        _setupSubscription();
+
+        vm.prank(creator);
+        uint256 listingId = registry.list(1, address(0xA6E17), Category.GRID, 10_00000000, 30 days, "");
+
+        vm.prank(user);
+        uint256 subId = subs.subscribe(listingId, 1, address(usdt), type(uint256).max, block.timestamp + 1 hours);
+
+        vm.warp(block.timestamp + 20 days);
+        subs.claim(subId);
+
+        assertEq(subs.minPaidBpsOfPeriod(), 5000);
+        assertEq(subs.periodPriceRef(listingId, user), 10e18);
+        assertTrue(subs.hasSubscribed(listingId, user));
+        uint256 paidBefore = subs.paidToAgent(listingId, user);
+
+        FuguSubscriptionV2 v2impl = new FuguSubscriptionV2();
+        vm.prank(owner);
+        subs.upgradeToAndCall(address(v2impl), "");
+        FuguSubscriptionV2 upgraded = FuguSubscriptionV2(payable(address(subs)));
+
+        // Nilai variabel baru selamat melewati upgrade...
+        assertEq(upgraded.minPaidBpsOfPeriod(), 5000);
+        assertEq(upgraded.periodPriceRef(listingId, user), 10e18);
+        assertEq(upgraded.paidToAgent(listingId, user), paidBefore);
+        assertTrue(upgraded.hasSubscribed(listingId, user));
+
+        // ...dan slot V2 yang ditambahkan sesudahnya tetap perawan.
+        assertEq(upgraded.extraField(), 0);
+        upgraded.setExtraField(123);
+        assertEq(upgraded.extraField(), 123);
+        // menulis slot baru tidak merusak yang lama
+        assertEq(upgraded.minPaidBpsOfPeriod(), 5000);
+        assertEq(upgraded.periodPriceRef(listingId, user), 10e18);
+    }
+
+    /// @notice `listingByAgentId` juga ditambahkan di akhir dan selamat melewati upgrade.
+    function test_registryListingByAgentIdSurvivesUpgrade() public {
+        vm.prank(creator);
+        uint256 id = registry.list(7, address(0xA6E17), Category.YIELD, 3_00000000, 7 days, "ipfs://x");
+        assertEq(registry.listingByAgentId(7), id);
+
+        FuguRegistryV2 v2impl = new FuguRegistryV2();
+        vm.prank(owner);
+        registry.upgradeToAndCall(address(v2impl), "");
+        FuguRegistryV2 upgraded = FuguRegistryV2(address(registry));
+
+        assertEq(upgraded.listingByAgentId(7), id);
+        assertEq(upgraded.extraField(), 0);
+        upgraded.setExtraField(5);
+        assertEq(upgraded.listingByAgentId(7), id);
+    }
+
+    /// @notice Proxy lama (yang `initialize`-nya sudah jalan sebelum ambang ini ada)
+    ///         mengisi `minPaidBpsOfPeriod` lewat `initializeV2`, dan hanya sekali.
+    function test_initializeV2SetsMinPaidBpsOnUpgradedProxy() public {
+        _setupSubscription();
+
+        // Simulasikan proxy lama: paksa slot ambang kembali ke 0 seperti kondisi
+        // sebelum variabel ini ada.
+        vm.prank(owner);
+        subs.setMinPaidBpsOfPeriod(0);
+        assertEq(subs.minPaidBpsOfPeriod(), 0);
+
+        FuguSubscriptionV2 v2impl = new FuguSubscriptionV2();
+        vm.prank(owner);
+        subs.upgradeToAndCall(address(v2impl), abi.encodeCall(FuguSubscription.initializeV2, ()));
+
+        assertEq(subs.minPaidBpsOfPeriod(), 5000);
+
+        // Tidak bisa dipanggil dua kali.
+        vm.expectRevert();
+        subs.initializeV2();
     }
 }

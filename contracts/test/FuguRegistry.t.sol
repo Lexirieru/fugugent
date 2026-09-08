@@ -19,9 +19,14 @@ contract FuguRegistryTest is Test {
         );
     }
 
+    /// @dev Setiap listing perlu `erc8004AgentId` yang unik sekarang, jadi helper ini
+    ///      menaikkan nonce-nya sendiri. Tes yang peduli pada ID spesifik memanggil
+    ///      `registry.list` langsung.
+    uint256 private _agentIdNonce = 41;
+
     function _list(address as_, Category cat) internal returns (uint256) {
         vm.prank(as_);
-        return registry.list(42, address(0xA6E17), cat, 5_00000000, 30 days, "ipfs://meta");
+        return registry.list(++_agentIdNonce, address(0xA6E17), cat, 5_00000000, 30 days, "ipfs://meta");
     }
 
     function test_listAssignsSequentialIds() public {
@@ -134,5 +139,97 @@ contract FuguRegistryTest is Test {
     function test_getListingRevertsForUnknownId() public {
         vm.expectRevert(abi.encodeWithSelector(FuguRegistry.ListingNotFound.selector, uint256(99)));
         registry.getListing(99);
+    }
+
+    // ---------------------------------------------------------------------
+    // Butir 4 — keunikan erc8004AgentId dan kurasi diri sendiri
+    // ---------------------------------------------------------------------
+
+    /// @notice Tanpa ini, siapa pun bisa me-list ulang `erc8004AgentId` milik orang lain
+    ///         dan menerima pembayaran atas nama identitas tersebut.
+    function test_cannotListSameAgentIdTwice() public {
+        vm.prank(creator);
+        uint256 first = registry.list(1234, address(0xA6E17), Category.GRID, 5_00000000, 30 days, "");
+
+        // Bahkan pemiliknya sendiri tidak bisa mendaftarkan ID yang sama dua kali.
+        vm.prank(creator);
+        vm.expectRevert(abi.encodeWithSelector(FuguRegistry.AgentAlreadyListed.selector, uint256(1234), first));
+        registry.list(1234, address(0xA6E17), Category.GRID, 5_00000000, 30 days, "");
+
+        // Apalagi penyerobot.
+        vm.prank(stranger);
+        vm.expectRevert(abi.encodeWithSelector(FuguRegistry.AgentAlreadyListed.selector, uint256(1234), first));
+        registry.list(1234, address(0xBAD), Category.YIELD, 1_00000000, 1 days, "ipfs://hijack");
+
+        assertEq(registry.listingCount(), 1);
+    }
+
+    function test_listingByAgentIdPointsToListing() public {
+        assertEq(registry.listingByAgentId(4242), 0);
+        vm.prank(creator);
+        uint256 id = registry.list(4242, address(0xA6E17), Category.GRID, 5_00000000, 30 days, "");
+        assertEq(registry.listingByAgentId(4242), id);
+        assertEq(registry.getListing(id).erc8004AgentId, 4242);
+    }
+
+    function test_differentAgentIdsStillAllowed() public {
+        vm.startPrank(creator);
+        uint256 a = registry.list(1, address(0xA6E17), Category.GRID, 5_00000000, 30 days, "");
+        uint256 b = registry.list(2, address(0xA6E17), Category.GRID, 5_00000000, 30 days, "");
+        vm.stopPrank();
+        assertEq(a, 1);
+        assertEq(b, 2);
+    }
+
+    function test_cannotCurateOwnListing() public {
+        // `creator` sekaligus kurator — tetap tidak boleh menstempel listing sendiri.
+        vm.prank(owner);
+        registry.setCurator(creator, true);
+
+        uint256 id = _list(creator, Category.YIELD);
+        vm.prank(creator);
+        vm.expectRevert(FuguRegistry.CannotCurateOwnListing.selector);
+        registry.setCurated(id, true);
+        assertFalse(registry.getListing(id).curated);
+
+        // Tapi listing orang lain tetap boleh dikurasi.
+        uint256 other = _list(stranger, Category.YIELD);
+        vm.prank(creator);
+        registry.setCurated(other, true);
+        assertTrue(registry.getListing(other).curated);
+    }
+
+    /// @notice Larangan juga berlaku saat MELEPAS kurasi listing sendiri.
+    function test_cannotUncurateOwnListing() public {
+        uint256 id = _list(creator, Category.YIELD);
+        vm.prank(owner);
+        registry.setCurator(stranger, true);
+        vm.prank(stranger);
+        registry.setCurated(id, true);
+
+        vm.prank(owner);
+        registry.setCurator(creator, true);
+        vm.prank(creator);
+        vm.expectRevert(FuguRegistry.CannotCurateOwnListing.selector);
+        registry.setCurated(id, false);
+    }
+
+    // ---------------------------------------------------------------------
+    // Butir 7 — harga nol
+    // ---------------------------------------------------------------------
+
+    function test_listRejectsZeroPrice() public {
+        vm.prank(creator);
+        vm.expectRevert(FuguRegistry.InvalidPrice.selector);
+        registry.list(555, address(0xA6E17), Category.YIELD, 0, 30 days, "");
+    }
+
+    function test_updateListingRejectsZeroPrice() public {
+        uint256 id = _list(creator, Category.YIELD);
+        vm.prank(creator);
+        vm.expectRevert(FuguRegistry.InvalidPrice.selector);
+        registry.updateListing(id, 0, 30 days, "");
+        // harga lama tidak berubah
+        assertEq(registry.getListing(id).priceUsd8PerPeriod, 5_00000000);
     }
 }
