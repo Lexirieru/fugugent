@@ -5,35 +5,12 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {IFuguRegistry} from "./interfaces/IFuguRegistry.sol";
+import {Category, Listing} from "./types/FuguTypes.sol";
 
 /// @title FuguRegistry
 /// @notice Katalog agent yang layak ditampilkan di marketplace, menjembatani
 ///         identitas ERC-8004 yang mentah dengan listing yang punya harga dan kategori.
 contract FuguRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, IFuguRegistry {
-    // NOTE: Category dan Listing dideklarasikan langsung di sini (bukan di
-    // IFuguRegistry) supaya `FuguRegistry.Category` / `FuguRegistry.Listing`
-    // bisa di-resolve dari luar kontrak (dipakai oleh test). IFuguRegistry.sol
-    // meng-import kontrak ini untuk memakai ulang tipe `Listing` pada
-    // signature `getListing`. Lihat komentar di IFuguRegistry.sol.
-    enum Category {
-        REBALANCING,
-        GRID,
-        YIELD,
-        HEALTH_FACTOR
-    }
-
-    struct Listing {
-        uint256 erc8004AgentId;
-        address owner;
-        address agentWallet;
-        Category category;
-        uint128 priceUsd8PerPeriod;
-        uint32 periodSeconds;
-        bool active;
-        bool curated;
-        string metadataURI;
-    }
-
     uint256 private _listingCount;
     mapping(uint256 listingId => Listing) private _listings;
     mapping(Category => uint256) private _countByCategory;
