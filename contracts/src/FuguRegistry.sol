@@ -109,6 +109,11 @@ contract FuguRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable, IFu
         return _listingCount;
     }
 
+    /// @notice Total listing yang PERNAH dibuat pada kategori ini.
+    /// @dev Angka ini tidak berkurang saat sebuah listing dinonaktifkan lewat
+    ///      `setActive(id, false)` — ini adalah hitungan kumulatif "pernah dibuat",
+    ///      bukan hitungan listing yang sedang aktif. Jangan ditafsirkan sebagai
+    ///      jumlah listing aktif di frontend.
     function countByCategory(Category category) external view returns (uint256) {
         return _countByCategory[category];
     }

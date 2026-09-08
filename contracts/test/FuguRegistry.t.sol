@@ -58,11 +58,57 @@ contract FuguRegistryTest is Test {
         registry.list(1, address(0xA6E17), Category.YIELD, 1e8, 0, "");
     }
 
-    function test_onlyOwnerCanUpdateListing() public {
+    function test_onlyListingOwnerCanSetActive() public {
         uint256 id = _list(creator, Category.YIELD);
         vm.prank(stranger);
         vm.expectRevert(abi.encodeWithSelector(FuguRegistry.NotListingOwner.selector, id));
         registry.setActive(id, false);
+    }
+
+    function test_updateListingChangesFields() public {
+        uint256 id = _list(creator, Category.GRID);
+        vm.prank(creator);
+        registry.updateListing(id, 9_00000000, 7 days, "ipfs://new-meta");
+
+        Listing memory l = registry.getListing(id);
+        assertEq(l.priceUsd8PerPeriod, 9_00000000);
+        assertEq(l.periodSeconds, 7 days);
+        assertEq(l.metadataURI, "ipfs://new-meta");
+
+        assertEq(l.erc8004AgentId, 42);
+        assertEq(l.owner, creator);
+        assertEq(uint8(l.category), uint8(Category.GRID));
+        assertTrue(l.active);
+    }
+
+    function test_onlyListingOwnerCanUpdateListing() public {
+        uint256 id = _list(creator, Category.YIELD);
+        vm.prank(stranger);
+        vm.expectRevert(abi.encodeWithSelector(FuguRegistry.NotListingOwner.selector, id));
+        registry.updateListing(id, 1_00000000, 1 days, "ipfs://hijacked");
+    }
+
+    function test_updateListingRejectsZeroPeriod() public {
+        uint256 id = _list(creator, Category.YIELD);
+        vm.prank(creator);
+        vm.expectRevert(FuguRegistry.InvalidPeriod.selector);
+        registry.updateListing(id, 1_00000000, 0, "ipfs://meta");
+    }
+
+    function test_updateListingEmitsEvent() public {
+        uint256 id = _list(creator, Category.YIELD);
+        vm.expectEmit(true, false, false, true, address(registry));
+        emit FuguRegistry.ListingUpdated(id, 3_00000000, 14 days, "ipfs://emitted");
+        vm.prank(creator);
+        registry.updateListing(id, 3_00000000, 14 days, "ipfs://emitted");
+    }
+
+    function test_setCuratedRevertsForUnknownListing() public {
+        vm.prank(owner);
+        registry.setCurator(stranger, true);
+        vm.prank(stranger);
+        vm.expectRevert(abi.encodeWithSelector(FuguRegistry.ListingNotFound.selector, uint256(99)));
+        registry.setCurated(99, true);
     }
 
     function test_listingOwnerCanDeactivate() public {
