@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {MockLendingPool} from "../src/mocks/MockLendingPool.sol";
 import {MockPriceFeed} from "../src/mocks/MockPriceFeed.sol";
 import {MockToken} from "../src/mocks/MockToken.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 /// @dev Menguji `MockLendingPool` terhadap rumus Aave v3 yang mengikat, sehingga
 ///      adapter TypeScript `readAavePosition` (yang membaca `getUserAccountData`
@@ -150,8 +151,23 @@ contract MockLendingPoolTest is Test {
 
         // Additional $301 pushes total debt to $801 > $800 ceiling => HF < 1
         vm.prank(borrower);
-        vm.expectRevert();
+        vm.expectPartialRevert(MockLendingPool.HealthFactorTooLow.selector);
         pool.borrow(address(debtToken), 301 ether);
+    }
+
+    function test_borrowRevertsWhenPoolLacksLiquidity() public {
+        _supplyCollateral(100 ether); // agunan cukup untuk HF, tapi likuiditas aset pinjaman nol
+
+        MockToken illiquidToken = new MockToken("Illiquid", "ILQ");
+        MockPriceFeed illiquidFeed = new MockPriceFeed(8, 1e8);
+        pool.addAsset(address(illiquidToken), address(illiquidFeed), 5000, 6000);
+        // Tidak ada siapa pun yang men-supply illiquidToken ke pool -> saldo pool = 0.
+
+        vm.prank(borrower);
+        vm.expectRevert(
+            abi.encodeWithSelector(MockLendingPool.InsufficientPoolLiquidity.selector, address(illiquidToken), 0, 1 ether)
+        );
+        pool.borrow(address(illiquidToken), 1 ether);
     }
 
     function test_borrowSucceedsExactlyAtHealthFactorFloor() public {
@@ -169,8 +185,18 @@ contract MockLendingPoolTest is Test {
 
         // Withdrawing 40 tokens ($400) leaves $600 collateral; ceiling debt becomes $480 < $500 debt => HF < 1
         vm.prank(borrower);
-        vm.expectRevert();
+        vm.expectPartialRevert(MockLendingPool.HealthFactorTooLow.selector);
         pool.withdraw(address(collateralToken), 40 ether);
+    }
+
+    function test_withdrawRevertsWhenAmountExceedsCollateral() public {
+        _supplyCollateral(50 ether); // tanpa hutang sama sekali — ini murni jalur over-withdraw
+
+        vm.prank(borrower);
+        vm.expectRevert(
+            abi.encodeWithSelector(MockLendingPool.InsufficientCollateral.selector, address(collateralToken), 50 ether, 51 ether)
+        );
+        pool.withdraw(address(collateralToken), 51 ether);
     }
 
     function test_withdrawSucceedsWhenHealthFactorStaysAtOrAboveOne() public {
@@ -182,7 +208,9 @@ contract MockLendingPoolTest is Test {
         pool.withdraw(address(collateralToken), 37 ether);
 
         (,,,,, uint256 healthFactor) = pool.getUserAccountData(borrower);
-        assertGe(healthFactor, 1e18);
+        // totalCollateralBase = 630*1e8, currentLiquidationThreshold = 8000, totalDebtBase = 500*1e8
+        // HF = (630e8 * 8000 * 1e18) / (10000 * 500e8) = 1.008e18 tepat
+        assertEq(healthFactor, 1.008e18);
     }
 
     function test_withdrawWithoutDebtNeverReverts() public {
@@ -211,6 +239,24 @@ contract MockLendingPoolTest is Test {
 
         assertEq(totalDebtBaseAfter, 250 * 1e8);
         assertGt(healthFactorAfter, healthFactorBefore);
+    }
+
+    function test_repayOnlyPullsOutstandingDebt() public {
+        _supplyCollateral(100 ether);
+        _borrow(500 ether); // borrower menerima 500 ether dB dari pool, itu juga saldo dB-nya sekarang
+
+        uint256 balBefore = debtToken.balanceOf(borrower);
+
+        // Borrower mengajukan pelunasan jauh lebih besar dari hutangnya (500 ether).
+        vm.prank(borrower);
+        pool.repay(address(debtToken), 10_000 ether);
+
+        (, uint256 totalDebtBase,,,,) = pool.getUserAccountData(borrower);
+        assertEq(totalDebtBase, 0);
+
+        uint256 balAfter = debtToken.balanceOf(borrower);
+        // Hanya sisa hutang lama (500 ether) yang benar-benar ditarik, bukan 10_000 ether yang diajukan.
+        assertEq(balBefore - balAfter, 500 ether);
     }
 
     function test_repayFullDebtRestoresMaxHealthFactor() public {
@@ -266,12 +312,52 @@ contract MockLendingPoolTest is Test {
     }
 
     // ---------------------------------------------------------------
+    // penskalaan desimal feed (bukan 8) — bug penskalaan tidak akan terdeteksi
+    // kalau semua test lain memakai feed 8 desimal.
+    // ---------------------------------------------------------------
+
+    function test_priceScalingFromFeedWith18Decimals() public {
+        MockToken token18 = new MockToken("Token 18dp feed", "T18");
+        MockPriceFeed feed18 = new MockPriceFeed(18, 2e18); // $2.00, feed 18 desimal
+
+        pool.addAsset(address(token18), address(feed18), 5000, 6000);
+
+        token18.mint(borrower, 50 ether);
+        vm.startPrank(borrower);
+        token18.approve(address(pool), type(uint256).max);
+        pool.supply(address(token18), 50 ether); // 50 token * $2.00 = $100
+        vm.stopPrank();
+
+        (uint256 totalCollateralBase,,,,,) = pool.getUserAccountData(borrower);
+        assertEq(totalCollateralBase, 100 * 1e8);
+    }
+
+    function test_priceScalingFromFeedWith6Decimals() public {
+        MockToken token6 = new MockToken("Token 6dp feed", "T6");
+        MockPriceFeed feed6 = new MockPriceFeed(6, 2_000_000); // $2.00, feed 6 desimal
+
+        pool.addAsset(address(token6), address(feed6), 5000, 6000);
+
+        token6.mint(borrower, 50 ether);
+        vm.startPrank(borrower);
+        token6.approve(address(pool), type(uint256).max);
+        pool.supply(address(token6), 50 ether); // 50 token * $2.00 = $100
+        vm.stopPrank();
+
+        (uint256 totalCollateralBase,,,,,) = pool.getUserAccountData(borrower);
+        // Skala feed berbeda (18 vs 6 desimal), tapi harga USD yang dinormalkan sama
+        // ($2.00) dan jumlah token yang disupply sama -> nilai USD harus identik
+        // dengan test_priceScalingFromFeedWith18Decimals.
+        assertEq(totalCollateralBase, 100 * 1e8);
+    }
+
+    // ---------------------------------------------------------------
     // access control / config
     // ---------------------------------------------------------------
 
     function test_addAssetRevertsForNonOwner() public {
         vm.prank(borrower);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, borrower));
         pool.addAsset(address(collateralToken), address(collateralFeed), 1, 1);
     }
 
@@ -280,7 +366,7 @@ contract MockLendingPoolTest is Test {
         unsupported.mint(borrower, 1 ether);
         vm.startPrank(borrower);
         unsupported.approve(address(pool), type(uint256).max);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(MockLendingPool.AssetNotSupported.selector, address(unsupported)));
         pool.supply(address(unsupported), 1 ether);
         vm.stopPrank();
     }
