@@ -16,5 +16,32 @@
     "FuguRegistry": "0xD89395Df78aaFdF86b330899d1C6189211e88750",
     "FuguSubscription": "0xF76DA0ec605CFac82f1DA86080da21316C07d130",
     "FuguReputation": "0x020744cC10fEaD789dE205de76A2769B9A4945DE"
+  },
+  "mocks": {
+    "deployedAt": "2026-09-08",
+    "notes": "Alat uji testnet untuk mensimulasikan protokol lending, BUKAN bagian produk Fugugent. Dipakai untuk menguji agent penyelamat (rescue agent) terhadap posisi yang mendekati likuidasi. Belum diverifikasi di BscScan: BSCSCAN_API_KEY belum tersedia.",
+    "MockLendingPool": "0xb3e1F06Ac529aded2aA20aA38F4C0b4AD317e5F5",
+    "MockTokenUSD": "0x932E82632E80b06318ca969e33F99A54F1a04b10",
+    "MockTokenBNB": "0xF380E8B6803aD065EF0567dd20C894a55050737c",
+    "MockPriceFeedUSD": "0x5B0770513b6CD76Bf225462F3ec42783E8Da69A1",
+    "MockPriceFeedBNB": "0x0aA42416bAccdb2fd4768B61111DeB7F7D212F9B",
+    "liquidityProvider": {
+      "address": "0xdDBC1c5FC604A8d91e73Ab6Dd69EA472a17c7eFF",
+      "note": "Alamat kunci-uji deterministik (bukan rahasia — testnet saja) yang menyuplai 50.000 mUSD likuiditas ke pool, dipisah dari deployer agar tidak tercampur dengan posisi contoh."
+    },
+    "samplePosition": {
+      "owner": "0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E",
+      "collateral": "10 mBNB (= $7,500 @ $750/mBNB)",
+      "debt": "3,125 mUSD",
+      "healthFactorWad": "1800000000000000000",
+      "getUserAccountData": {
+        "totalCollateralBase": "750000000000",
+        "totalDebtBase": "312500000000",
+        "availableBorrowsBase": "137500000000",
+        "currentLiquidationThreshold": "7500",
+        "ltv": "6000",
+        "healthFactor": "1800000000000000000"
+      }
+    }
   }
 }
