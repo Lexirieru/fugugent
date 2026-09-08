@@ -190,7 +190,7 @@ contract FuguSubscriptionTest is Test {
         uint256 needed = oracle.quote(address(0), 10_00000000);
         vm.deal(user, 1 ether);
         vm.prank(user);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(FuguSubscription.WrongNativeAmount.selector, needed, needed - 1));
         subs.subscribe{value: needed - 1}(listingId, 1, address(0));
 
         vm.prank(user);
@@ -200,7 +200,12 @@ contract FuguSubscriptionTest is Test {
 
     function test_hasSubscribedGatesReputation() public {
         assertFalse(subs.hasSubscribed(listingId, user));
-        _subscribeOnePeriod();
+        uint256 id = _subscribeOnePeriod();
+        // Subscribe saja belum membayar apa pun ke agent — belum boleh menilai.
+        assertFalse(subs.hasSubscribed(listingId, user));
+        vm.warp(block.timestamp + 15 days);
+        subs.claim(id);
+        // Baru setelah agent benar-benar dibayar, hak review terbuka.
         assertTrue(subs.hasSubscribed(listingId, user));
     }
 
@@ -217,22 +222,29 @@ contract FuguSubscriptionTest is Test {
         subs.subscribe(listingId, 0, address(usdt));
     }
 
-    /// @notice Kontrak tidak pernah membayar lebih dari yang disetor.
-    function testFuzz_neverPaysOutMoreThanDeposited(uint32 periods, uint64 skipTime) public {
+    /// @notice Kontrak tidak pernah membayar lebih (atau kurang, secara total) dari yang
+    ///         disetor — tidak ada dana yang bisa nyangkut di kontrak.
+    function testFuzz_neverPaysOutMoreThanDeposited(uint32 periods, uint64 skipTime1, uint64 skipTime2) public {
         periods = uint32(bound(periods, 1, 12));
-        skipTime = uint64(bound(skipTime, 0, 400 days));
+        skipTime1 = uint64(bound(skipTime1, 0, 400 days));
+        skipTime2 = uint64(bound(skipTime2, 0, 400 days));
 
         vm.prank(user);
         uint256 id = subs.subscribe(listingId, periods, address(usdt));
         uint256 deposited = subs.getSub(id).deposited;
 
-        vm.warp(block.timestamp + skipTime);
+        vm.warp(block.timestamp + skipTime1);
 
         uint256 creatorBefore = usdt.balanceOf(creator);
         uint256 treasuryBefore = usdt.balanceOf(treasury);
         uint256 userBefore = usdt.balanceOf(user);
 
         if (subs.claimable(id) > 0) subs.claim(id);
+
+        // Warp lagi di antara claim dan cancel, supaya cabang "sudah lewat endsAt secara
+        // alami sebelum sempat di-cancel" ikut ter-fuzz.
+        vm.warp(block.timestamp + skipTime2);
+
         vm.prank(user);
         subs.cancel(id);
         if (subs.claimable(id) > 0) subs.claim(id);
@@ -240,6 +252,111 @@ contract FuguSubscriptionTest is Test {
         uint256 paidOut = (usdt.balanceOf(creator) - creatorBefore) + (usdt.balanceOf(treasury) - treasuryBefore)
             + (usdt.balanceOf(user) - userBefore);
 
-        assertLe(paidOut, deposited);
+        // Invarian penuh: bukan cuma "tidak lebih" — setiap rupiah yang disetor harus
+        // keluar lagi (ke creator, treasury, atau user), tidak ada yang nyangkut.
+        assertEq(paidOut, deposited);
+        assertEq(usdt.balanceOf(address(subs)), 0);
+    }
+
+    function test_cancelInSameBlockRefundsEverything() public {
+        uint256 id = _subscribeOnePeriod();
+        uint256 before = usdt.balanceOf(user);
+
+        vm.prank(user);
+        subs.cancel(id);
+
+        // Tidak ada waktu berlalu sama sekali -> seluruh deposit kembali, tidak ada yang
+        // "diperoleh" agent, dan gate reputasi tidak boleh terbuka hanya bermodal gas.
+        assertEq(usdt.balanceOf(user) - before, 10e18);
+        assertEq(subs.claimable(id), 0);
+        assertFalse(subs.hasSubscribed(listingId, user));
+    }
+
+    function test_nativePayoutDeferredWhenRecipientRejects() public {
+        MockAggregator bnbFeed = new MockAggregator(8, 754_46000000);
+        vm.prank(owner);
+        oracle.setToken(
+            address(0),
+            FuguPriceOracle.TokenConfig({
+                kind: FuguPriceOracle.PriceSourceKind.CHAINLINK,
+                feed: address(bnbFeed),
+                maxStaleness: 3600,
+                tokenDecimals: 18,
+                fixedPriceUsd8: 0,
+                enabled: true
+            })
+        );
+
+        RejectingReceiver rejector = new RejectingReceiver();
+        vm.prank(address(rejector));
+        uint256 nativeListingId = registry.list(2, address(0xA6E17), Category.GRID, 10_00000000, 30 days, "");
+
+        uint256 needed = oracle.quote(address(0), 10_00000000);
+        vm.deal(user, needed);
+        vm.prank(user);
+        uint256 id = subs.subscribe{value: needed}(nativeListingId, 1, address(0));
+
+        vm.warp(block.timestamp + 30 days);
+
+        // claim tidak boleh revert walau penerima menolak ETH.
+        subs.claim(id);
+        assertEq(subs.pendingWithdrawals(address(rejector)), needed - (needed * 500) / 10_000);
+        assertEq(address(rejector).balance, 0);
+
+        rejector.setAccept(true);
+        vm.prank(address(rejector));
+        subs.withdrawPending();
+
+        assertEq(address(rejector).balance, needed - (needed * 500) / 10_000);
+        assertEq(subs.pendingWithdrawals(address(rejector)), 0);
+    }
+
+    function test_erc20SubscribeRejectsNonZeroValue() public {
+        vm.deal(user, 1 ether);
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(FuguSubscription.WrongNativeAmount.selector, 0, 1));
+        subs.subscribe{value: 1}(listingId, 1, address(usdt));
+    }
+
+    function test_onlyOwnerCanSetTreasuryAndFee() public {
+        vm.expectRevert();
+        subs.setTreasury(address(0xBEEF));
+
+        vm.expectRevert();
+        subs.setProtocolFeeBps(100);
+    }
+
+    function test_setProtocolFeeBpsRejectsTooHigh() public {
+        vm.prank(owner);
+        vm.expectRevert(FuguSubscription.FeeTooHigh.selector);
+        subs.setProtocolFeeBps(2001);
+    }
+
+    function test_feeSnapshotNotRetroactive() public {
+        uint256 id = _subscribeOnePeriod();
+
+        vm.prank(owner);
+        subs.setProtocolFeeBps(2000); // naikkan ke 20% setelah subscribe
+
+        vm.warp(block.timestamp + 30 days);
+        subs.claim(id);
+
+        // Tetap dihitung dengan fee 5% yang berlaku saat subscribe, bukan 20% saat ini.
+        assertEq(usdt.balanceOf(treasury), 0.5e18);
+        assertEq(usdt.balanceOf(creator), 9.5e18);
+    }
+}
+
+/// @notice Kontrak minimal untuk menguji jalur pending-withdrawal: menolak ETH sampai
+///         `accept` diaktifkan.
+contract RejectingReceiver {
+    bool public accept;
+
+    function setAccept(bool value) external {
+        accept = value;
+    }
+
+    receive() external payable {
+        require(accept, "rejected");
     }
 }

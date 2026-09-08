@@ -7,6 +7,7 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {IFuguRegistry} from "./interfaces/IFuguRegistry.sol";
 import {IFuguSubscription} from "./interfaces/IFuguSubscription.sol";
 import {FuguPriceOracle} from "./FuguPriceOracle.sol";
@@ -23,6 +24,7 @@ contract FuguSubscription is
     IFuguSubscription
 {
     using SafeERC20 for IERC20;
+    using SafeCast for uint256;
 
     struct Sub {
         uint256 listingId;
@@ -33,6 +35,9 @@ contract FuguSubscription is
         uint64 startedAt;
         uint64 endsAt;
         bool cancelled;
+        // @dev Ditambahkan di akhir struct (append-only) — snapshot fee saat subscribe,
+        //      supaya kenaikan `protocolFeeBps` di kemudian hari tidak berlaku surut.
+        uint16 feeBps;
     }
 
     IFuguRegistry public registry;
@@ -42,7 +47,15 @@ contract FuguSubscription is
 
     uint256 private _subCount;
     mapping(uint256 subId => Sub) private _subs;
-    mapping(uint256 listingId => mapping(address user => bool)) private _hasSubscribed;
+    /// @dev listingId => subscriber => total yang sudah benar-benar dibayarkan ke agent
+    ///      (lewat `claim`). Sumber kebenaran untuk `hasSubscribed`: subscribe+cancel di
+    ///      blok yang sama tidak boleh membuka hak review — hanya pembayaran nyata yang
+    ///      membukanya.
+    mapping(uint256 listingId => mapping(address user => uint256)) private _paidToAgent;
+    /// @dev Payout native yang gagal terkirim (push) menumpuk di sini untuk ditarik (pull)
+    ///      lewat `withdrawPending`, supaya listing owner berupa kontrak yang menolak ETH
+    ///      tidak mengunci bagian agent selamanya.
+    mapping(address => uint256) public pendingWithdrawals;
 
     event Subscribed(
         uint256 indexed subId, uint256 indexed listingId, address indexed subscriber, address payToken, uint256 amount
@@ -51,6 +64,7 @@ contract FuguSubscription is
     event Cancelled(uint256 indexed subId, uint256 refunded);
     event TreasuryChanged(address treasury);
     event ProtocolFeeChanged(uint16 bps);
+    event PayoutDeferred(address indexed to, uint256 amount);
 
     error ListingInactive();
     error ZeroPeriods();
@@ -60,6 +74,8 @@ contract FuguSubscription is
     error NothingToClaim();
     error TransferFailed();
     error FeeTooHigh();
+    error NothingToWithdraw();
+    error ZeroAmountReceived();
 
     constructor() {
         _disableInitializers();
@@ -94,7 +110,14 @@ contract FuguSubscription is
             if (msg.value != amount) revert WrongNativeAmount(amount, msg.value);
         } else {
             if (msg.value != 0) revert WrongNativeAmount(0, msg.value);
+            // Ukur delta saldo nyata alih-alih mempercayai `amount` hasil quote, supaya
+            // token fee-on-transfer / rebasing tidak membuat `deposited` mengklaim lebih
+            // dari yang benar-benar diterima kontrak.
+            uint256 balBefore = IERC20(payToken).balanceOf(address(this));
             IERC20(payToken).safeTransferFrom(msg.sender, address(this), amount);
+            uint256 received = IERC20(payToken).balanceOf(address(this)) - balBefore;
+            if (received == 0) revert ZeroAmountReceived();
+            amount = received;
         }
 
         subId = ++_subCount;
@@ -103,13 +126,13 @@ contract FuguSubscription is
             listingId: listingId,
             subscriber: msg.sender,
             payToken: payToken,
-            deposited: uint128(amount),
+            deposited: amount.toUint128(),
             claimed: 0,
             startedAt: startedAt,
             endsAt: startedAt + uint64(uint256(l.periodSeconds) * periods),
-            cancelled: false
+            cancelled: false,
+            feeBps: protocolFeeBps
         });
-        _hasSubscribed[listingId][msg.sender] = true;
 
         emit Subscribed(subId, listingId, msg.sender, payToken, amount);
     }
@@ -131,9 +154,13 @@ contract FuguSubscription is
         Sub storage s = _subs[subId];
         uint256 amount = _earned(s) - s.claimed;
         if (amount == 0) revert NothingToClaim();
-        s.claimed += uint128(amount);
+        s.claimed += amount.toUint128();
+        // Sumber kebenaran hak review: dibayar dulu, baru boleh dinilai.
+        _paidToAgent[s.listingId][s.subscriber] += amount;
 
-        uint256 fee = (amount * protocolFeeBps) / 10_000;
+        // Fee dipakai dari snapshot saat subscribe, bukan `protocolFeeBps` saat ini,
+        // supaya kenaikan fee tidak berlaku surut ke penghasilan yang sudah accrued.
+        uint256 fee = (amount * s.feeBps) / 10_000;
         uint256 toOwner = amount - fee;
         address listingOwner = registry.getListing(s.listingId).owner;
 
@@ -155,7 +182,7 @@ contract FuguSubscription is
         // hentikan pertumbuhan bagian agent
         if (block.timestamp < s.endsAt) {
             s.endsAt = uint64(block.timestamp);
-            s.deposited = uint128(earned);
+            s.deposited = earned.toUint128();
         }
 
         if (refund > 0) _payout(s.payToken, msg.sender, refund);
@@ -165,11 +192,27 @@ contract FuguSubscription is
     function _payout(address token, address to, uint256 amount) internal {
         if (amount == 0) return;
         if (token == address(0)) {
+            // Push payment: bila penerima menolak ETH (mis. listing owner adalah kontrak
+            // tanpa `receive`/`payable fallback`, atau sengaja menolak), JANGAN revert
+            // seluruh `claim` — kredit ke `pendingWithdrawals` supaya bagian agent tidak
+            // terkunci selamanya dan bisa ditarik nanti lewat `withdrawPending`.
             (bool ok,) = payable(to).call{value: amount}("");
-            if (!ok) revert TransferFailed();
+            if (!ok) {
+                pendingWithdrawals[to] += amount;
+                emit PayoutDeferred(to, amount);
+            }
         } else {
             IERC20(token).safeTransfer(to, amount);
         }
+    }
+
+    /// @notice Tarik native coin yang gagal terkirim otomatis lewat `_payout`.
+    function withdrawPending() external nonReentrant {
+        uint256 amount = pendingWithdrawals[msg.sender];
+        if (amount == 0) revert NothingToWithdraw();
+        pendingWithdrawals[msg.sender] = 0;
+        (bool ok,) = payable(msg.sender).call{value: amount}("");
+        if (!ok) revert TransferFailed();
     }
 
     function getSub(uint256 subId) external view returns (Sub memory) {
@@ -180,8 +223,11 @@ contract FuguSubscription is
         return _subCount;
     }
 
+    /// @notice True hanya bila agent benar-benar sudah dibayar untuk `user` pada `listingId`
+    ///         (lewat `claim`) — subscribe lalu cancel di blok yang sama TIDAK membuka hak
+    ///         review, karena tidak ada pembayaran nyata yang terjadi.
     function hasSubscribed(uint256 listingId, address user) external view returns (bool) {
-        return _hasSubscribed[listingId][user];
+        return _paidToAgent[listingId][user] > 0;
     }
 
     function setTreasury(address treasury_) external onlyOwner {
