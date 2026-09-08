@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createTestnetReader } from "../chain/testnet.js";
 import { computeHealthFactor } from "../healthFactor.js";
 
-/** Pemilik posisi contoh di MockLendingPool BSC testnet. */
+/** The owner of the sample position in MockLendingPool on BSC testnet. */
 const AKUN_CONTOH = "0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E" as const;
 
 describe("adapter testnet (MockLendingPool, read-only)", () => {
@@ -19,46 +19,43 @@ describe("adapter testnet (MockLendingPool, read-only)", () => {
       expect(pos.liquidationThresholdBps).toBeGreaterThanOrEqual(1n);
       expect(pos.liquidationThresholdBps).toBeLessThanOrEqual(10_000n);
 
-      // Health factor SENGAJA tidak dipatok ke angka snapshot.
+      // The health factor is DELIBERATELY not pinned to a snapshot number.
       //
-      // Versi sebelumnya menuntut HF ≈ 1,8 — nilai posisi contoh sesaat setelah
-      // deploy. Itu bukan menguji adapter, melainkan menguji "belum ada yang
-      // menyentuh testnet", dan langsung merah begitu E2E Guardian
-      // (`scripts/e2e-guardian.ts`) melakukan persis apa yang memang tugasnya:
-      // membayar sebagian hutang, sehingga hutang posisi contoh berkurang
-      // permanen dan HF-nya naik. Test yang merah karena produknya bekerja
-      // adalah test yang salah menagih.
+      // The previous version demanded HF ~= 1.8 — the sample position's value just after
+      // deploy. That was not testing the adapter, it was testing "nobody has touched testnet
+      // yet", and it went red the instant the Guardian E2E script
+      // (`scripts/e2e-guardian.ts`) did exactly its job: repay part of the debt, permanently
+      // reducing the sample position's debt and raising its HF. A test that goes red because
+      // the product works is a test demanding the wrong thing.
       //
-      // Yang benar-benar harus dijamin adapter ini: angka yang dilaporkan pool
-      // dibaca dari posisi tuple yang tepat dan dalam satuan yang tepat. Itu
-      // diperiksa dengan menghitung ulang HF dari `collateralBase`,
-      // `debtBase`, dan `liquidationThresholdBps` pada bacaan yang SAMA memakai
-      // implementasi TypeScript yang berdiri sendiri. Kalau urutan field
-      // tertukar atau satuannya meleset, kedua angka ini tidak akan cocok.
+      // What this adapter really has to guarantee: the numbers the pool reports are read
+      // from the right tuple positions and in the right units. That is checked by
+      // recomputing HF from `collateralBase`, `debtBase`, and `liquidationThresholdBps` on
+      // the SAME reading, using a standalone TypeScript implementation. If the field order
+      // is swapped or a unit is off, these two numbers will not match.
       const hf = pos.healthFactor as bigint;
       expect(hf).toBeGreaterThan(0n);
       expect(hf).toBe(
         computeHealthFactor(pos.collateralBase, pos.debtBase, pos.liquidationThresholdBps),
       );
 
-      // Identitas posisi tetap dipaku — dua nilai ini TIDAK berubah oleh repay,
-      // jadi memakukannya tidak mengembalikan kerapuhan yang baru saja dibuang.
+      // The position's identity is still pinned — these two values are NOT changed by a
+      // repay, so pinning them does not bring back the brittleness just removed.
       //
-      //   - `collateralBase`: repay hanya menyentuh sisi hutang. Agunan posisi
-      //     contoh tetap 10 mBNB, dan pada harga feed $750 nilainya $7.500,00.
-      //   - `liquidationThresholdBps`: konfigurasi aset di pool, bukan keadaan
-      //     posisi.
+      //   - `collateralBase`: a repay only touches the debt side. The sample position's
+      //     collateral stays at 10 mBNB, and at the feed price of $750 that is $7,500.00.
+      //   - `liquidationThresholdBps`: the pool's asset configuration, not the position's
+      //     state.
       //
-      // Tanpa keduanya, test ini lolos terhadap pool mana pun ber-ABI Aave v3
-      // dengan posisi apa pun yang kebetulan konsisten secara internal — alamat
-      // pool yang salah pun tidak akan ketahuan.
+      // Without both, this test would pass against any Aave v3-ABI pool with any position
+      // that happens to be internally consistent — even the wrong pool address would go
+      // unnoticed.
       //
-      // Ketergantungannya jelas dan disengaja: `collateralBase` benar hanya
-      // selama harga mBNB di feed adalah $750. E2E (`scripts/e2e-guardian.ts`)
-      // menurunkan harga itu sementara, lalu SELALU memulihkannya lewat
-      // `finally` — termasuk saat ia gagal di tengah jalan. Kalau test ini
-      // merah di sini, itu sinyal jujur bahwa testnet ditinggalkan dalam
-      // keadaan tidak pulih, bukan sekadar test yang cerewet.
+      // The dependency is clear and deliberate: `collateralBase` is only correct while the
+      // feed's mBNB price is $750. The E2E script (`scripts/e2e-guardian.ts`) lowers that
+      // price temporarily, then ALWAYS restores it in a `finally` — including when it fails
+      // partway through. If this test goes red here, that is an honest signal that testnet
+      // was left in an unrestored state, not merely a fussy test.
       expect(pos.collateralBase).toBe(750_000_000_000n); // $7.500,00 @ $750/mBNB
       expect(pos.liquidationThresholdBps).toBe(7_500n); // 75%
     },

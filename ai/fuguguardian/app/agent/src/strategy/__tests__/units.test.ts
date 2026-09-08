@@ -9,7 +9,7 @@ import {
 } from "../units.js";
 
 const ASET = "0x932E82632E80b06318ca969e33F99A54F1a04b10" as const;
-const HARGA_SATU_DOLAR = USD8_ONE; // $1,00 dalam basis 8 desimal
+const HARGA_SATU_DOLAR = USD8_ONE; // $1.00 on the 8-decimal basis
 const HARGA_750 = 75_000_000_000n; // $750,00
 
 describe("usd8ToTokenUnits", () => {
@@ -22,9 +22,9 @@ describe("usd8ToTokenUnits", () => {
   });
 
   it("stablecoin BSC tetap 18 desimal, bukan 6 — jumlah unitnya beda 10^12", () => {
-    // CLAUDE.md #2: semua token di BSC 18 desimal, termasuk USDT. Kalau ada yang
-    // memakai 6 karena kebiasaan dari chain lain, jumlah yang dikirim meleset
-    // sepuluh triliun kali lipat. Test ini memaku selisih itu supaya terlihat.
+    // CLAUDE.md #2: every token on BSC has 18 decimals, including USDT. If someone uses 6
+    // out of habit from another chain, the amount sent is off by a factor of ten trillion.
+    // This test nails that gap down so it is visible.
     const delapanBelas = usd8ToTokenUnits(USD8_ONE, 18, HARGA_SATU_DOLAR);
     const enam = usd8ToTokenUnits(USD8_ONE, 6, HARGA_SATU_DOLAR);
     expect(delapanBelas / enam).toBe(10n ** 12n);
@@ -35,9 +35,9 @@ describe("usd8ToTokenUnits", () => {
   });
 
   it("membulatkan KE BAWAH: agent tidak pernah mengirim lebih dari yang diputuskan", () => {
-    // $0,00000001 pada harga $1 dengan token tanpa desimal = 1e-8 token -> 0 unit.
+    // $0.00000001 at a price of $1 with a zero-decimal token = 1e-8 tokens -> 0 units.
     expect(usd8ToTokenUnits(1n, 0, HARGA_SATU_DOLAR)).toBe(0n);
-    // Satu unit kurang dari dua unit penuh tetap satu unit, bukan dua.
+    // One unit short of two full units is still one unit, not two.
     expect(usd8ToTokenUnits(199_999_999n, 0, HARGA_SATU_DOLAR)).toBe(1n);
   });
 
@@ -72,11 +72,10 @@ describe("tokenUnitsToUsd8", () => {
 });
 
 describe("assertTokenDecimalsAgree", () => {
-  // Inilah pengganti "cek bolak-balik" yang dulu ada di skrip E2E. Cek itu
-  // menghitung a*10^d/p lalu *p/10^d dengan d dan p yang SAMA, jadi ia benar
-  // untuk d dan p apa pun dan tidak pernah bisa menangkap desimal atau feed
-  // yang salah. Yang benar-benar menangkapnya adalah membandingkan dua SUMBER
-  // BERBEDA untuk angka yang sama.
+  // This replaces the "round-trip check" that used to be in the E2E script. That check
+  // computed a*10^d/p then *p/10^d with the SAME d and p, so it holds for any d and p and
+  // could never catch wrong decimals or a wrong feed. What actually catches them is
+  // comparing two DIFFERENT SOURCES for the same number.
   it("dua sumber sepakat -> lolos", () => {
     expect(() => assertTokenDecimalsAgree(18, 18, ASET)).not.toThrow();
   });
@@ -93,8 +92,8 @@ describe("assertFeedIsUsd8", () => {
   });
 
   it.each([6, 18])("feed %s desimal ditolak, bukan dipakai apa adanya", (d) => {
-    // `MockPriceFeed` menerima `decimals_` sebagai parameter konstruktor, jadi
-    // feed non-8-desimal bukan hipotesis — ia bisa dideploy hari ini.
+    // `MockPriceFeed` takes `decimals_` as a constructor parameter, so a non-8-decimal feed
+    // is not hypothetical — it could be deployed today.
     expect(() => assertFeedIsUsd8(d, ASET)).toThrow(UnitConversionError);
   });
 });

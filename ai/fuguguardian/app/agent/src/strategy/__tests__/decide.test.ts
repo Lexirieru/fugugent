@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { decide } from "../decide.js";
 import { DEFAULT_THRESHOLDS, HF_ONE, PositionError, type Position } from "../types.js";
 
-// helper: bangun posisi dengan HF yang diinginkan pada LT 80%
+// helper: build a position with the desired HF at LT 80%
 function posWithHf(hf: bigint): Position {
-  // collateral tetap 10_000; debt = collateral × lt / 10000 × 1e18 / hf
+  // collateral is fixed at 10_000; debt = collateral x lt / 10000 x 1e18 / hf
   const collateral = 10_000n;
   const debt = hf === 0n ? 0n : (collateral * 8000n * HF_ONE) / (10_000n * hf);
   return {
@@ -75,7 +75,7 @@ describe("decide", () => {
   });
 
   it("ambang yang tidak berurutan ditolak", () => {
-    // deleverage (1,3) lebih besar daripada partialRepay (1,2) — urutan terbalik.
+    // deleverage (1.3) is greater than partialRepay (1.2) — the order is inverted.
     const salah = {
       warn: 15n * HF_ONE / 10n,
       partialRepay: 12n * HF_ONE / 10n,
@@ -85,8 +85,8 @@ describe("decide", () => {
   });
 
   it("ambang di bawah atau sama dengan 1,0 ditolak", () => {
-    // deleverage diisi tepat HF_ONE — agent tidak boleh baru bertindak saat
-    // posisi sudah di titik likuidasi.
+    // deleverage set exactly to HF_ONE — the agent must not first act once the position is
+    // already at the liquidation point.
     const salah = {
       warn: 15n * HF_ONE / 10n,
       partialRepay: 12n * HF_ONE / 10n,
@@ -100,24 +100,24 @@ describe("decide", () => {
   });
 
   it("HF di tengah zona menghasilkan aksi zona itu", () => {
-    // 1,15 berada tepat di tengah zona PARTIAL_REPAY default (deleverage 1,1
-    // sampai partialRepay 1,2), bukan tepat di salah satu ambangnya.
+    // 1.15 sits right in the middle of the default PARTIAL_REPAY zone (deleverage 1.1 up to
+    // partialRepay 1.2), not exactly on either threshold.
     expect(decide(posWithHf(115n * HF_ONE / 100n)).action).toBe("PARTIAL_REPAY");
   });
 
   it("posisi dengan ambang likuidasi tidak masuk akal ditolak", () => {
     const dasar = posWithHf(2n * HF_ONE);
 
-    // 0 bps: dulu ini menghasilkan HF 0 sehingga posisi sehat dinilai
-    // EMERGENCY dan agent disarankan melunasi SELURUH hutang.
+    // 0 bps: this used to produce HF 0, so a healthy position was judged EMERGENCY and the
+    // agent was advised to repay ALL of its debt.
     expect(() => decide({ ...dasar, liquidationThresholdBps: 0n, healthFactor: 0n })).toThrow(
       PositionError,
     );
-    // Di atas 100%: agunan tidak bisa menjamin lebih dari nilainya sendiri.
+    // Above 100%: collateral cannot secure more than its own value.
     expect(() => decide({ ...dasar, liquidationThresholdBps: 10_001n })).toThrow(PositionError);
-    // Negatif jelas mustahil.
+    // A negative value is plainly impossible.
     expect(() => decide({ ...dasar, liquidationThresholdBps: -1n })).toThrow(PositionError);
-    // Tepat 100% masih sah (batas atas fisik).
+    // Exactly 100% is still valid (the physical upper bound).
     expect(() => decide({ ...dasar, liquidationThresholdBps: 10_000n })).not.toThrow();
   });
 
@@ -128,8 +128,8 @@ describe("decide", () => {
   });
 
   it("posisi tanpa hutang yang ambangnya tidak masuk akal tetap ditolak", () => {
-    // Validasi berjalan sebelum jalur "tidak ada hutang", jadi input rusak
-    // tidak bisa lolos hanya karena kebetulan tidak berhutang.
+    // Validation runs before the "no debt" path, so corrupt input cannot slip through just
+    // because it happens to have no debt.
     const p = { ...posWithHf(0n), liquidationThresholdBps: 0n };
     expect(() => decide(p)).toThrow(PositionError);
   });

@@ -1,22 +1,20 @@
 /**
- * Plumbing Altana bersama untuk skrip-skrip operasional (grant sesi, penyiapan
- * posisi, uji batas, dan E2E). Tidak ada logika strategi di sini.
+ * Shared Altana plumbing for the operational scripts (granting a session, setting up a
+ * position, probing the boundary, and E2E). No strategy logic here.
  *
- * Kenapa TIDAK memakai `ensureAltanaSessionLoaded()` + `getWallet()` dari
- * `@bnbagent/studio-runtime/wallet`:
- * jalur itu memaksa `permissions.calls` sebuah sesi **sama persis** dengan
- * `defaultAgentPermissions()` milik SDK (ERC-8004 + ERC-8183), dan menolak sesi
- * lain dengan pesan "Altana session does not match the selector-bound
- * @bnbagent/sdk@0.5.4 permission set" — lihat `inspectAltanaSessionPermissions`
- * di `studio-runtime/dist/chunk-ZZZFODYE.js:76`. Sesi Guardian di sini justru
- * HARUS punya allowlist lain (repay + approve, tidak lebih), jadi ia dimuat
- * lewat `deserializeSession` + `AltanaWalletProvider` dari `@bnbagent/sdk`
- * secara langsung. Sesi komersial yang lama tidak disentuh dan tetap dipakai
- * runtime agent apa adanya.
+ * Why NOT `ensureAltanaSessionLoaded()` + `getWallet()` from
+ * `@bnbagent/studio-runtime/wallet`: that path forces a session's `permissions.calls` to
+ * match the SDK's `defaultAgentPermissions()` **exactly** (ERC-8004 + ERC-8183), and rejects
+ * any other session with "Altana session does not match the selector-bound
+ * @bnbagent/sdk@0.5.4 permission set" — see `inspectAltanaSessionPermissions` in
+ * `studio-runtime/dist/chunk-ZZZFODYE.js:76`. The Guardian session here specifically MUST
+ * have a different allowlist (repay + approve, nothing more), so it is loaded via
+ * `deserializeSession` + `AltanaWalletProvider` from `@bnbagent/sdk` directly. The old
+ * commercial session is untouched and the agent runtime keeps using it as-is.
  *
- * Bagian `signer` dari file sesi tidak pernah dibaca, di-parse, atau dicetak di
- * sini: isinya diserahkan utuh ke `deserializeSession`, yang memverifikasi
- * sendiri bahwa kunci di dalamnya menurunkan `publicKey` yang tercatat.
+ * The `signer` part of the session file is never read, parsed, or printed here: its content
+ * is handed intact to `deserializeSession`, which verifies for itself that the key inside
+ * derives the recorded `publicKey`.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -32,32 +30,30 @@ import {
 import { resolveProjectAltanaSdkEntry } from "@bnbagent/studio-runtime/wallet";
 import { encodeFunctionData, type Abi, type PublicClient } from "viem";
 
-/** `.../ai/fuguguardian/app/agent` — akar project yang dipakai `bag`. */
+/** `.../ai/fuguguardian/app/agent` — the project root `bag` uses. */
 export const AGENT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-/** `.../ai/fuguguardian` — workspace tempat `.studio/` berada. */
+/** `.../ai/fuguguardian` — the workspace `.studio/` lives in. */
 export const WORKSPACE_ROOT = path.resolve(AGENT_ROOT, "../..");
 
-/** Direktori keystore admin Altana (lihat `[wallet].keystore_dir` di studio.toml). */
+/** The Altana admin keystore directory (see `[wallet].keystore_dir` in studio.toml). */
 export const KEYSTORE_DIR = path.join(WORKSPACE_ROOT, ".studio/wallets");
 
 /**
- * File sesi ber-batas milik Guardian. TERPISAH dari `altana-session.json`
- * (sesi komersial ERC-8004/8183 yang dipakai `bag dev`), supaya satu tidak
- * menimpa yang lain.
+ * Guardian's own bounded session file. SEPARATE from `altana-session.json` (the commercial
+ * ERC-8004/8183 session `bag dev` uses), so neither overwrites the other.
  */
 export const GUARDIAN_SESSION_FILE = path.join(KEYSTORE_DIR, "altana-session-guardian.json");
 
 /**
- * Konfigurasi jaringan Altana untuk BSC testnet, dengan `publicRpcUrl`
- * DI-OVERRIDE. Alamat Keystore/Controller/relay diambil apa adanya dari preset
- * SDK supaya tidak ada salinan alamat yang bisa menyimpang.
+ * The Altana network config for BSC testnet, with `publicRpcUrl` OVERRIDDEN. The
+ * Keystore/Controller/relay addresses are taken as-is from the SDK preset so there is no
+ * copy of an address that could drift.
  *
- * `ALTANA_RELAY_URL` boleh menimpa endpoint relay. Gunanya bukan sekadar
- * konfigurasi: mengarahkannya ke endpoint mati adalah cara MEMBUKTIKAN bahwa
- * uji penolakan tidak menerima kegagalan jaringan sebagai "batas sesi bekerja"
- * — skrip probe harus mati dengan galat "BUKAN karena batas sesi", bukan
- * mencetak tanda centang.
+ * `ALTANA_RELAY_URL` may override the relay endpoint. Its purpose is not merely
+ * configuration: pointing it at a dead endpoint is how you PROVE that the denial test does
+ * not accept a network failure as "the session boundary works" — the probe script must die
+ * with a "NOT because of the session boundary" error rather than printing a check mark.
  */
 export function altanaTestnetNetwork(rpcUrl: string): AltanaNetworkConfig {
   const relayUrl = process.env.ALTANA_RELAY_URL;
@@ -69,9 +65,9 @@ export function altanaTestnetNetwork(rpcUrl: string): AltanaNetworkConfig {
 }
 
 /**
- * Menyalakan loader ESM untuk `@altananetwork/sdk` yang terpasang di project
- * ini. Tanpa ini, `import("@altananetwork/sdk")` dari dalam paket
- * `@bnbagent/sdk` tidak bisa di-resolve di layout pnpm.
+ * Arms the ESM loader for the `@altananetwork/sdk` installed in this project. Without it,
+ * `import("@altananetwork/sdk")` from inside the `@bnbagent/sdk` package cannot be resolved
+ * in pnpm's layout.
  */
 export function armAltanaSdk(): void {
   const entry = resolveProjectAltanaSdkEntry(AGENT_ROOT);
@@ -83,13 +79,13 @@ export function armAltanaSdk(): void {
   setAltanaSdkImporter(() => import(entry));
 }
 
-/** Memuat sesi Guardian dari disk. Isi `signer` tidak pernah disentuh di sini. */
+/** Loads the Guardian session from disk. The `signer` content is never touched here. */
 export async function loadGuardianSession(file = GUARDIAN_SESSION_FILE): Promise<AltanaSession> {
   const serialized = readFileSync(file, "utf8");
   return deserializeSession(serialized);
 }
 
-/** Provider mode sesi: HANYA bisa mengeksekusi di dalam izin yang di-grant. */
+/** A session-mode provider: it can ONLY execute within the permissions granted. */
 export function sessionProvider(
   session: AltanaSession,
   rpcUrl: string,
@@ -98,9 +94,8 @@ export function sessionProvider(
 }
 
 /**
- * Provider mode admin dari keystore terenkripsi. Dipakai HANYA untuk
- * penyiapan (grant sesi, membuat posisi contoh) — tidak pernah untuk repay
- * yang sedang dibuktikan.
+ * An admin-mode provider from the encrypted keystore. Used ONLY for setup (granting a
+ * session, opening the sample position) — never for the repay being proven.
  */
 export function adminProvider(password: string, address: string, rpcUrl: string): AltanaWalletProvider {
   return AltanaWalletProvider.adminFromKeystore({
@@ -111,7 +106,7 @@ export function adminProvider(password: string, address: string, rpcUrl: string)
   });
 }
 
-/** Satu panggilan kontrak yang dikirim lewat relay Altana. */
+/** One contract call sent through the Altana relay. */
 export interface RelayCall {
   readonly address: `0x${string}`;
   readonly abi: readonly unknown[];
@@ -120,10 +115,10 @@ export interface RelayCall {
 }
 
 /**
- * Hasil satu eksekusi relay. Bentuknya dipersempit dengan sengaja: `TxResult`
- * milik SDK mengacu ke instance viem lain di pohon dependensi (SDK di-hoist ke
- * root workspace), sehingga tipe `TransactionReceipt`-nya tidak assignable
- * bolak-balik. Yang dibutuhkan skrip hanya field-field di bawah ini.
+ * The result of one relay execution. Its shape is deliberately narrowed: the SDK's
+ * `TxResult` refers to a different viem instance in the dependency tree (the SDK is hoisted
+ * to the workspace root), so its `TransactionReceipt` type is not assignable in either
+ * direction. All the scripts need are the fields below.
  */
 export interface RelayResult {
   readonly transactionHash: `0x${string}`;
@@ -142,21 +137,19 @@ export interface RelayResult {
 }
 
 /**
- * Mengikat satu provider Altana (mode admin ATAU mode sesi) ke sebuah
- * `PublicClient`, dan mengembalikan fungsi kirim-SATU-BATCH.
+ * Binds one Altana provider (admin mode OR session mode) to a `PublicClient`, and returns a
+ * send-ONE-BATCH function.
  *
- * Kenapa batch, bukan satu panggilan per transaksi seperti
- * `AltanaIntentExecutor`: kunci sesi yang punya spend permission dijalankan
- * lewat guarded executor Porto, dan guard itu **mengembalikan allowance ERC-20
- * ke nol di akhir userOp yang sama** — terbukti di jalan pertama task ini
- * (tx `0xf9570e1e…` memuat dua event `Approval`: 11,67 lalu 0), sehingga
- * `repay` di transaksi berikutnya gagal dengan `ERC20InsufficientAllowance`.
- * Perilaku itu justru benar — allowance dari kunci yang bocor tidak boleh
- * hidup lebih lama daripada transaksinya — dan jawabannya adalah mengirim
- * `approve` + `repay` sebagai SATU userOp atomik.
+ * Why a batch, rather than one call per transaction like `AltanaIntentExecutor`: a session
+ * key that holds a spend permission runs through Porto's guarded executor, and that guard
+ * **returns ERC-20 allowances to zero at the end of the same userOp** — proven on this
+ * task's first run (tx `0xf9570e1e...` carried two `Approval` events: 11.67 then 0), so a
+ * `repay` in the next transaction failed with `ERC20InsufficientAllowance`. That behavior is
+ * in fact correct — an allowance from a leaked key must not outlive its transaction — and
+ * the answer is to send `approve` + `repay` as ONE atomic userOp.
  *
- * Relay tidak mengembalikan receipt sendiri, jadi `client` yang menunggunya,
- * dan status `FAILED` maupun revert on-chain sama-sama dilempar.
+ * The relay does not return a receipt itself, so `client` is what waits for it, and both a
+ * `FAILED` status and an on-chain revert are thrown.
  */
 export function relaySender(
   provider: AltanaWalletProvider,

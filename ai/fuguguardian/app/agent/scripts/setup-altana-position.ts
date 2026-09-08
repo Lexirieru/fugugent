@@ -1,20 +1,18 @@
 /**
- * Membuat posisi pinjaman contoh yang **dimiliki wallet Altana**, bukan EOA deployer.
+ * Opens a sample borrow position **owned by the Altana wallet**, not by the deployer EOA.
  *
- * Kenapa ini perlu: `MockLendingPool.repay(address,uint256)` tidak punya
- * `onBehalfOf` — ia hanya mengurangi hutang `msg.sender`. Posisi contoh yang
- * lama dimiliki EOA deployer, jadi wallet Altana tidak akan pernah bisa
- * membayarnya. Bentuk yang benar untuk produknya justru ini: **posisi dimiliki
- * wallet pengguna, dan agent hanya memegang session key ber-batas atas wallet
- * itu**.
+ * Why this is needed: `MockLendingPool.repay(address,uint256)` has no `onBehalfOf` — it only
+ * reduces `msg.sender`'s debt. The old sample position was owned by the deployer EOA, so the
+ * Altana wallet could never repay it. And this is in fact the correct shape for the product:
+ * **the position is owned by the user's wallet, and the agent only holds a bounded session
+ * key over that wallet**.
  *
- * Penyiapan boleh memakai kewenangan admin — yang sedang dibuktikan task ini
- * adalah repay-nya, bukan setup-nya. Jadi:
- *   - `mBNB.mint` dikirim EOA deployer (mint MockToken terbuka untuk siapa pun),
- *   - `approve` + `supply` + `borrow` dikirim lewat jalur **admin** Altana,
- *     sehingga `msg.sender`-nya adalah wallet Altana.
+ * Setup may use admin authority — what this task proves is the repay, not the setup. So:
+ *   - `mBNB.mint` is sent by the deployer EOA (MockToken's mint is open to anyone),
+ *   - `approve` + `supply` + `borrow` go through Altana's **admin** path, so their
+ *     `msg.sender` is the Altana wallet.
  *
- * Jalankan dari `ai/fuguguardian/app/agent`:
+ * Run it from `ai/fuguguardian/app/agent`:
  *   npx tsx scripts/setup-altana-position.ts
  */
 import path from "node:path";
@@ -34,10 +32,10 @@ import { formatHf, formatUsd8 } from "../src/strategy/format.js";
 const ALTANA_WALLET = "0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0" as const;
 const MBNB = "0xF380E8B6803aD065EF0567dd20C894a55050737c" as const;
 
-/** Agunan: 0,2 mBNB (= $150 pada $750/mBNB). Sengaja kecil — ini demo, bukan dana. */
+/** Collateral: 0.2 mBNB (= $150 at $750/mBNB). Deliberately small — this is a demo, not funds. */
 const COLLATERAL_UNITS = 2n * 10n ** 17n;
 
-/** Hutang: 50 mUSD → HF 2,25 pada harga $750. Aman, dan turun ke zona PARTIAL_REPAY saat harga jatuh. */
+/** Debt: 50 mUSD -> HF 2.25 at a price of $750. Safe, and it falls into the PARTIAL_REPAY zone when the price drops. */
 const DEBT_UNITS = 50n * 10n ** 18n;
 
 const ERC20_ABI = [
@@ -143,7 +141,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  // --- 1. Mint mBNB ke wallet Altana (EOA deployer yang membayar gas) --------
+  // --- 1. Mint mBNB to the Altana wallet (the deployer EOA pays the gas) -----
   const saldoMbnb = await publicClient.readContract({
     address: MBNB,
     abi: ERC20_ABI,
@@ -169,7 +167,7 @@ async function main(): Promise<void> {
     console.log(`\nWallet Altana sudah punya ${saldoMbnb} unit mBNB; mint dilewati.`);
   }
 
-  // --- 2. approve + supply + borrow lewat jalur ADMIN Altana ----------------
+  // --- 2. approve + supply + borrow through Altana's ADMIN path -------------
   armAltanaSdk();
   const admin = adminProvider(password, ALTANA_WALLET, rpcUrl);
   wajib(

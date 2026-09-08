@@ -1,17 +1,17 @@
 /**
- * Adapter Aave v3, membaca posisi pinjaman sungguhan di BSC **mainnet**.
- * Venus dan Aave v3 hanya ada di BSC mainnet (chain 56), tidak di testnet,
- * jadi pembacaan ini sengaja menyasar mainnet. Read-only lewat `eth_call`,
- * tidak ada transaksi dan tidak berbiaya. Eksekusi transaksi agent tetap
- * berjalan di testnet — hanya pembacaan posisi ini yang lintas ke mainnet.
+ * The Aave v3 adapter, reading a real borrow position on BSC **mainnet**.
+ * Venus and Aave v3 only exist on BSC mainnet (chain 56), not on testnet, so this read
+ * deliberately targets mainnet. Read-only via `eth_call`, no transactions and no cost. The
+ * agent's transaction execution still runs on testnet — only this position read crosses to
+ * mainnet.
  */
 import type { PublicClient } from "viem";
 import { PositionError, type Position } from "../types.js";
 
-/** Alamat Aave v3 Pool di BSC mainnet, terverifikasi live. */
+/** The Aave v3 Pool address on BSC mainnet, verified live. */
 export const AAVE_V3_POOL_ADDRESS = "0x6807dc923806fE8Fd134338EABCA509979a7e0cB" as const;
 
-/** Sentinel yang dikembalikan Aave untuk healthFactor saat tidak ada hutang. */
+/** The sentinel Aave returns for healthFactor when there is no debt. */
 const HF_SENTINEL_NO_DEBT = 2n ** 256n - 1n;
 
 const AAVE_POOL_ABI = [
@@ -32,28 +32,26 @@ const AAVE_POOL_ABI = [
 ] as const;
 
 /**
- * Membaca posisi Aave v3 satu akun, DITAMBATKAN ke satu tinggi blok.
- * `healthFactor` dinormalkan menjadi null bila sentinel 2^256-1 ATAU
- * tidak ada hutang sama sekali — seluruh lapisan strategi memperlakukan
- * null sebagai "tidak ada risiko", bukan angka besar yang harus dibandingkan.
+ * Reads one account's Aave v3 position, ANCHORED to a single block height.
+ * `healthFactor` is normalized to null when it is the 2^256-1 sentinel OR when there is no
+ * debt at all — the whole strategy layer treats null as "no risk", not as a large number to
+ * be compared.
  *
- * JANGAN menghitung `healthFactor` sendiri di sini. Ia WAJIB tetap diambil apa
- * adanya dari tuple `getUserAccountData` (indeks 5), yaitu angka yang dihitung
- * protokol sendiri. `__tests__/testnet.test.ts` memakai fakta itu sebagai uji
- * diferensial: HF dari protokol dicocokkan dengan `computeHealthFactor` versi
- * TypeScript atas bacaan yang sama, dan itulah yang menangkap indeks tuple
- * tertukar atau satuan yang meleset. Begitu fungsi ini menghitung HF-nya
- * sendiri, test tersebut berubah menjadi tautologi yang hijau selamanya tanpa
- * menguji apa pun — dan tidak ada yang akan memperingatkan.
+ * DO NOT compute `healthFactor` yourself here. It MUST keep coming straight out of the
+ * `getUserAccountData` tuple (index 5), i.e. the number the protocol computed itself.
+ * `__tests__/testnet.test.ts` uses that fact as a differential test: the protocol's HF is
+ * matched against the TypeScript `computeHealthFactor` over the same reading, and that is
+ * what catches a swapped tuple index or a unit that is off. The moment this function
+ * computes its own HF, that test turns into a tautology that stays green forever while
+ * testing nothing — and nobody will warn you.
  */
 export async function readAavePosition(
   client: PublicClient,
   account: `0x${string}`,
   /**
-   * Alamat pool `getUserAccountData`. Default ke Aave v3 mainnet supaya
-   * pemanggil lama tetap jalan tanpa perubahan. Adapter testnet
-   * (`chain/testnet.ts`) menyuntikkan alamat `MockLendingPool` di sini —
-   * logika pembacaan di bawah ini tidak berubah sama sekali.
+   * The address of the `getUserAccountData` pool. Defaults to Aave v3 mainnet so existing
+   * callers keep working unchanged. The testnet adapter (`chain/testnet.ts`) injects the
+   * `MockLendingPool` address here — the reading logic below does not change at all.
    */
   poolAddress: `0x${string}` = AAVE_V3_POOL_ADDRESS,
 ): Promise<Position> {
@@ -61,20 +59,19 @@ export async function readAavePosition(
     throw new PositionError("Client viem tidak memiliki konfigurasi chain.");
   }
 
-  // Blok diambil LEBIH DULU, lalu bacaannya ditambatkan ke blok itu.
+  // The block is fetched FIRST, then the read is anchored to that block.
   //
-  // Sebelumnya keduanya ditembakkan sebagai dua panggilan RPC independen di
-  // dalam `Promise.all`: `readContract` pada blok "latest" menurut node yang
-  // melayaninya, dan `getBlockNumber()` terpisah. Keduanya bisa jatuh di sisi
-  // berlawanan dari sebuah blok baru, sehingga `Position.blockNumber` hanya
-  // kira-kira blok datanya. Untuk E2E itu tidak terlihat (ia menambatkan
-  // bacaannya sendiri), tetapi indexer backend yang mewarisi adapter ini akan
-  // mencatat "blok X melaporkan hutang Y" yang meleset satu blok — bug diam
-  // yang tidak punya gejala sampai ada yang merekonsiliasi angkanya.
+  // Previously both were fired as two independent RPC calls inside `Promise.all`: a
+  // `readContract` at whatever block the serving node considered "latest", and a separate
+  // `getBlockNumber()`. The two can land on opposite sides of a new block, making
+  // `Position.blockNumber` only approximately the block the data came from. For the E2E
+  // script that is invisible (it anchors its own reads), but a backend indexer inheriting
+  // this adapter would record "block X reported debt Y" off by one block — a silent bug with
+  // no symptom until someone reconciles the numbers.
   //
-  // Harganya satu panggilan RPC berurutan, bukan paralel. Node yang belum punya
-  // blok itu MELEMPAR ("header not found") alih-alih diam-diam menjawab dari
-  // masa lalu — arah kegagalan yang benar.
+  // The price is one sequential RPC call instead of parallel ones. A node that does not have
+  // that block yet THROWS ("header not found") instead of quietly answering from the past —
+  // the correct failure direction.
   const blockNumber = await client.getBlockNumber();
   const [totalCollateralBase, totalDebtBase, , currentLiquidationThreshold, , healthFactorRaw] =
     await client.readContract({

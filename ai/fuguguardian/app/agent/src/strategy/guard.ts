@@ -1,39 +1,36 @@
 /**
- * Loop pemantauan Guardian. Merangkai modul yang sudah ada — `decide`,
- * `executeDecision`, `explainDecision`, pembaca posisi — menjadi satu siklus
- * yang benar-benar berjalan, lalu memanggilnya berulang.
+ * The Guardian monitoring loop. It wires the existing modules — `decide`,
+ * `executeDecision`, `explainDecision`, the position reader — into one cycle that
+ * actually runs, then calls it repeatedly.
  *
- * Tidak ada logika keputusan atau eksekusi baru di sini: `runGuardCycle`
- * murni menjalankan baca posisi → `decide` → `executeDecision` → lalu
- * `explainDecision`, dan mengubah hasilnya menjadi satu catatan.
+ * There is no new decision or execution logic here: `runGuardCycle` purely runs read
+ * position -> `decide` -> `executeDecision` -> then `explainDecision`, and turns the
+ * result into a single record.
  *
- * ATURAN YANG TIDAK BOLEH DILANGGAR:
+ * RULES THAT MUST NOT BE BROKEN:
  *
- * 1. Satu siklus TIDAK PERNAH melempar — bukan hanya untuk kegagalan baca
- *    posisi/`decide`/eksekusi, tetapi juga untuk kegagalan `now()` atau
- *    `logger` itu sendiri (round fix pertama: `logger` yang melempar EPIPE
- *    dulu bisa membuat `tick()` mati diam-diam karena `scheduleNext()`
- *    dilewati). Semua pemanggilan logger lewat `logInfo`/`logError` yang
- *    membungkam exception, dan `deps.now()` punya fallback bila gagal.
- * 2. `explainDecision` dipanggil SETELAH eksekusi selesai, tidak pernah
- *    sebelum — hasil eksekusi sudah final sebelum kalimat penjelasan
- *    disusun. Kegagalannya TIDAK PERNAH mengubah `action`/`amountSentUsd8`/
- *    `txHash` yang sudah terjadi. Untuk aksi `NONE` ia dilewati sama sekali
- *    — dGrid butuh 3–46 detik untuk kalimat yang tidak dibaca siapa pun saat
- *    posisi sehat (CLAUDE.md #1: dGrid tidak pernah di jalur kritis).
- * 3. State eksekusi (`ExecuteState` dari `execute.ts`: anggaran harian,
- *    cooldown, kill switch) MENGALIR eksplisit lewat tipe — `runGuardCycle`
- *    menerimanya sebagai parameter dan mengembalikan versi barunya lewat
- *    `nextExecuteState`; `startGuardLoop` yang menyimpannya sendiri di
- *    antara siklus. Ini memperbaiki cacat round pertama: closure pemanggil
- *    yang "harus ingat" menyimpan `execResult.state` membuat batas harian
- *    dan cooldown mati total begitu loop berjalan lebih dari satu siklus.
- * 4. Eksekusi yang GAGAL SETELAH menyentuh jaringan (`RepaySendError`) TETAP
- *    memajukan state. Putaran sebelumnya mengembalikan state lama di semua
- *    jalur gagal — benar untuk kegagalan sebelum kirim, dan berbahaya untuk
- *    kegagalan sesudahnya: receipt yang timeout membuat anggaran dan cooldown
- *    tidak bergerak, dan siklus berikutnya membayar lagi. Lihat catatan
- *    lengkapnya di kepala `execute.ts`.
+ * 1. A cycle NEVER throws — not only for a failed position read/`decide`/execution, but
+ *    also for a failure in `now()` or `logger` itself (first fix round: a `logger` that
+ *    threw EPIPE used to make `tick()` die silently because `scheduleNext()` was skipped).
+ *    Every logger call goes through `logInfo`/`logError`, which swallow exceptions, and
+ *    `deps.now()` has a fallback if it fails.
+ * 2. `explainDecision` is called AFTER execution finishes, never before — the execution
+ *    result is already final before the explanation sentence is composed. Its failure
+ *    NEVER changes the `action`/`amountSentUsd8`/`txHash` that already happened. For a
+ *    `NONE` action it is skipped entirely — dGrid takes 3–46 seconds for a sentence nobody
+ *    reads when the position is healthy (CLAUDE.md #1: dGrid is never on the critical
+ *    path).
+ * 3. The execution state (`ExecuteState` from `execute.ts`: the daily budget, the
+ *    cooldown, the kill switch) FLOWS explicitly through the types — `runGuardCycle`
+ *    takes it as a parameter and returns the new version via `nextExecuteState`;
+ *    `startGuardLoop` is what holds it between cycles. This fixes a first-round defect: a
+ *    caller closure that "has to remember" to keep `execResult.state` made the daily cap
+ *    and the cooldown die completely as soon as the loop ran more than one cycle.
+ * 4. An execution that FAILS AFTER touching the network (`RepaySendError`) STILL advances
+ *    the state. The previous round returned the old state on every failure path — correct
+ *    for a failure before sending, and dangerous for one after: a timed-out receipt leaves
+ *    the budget and cooldown untouched, and the next cycle pays again. See the full note at
+ *    the top of `execute.ts`.
  */
 import { decide } from "./decide.js";
 import { formatHf, formatUsd8 } from "./format.js";
@@ -45,16 +42,15 @@ export interface Logger {
   error(message: string, meta?: Record<string, unknown>): void;
 }
 
-/** Membaca posisi terkini dari rantai; disuntikkan agar test tak menyentuh jaringan. */
+/** Reads the current position from the chain; injected so tests never touch the network. */
 export type ReadPositionFn = (account: `0x${string}`) => Promise<Position>;
 
 /**
- * Bentuk yang dipakai `runGuardCycle` untuk memanggil eksekusi. Ini adalah
- * `executeDecision` asli dari `execute.ts` yang di-partial-apply oleh
- * pemanggil hanya untuk `limits` dan `ExecuteDeps` (`sendRepay`/`now`) —
- * `state` TIDAK ditutup oleh closure pemanggil, melainkan diteruskan
- * eksplisit oleh `runGuardCycle` pada setiap panggilan (lihat catatan C1
- * di atas). Wiring yang benar di sisi pemanggil:
+ * The shape `runGuardCycle` uses to invoke execution. This is the real `executeDecision`
+ * from `execute.ts`, partially applied by the caller for `limits` and `ExecuteDeps`
+ * (`sendRepay`/`now`) ONLY — `state` is NOT captured by the caller's closure, it is passed
+ * explicitly by `runGuardCycle` on every call (see note C1 above). The correct wiring on
+ * the caller's side:
  *
  * ```ts
  * const execFn: ExecuteFn = (decision, pos, state) =>
@@ -67,7 +63,7 @@ export type ExecuteFn = (
   state: ExecuteState,
 ) => Promise<ExecuteResult>;
 
-/** `explainDecision` asli, dipanggil setelah eksekusi (dan dilewati untuk aksi `NONE`). */
+/** The real `explainDecision`, called after execution (and skipped for a `NONE` action). */
 export type ExplainFn = (pos: Position, decision: Decision) => Promise<string>;
 
 export interface GuardCycleDeps {
@@ -75,51 +71,50 @@ export interface GuardCycleDeps {
   readPosition: ReadPositionFn;
   executeDecision: ExecuteFn;
   explainDecision: ExplainFn;
-  /** Jam sekarang dalam detik epoch; disuntikkan agar waktu bisa dikontrol penuh saat test. */
+  /** The current clock in epoch seconds; injected so time is fully controllable in tests. */
   now: () => number;
   logger: Logger;
-  /** Ambang opsional untuk `decide`; default `DEFAULT_THRESHOLDS` bila tidak diisi. */
+  /** Optional thresholds for `decide`; defaults to `DEFAULT_THRESHOLDS` when omitted. */
   thresholds?: Thresholds;
   /**
-   * Dipanggil setelah setiap siklus (sukses maupun gagal) dengan catatan
-   * lengkapnya — dipakai `startGuardLoop` supaya catatan tidak "hilang" di
-   * dalam loop (round pertama: `tick()` membuang nilai balik `runGuardCycle`
-   * begitu saja). Kegagalan callback ini tidak pernah menghentikan loop.
+   * Called after every cycle (successful or failed) with the full record — used by
+   * `startGuardLoop` so records do not get "lost" inside the loop (first round: `tick()`
+   * simply threw away `runGuardCycle`'s return value). A failure in this callback never
+   * stops the loop.
    */
   onCycle?: (result: CycleResult) => void;
 }
 
-/** Catatan satu siklus yang berhasil dijalankan sampai selesai. */
+/** The record of one cycle that ran to completion. */
 export interface CycleSuccess {
   ok: true;
   timestamp: number;
   account: `0x${string}`;
   healthFactor: bigint | null;
   action: Action;
-  /** true bila transaksi repay benar-benar terkirim pada siklus ini. */
+  /** true when a repay transaction was actually sent on this cycle. */
   sent: boolean;
   amountSentUsd8: bigint;
-  /** true bila jumlah dipotong oleh batas per-aksi (lihat `execute.ts`). */
+  /** true when the amount was capped by the per-action limit (see `execute.ts`). */
   cappedPerAction: boolean;
-  /** true bila jumlah dipotong oleh sisa anggaran harian (lihat `execute.ts`). */
+  /** true when the amount was capped by what is left of the daily budget (see `execute.ts`). */
   cappedPerDay: boolean;
   txHash: `0x${string}` | null;
   /**
-   * Alasan KEPUTUSAN — kenapa `decide` memilih `action` ini (`decision.reason`).
-   * TIDAK sama dengan `executeReason` di bawah: sebuah `EMERGENCY` yang
-   * benar secara keputusan bisa saja tetap `sent: false` karena kill switch,
-   * cooldown, atau anggaran habis — dan itu hanya terlihat di `executeReason`.
+   * The DECISION reason — why `decide` chose this `action` (`decision.reason`).
+   * NOT the same as `executeReason` below: an `EMERGENCY` that is correct as a decision
+   * can still end up `sent: false` because of the kill switch, the cooldown, or an
+   * exhausted budget — and that is only visible in `executeReason`.
    */
   reason: string;
-  /** Alasan EKSEKUSI — kenapa terkirim, tidak terkirim, atau dipotong (`ExecuteResult.reason`). */
+  /** The EXECUTION reason — why it was sent, not sent, or capped (`ExecuteResult.reason`). */
   executeReason: string;
   explanation: string;
 }
 
 /**
- * Catatan satu siklus yang gagal di salah satu tahap (baca posisi, `decide`,
- * atau eksekusi). Siklus gagal TETAP menghasilkan catatan — tidak pernah
- * melempar ke pemanggil.
+ * The record of a cycle that failed at one of its stages (position read, `decide`, or
+ * execution). A failed cycle STILL produces a record — it never throws to the caller.
  */
 export interface CycleFailure {
   ok: false;
@@ -130,15 +125,15 @@ export interface CycleFailure {
 
 export type CycleResult = CycleSuccess | CycleFailure;
 
-/** Hasil satu panggilan `runGuardCycle`: catatan siklus plus state eksekusi yang harus dibawa ke siklus berikutnya. */
+/** The result of one `runGuardCycle` call: the cycle record plus the execution state that must be carried into the next cycle. */
 export interface GuardCycleOutcome {
   result: CycleResult;
   /**
-   * State eksekusi untuk siklus BERIKUTNYA. Sama persis dengan input `executeState`
-   * bila siklus ini gagal sebelum sempat mengeksekusi (baca posisi/`decide` gagal)
-   * atau bila `executeDecision` sendiri melempar (mengikuti kontrak `execute.ts`:
-   * anggaran hanya berubah setelah kirim benar-benar berhasil). Pemanggil WAJIB
-   * memakai nilai ini, bukan `executeState` lama, pada panggilan berikutnya.
+   * The execution state for the NEXT cycle. Identical to the `executeState` input when
+   * this cycle failed before it could execute (a failed position read/`decide`) or when
+   * `executeDecision` itself threw (following the `execute.ts` contract: the budget only
+   * changes after a send actually succeeds). The caller MUST use this value, not the old
+   * `executeState`, on the next call.
    */
   nextExecuteState: ExecuteState;
 }
@@ -148,19 +143,17 @@ function toMessage(err: unknown): string {
 }
 
 /**
- * Logging yang tidak pernah melempar. `logger` adalah dependensi yang
- * disuntikkan dari luar (mis. menulis ke pipa, file, atau layanan eksternal)
- * — kegagalannya (pipa tertutup -> EPIPE, disk penuh, dll.) TIDAK PERNAH
- * boleh menghentikan Guardian. Round pertama melewatkan ini: `logger.error`
- * yang melempar di dalam blok `catch` milik `tick()` membuat `scheduleNext()`
- * tidak pernah tercapai, sehingga loop mati diam-diam tanpa jejak sama
- * sekali — persis kegagalan yang task ini ada untuk mencegahnya.
+ * Logging that never throws. `logger` is an injected dependency (it might write to a pipe,
+ * a file, or an external service) — its failures (closed pipe -> EPIPE, full disk, and so
+ * on) must NEVER stop Guardian. The first round missed this: a `logger.error` that threw
+ * inside `tick()`'s `catch` block meant `scheduleNext()` was never reached, so the loop
+ * died silently with no trace at all — exactly the failure this task exists to prevent.
  */
 export function logInfo(logger: Logger, message: string, meta?: Record<string, unknown>): void {
   try {
     logger.info(message, meta);
   } catch {
-    // Logging tidak boleh pernah menjadi alasan Guardian berhenti bekerja.
+    // Logging must never be the reason Guardian stops working.
   }
 }
 
@@ -168,31 +161,30 @@ export function logError(logger: Logger, message: string, meta?: Record<string, 
   try {
     logger.error(message, meta);
   } catch {
-    // Sama seperti di atas.
+    // Same as above.
   }
 }
 
-/** Memanggil callback yang disuntikkan pemanggil tanpa membiarkan kegagalannya menjalar. */
+/** Calls a caller-injected callback without letting its failure propagate. */
 function safeInvoke(fn: () => void): void {
   try {
     fn();
   } catch {
-    // Callback pihak luar tidak boleh pernah mematikan loop.
+    // An outside callback must never kill the loop.
   }
 }
 
 /**
- * Menjalankan satu siklus pemantauan: baca posisi → `decide` → `executeDecision`
- * → `explainDecision` (dilewati untuk `NONE`). Tidak pernah melempar; setiap
- * kegagalan — termasuk `deps.now()` atau `deps.logger` itu sendiri gagal —
- * menghasilkan `CycleResult` dengan `ok: false`/catatan yang tetap lengkap,
- * sehingga pemanggil (`startGuardLoop`) selalu bisa lanjut ke siklus berikutnya.
+ * Runs one monitoring cycle: read position -> `decide` -> `executeDecision` ->
+ * `explainDecision` (skipped for `NONE`). Never throws; every failure — including
+ * `deps.now()` or `deps.logger` itself failing — produces a `CycleResult` with
+ * `ok: false` and a record that is still complete, so the caller (`startGuardLoop`) can
+ * always move on to the next cycle.
  *
- * `executeState` mengalir eksplisit: nilai baru selalu ada di
- * `outcome.nextExecuteState`, dan pemanggil (termasuk `startGuardLoop`
- * sendiri) bertanggung jawab meneruskannya ke panggilan berikutnya — lihat
- * catatan di atas modul ini soal kenapa ini tidak boleh jadi convention
- * yang "diingat sendiri" oleh kode perakit.
+ * `executeState` flows explicitly: the new value is always in `outcome.nextExecuteState`,
+ * and the caller (including `startGuardLoop` itself) is responsible for passing it to the
+ * next call — see the note at the top of this module about why this must not be a
+ * convention the wiring code "remembers on its own".
  */
 export async function runGuardCycle(
   deps: GuardCycleDeps,
@@ -202,8 +194,8 @@ export async function runGuardCycle(
   try {
     timestamp = deps.now();
   } catch (err) {
-    // `now()` gagal adalah kegagalan dependensi kecil, bukan alasan untuk
-    // berhenti melindungi posisi — pakai timestamp fallback dan lanjut.
+    // A failing `now()` is a small dependency failure, not a reason to stop protecting
+    // the position — use a fallback timestamp and carry on.
     logError(deps.logger, "guard: now() gagal, memakai timestamp fallback", {
       account: deps.account,
       error: toMessage(err),
@@ -246,19 +238,19 @@ export async function runGuardCycle(
     execResult = await deps.executeDecision(decision, pos, executeState);
   } catch (err) {
     const error = toMessage(err);
-    // Dikenali lewat penanda duck-typed, BUKAN `instanceof`: pembungkus
-    // `executeDecision` di backend (telemetri, retry, tracing) yang melempar
-    // ulang galat lain — atau dua salinan modul `execute.js` di pohon
-    // dependensi — akan membuat `instanceof` gagal DIAM-DIAM, dan cabang di
-    // bawah akan mengembalikan state lama. Itu bug C2 yang kembali tanpa satu
-    // test pun berteriak. `asRepaySendFailure` juga menelusuri rantai `cause`.
+    // Recognized by a duck-typed marker, NOT `instanceof`: a wrapper around
+    // `executeDecision` in the backend (telemetry, retry, tracing) that rethrows a
+    // different error — or two copies of the `execute.js` module in the dependency tree —
+    // would make `instanceof` fail SILENTLY, and the branch below would return the old
+    // state. That is bug C2 coming back without a single test shouting.
+    // `asRepaySendFailure` also walks the `cause` chain.
     const kegagalanSetelahKirim = asRepaySendFailure(err);
     if (kegagalanSetelahKirim !== null) {
-      // Transaksinya MUNGKIN sudah mendarat — hanya pembacaan hasilnya yang
-      // gagal. State yang dibawa galat ini sudah memotong anggaran, memulai
-      // cooldown, dan mencatat repay menggantung; meneruskannya adalah
-      // satu-satunya yang mencegah siklus berikutnya membayar untuk kedua
-      // kalinya. Mengembalikan `executeState` lama di sini adalah bug C2.
+      // The transaction MAY already have landed — only reading its result failed. The
+      // state carried by this error has already deducted the budget, started the cooldown,
+      // and recorded the repay as pending; passing it along is the only thing that stops
+      // the next cycle from paying a second time. Returning the old `executeState` here is
+      // bug C2.
       logError(deps.logger, "guard: pengiriman repay gagal SETELAH mungkin terkirim", {
         account: deps.account,
         action: decision.action,
@@ -277,22 +269,22 @@ export async function runGuardCycle(
       action: decision.action,
       error,
     });
-    // Kegagalan yang terjadi SEBELUM apa pun menyentuh jaringan (atau sebelum
-    // `executeDecision` sempat mengirim): tidak ada yang berubah di rantai,
-    // jadi state lama diteruskan apa adanya.
+    // A failure that happened BEFORE anything touched the network (or before
+    // `executeDecision` got to send): nothing changed on chain, so the old state is passed
+    // through as-is.
     return {
       result: { ok: false, timestamp, account: deps.account, error },
       nextExecuteState: executeState,
     };
   }
 
-  // Titik ini: eksekusi sudah final. Apa pun yang terjadi di bawah pada
-  // penjelasan TIDAK PERNAH mengubah `execResult` atau `decision` di atas.
+  // At this point execution is final. Whatever happens below with the explanation NEVER
+  // changes the `execResult` or `decision` above.
   let explanation: string;
   if (decision.action === "NONE") {
-    // Tidak ada apa pun untuk dijelaskan pada posisi yang aman, dan
-    // memanggil dGrid di sini hanya menambah 3–46 detik ke siklus paling
-    // umum (posisi sehat) untuk kalimat yang tidak dibaca siapa pun.
+    // There is nothing to explain about a safe position, and calling dGrid here would
+    // only add 3–46 seconds to the most common cycle (a healthy position) for a sentence
+    // nobody reads.
     explanation = decision.reason;
   } else {
     try {
@@ -326,7 +318,7 @@ export async function runGuardCycle(
   };
 }
 
-/** Menulis catatan satu siklus ke logger, dengan nilai USD/HF sudah terformat (tidak pernah basis mentah). */
+/** Writes one cycle's record to the logger, with USD/HF values already formatted (never the raw basis). */
 function logCycleResult(logger: Logger, result: CycleResult): void {
   if (!result.ok) {
     logError(logger, "guard: siklus gagal", {
@@ -355,67 +347,61 @@ function logCycleResult(logger: Logger, result: CycleResult): void {
 
 export interface GuardLoopOptions {
   /**
-   * Menyimpan `ExecuteState` setiap kali ia berubah — setelah setiap siklus DAN
-   * segera setelah `kill()`. Disuntikkan sebagai fungsi, bukan store konkret,
-   * supaya backend bisa memasang Postgres tanpa menyentuh modul ini
-   * (`state/store.ts` menyediakan implementasi berkas JSON dan memori).
+   * Persists `ExecuteState` every time it changes — after every cycle AND immediately
+   * after `kill()`. Injected as a function rather than a concrete store so the backend can
+   * plug in Postgres without touching this module (`state/store.ts` provides JSON-file and
+   * in-memory implementations).
    *
-   * Kegagalannya dicatat lewat logger dan TIDAK PERNAH menghentikan loop:
-   * disk penuh tidak boleh membuat Guardian berhenti melindungi posisi. Ia
-   * dilaporkan, bukan disembunyikan.
+   * Its failures are logged and NEVER stop the loop: a full disk must not make Guardian
+   * stop protecting a position. It is reported, not hidden.
    */
   saveExecuteState?: (state: ExecuteState) => Promise<void> | void;
 }
 
 export interface GuardLoopHandle {
-  /** Menghentikan loop segera. Siklus yang sedang berjalan dibiarkan selesai, tetapi tidak ada siklus baru dijadwalkan sesudahnya. */
+  /** Stops the loop immediately. A cycle already in flight is left to finish, but no new cycle is scheduled after it. */
   stop: () => void;
   /**
-   * Kill switch sebagai TUAS SUNGGUHAN, bukan sekadar field pada state awal.
+   * The kill switch as a REAL LEVER, not just a field on the initial state.
    *
-   * Sebelum ini `killed` hanya bisa bernilai true kalau ia SUDAH true sebelum
-   * loop dimulai — tidak ada jalan menariknya selagi agent berjalan, padahal
-   * dokumen produk menyebutnya "jalan keluar user". `kill()` menutup itu:
-   * ia langsung menyetel `killed`, mempersistkannya, dan sejak saat itu setiap
-   * siklus berikutnya ditolak `executeDecision` pada aturan pertama.
+   * Before this, `killed` could only be true if it was ALREADY true before the loop
+   * started — there was no way to pull it while the agent was running, even though the
+   * product doc calls it "the user's way out". `kill()` closes that: it sets `killed`
+   * immediately, persists it, and from that moment every following cycle is refused by
+   * `executeDecision` on its first rule.
    *
-   * Ini KAIT SATU ARAH. Sebuah siklus yang sedang berjalan saat `kill()`
-   * dipanggil akan selesai dengan state yang masih `killed: false`; hasil
-   * itu TIDAK boleh membatalkan kill. Karena itu kill dicatat terpisah dan
-   * di-OR-kan ke setiap state yang masuk.
+   * This is a ONE-WAY LATCH. A cycle already in flight when `kill()` is called will finish
+   * with a state that still says `killed: false`; that result MUST NOT undo the kill. That
+   * is why the kill is recorded separately and OR-ed into every incoming state.
    *
-   * `kill()` tidak menghentikan loop: pemantauan dan pencatatan tetap jalan,
-   * yang berhenti adalah pengiriman transaksi. Untuk berhenti total panggil
-   * `stop()` juga.
+   * `kill()` does not stop the loop: monitoring and logging keep running, what stops is
+   * sending transactions. To stop entirely, call `stop()` as well.
    */
   kill: () => void;
-  /** Apakah kill switch sudah ditarik. */
+  /** Whether the kill switch has been pulled. */
   isKilled: () => boolean;
-  /** State eksekusi terkini (anggaran, cooldown, kill switch, repay menggantung). */
+  /** The current execution state (budget, cooldown, kill switch, pending repay). */
   getExecuteState: () => ExecuteState;
-  /** Catatan siklus terakhir yang selesai, atau `null` bila belum ada satu pun yang selesai. */
+  /** The record of the last completed cycle, or `null` when none has completed yet. */
   getLastResult: () => CycleResult | null;
 }
 
 /**
- * Menjalankan `runGuardCycle` berulang setiap `intervalMs`, dimulai segera
- * (tidak menunggu interval pertama). `initialExecuteState` adalah state
- * eksekusi awal (anggaran harian, cooldown, kill switch); `startGuardLoop`
- * sendiri yang menyimpan dan meneruskan versi terbarunya ke setiap siklus
- * berikutnya lewat `outcome.nextExecuteState` — pemanggil tidak perlu (dan
- * tidak harus) mengelola state itu sendiri lagi.
+ * Runs `runGuardCycle` repeatedly every `intervalMs`, starting immediately (it does not
+ * wait out the first interval). `initialExecuteState` is the starting execution state (the
+ * daily budget, the cooldown, the kill switch); `startGuardLoop` itself holds and passes
+ * the latest version into every following cycle via `outcome.nextExecuteState` — the
+ * caller does not need to (and must not) manage that state itself any more.
  *
- * Mengembalikan handle yang bisa dihentikan kapan saja — baik oleh user
- * (kill switch di level proses) maupun oleh test, tanpa perlu menunggu
- * siklus berikutnya. Bila `stop()` dipanggil selagi satu siklus sedang
- * berjalan, siklus itu dibiarkan selesai tetapi tidak ada siklus baru yang
- * dijadwalkan sesudahnya.
+ * Returns a handle that can be stopped at any time — by a user (a process-level kill
+ * switch) or by a test, with no need to wait for the next cycle. If `stop()` is called
+ * while a cycle is in flight, that cycle is left to finish but no new cycle is scheduled
+ * after it.
  *
- * `runGuardCycle` sendiri sudah dijamin tidak melempar (termasuk kegagalan
- * `now()`/`logger`), tetapi `tick()` tetap membungkusnya dalam try/finally
- * sebagai lapis pertahanan kedua: `scheduleNext()` ada di blok `finally`
- * sehingga bahkan kegagalan tak terduga yang lolos dari semua penjagaan di
- * atas tidak pernah menghentikan penjadwalan siklus berikutnya.
+ * `runGuardCycle` is itself guaranteed not to throw (including `now()`/`logger`
+ * failures), but `tick()` still wraps it in try/finally as a second layer of defense:
+ * `scheduleNext()` lives in the `finally` block, so even an unexpected failure that
+ * escapes every guard above never stops the next cycle from being scheduled.
  */
 export function startGuardLoop(
   deps: GuardCycleDeps,
@@ -431,8 +417,8 @@ export function startGuardLoop(
 
   let stopped = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
-  // Kait kill satu arah, terpisah dari state siklus: hasil siklus yang sudah
-  // berjalan sebelum `kill()` tidak boleh mengembalikan `killed` ke false.
+  // The one-way kill latch, kept separate from the cycle state: the result of a cycle
+  // that started before `kill()` must not set `killed` back to false.
   let killLatched = initialExecuteState.killed;
   let currentExecuteState = initialExecuteState;
   let lastResult: CycleResult | null = null;
@@ -456,9 +442,9 @@ export function startGuardLoop(
   function scheduleNext(): void {
     if (stopped) return;
     timer = setTimeout(() => {
-      // Timer sudah menyala dan tidak lagi valid untuk di-`clearTimeout` --
-      // null-kan sebelum `tick()` supaya `stop()` yang dipanggil sesudahnya
-      // tidak memegang id basi (tidak berbahaya, tapi tidak rapi).
+      // The timer has fired and is no longer valid to `clearTimeout` -- null it out before
+      // `tick()` so a `stop()` called afterwards is not holding a stale id (harmless, but
+      // untidy).
       timer = null;
       void tick();
     }, intervalMs);
@@ -476,8 +462,8 @@ export function startGuardLoop(
         safeInvoke(() => deps.onCycle!(outcome.result));
       }
     } catch (err) {
-      // `runGuardCycle` tidak seharusnya pernah sampai sini, tetapi loop
-      // tidak boleh mati diam-diam meski itu terjadi (defense in depth).
+      // `runGuardCycle` should never reach here, but the loop must not die silently even
+      // if it does (defense in depth).
       logError(deps.logger, "guard: siklus melempar tak terduga di loop, lanjut ke siklus berikutnya", {
         account: deps.account,
         error: toMessage(err),
@@ -503,8 +489,8 @@ export function startGuardLoop(
       logInfo(deps.logger, "guard: kill switch ditarik, tidak ada transaksi baru yang dikirim", {
         account: deps.account,
       });
-      // Dipersist di latar: `kill()` harus langsung berlaku di memori, dan
-      // penyimpanannya tidak boleh membuat pemanggil menunggu I/O.
+      // Persisted in the background: `kill()` must take effect in memory immediately, and
+      // persisting it must not make the caller wait on I/O.
       void persist(currentExecuteState);
     },
     isKilled: () => killLatched,

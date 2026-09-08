@@ -16,7 +16,7 @@ describe("adapter Aave v3 (BSC mainnet, read-only)", () => {
   it("menormalkan healthFactor tak terhingga menjadi null", { timeout: 30_000 }, async () => {
     const r = createReader();
     const pos = await r.readAavePosition(AKUN_KOSONG);
-    // akun tanpa hutang: Aave mengembalikan 2^256-1
+    // an account with no debt: Aave returns 2^256-1
     expect(pos.debtBase).toBe(0n);
     expect(pos.healthFactor).toBeNull();
   });
@@ -26,8 +26,8 @@ describe("adapter Venus (BSC mainnet, read-only)", () => {
   it("membaca likuiditas akun tanpa melempar", { timeout: 30_000 }, async () => {
     const r = createReader();
     const v = await readVenusLiquidity(r.client, AKUN_KOSONG);
-    // Nama field menyebut skalanya sendiri (1e18), berbeda dari `*Base`
-    // milik Position yang berbasis 8 desimal Aave.
+    // The field names state their own scale (1e18), unlike Position's `*Base` fields, which
+    // are on Aave's 8-decimal basis.
     expect(v.shortfallUsd18).toBe(0n);
     expect(v.liquidityUsd18).toBe(0n);
     expect(v.blockNumber).toBeGreaterThan(0n);

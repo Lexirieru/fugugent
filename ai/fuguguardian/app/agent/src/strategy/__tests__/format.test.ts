@@ -4,8 +4,8 @@ import { HF_ONE } from "../types.js";
 
 describe("formatUsd8", () => {
   it("12345678 (basis 8 desimal) adalah $0,12, bukan belasan juta", () => {
-    // Inti bug satuan yang diperbaiki: angka mentah 12345678 terbaca manusia
-    // sebagai dua belas juta, padahal artinya dua belas sen.
+    // The heart of the units bug that was fixed: the raw number 12345678 reads to a human
+    // as twelve million, when it means twelve cents.
     expect(formatUsd8(12_345_678n)).toBe("$0,12");
   });
 
@@ -18,7 +18,7 @@ describe("formatUsd8", () => {
   });
 
   it("pecahan sen dipotong, tidak dibulatkan ke atas", () => {
-    // 0,999999 dolar tidak boleh terlihat sebagai $1,00.
+    // 0.999999 dollars must not display as $1,00.
     expect(formatUsd8(99_999_999n)).toBe("$0,99");
   });
 
@@ -31,8 +31,8 @@ describe("formatUsd8", () => {
   });
 
   it("nilai jauh di atas MAX_SAFE_INTEGER tetap presisi penuh", () => {
-    // 9_007_199_254_740_993 (2^53 + 1) sebagai basis 8 desimal.
-    // Lewat Number() digit terakhirnya akan hilang; bigint mempertahankannya.
+    // 9_007_199_254_740_993 (2^53 + 1) on the 8-decimal basis.
+    // Through Number() its last digit would be lost; bigint keeps it.
     expect(formatUsd8(900_719_925_474_099_300_000_001n)).toBe("$9.007.199.254.740.993,00");
   });
 });

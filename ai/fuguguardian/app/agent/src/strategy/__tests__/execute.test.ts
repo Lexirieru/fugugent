@@ -13,7 +13,7 @@ import {
 } from "../execute.js";
 import type { Decision, Position } from "../types.js";
 
-/** Alamat aset repay kini DISUNTIKKAN, bukan konstanta di dalam execute.ts. */
+/** The repay asset's address is now INJECTED, not a constant inside execute.ts. */
 const REPAY_ASSET = "0x932E82632E80b06318ca969e33F99A54F1a04b10" as const;
 
 const POS: Position = {
@@ -129,8 +129,8 @@ describe("executeDecision", () => {
   });
 
   it("aturan 4: jumlah melebihi sisa anggaran harian dipotong ke sisa", async () => {
-    const d = decisionWith("PARTIAL_REPAY", 80_000_000_000n); // $800, di bawah cap per-aksi
-    const s = state({ spentTodayUsd8: 450_000_000_000n }); // sisa dari $5000: $500
+    const d = decisionWith("PARTIAL_REPAY", 80_000_000_000n); // $800, below the per-action cap
+    const s = state({ spentTodayUsd8: 450_000_000_000n }); // left of $5000: $500
     const dep = deps();
     const result = await executeDecision(d, POS, limits(), s, dep);
 
@@ -141,24 +141,24 @@ describe("executeDecision", () => {
   });
 
   it("pemotongan per-aksi dan harian berlaku bersamaan", async () => {
-    // suggestedRepayBase ($2000) > maxPerActionUsd8 ($1000) > sisa harian ($300)
+    // suggestedRepayBase ($2000) > maxPerActionUsd8 ($1000) > the daily remainder ($300)
     const d = decisionWith("PARTIAL_REPAY", 200_000_000_000n);
-    const s = state({ spentTodayUsd8: 470_000_000_000n }); // sisa dari $5000: $300
+    const s = state({ spentTodayUsd8: 470_000_000_000n }); // left of $5000: $300
     const dep = deps();
     const result = await executeDecision(d, POS, limits(), s, dep);
 
     expect(result.sent).toBe(true);
     expect(result.cappedPerAction).toBe(true);
     expect(result.cappedPerDay).toBe(true);
-    // Jumlah yang benar-benar terkirim adalah sisa harian ($300), bukan
-    // batas per-aksi ($1000) — pemotongan kedua lebih ketat dari yang pertama.
+    // The amount actually sent is the daily remainder ($300), not the per-action cap
+    // ($1000) — the second cap is tighter than the first.
     expect(result.amountSentUsd8).toBe(30_000_000_000n);
     expect(dep.sendRepay).toHaveBeenCalledWith(expect.anything(), 30_000_000_000n);
   });
 
   it("aturan 4: sisa anggaran harian nol -> tidak mengirim", async () => {
     const d = decisionWith("PARTIAL_REPAY", 10_000_000_000n);
-    const s = state({ spentTodayUsd8: 500_000_000_000n }); // sudah habis
+    const s = state({ spentTodayUsd8: 500_000_000_000n }); // already exhausted
     const dep = deps();
     const result = await executeDecision(d, POS, limits(), s, dep);
 
@@ -219,13 +219,13 @@ describe("executeDecision", () => {
   });
 
   // ————————————————————————————————————————————————————————————————
-  // C2 — "gagal" tidak berarti "tidak terjadi"
+  // C2 — "failed" does not mean "did not happen"
   //
-  // Test lama di tempat ini bernama "kegagalan kirim tidak menghabiskan
-  // anggaran" dan mengunci kebalikan dari aturan di bawah. Ia dibuat sengaja
-  // di putaran sebelumnya dan memang benar untuk sebuah fungsi murni; ia SALAH
-  // untuk pengiriman jaringan, karena `waitForTransactionReceipt` yang timeout
-  // melempar SESUDAH transaksinya mendarat. Ia diganti, bukan dihapus diam-diam.
+  // The old test in this spot was named "a failed send does not consume the budget" and
+  // locked in the opposite of the rule below. It was written deliberately in the previous
+  // round and is indeed correct for a pure function; it is WRONG for a network send, because
+  // a `waitForTransactionReceipt` that times out throws AFTER the transaction landed. It was
+  // replaced, not quietly deleted.
   // ————————————————————————————————————————————————————————————————
 
   it("kegagalan kirim yang tidak bertanda TETAP memotong anggaran dan mencatat repay menggantung", async () => {
@@ -233,8 +233,8 @@ describe("executeDecision", () => {
     const s = state({ spentTodayUsd8: 5_000_000_000n, dayStartedAt: 1_000_000, lastActionAt: 0 });
     const dep = deps({
       sendRepay: vi.fn(async () => {
-        // Bentuk kegagalan yang menjadi alasan aturan ini ada: transaksinya
-        // sudah mendarat, yang gagal hanya pembacaan receipt-nya.
+        // The failure shape that is the whole reason this rule exists: the transaction landed,
+        // only reading its receipt failed.
         throw new Error("waitForTransactionReceipt timeout setelah 180s");
       }),
       now: () => 1_000_500,
@@ -244,16 +244,16 @@ describe("executeDecision", () => {
 
     expect(err).toBeInstanceOf(RepaySendError);
     const sendErr = err as RepaySendError;
-    // Galat aslinya tidak boleh hilang: pemanggil tetap harus bisa membacanya.
+    // The original error must not be lost: the caller still has to be able to read it.
     expect(sendErr.message).toContain("waitForTransactionReceipt timeout");
     expect(sendErr.cause).toBeInstanceOf(Error);
 
-    // Anggaran DAN cooldown sudah bergerak, karena uangnya mungkin sudah pindah.
+    // The budget AND the cooldown have both moved, because the money may already be gone.
     expect(sendErr.stateAfterSend.spentTodayUsd8).toBe(15_000_000_000n);
     expect(sendErr.stateAfterSend.lastActionAt).toBe(1_000_500);
 
-    // Dan yang paling menentukan: catatan menggantung yang akan menahan siklus
-    // berikutnya, lengkap dengan jangkar rekonsiliasinya.
+    // And most decisive of all: the pending record that will hold back the next cycle,
+    // complete with its reconciliation anchors.
     expect(sendErr.stateAfterSend.pendingRepay).toEqual({
       asset: REPAY_ASSET,
       amountUsd8: 10_000_000_000n,
@@ -263,7 +263,7 @@ describe("executeDecision", () => {
       blockNumberBeforeSend: POS.blockNumber,
     });
 
-    // Objek masukan tetap tidak dimutasi — modul ini masih murni.
+    // The input object is still not mutated — this module remains pure.
     expect(s.spentTodayUsd8).toBe(5_000_000_000n);
     expect(s.pendingRepay).toBeNull();
   });
@@ -275,15 +275,15 @@ describe("executeDecision", () => {
 
     const err = await executeDecision(d, POS, limits(), state(), dep).catch((e: unknown) => e);
 
-    // Bukan RepaySendError: tidak ada anggaran terpotong dan tidak ada yang menggantung.
+    // Not a RepaySendError: no budget is deducted and nothing is left pending.
     expect(err).toBe(asli);
     expect(err).not.toBeInstanceOf(RepaySendError);
   });
 
   it("galat berbentuk objek biasa dengan neverSent:true juga dihormati (bukan lewat instanceof)", async () => {
     const d = decisionWith("PARTIAL_REPAY", 10_000_000_000n);
-    // `chain/session.ts` menandai galatnya sendiri lewat properti supaya ia tidak
-    // perlu mewarisi kelas dari execute.ts.
+    // `chain/session.ts` marks its own errors via a property so it does not have to inherit
+    // a class from execute.ts.
     const asli = Object.assign(new Error("konversi menghasilkan nol unit token"), {
       neverSent: true as const,
     });
@@ -323,7 +323,7 @@ describe("reconcilePendingRepay", () => {
     });
 
     expect(sesudah.pendingRepay).toBeNull();
-    // Anggaran yang sudah terpotong TIDAK dikembalikan: transaksinya memang jadi.
+    // The budget already deducted is NOT refunded: the transaction did go through.
     expect(sesudah.spentTodayUsd8).toBe(10_000_000_000n);
   });
 
@@ -334,9 +334,9 @@ describe("reconcilePendingRepay", () => {
   ])(
     "hutang berkurang oleh SEBAB LAIN (%s) TIDAK dianggap bukti repay kita mendarat",
     (_label, turun) => {
-      // Ini yang membedakan "hutang turun" dari "hutang turun sebesar yang kita
-      // bayar". Tanpa pembedaan itu, catatan kita dibereskan terlalu dini,
-      // Guardian bebas bertindak, lalu tx pertama mendarat -> dua pembayaran.
+      // This is what separates "the debt fell" from "the debt fell by exactly what we paid".
+      // Without that distinction our record is cleared too early, Guardian is free to act,
+      // and then the first tx lands -> two payments.
       const s = state({ pendingRepay: pending() });
       const sesudah = reconcilePendingRepay(s, {
         ...POS,
@@ -378,8 +378,8 @@ describe("reconcilePendingRepay", () => {
       debtBase: POS.debtBase,
     });
 
-    // Transaksi yang masih di mempool bisa mendarat kapan saja; "belum terlihat"
-    // tidak pernah berarti "tidak akan terjadi".
+    // A transaction still in the mempool can land at any moment; "not seen yet" never means
+    // "will not happen".
     expect(sesudah.pendingRepay).toEqual(pending());
   });
 
@@ -429,11 +429,10 @@ describe("clearPendingRepay", () => {
 
 describe("persistBeforeSend — catatan menggantung menyentuh disk SEBELUM tx berangkat", () => {
   it("saat sendRepay dipanggil, state yang sudah tersimpan SUDAH memuat pendingRepay", async () => {
-    // Ini menyimulasikan kematian proses di dalam jendela tunggu-receipt 180
-    // detik: apa yang sudah tersimpan pada DETIK sendRepay dipanggil adalah
-    // persis apa yang akan ditemukan restart. Kalau `persistBeforeSend` tidak
-    // dipanggil sebelum kirim, yang terlihat di sini adalah `null` — dan
-    // restart akan membayar lagi.
+    // This simulates the process dying inside the 180-second receipt wait: whatever is saved
+    // at the MOMENT sendRepay is called is exactly what a restart will find. If
+    // `persistBeforeSend` is not called before sending, what shows up here is `null` — and
+    // the restart pays again.
     const tersimpan: ExecuteState[] = [];
     let terlihatSaatKirim: ExecuteState | undefined;
     const d = decisionWith("PARTIAL_REPAY", 10_000_000_000n);
@@ -458,8 +457,8 @@ describe("persistBeforeSend — catatan menggantung menyentuh disk SEBELUM tx be
   });
 
   it("penyimpanan gagal -> TIDAK mengirim apa pun, dan galatnya bertanda neverSent", async () => {
-    // Gagal tertutup: mengirim tanpa jejak yang bisa menahan pembayaran kedua
-    // lebih buruk daripada tidak mengirim sama sekali.
+    // Fail closed: sending with no trace that could hold back a second payment is worse than
+    // not sending at all.
     const d = decisionWith("PARTIAL_REPAY", 10_000_000_000n);
     const sendRepay = vi.fn(async () => "0xdeadbeef" as `0x${string}`);
     const dep = deps({
@@ -507,8 +506,8 @@ describe("asRepaySendFailure — pengenalan duck-typed, bukan instanceof", () =>
   });
 
   it("mengenali galat yang BUKAN instanceof tetapi membawa penanda yang sama", () => {
-    // Dua salinan modul `execute.js` di pohon dependensi menghasilkan persis ini:
-    // bentuknya benar, kelasnya bukan yang sama. `instanceof` akan meleset.
+    // Two copies of the `execute.js` module in the dependency tree produce exactly this: the
+    // shape is right, the class is not the same one. `instanceof` would miss it.
     const asing = Object.assign(new Error("dari salinan modul lain"), {
       repaySendFailure: true,
       stateAfterSend: contohState,

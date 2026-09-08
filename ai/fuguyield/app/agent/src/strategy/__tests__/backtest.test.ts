@@ -5,7 +5,7 @@ import { YieldError, type SwitchCostModel } from "../types.js";
 const usd = (n: bigint) => n * 100_000_000n;
 const biaya: SwitchCostModel = { swapFeeBps: 5n, slippageBps: 10n, gasCostBase: usd(1n) };
 
-/** Dua pool yang bergantian menjadi yang tertinggi dengan selisih kecil. */
+/** Two pools that take turns being the highest, by a small margin. */
 function berkedip(candles: number): { poolId: string; apyBps: bigint }[][] {
   const out: { poolId: string; apyBps: bigint }[][] = [];
   for (let i = 0; i < candles; i++) {
@@ -19,7 +19,7 @@ function berkedip(candles: number): { poolId: string; apyBps: bigint }[][] {
   return out;
 }
 
-/** Satu pool jelas dan tetap lebih tinggi sepanjang periode. */
+/** One pool is clearly and consistently higher for the whole period. */
 function selisihNyata(candles: number): { poolId: string; apyBps: bigint }[][] {
   return Array.from({ length: candles }, () => [
     { poolId: "venus-usdt", apyBps: 500n },
@@ -88,10 +88,10 @@ describe("runBacktest — selisih yang nyata memang dikejar", () => {
   });
 
   it("periode terlalu pendek untuk membayar ongkos: yang disiplin tetap diam", () => {
-    // Ongkos $16 tidak akan kembali dalam beberapa hari, tetapi ambang wajib
-    // memakai horizon 30 hari dan tetap membolehkan pindah. Test ini merekam
-    // bahwa keputusan tidak pernah melihat panjang deret — horizonnyalah
-    // asumsinya, bukan durasi backtest.
+    // A $16 cost will not be repaid within a few days, but the required threshold uses
+    // the 30-day horizon and still allows the move. This test records that the decision
+    // never looks at the length of the series — the horizon is the assumption, not the
+    // backtest's duration.
     const r = runBacktest(input({ apySeriesBps: selisihNyata(4) }));
     expect(r.disciplined.migrations).toBe(1);
     expect(r.disciplined.finalPrincipalBase).toBeLessThan(r.passive.finalPrincipalBase);

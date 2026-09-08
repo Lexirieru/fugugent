@@ -1,34 +1,33 @@
 /**
  * ============================================================================
- * KETERBATASAN JUJUR — BACA SEBELUM MEMAKAI ANGKA DARI MODUL INI
+ * HONEST LIMITATIONS — READ BEFORE USING ANY NUMBER FROM THIS MODULE
  * ============================================================================
- * Harness ini menjalankan `decide` candle demi candle di atas deret harga yang
- * diberikan, lalu membandingkan nilai akhirnya dengan SATU pembanding:
- * alokasi awal yang sama persis, dibiarkan tidak disentuh sampai candle
- * terakhir (`holdValueBase`). Pembanding itu dipilih karena ia satu-satunya
- * yang jujur: grid dan pembandingnya berangkat dari portofolio yang identik.
+ * This harness runs `decide` candle by candle over the given price series, then compares
+ * its final value against ONE benchmark: the exact same starting allocation, left
+ * untouched until the last candle (`holdValueBase`). That benchmark was chosen because
+ * it is the only honest one: the grid and its benchmark start from an identical
+ * portfolio.
  *
- * Yang sengaja TIDAK dimodelkan:
- *   - dampak harga yang tidak linear; slippage dimodelkan sebagai persentase
- *     tetap, sehingga lot besar di pool dangkal jauh lebih mahal daripada ini
- *   - transaksi gagal, revert, RPC mati, sesi Altana kedaluwarsa
- *   - gas yang berubah-ubah; `gasCostBase` tetap sepanjang simulasi
- *   - pergerakan harga DI ANTARA dua candle. Ini yang paling berat untuk grid:
- *     grid nyata diisi oleh limit order yang tersentuh oleh sumbu lilin,
- *     sedangkan model ini hanya melihat satu harga per candle dan karena itu
- *     MELEWATKAN putaran yang di dunia nyata akan terisi. Arah bias ini
- *     MELAWAN grid, jadi keuntungan yang dilaporkan di sini adalah batas bawah
- *     untuk sisi itu — sekaligus alasan mengapa hasilnya tidak boleh dibaca
- *     sebagai ramalan.
- *   - antrean order, pembatalan, dan front-running
+ * What is deliberately NOT modeled:
+ *   - non-linear price impact; slippage is modeled as a fixed percentage, so a large lot
+ *     in a shallow pool costs far more than this
+ *   - failed transactions, reverts, dead RPC, expired Altana sessions
+ *   - varying gas; `gasCostBase` is constant for the whole simulation
+ *   - price movement BETWEEN two candles. This is the harshest one for a grid: a real
+ *     grid is filled by limit orders that candle wicks touch, whereas this model sees
+ *     only one price per candle and therefore MISSES round trips that would fill in the
+ *     real world. This bias points AGAINST the grid, so the profit reported here is a
+ *     lower bound on that side — and it is also why the result must not be read as a
+ *     forecast.
+ *   - order queueing, cancellations, and front-running
  *
- * Gas dimodelkan dibayar dari saldo NATIVE terpisah (tBNB), bukan dari kaki
- * quote grid, karena begitulah kenyataannya di BSC. Totalnya dikurangkan sekali
- * di akhir. Kalau saldo native habis, agent berhenti bertransaksi sama sekali —
- * keadaan itu TIDAK dimodelkan di sini dan harus diuji di lapisan eksekusi.
+ * Gas is modeled as paid out of a separate NATIVE balance (tBNB), not out of the grid's
+ * quote leg, because that is how it works on BSC. The total is subtracted once at the
+ * end. If the native balance runs out the agent stops trading entirely — that state is
+ * NOT modeled here and must be tested at the execution layer.
  *
- * Deret harga adalah masukan, bukan sesuatu yang dibangkitkan di dalam modul
- * ini: seluruh fungsi di sini murni dan deterministik.
+ * The price series is an input, not something generated inside this module: every
+ * function here is pure and deterministic.
  * ============================================================================
  */
 import { decide } from "./decide.js";
@@ -47,7 +46,7 @@ import {
 
 export interface GridBacktestInput {
   config: GridConfig;
-  /** Harga aset dasar per candle, USD basis 8 desimal. */
+  /** The base asset's price per candle, USD on the 8-decimal basis. */
   priceSeriesBase: bigint[];
   cost?: CostModel;
   thresholds?: GridThresholds;
@@ -57,27 +56,26 @@ export interface GridBacktestResult {
   candles: number;
   buys: number;
   sells: number;
-  /** Fee proporsional + gas, USD basis 8 desimal. */
+  /** Proportional fees + gas, USD on the 8-decimal basis. */
   totalCostBase: bigint;
-  /** Nilai akhir grid: quote + persediaan dinilai pada harga terakhir, dikurangi gas. */
+  /** The grid's final value: quote + inventory marked at the last price, minus gas. */
   finalValueBase: bigint;
-  /** Alokasi awal yang sama, dibiarkan tidak disentuh sampai candle terakhir. */
+  /** The same starting allocation, left untouched until the last candle. */
   holdValueBase: bigint;
   gridBeatsHold: boolean;
-  /** Indeks candle saat grid keluar; null bila tidak pernah keluar. */
+  /** The candle index at which the grid exited; null if it never exited. */
   exitedAtCandle: number | null;
   exitSide: "ABOVE" | "BELOW" | null;
 }
 
 /**
- * Fungsi MURNI: tanpa jaringan, jam, atau environment.
+ * A PURE function: no network, clock, or environment.
  *
- * Persediaan disimpan sebagai TUMPUKAN jumlah token per lot (18 desimal), dan
- * penjualan mengambil dari puncak tumpukan (LIFO). Bukan pilihan sembarangan:
- * pada grid, lot yang paling baru dibeli adalah lot yang dibeli satu garis di
- * bawah harga jual sekarang — memasangkan keduanya adalah definisi satu putaran
- * grid. FIFO akan memasangkan penjualan dengan lot tertua dan melaporkan laba
- * yang bukan laba putaran ini.
+ * Inventory is kept as a STACK of per-lot token amounts (18 decimals), and a sale takes
+ * from the top of the stack (LIFO). This is not an arbitrary choice: on a grid, the most
+ * recently bought lot is the one bought one line below the current sell price — pairing
+ * those two is the definition of one grid round trip. FIFO would pair the sale with the
+ * oldest lot and report a profit that is not this round trip's profit.
  */
 export function runBacktest(input: GridBacktestInput): GridBacktestResult {
   const { config, priceSeriesBase: series } = input;
@@ -101,11 +99,11 @@ export function runBacktest(input: GridBacktestInput): GridBacktestResult {
   const hargaAkhir = series[series.length - 1]!;
 
   /**
-   * Grid dimulai seimbang di sekitar harga awal: satu lot persediaan untuk
-   * setiap garis DI ATAS harga (supaya ada yang bisa dijual saat harga naik),
-   * sisa modal disimpan sebagai quote (supaya ada yang bisa dipakai membeli
-   * saat harga turun). Grid yang dimulai 100% pada salah satu kaki hanya bisa
-   * berdagang ke satu arah sampai harga kebetulan berbalik.
+   * The grid starts balanced around the opening price: one lot of inventory for every
+   * line ABOVE the price (so there is something to sell when the price rises), and the
+   * rest of the capital held as quote (so there is something to buy with when the price
+   * falls). A grid that starts 100% on one leg can only trade in one direction until the
+   * price happens to turn around.
    */
   const bandAwal = bandIndexOf(hargaAwal, config);
   const lotsAwal = intervals - bandAwal;
@@ -128,7 +126,7 @@ export function runBacktest(input: GridBacktestInput): GridBacktestResult {
   let exitedAtCandle: number | null = null;
   let exitSide: "ABOVE" | "BELOW" | null = null;
 
-  /** Fee proporsional satu swap atas `notional`, dibulatkan ke atas. */
+  /** The proportional fee for one swap on `notional`, rounded up. */
   const feeOf = (notional: bigint): bigint =>
     ceilDiv(notional * (cost.swapFeeBps + cost.slippageBps), BPS_ONE);
 
@@ -138,12 +136,12 @@ export function runBacktest(input: GridBacktestInput): GridBacktestResult {
     if (d.action === "BUY" && d.lots > 0) {
       const belanja = BigInt(d.lots) * lot;
       const fee = feeOf(belanja);
-      // Fee proporsional tertanam di dalam swap: dolar yang dibelanjakan tetap
-      // `belanja`, tetapi token yang diterima berkurang sebesar fee itu.
+      // The proportional fee is embedded in the swap: the dollars spent stay at
+      // `belanja`, but the tokens received are reduced by that fee.
       const tokenTotal = ((belanja - fee) * WAD) / price;
-      // Dibagi rata per lot supaya penjualan LIFO nanti melepas jumlah yang
-      // sama besar. Sisa bagi (< jumlah lot wei, yaitu di bawah 1e-18 token)
-      // hangus; mengejarnya akan menambah wei ke satu lot secara sewenang-wenang.
+      // Split evenly per lot so a later LIFO sale releases equal amounts. The remainder
+      // (< one wei per lot, i.e. under 1e-18 tokens) is burned; chasing it would add wei
+      // to one lot arbitrarily.
       const tokenPerLot = tokenTotal / BigInt(d.lots);
       quoteBase -= belanja;
       for (let k = 0; k < d.lots; k++) tumpukan.push(tokenPerLot);
@@ -173,9 +171,9 @@ export function runBacktest(input: GridBacktestInput): GridBacktestResult {
       exitedAtCandle = i;
       exitSide = d.action === "EXIT_ABOVE" ? "ABOVE" : "BELOW";
       state = d.nextState;
-      // Setelah keluar, grid memegang quote saja dan nilainya tidak berubah lagi.
-      // Pembandingnya tetap dinilai pada harga candle TERAKHIR, sehingga
-      // perbandingannya jujur: keduanya diukur pada akhir periode yang sama.
+      // After exiting, the grid holds quote only and its value no longer changes. The
+      // benchmark is still marked at the LAST candle's price, so the comparison stays
+      // honest: both are measured at the end of the same period.
       break;
     }
 

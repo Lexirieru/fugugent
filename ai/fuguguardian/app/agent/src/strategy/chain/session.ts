@@ -1,81 +1,77 @@
 /**
- * Penandatangan `repay` lewat **session key Altana ber-batas**.
+ * The `repay` signer that goes through a **bounded Altana session key**.
  *
- * Ini pengganti drop-in bagi `ExecuteDeps["sendRepay"]` yang sebelumnya
- * ditandatangani EOA deployer — sebuah kunci berkuasa penuh. Bedanya bukan
- * kosmetik: batas belanja, daftar kontrak, dan kedaluwarsa sesi ditegakkan
- * **oleh kontrak akun Altana di rantai**, bukan oleh kode di repo ini. Kalau
- * proses agent dibajak, kunci yang dipegangnya tetap tidak bisa memanggil
- * apa pun di luar allowlist.
+ * This is a drop-in replacement for `ExecuteDeps["sendRepay"]`, which used to be signed by
+ * the deployer EOA — a key with full power. The difference is not cosmetic: the spending
+ * cap, the contract allowlist, and the session expiry are enforced **by the Altana account
+ * contract on chain**, not by code in this repo. If the agent process is hijacked, the key
+ * it holds still cannot call anything outside the allowlist.
  *
- * Modul ini SENGAJA tidak berisi logika strategi apa pun dan tidak menyentuh
- * jaringan sendiri. Yang ada di sini hanya tiga hal:
+ * This module DELIBERATELY contains no strategy logic and does not touch the network
+ * itself. There are only three things here:
  *
- *   1. **Memeriksa izin sesi sebelum apa pun dikirim.** `calls` yang kosong
- *      atau hilang berarti izin TANPA BATAS di Altana (lihat
- *      `docs/research/03-altana.md` §2.3) — jadi kode kita menolaknya lebih
- *      dulu, sebelum SDK sempat dipanggil. Begitu pula entri "wildcard" yang
- *      hanya mengikat kontrak tanpa selector (atau sebaliknya), dan entri apa
- *      pun di luar daftar yang memang dibutuhkan.
- *   2. **Menyusun panggilan** `approve` + `repay` dari ABI minimal di bawah.
- *      Signature yang dipakai untuk allowlist diturunkan dari konstanta yang
- *      sama dengan yang dipakai memanggil, jadi keduanya tidak bisa menyimpang.
- *   3. **Mengirim lewat sesi** — lewat `sendCall` yang disuntikkan pemanggil,
- *      sehingga seluruh aturan di atas bisa diuji tanpa jaringan sama sekali.
+ *   1. **Checking the session permissions before anything is sent.** An empty or missing
+ *      `calls` means UNLIMITED permission in Altana (see `docs/research/03-altana.md` §2.3)
+ *      — so our code refuses it first, before the SDK is even called. The same goes for
+ *      "wildcard" entries that bind only a contract with no selector (or vice versa), and
+ *      for any entry outside the list actually needed.
+ *   2. **Composing the calls** — `approve` + `repay` from the minimal ABIs below. The
+ *      signatures used for the allowlist are derived from the same constants used to make
+ *      the calls, so the two cannot drift apart.
+ *   3. **Sending through the session** — via the caller-injected `sendCall`, so every rule
+ *      above can be tested with no network at all.
  *
- * Bagian `signer` dari file sesi tidak pernah dibaca, dicetak, atau disalin
- * di mana pun di modul ini; sesi hanya lewat sebagai `sendCall` yang sudah
- * terikat.
+ * The `signer` part of the session file is never read, printed, or copied anywhere in this
+ * module; the session only comes through as an already-bound `sendCall`.
  */
 import type { ExecuteDeps } from "../execute.js";
 
 /**
- * Satu aturan allowlist Altana. Bentuk union-nya sengaja ditiru apa adanya
- * dari SDK: `{ to }` saja berarti "semua metode di kontrak itu", `{ signature }`
- * saja berarti "metode itu di kontrak mana pun". Keduanya terlalu longgar
- * untuk agent ini, dan `assertBoundedAllowlist` menolaknya.
+ * One Altana allowlist rule. Its union shape deliberately mirrors the SDK's exactly:
+ * `{ to }` alone means "every method on that contract", `{ signature }` alone means "that
+ * method on any contract". Both are too loose for this agent, and `assertBoundedAllowlist`
+ * refuses them.
  */
 export type SessionCallPermission =
   | { readonly to: `0x${string}`; readonly signature: string }
   | { readonly to: `0x${string}` }
   | { readonly signature: string };
 
-/** Batas belanja per token untuk satu periode bergulir. */
+/** The spending cap per token for one rolling period. */
 export interface SessionSpendPermission {
   readonly limit: bigint;
   readonly period: string;
-  /** Dihilangkan berarti token native (tBNB) — inilah yang membayar ongkos relay. */
+  /** Omitted means the native token (tBNB) — this is what pays the relay cost. */
   readonly token?: `0x${string}`;
 }
 
-/** Bentuk `permissions` sebuah sesi Altana, sejauh yang diperiksa modul ini. */
+/** The shape of an Altana session's `permissions`, as far as this module checks it. */
 export interface SessionPermissions {
   readonly calls?: readonly SessionCallPermission[] | null;
   readonly spend?: readonly SessionSpendPermission[] | null;
 }
 
-/** Satu entri allowlist yang mengikat kontrak DAN selector sekaligus. */
+/** One allowlist entry that binds both a contract AND a selector. */
 export interface BoundCallPermission {
   readonly to: `0x${string}`;
   readonly signature: string;
 }
 
-/** Selector `MockLendingPool.repay` — satu-satunya cara agent melunasi hutang. */
+/** The `MockLendingPool.repay` selector — the only way the agent repays debt. */
 export const REPAY_SIGNATURE = "repay(address,uint256)";
 
-/** Selector `ERC20.approve` — dibutuhkan karena `repay` menarik lewat allowance. */
+/** The `ERC20.approve` selector — needed because `repay` pulls via an allowance. */
 export const APPROVE_SIGNATURE = "approve(address,uint256)";
 
 /**
- * Kesalahan izin sesi: selalu berarti "jangan kirim apa pun".
+ * A session permission error: it always means "do not send anything".
  *
- * `neverSent` menyatakan apakah galat ini terjadi SEBELUM apa pun menyentuh
- * jaringan. Modul ini satu-satunya yang tahu di mana batas itu berada — semua
- * yang terjadi sampai tepat sebelum `deps.sendCalls` terbukti belum mengirim
- * apa-apa; apa pun sesudahnya tidak bisa dipastikan. `execute.ts` membacanya
- * lewat `wasNeverSent()` untuk memutuskan apakah anggaran ikut terpotong
- * (lihat catatan C2 di kepala `execute.ts`). Default-nya `false`: diam berarti
- * "mungkin sudah terkirim", asumsi yang aman ke arah tidak membayar dua kali.
+ * `neverSent` states whether this error happened BEFORE anything touched the network. This
+ * module is the only one that knows where that boundary lies — everything up to just before
+ * `deps.sendCalls` is provably not yet sent; anything after that cannot be known for
+ * certain. `execute.ts` reads it via `wasNeverSent()` to decide whether the budget gets
+ * deducted (see the C2 note at the top of `execute.ts`). Its default is `false`: silence
+ * means "may already have been sent", the assumption that errs toward not paying twice.
  */
 export class SessionPermissionError extends Error {
   readonly neverSent: boolean;
@@ -87,23 +83,23 @@ export class SessionPermissionError extends Error {
 }
 
 /**
- * Allowlist minimum yang dibutuhkan Guardian: `repay` di pool dan `approve`
- * di token hutang. Tidak lebih. Dipakai baik saat grant sesi maupun saat
- * memeriksanya kembali sebelum eksekusi, supaya keduanya tidak bisa berbeda.
+ * The minimum allowlist Guardian needs: `repay` on the pool and `approve` on the debt
+ * token. Nothing more. Used both when granting the session and when re-checking it before
+ * execution, so the two cannot differ.
  *
- * **Batas izin Altana berhenti di kontrak + selector; ia tidak mengikat nilai
- * argumen.** Sesi ini karena itu secara teknis boleh memanggil
- * `mUSD.approve(<siapa pun>, <berapa pun>)` dan `pool.repay(<aset apa pun>, …)`.
- * Yang menahannya ada tiga, dan hanya dua yang milik kita:
- *   1. spend cap per token pada sesi (ditegakkan akun Altana);
- *   2. `createSessionSendRepay` yang hanya pernah menyusun `approve` untuk pool
- *      dan `repay` untuk aset yang di-allowlist — tetapi ini kode kita sendiri,
- *      jadi ia hilang begitu prosesnya dibajak;
- *   3. guarded executor Porto yang menolkan allowance ERC-20 di akhir userOp —
- *      perilaku pihak ketiga yang kami temukan **secara empiris** di task ini,
- *      bukan yang dijamin kontrak kita, dan bukan yang boleh diandalkan diam-diam.
- * Kalau pengikatan argumen kelak dibutuhkan, tempatnya adalah kontrak perantara
- * yang di-allowlist, bukan modul ini.
+ * **Altana's permission boundary stops at contract + selector; it does not bind argument
+ * values.** This session may therefore technically call `mUSD.approve(<anyone>, <any
+ * amount>)` and `pool.repay(<any asset>, ...)`. Three things hold it back, and only two are
+ * ours:
+ *   1. the per-token spend cap on the session (enforced by the Altana account);
+ *   2. `createSessionSendRepay`, which only ever composes `approve` for the pool and
+ *      `repay` for the allowlisted asset — but this is our own code, so it is gone the
+ *      moment the process is hijacked;
+ *   3. Porto's guarded executor, which zeroes ERC-20 allowances at the end of a userOp — a
+ *      third-party behavior we found **empirically** during this task, not something our
+ *      contracts guarantee, and not something to rely on silently.
+ * If argument binding is ever needed, its place is an allowlisted intermediary contract,
+ * not this module.
  */
 export function requiredSessionCalls(
   pool: `0x${string}`,
@@ -126,14 +122,14 @@ function describeCall(call: SessionCallPermission): string {
 }
 
 /**
- * Menolak izin yang lebih longgar daripada `required`, SEBELUM SDK dipanggil.
+ * Refuses permissions looser than `required`, BEFORE the SDK is called.
  *
- * Lima penolakan, berurutan:
- *   1. `calls` hilang → di Altana itu izin tanpa batas.
- *   2. `calls` kosong → sama saja, dan ini jebakan yang paling sering terjadi.
- *   3. entri tanpa `to` atau tanpa `signature` → wildcard satu sisi.
- *   4. entri yang tidak ada di `required` → sesi lebih luas dari yang dibutuhkan.
- *   5. entri di `required` yang tidak ada di sesi → sesi tidak akan bisa bekerja.
+ * Five refusals, in order:
+ *   1. `calls` is missing -> in Altana that is unlimited permission.
+ *   2. `calls` is empty -> the same thing, and this is the trap people fall into most.
+ *   3. an entry with no `to` or no `signature` -> a one-sided wildcard.
+ *   4. an entry not in `required` -> the session is broader than what is needed.
+ *   5. an entry in `required` missing from the session -> the session cannot work.
  */
 export function assertBoundedAllowlist(
   permissions: SessionPermissions,
@@ -192,10 +188,10 @@ export function assertBoundedAllowlist(
 }
 
 /**
- * Menolak sesi tanpa cap native. Ini bukan kerewelan: sesi Altana membayar
- * ongkos relay dari wallet, dan ongkos itu dihitung terhadap cap native.
- * Sesi yang hanya punya cap token gagal di rantai dengan `NoSpendPermissions`
- * sebelum sempat melakukan apa pun (lihat `docs/research/03-altana.md` §2.4).
+ * Refuses a session with no native cap. This is not fussiness: an Altana session pays the
+ * relay cost out of the wallet, and that cost is charged against the native cap. A session
+ * with only a token cap fails on chain with `NoSpendPermissions` before it manages to do
+ * anything (see `docs/research/03-altana.md` §2.4).
  */
 export function assertNativeSpendCap(permissions: SessionPermissions): void {
   const spend = permissions.spend;
@@ -220,38 +216,37 @@ export function assertNativeSpendCap(permissions: SessionPermissions): void {
 }
 
 /**
- * Custom error kontrak akun Altana untuk panggilan di luar allowlist sesi.
+ * The Altana account contract's custom error for a call outside the session allowlist.
  *
- * Ini SATU-SATUNYA bentuk galat yang boleh dihitung sebagai "batas sesi
- * bekerja". Sebuah `try/catch` yang menerima exception apa pun akan mencetak
- * "ditolak" untuk relay yang membalas HTTP 502, receipt yang timeout, atau
- * nonce race — dan dengan begitu melaporkan bukti yang tidak pernah diuji.
- * Bukti terpenting produk ini tidak boleh bergantung pada kebetulan bahwa
- * sesuatu, entah apa, gagal.
+ * This is the ONLY error shape that may count as "the session boundary works". A
+ * `try/catch` that accepts any exception would print "denied" for a relay answering HTTP
+ * 502, a timed-out receipt, or a nonce race — and thereby report evidence that was never
+ * tested. This product's most important piece of evidence must not rest on the coincidence
+ * that something, anything, failed.
  *
- * Stringnya tidak ada di mana pun dalam kode kita maupun di `node_modules`:
- * ia datang ter-decode dari kontrak akun lewat relay, lengkap dengan `keyHash`,
- * `target`, dan `data` panggilan yang ditolak.
+ * The string appears nowhere in our code nor in `node_modules`: it arrives decoded from the
+ * account contract through the relay, complete with the `keyHash`, `target`, and `data` of
+ * the refused call.
  */
 export const SESSION_DENIAL_PATTERN = /UnauthorizedCall/;
 
-/** Pesan galat apa adanya, apa pun bentuk nilai yang dilempar. */
+/** The error message as-is, whatever shape the thrown value has. */
 export function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   return String(error);
 }
 
 /**
- * Apakah `error` benar-benar penolakan izin sesi terhadap `target`?
+ * Is `error` genuinely a session permission denial for `target`?
  *
- * Dua syarat, dan keduanya wajib:
- *   1. galatnya `UnauthorizedCall` — bukan galat jaringan, timeout, atau revert
- *      kontrak tujuan;
- *   2. galat itu menyebut kontrak yang memang kita coba panggil, sehingga
- *      penolakan atas panggilan lain tidak bisa dipinjam sebagai bukti.
+ * Two conditions, both required:
+ *   1. the error is `UnauthorizedCall` — not a network error, a timeout, or a revert from
+ *      the target contract;
+ *   2. the error names the contract we actually tried to call, so a denial of some other
+ *      call cannot be borrowed as evidence.
  *
- * Argumen panggilan tidak diperiksa: model izin Altana mengikat kontrak dan
- * selector, tidak pernah nilai argumen (lihat catatan di `requiredSessionCalls`).
+ * The call's arguments are not checked: Altana's permission model binds contracts and
+ * selectors, never argument values (see the note on `requiredSessionCalls`).
  */
 export function isSessionDenial(error: unknown, target: `0x${string}`): boolean {
   const message = errorMessage(error);
@@ -262,9 +257,8 @@ export function isSessionDenial(error: unknown, target: `0x${string}`): boolean 
 }
 
 /**
- * Menuntut `error` adalah penolakan izin sesi terhadap `target`, dan
- * mengembalikan pesannya untuk dicetak. Bentuk galat lain dilempar ulang
- * sebagai KEGAGALAN, bukan diterima sebagai bukti.
+ * Demands that `error` is a session permission denial for `target`, and returns its message
+ * to be printed. Any other error shape is rethrown as a FAILURE, not accepted as evidence.
  */
 export function assertSessionDenial(
   error: unknown,
@@ -289,7 +283,7 @@ export function assertSessionDenial(
   return message;
 }
 
-/** Satu panggilan kontrak di dalam batch sesi. */
+/** One contract call inside a session batch. */
 export interface SessionCall {
   readonly address: `0x${string}`;
   readonly abi: readonly unknown[];
@@ -297,47 +291,45 @@ export interface SessionCall {
   readonly args: readonly unknown[];
 }
 
-/** Hasil satu batch lewat sesi. `status` 1 berarti receipt sukses. */
+/** The result of one batch through the session. `status` 1 means a successful receipt. */
 export interface SessionSendResult {
   readonly transactionHash: `0x${string}`;
   readonly status: number;
 }
 
 export interface SessionRepayDeps {
-  /** Wallet Altana pemilik posisi — pengirim sebenarnya dari `repay`. */
+  /** The position owner's Altana wallet — the actual sender of `repay`. */
   readonly walletAddress: `0x${string}`;
-  /** Pool tujuan `repay`. */
+  /** The pool `repay` targets. */
   readonly pool: `0x${string}`;
-  /** Token hutang yang boleh dibayar sesi ini. */
+  /** The debt token this session may repay. */
   readonly repayAsset: `0x${string}`;
-  /** Izin sesi yang benar-benar berlaku, apa adanya dari file sesi. */
+  /** The session permissions actually in force, exactly as they came from the session file. */
   readonly permissions: SessionPermissions;
   /**
-   * USD basis 8 desimal → unit token. Disuntik karena konversi (desimal token,
-   * harga feed) bukan urusan modul penandatanganan.
+   * USD on the 8-decimal basis -> token units. Injected because the conversion (token
+   * decimals, feed price) is not the signing module's business.
    *
-   * **WAJIB bebas efek samping — hanya membaca.** Kegagalannya diperlakukan
-   * sebagai "belum menyentuh jaringan" (`neverSent`), sehingga anggaran tidak
-   * terpotong dan tidak ada catatan menggantung yang ditinggalkan. Implementasi
-   * yang mengirim transaksi di sini akan membuat asumsi itu bohong, dan bohong
-   * ke arah yang membayar dua kali.
+   * **MUST be side-effect free — reads only.** Its failure is treated as "never touched the
+   * network" (`neverSent`), so no budget is deducted and no pending record is left behind.
+   * An implementation that sends a transaction here would make that assumption a lie, and a
+   * lie in the direction that pays twice.
    */
   readonly toTokenUnits: (asset: `0x${string}`, amountUsd8: bigint) => Promise<bigint> | bigint;
-  /** `allowance(owner, spender)` token saat ini. **WAJIB hanya membaca** — lihat `toTokenUnits`. */
+  /** The token's current `allowance(owner, spender)`. **MUST read only** — see `toTokenUnits`. */
   readonly readAllowance: (
     asset: `0x${string}`,
     owner: `0x${string}`,
     spender: `0x${string}`,
   ) => Promise<bigint>;
   /**
-   * Mengirim SATU BATCH panggilan lewat sesi Altana — atomik, satu userOp —
-   * dan menunggu receipt-nya.
+   * Sends ONE BATCH of calls through the Altana session — atomic, a single userOp — and
+   * waits for its receipt.
    *
-   * Batch, bukan satu panggilan per transaksi, karena guarded executor Porto
-   * mengembalikan allowance ERC-20 ke nol di akhir userOp yang sama. Itu
-   * perilaku yang benar (allowance dari kunci bocor tidak boleh hidup lebih
-   * lama daripada transaksinya), dan konsekuensinya `approve` harus berada di
-   * userOp yang sama dengan `repay`.
+   * A batch, rather than one call per transaction, because Porto's guarded executor returns
+   * ERC-20 allowances to zero at the end of that same userOp. That is the correct behavior
+   * (an allowance from a leaked key must not outlive its transaction), and the consequence
+   * is that `approve` has to sit in the same userOp as `repay`.
    */
   readonly sendCalls: (
     calls: readonly SessionCall[],
@@ -346,7 +338,7 @@ export interface SessionRepayDeps {
   readonly log?: (message: string) => void;
 }
 
-/** ABI minimal — sumber tunggal untuk selector yang di-allowlist DAN dipanggil. */
+/** Minimal ABIs — the single source for the selectors that are both allowlisted AND called. */
 const POOL_REPAY_ABI = [
   {
     type: "function",
@@ -374,10 +366,9 @@ const ERC20_APPROVE_ABI = [
 ] as const;
 
 /**
- * Menjalankan sesuatu yang terjadi SEBELUM batch dikirim, dan menandai
- * kegagalannya sebagai "belum menyentuh jaringan". Yang dibungkus di sini hanya
- * pembacaan dan konversi; begitu `sendCalls` dipanggil, tidak ada lagi yang
- * boleh mengklaim kepastian itu.
+ * Runs something that happens BEFORE the batch is sent, and marks its failure as "never
+ * touched the network". Only reads and conversions are wrapped here; once `sendCalls` is
+ * called, nothing may claim that certainty any more.
  */
 async function tandaiBelumTerkirim<T>(jalankan: () => Promise<T> | T, label: string): Promise<T> {
   try {
@@ -394,11 +385,10 @@ async function tandaiBelumTerkirim<T>(jalankan: () => Promise<T> | T, label: str
 
 function assertConfirmed(result: SessionSendResult, label: string): void {
   if (result.status !== 1) {
-    // SENGAJA tanpa `neverSent`: sampai di sini batch sudah dikirim dan punya
-    // hash. Status yang bukan 1 bisa berarti revert, bisa juga berarti receipt
-    // yang dibaca dari node basi — dan yang kedua berakhir dengan transaksi
-    // yang tetap mendarat. `execute.ts` harus memperlakukannya sebagai
-    // "mungkin terjadi", bukan "tidak terjadi".
+    // DELIBERATELY without `neverSent`: by this point the batch has been sent and has a
+    // hash. A status other than 1 can mean a revert, but it can also mean a receipt read
+    // from a stale node — and the second ends with the transaction landing anyway.
+    // `execute.ts` has to treat it as "may have happened", not "did not happen".
     throw new SessionPermissionError(
       `Batch ${label} lewat sesi tidak sukses di rantai (status=${result.status}, ` +
         `tx=${result.transactionHash}).`,
@@ -407,11 +397,11 @@ function assertConfirmed(result: SessionSendResult, label: string): void {
 }
 
 /**
- * Membangun `sendRepay` yang menandatangani lewat session key Altana.
+ * Builds a `sendRepay` that signs via an Altana session key.
  *
- * Izin sesi diperiksa **saat konstruksi**, bukan saat transaksi pertama:
- * sesi yang terlalu longgar harus terlihat sebelum siklus Guardian dimulai,
- * bukan setelah agent sudah memutuskan membayar.
+ * The session permissions are checked **at construction**, not on the first transaction: a
+ * session that is too loose must be visible before Guardian's cycle starts, not after the
+ * agent has already decided to pay.
  */
 export function createSessionSendRepay(deps: SessionRepayDeps): ExecuteDeps["sendRepay"] {
   const required = requiredSessionCalls(deps.pool, deps.repayAsset);

@@ -20,7 +20,7 @@ const MUSD = "0x932E82632E80b06318ca969e33F99A54F1a04b10" as const;
 const FEED = "0x0aA42416bAccdb2fd4768B61111DeB7F7D212F9B" as const;
 const TX = `0x${"ab".repeat(32)}` as const;
 
-/** Posisi contoh: agunan $7.500, hutang $6.000, LT 75% -> HF 0,9375 (EMERGENCY). */
+/** The sample position: $7,500 collateral, $6,000 debt, LT 75% -> HF 0.9375 (EMERGENCY). */
 const AGUNAN = 750_000_000_000n;
 const HUTANG = 600_000_000_000n;
 const LT_BPS = 7_500n;
@@ -39,9 +39,9 @@ interface RantaiPalsu {
 }
 
 /**
- * Client viem palsu — test ini TIDAK menyentuh jaringan sama sekali. Itu justru
- * intinya: seluruh perakitan yang dulu hanya hidup di dalam skrip E2E sekarang
- * bisa diuji tanpa gas, tanpa RPC, dan tanpa session key sungguhan.
+ * A fake viem client — this test does NOT touch the network at all. That is precisely the
+ * point: the entire assembly that used to live only inside the E2E script can now be tested
+ * with no gas, no RPC, and no real session key.
  */
 function fakeClient(o: RantaiPalsu = {}) {
   const calls: { functionName: string; address: string }[] = [];
@@ -71,7 +71,7 @@ function fakeClient(o: RantaiPalsu = {}) {
   return { client, readContract, getBlockNumber, calls };
 }
 
-/** Mock `sendCalls` dengan tipe parameter yang benar, supaya `mock.calls` ikut bertipe. */
+/** A `sendCalls` mock with correct parameter types, so `mock.calls` is typed too. */
 function fakeSendCalls(
   impl: (calls: readonly SessionCall[], description: string) => Promise<{ transactionHash: `0x${string}`; status: number }> = async () => ({
     transactionHash: TX,
@@ -106,8 +106,8 @@ function config(overrides: Partial<GuardianConfig> = {}): GuardianConfig {
       minIntervalSeconds: 0,
     },
     logger: silentLogger(),
-    // Store WAJIB — tidak ada lagi default memori diam-diam. Di test ia disebut
-    // eksplisit; di proses sungguhan yang disebut adalah `createFileStateStore`.
+    // The store is REQUIRED — there is no silent in-memory default any more. In tests it is
+    // named explicitly; in a real process what gets named is `createFileStateStore`.
     stateStore: createMemoryStateStore(),
     now: () => 1_700_000_000,
     ...overrides,
@@ -121,8 +121,8 @@ describe("createGuardian — pemeriksaan saat konstruksi", () => {
   });
 
   it("menolak desimal yang tidak disepakati pool dan kontrak token", async () => {
-    // Persis kesalahan yang diklaim ditangkap oleh cek bolak-balik lama, dan
-    // yang sebenarnya lolos dari cek itu.
+    // Exactly the mistake the old round-trip check claimed to catch, and which in fact
+    // slipped straight past it.
     const { client } = fakeClient({ tokenDecimalsPool: 17, tokenDecimalsToken: 18 });
     await expect(createGuardian(config({ client }))).rejects.toThrow(UnitConversionError);
   });
@@ -162,13 +162,13 @@ describe("createGuardian — satu siklus utuh tanpa jaringan", () => {
     expect(result.sent).toBe(true);
     expect(result.txHash).toBe(TX);
 
-    // Batch berisi approve DAN repay dalam satu userOp — guarded executor Porto
-    // menolkan allowance di akhir userOp yang sama, jadi keduanya wajib menyatu.
+    // The batch holds approve AND repay in one userOp — Porto's guarded executor zeroes the
+    // allowance at the end of that same userOp, so the two must travel together.
     const batch = sendCalls.mock.calls[0]![0];
     expect(batch.map((c) => c.functionName)).toEqual(["approve", "repay"]);
     expect(batch[1].address).toBe(POOL);
 
-    // Konversi satuan: harga $1,00 dan token 18 desimal -> jumlah USD8 * 1e10.
+    // The unit conversion: a $1.00 price and an 18-decimal token -> the USD8 amount * 1e10.
     const repayArgs = batch[1].args as readonly [string, bigint];
     expect(repayArgs[0]).toBe(MUSD);
     expect(repayArgs[1]).toBe(result.amountSentUsd8 * 10n ** 10n);
@@ -212,7 +212,7 @@ describe("createGuardian — state persisten (C3)", () => {
   it("memuat state tersimpan alih-alih memulai dari anggaran kosong", async () => {
     const tersimpan: ExecuteState = {
       ...initialExecuteState(1_700_000_000),
-      spentTodayUsd8: 199_000_000_000n, // sisa hanya $10 dari batas $2.000
+      spentTodayUsd8: 199_000_000_000n, // only $10 left of the $2,000 cap
     };
     const sendCalls = fakeSendCalls();
     const g = await createGuardian(
@@ -223,8 +223,8 @@ describe("createGuardian — state persisten (C3)", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    // Anggaran yang tersisa dari SEBELUM restart-lah yang mengikat, bukan
-    // batas penuh. Tanpa persistensi, angka ini akan $1.000 (batas per aksi).
+    // What binds is the budget left over from BEFORE the restart, not the full cap. Without
+    // persistence this number would be $1,000 (the per-action cap).
     expect(result.amountSentUsd8).toBe(1_000_000_000n);
     expect(result.cappedPerDay).toBe(true);
   });
@@ -238,7 +238,7 @@ describe("createGuardian — state persisten (C3)", () => {
     const tersimpan = await store.load();
     expect(tersimpan?.spentTodayUsd8).toBeGreaterThan(0n);
 
-    // "Restart": Guardian baru atas store yang sama tidak mengulang anggaran.
+    // "Restart": a new Guardian over the same store does not start the budget over.
     const g2 = await createGuardian(config({ stateStore: store }));
     expect(g2.getExecuteState().spentTodayUsd8).toBe(tersimpan?.spentTodayUsd8);
   });
@@ -287,8 +287,8 @@ describe("createGuardian — C2 lewat rantai lengkap", () => {
   it("sendCalls melempar setelah tx mendarat: siklus berikutnya TIDAK mengirim ulang", async () => {
     vi.useFakeTimers();
     try {
-      // Rantai tidak menunjukkan hutang berkurang (receipt hilang, node basi),
-      // jadi rekonsiliasi tidak punya bukti dan catatan menggantung bertahan.
+      // The chain does not show the debt falling (a lost receipt, a stale node), so
+      // reconciliation has no proof and the pending record survives.
       const sendCalls = fakeSendCalls(async () => {
         throw new Error("waitForTransactionReceipt timeout setelah 180s");
       });
@@ -326,10 +326,9 @@ describe("createGuardian — store berkas sungguhan melewati 'kematian proses'",
   });
 
   it("catatan menggantung sudah ada di BERKAS pada detik batch dikirim, bukan setelah siklus", async () => {
-    // `waitForTransactionReceipt` menunggu sampai 180 detik. Proses yang mati di
-    // dalam jendela itu tidak akan pernah menyelesaikan siklusnya, jadi apa pun
-    // yang disimpan "setelah siklus" tidak akan pernah tersimpan. Yang diuji di
-    // sini persis itu: siklusnya SENGAJA tidak pernah selesai.
+    // `waitForTransactionReceipt` waits up to 180 seconds. A process that dies inside that
+    // window never finishes its cycle, so anything saved "after the cycle" is never saved at
+    // all. That is exactly what is tested here: the cycle DELIBERATELY never completes.
     const file = path.join(dir, "state.json");
     const store = createFileStateStore(file);
     let masukKirim!: () => void;
@@ -338,11 +337,11 @@ describe("createGuardian — store berkas sungguhan melewati 'kematian proses'",
     });
     const sendCalls = fakeSendCalls(() => {
       masukKirim();
-      return new Promise(() => {}); // tidak pernah selesai = proses menggantung
+      return new Promise(() => {}); // never settles = a hung process
     });
 
     const g = await createGuardian(config({ stateStore: store, sendCalls }));
-    void g.runOnce(); // sengaja TIDAK di-await: siklus ini tidak akan selesai
+    void g.runOnce(); // deliberately NOT awaited: this cycle will never finish
     await sudahMasukKirim;
 
     const isi = await store.load();
@@ -354,7 +353,7 @@ describe("createGuardian — store berkas sungguhan melewati 'kematian proses'",
   it("restart setelah kegagalan tunggu-receipt TIDAK membayar lagi", async () => {
     const file = path.join(dir, "state.json");
 
-    // Proses pertama: batch gagal dengan receipt timeout.
+    // The first process: the batch fails with a receipt timeout.
     const sendCalls1 = fakeSendCalls(async () => {
       throw new Error("waitForTransactionReceipt timeout setelah 180s");
     });
@@ -365,8 +364,8 @@ describe("createGuardian — store berkas sungguhan melewati 'kematian proses'",
     expect(result.ok).toBe(false);
     expect(sendCalls1).toHaveBeenCalledTimes(1);
 
-    // Proses KEDUA atas berkas yang sama — restart. Rantai belum menunjukkan
-    // hutang berkurang, jadi catatan menggantung masih berlaku.
+    // A SECOND process over the same file — a restart. The chain does not yet show the debt
+    // falling, so the pending record still stands.
     const sendCalls2 = fakeSendCalls();
     const g2 = await createGuardian(
       config({ stateStore: createFileStateStore(file), sendCalls: sendCalls2 }),
@@ -393,8 +392,7 @@ describe("createGuardian — store berkas sungguhan melewati 'kematian proses'",
     const menggantung = (await createFileStateStore(file).load())?.pendingRepay;
     expect(menggantung).toBeTruthy();
 
-    // Rantai kini melaporkan hutang berkurang PERSIS sebesar yang dibayar, pada
-    // blok yang lebih baru.
+    // The chain now reports the debt falling by EXACTLY the amount paid, at a newer block.
     const { client } = fakeClient({
       debtBase: HUTANG - menggantung!.amountUsd8,
       blockNumber: 2_000n,
@@ -406,7 +404,7 @@ describe("createGuardian — store berkas sungguhan melewati 'kematian proses'",
     const kedua = await g2.runOnce();
 
     expect(kedua.nextExecuteState.pendingRepay).toBeNull();
-    // Hutang sisa masih di zona berbahaya, jadi Guardian boleh bertindak lagi.
+    // The remaining debt is still in the danger zone, so Guardian is free to act again.
     expect(sendCalls2).toHaveBeenCalledTimes(1);
   });
 });

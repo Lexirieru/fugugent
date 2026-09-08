@@ -1,21 +1,21 @@
 /**
- * SATU-SATUNYA pintu keluar angka domain menuju manusia (dan menuju prompt LLM).
+ * The ONLY exit for domain numbers toward humans (and toward LLM prompts).
  *
- * Angka mentah tidak pernah boleh tampil apa adanya. `12345678` dalam basis 8
- * desimal terbaca manusia sebagai "dua belas juta" padahal artinya dua belas
- * sen — selisih 10^8 pada angka yang dipakai orang untuk memutuskan uangnya.
+ * A raw number must never be shown as-is. `12345678` on the 8-decimal basis reads to
+ * a human as "twelve million" when it means twelve cents — a factor of 10^8 on the
+ * number someone uses to decide about their money.
  *
- * Semua fungsi di sini murni aritmetika bigint. `Number()` sengaja tidak
- * dipakai: nilai di lapisan ini bisa melampaui Number.MAX_SAFE_INTEGER dan
- * konversi ke float akan diam-diam menghilangkan digit terakhir.
+ * Every function here is pure bigint arithmetic. `Number()` is deliberately unused:
+ * values at this layer can exceed Number.MAX_SAFE_INTEGER and converting to float
+ * silently drops the last digit.
  *
- * Pemformatan dipusatkan di satu file supaya mustahil ada dua versi kebenaran
- * tentang angka yang sama: kalimat di `Decision.reason` dan angka yang masuk ke
- * penjelasan LLM harus berasal dari fungsi yang persis sama.
+ * Formatting is centralized in one file so that two versions of the truth about the
+ * same number are impossible: the sentence in `Decision.reason` and the number that
+ * goes into the LLM explanation must come from the exact same function.
  */
 import { USD8_ONE, WAD } from "./types.js";
 
-/** Pemisah ribuan gaya Indonesia: 1234567n -> "1.234.567". */
+/** Indonesian-style thousands separator: 1234567n -> "1.234.567". */
 function grupRibuan(n: bigint): string {
   const s = n.toString();
   let out = "";
@@ -27,8 +27,8 @@ function grupRibuan(n: bigint): string {
 }
 
 /**
- * Nilai uang basis 8 desimal -> dolar terbaca. Pecahan sen DIPOTONG, bukan
- * dibulatkan: nilai tidak pernah terlihat lebih besar daripada aslinya.
+ * A money value on the 8-decimal basis -> readable dollars. Fractions of a cent are
+ * TRUNCATED, not rounded: a value never looks larger than it really is.
  */
 export function formatUsd8(v: bigint): string {
   const negatif = v < 0n;
@@ -39,14 +39,13 @@ export function formatUsd8(v: bigint): string {
 }
 
 /**
- * Jumlah token 18 desimal -> string enam desimal.
+ * An 18-decimal token amount -> a six-decimal string.
  *
- * Enam desimal, bukan delapan belas: delapan belas digit tidak bisa dibaca
- * manusia dan justru menyembunyikan besaran. Sisanya DIPOTONG, sehingga jumlah
- * yang ditampilkan tidak pernah melebihi jumlah yang sebenarnya dipindahkan.
- * Konsekuensinya jumlah yang sangat kecil tampil sebagai "0,000000"; itu jujur
- * pada enam desimal, dan lapisan pemanggil yang perlu presisi penuh harus
- * memakai nilai bigint-nya, bukan string ini.
+ * Six decimals, not eighteen: eighteen digits are unreadable to a human and hide the
+ * magnitude rather than showing it. The remainder is TRUNCATED, so the amount shown
+ * never exceeds the amount actually moved. The consequence is that a very small
+ * amount shows as "0,000000"; that is honest at six decimals, and a calling layer
+ * that needs full precision must use the bigint value, not this string.
  */
 export function formatToken18(v: bigint): string {
   const negatif = v < 0n;
@@ -56,7 +55,7 @@ export function formatToken18(v: bigint): string {
   return `${negatif ? "-" : ""}${grupRibuan(bulat)},${pecahan.toString().padStart(6, "0")}`;
 }
 
-/** bps -> persen satu desimal, mis. 2000n -> "20,0". */
+/** bps -> a percentage with one decimal, e.g. 2000n -> "20,0". */
 export function formatPercentFromBps(bps: bigint): string {
   const negatif = bps < 0n;
   const abs = negatif ? -bps : bps;
@@ -65,15 +64,15 @@ export function formatPercentFromBps(bps: bigint): string {
 }
 
 /**
- * bps ditulis apa adanya dengan satuannya. Dipakai untuk ambang biaya, di mana
- * menuliskannya sebagai persen ("0,5") lebih mudah tertukar dengan bps ("50")
- * daripada membantu.
+ * bps written as-is with its unit. Used for cost thresholds, where writing it as a
+ * percentage ("0,5") is more easily confused with the bps value ("50") than it is
+ * helpful.
  */
 export function formatBps(bps: bigint): string {
   return `${bps.toString()} bps`;
 }
 
-/** Bobot dalam bps -> persen, mis. 5000n -> "50,0%". */
+/** A weight in bps -> a percentage, e.g. 5000n -> "50,0%". */
 export function formatWeight(bps: bigint): string {
   return `${formatPercentFromBps(bps)}%`;
 }

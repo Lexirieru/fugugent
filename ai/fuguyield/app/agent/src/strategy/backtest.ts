@@ -1,39 +1,37 @@
 /**
  * ============================================================================
- * KETERBATASAN JUJUR — BACA SEBELUM MEMAKAI ANGKA DARI MODUL INI
+ * HONEST LIMITATIONS — READ BEFORE USING ANY NUMBER FROM THIS MODULE
  * ============================================================================
- * Harness ini menjalankan tiga kebijakan di atas deret APY yang SAMA:
- *   - `disciplined` : kebijakan sesungguhnya (`decide`) — gerbang risiko,
- *                     ambang selisih yang diturunkan dari ongkos, dan konfirmasi
- *   - `chaser`      : selalu pindah ke APY tertinggi, tanpa gerbang apa pun
- *   - `passive`     : tidak pernah pindah
- * Tujuannya satu: menunjukkan secara terukur bahwa mengejar APY tertinggi
- * adalah cara kalah, dan bahwa "selisih APY minimum yang membenarkan
- * perpindahan" bukan formalitas.
+ * This harness runs three policies over the SAME APY series:
+ *   - `disciplined` : the real policy (`decide`) — risk gates, a spread threshold
+ *                     derived from cost, and confirmation
+ *   - `chaser`      : always move to the highest APY, with no gate at all
+ *   - `passive`     : never move
+ * It has one purpose: to show measurably that chasing the highest APY is a way to lose,
+ * and that "the minimum APY spread that justifies a migration" is not a formality.
  *
- * Yang sengaja TIDAK dimodelkan:
- *   - APY yang BERUBAH karena deposit kita sendiri masuk. Ini penyederhanaan
- *     yang MEMIHAK `chaser`: di dunia nyata pool yang dikejar akan langsung
- *     menurunkan APY-nya begitu modal masuk, terutama pool kecil yang justru
- *     paling sering menjadi yang tertinggi. Kekalahan `chaser` yang terukur di
- *     sini karena itu adalah BATAS BAWAH kekalahannya.
- *   - bunga majemuk di dalam satu candle, dan reinvestasi hadiah
- *   - harga token hadiah: APY berbasis emisi diperlakukan sama nyatanya dengan
- *     APY berbasis bunga pinjaman, padahal yang pertama bisa menguap
- *   - transaksi gagal, revert, RPC mati, sesi Altana kedaluwarsa
- *   - lock-up, cooldown, atau antrean penarikan; perpindahan dianggap seketika
- *   - risiko yang benar-benar terjadi (exploit, depeg, bad debt). `riskScore`
- *     hanya menyaring, tidak pernah menimbulkan kerugian di simulasi ini —
- *     sehingga nilai gerbang risiko TIDAK terlihat di angka mana pun di sini.
- *     Itu keterbatasan terbesar modul ini.
- *   - pajak
+ * What is deliberately NOT modeled:
+ *   - the APY CHANGING because our own deposit arrives. This simplification FAVORS
+ *     `chaser`: in the real world the pool being chased drops its APY the moment capital
+ *     lands, especially the small pools that most often top the list. `chaser`'s losses
+ *     as measured here are therefore a LOWER BOUND on its losses.
+ *   - compounding within a single candle, and reward reinvestment
+ *   - reward-token prices: an emissions-based APY is treated as being just as real as an
+ *     APY backed by loan interest, when the first one can evaporate
+ *   - failed transactions, reverts, dead RPC, expired Altana sessions
+ *   - lock-ups, cooldowns, or withdrawal queues; a migration is assumed instant
+ *   - risk that actually materializes (exploits, depegs, bad debt). `riskScore` only
+ *     filters here, it never produces a loss in this simulation — so the value of the
+ *     risk gates is NOT visible in any number here. That is this module's biggest
+ *     limitation.
+ *   - taxes
  *
- * Deret APY adalah masukan; seluruh fungsi di sini murni dan deterministik.
+ * The APY series is an input; every function here is pure and deterministic.
  *
- * CARA MENGHITUNG KONFIRMASI ada di sini juga, dan itu disengaja: `decide`
- * murni dan tidak punya ingatan, jadi penjadwal di `backend/` HARUS memakai
- * aturan yang sama persis dengan yang dipakai `jalankan()` di bawah, kalau
- * tidak, perilaku produksi akan berbeda dari yang dibuktikan backtest ini.
+ * HOW CONFIRMATION IS COUNTED lives here too, and that is deliberate: `decide` is pure
+ * and has no memory, so the scheduler in `backend/` MUST use exactly the same rule as
+ * `jalankan()` below, otherwise production behavior will differ from what this backtest
+ * proves.
  * ============================================================================
  */
 import { decide } from "./decide.js";
@@ -63,9 +61,9 @@ export interface YieldBacktestInput {
   startPrincipalBase: bigint;
   startPoolId: string;
   pools: BacktestPool[];
-  /** `apySeriesBps[candle]` wajib memuat tepat satu entri untuk setiap pool. */
+  /** `apySeriesBps[candle]` must carry exactly one entry for every pool. */
   apySeriesBps: ApyPoint[][];
-  /** Berapa hari yang diwakili satu candle. */
+  /** How many days one candle represents. */
   daysPerCandle: bigint;
   cost?: SwitchCostModel;
   thresholds?: YieldThresholds;
@@ -75,7 +73,7 @@ export interface PolicyResult {
   finalPrincipalBase: bigint;
   migrations: number;
   totalCostBase: bigint;
-  /** Indeks candle perpindahan pertama; null bila tidak pernah pindah. */
+  /** The candle index of the first migration; null if it never migrated. */
   firstMigrationCandle: number | null;
 }
 
@@ -131,7 +129,7 @@ function validate(input: YieldBacktestInput): void {
 }
 
 /**
- * Fungsi MURNI: tanpa jaringan, jam, atau environment.
+ * A PURE function: no network, clock, or environment.
  */
 export function runBacktest(input: YieldBacktestInput): YieldBacktestResult {
   validate(input);
@@ -140,7 +138,7 @@ export function runBacktest(input: YieldBacktestInput): YieldBacktestResult {
   const thresholds = input.thresholds ?? DEFAULT_YIELD_THRESHOLDS;
   const meta = new Map(input.pools.map((p) => [p.poolId, p]));
 
-  /** Pool lengkap pada satu candle. Data selalu dianggap segar di backtest. */
+  /** The complete pool set at one candle. Data is always treated as fresh in a backtest. */
   const poolsAt = (candle: number): Map<string, Pool> => {
     const m = new Map<string, Pool>();
     for (const titik of input.apySeriesBps[candle]!) {
@@ -167,8 +165,8 @@ export function runBacktest(input: YieldBacktestInput): YieldBacktestResult {
     let totalCostBase = 0n;
     let firstMigrationCandle: number | null = null;
 
-    // Ingatan konfirmasi. `decide` murni dan tidak menyimpannya; penjadwal di
-    // produksi WAJIB memakai aturan yang sama persis dengan blok ini.
+    // The confirmation memory. `decide` is pure and does not store it; the production
+    // scheduler MUST use exactly the same rule as this block.
     let favorit: string | null = null;
     let berturut = 0;
 
@@ -180,9 +178,9 @@ export function runBacktest(input: YieldBacktestInput): YieldBacktestResult {
       let target: string | null = null;
 
       if (mode === "disciplined") {
-        // Panggilan pertama hanya untuk mengetahui apakah selisihnya memenuhi
-        // ambang dan pool mana yang dimaksud; hitungan konfirmasi diperbarui
-        // dari jawabannya, lalu keputusan sesungguhnya diambil.
+        // The first call only finds out whether the spread meets the threshold and which
+        // pool it refers to; the confirmation count is updated from that answer, and only
+        // then is the real decision taken.
         const probe = decide(
           { position: { principalBase: principal, current }, candidates, consecutiveFavorable: 0, blockNumber: BigInt(i) },
           cost,
@@ -202,9 +200,9 @@ export function runBacktest(input: YieldBacktestInput): YieldBacktestResult {
           thresholds,
         );
         if (d.action === "MIGRATE") target = d.targetPoolId;
-        // EXIT tidak muncul di backtest ini: seluruh pool selalu `isActive` dan
-        // metadatanya tetap, sehingga gerbang keselamatan tidak pernah menyala.
-        // Itu bagian dari keterbatasan yang ditulis di kepala file.
+        // EXIT never appears in this backtest: every pool is always `isActive` and its
+        // metadata is fixed, so the safety gate never fires. That is part of the
+        // limitations written at the top of this file.
       } else if (mode === "chaser") {
         let terbaik: Pool | null = null;
         for (const c of candidates) {
@@ -222,7 +220,7 @@ export function runBacktest(input: YieldBacktestInput): YieldBacktestResult {
         migrations += 1;
         if (firstMigrationCandle === null) firstMigrationCandle = i;
         poolId = target;
-        // Setelah pindah, hitungan konfirmasi tidak lagi berlaku untuk pool baru.
+        // After migrating, the confirmation count no longer applies to the new pool.
         berturut = 0;
         favorit = null;
       }

@@ -13,7 +13,7 @@ const grid: GridConfig = {
 
 const biaya: CostModel = { swapFeeBps: 5n, slippageBps: 10n, gasCostBase: 5_000_000n };
 
-/** Harga berayun bolak-balik antara dua harga di dalam rentang grid. */
+/** The price swings back and forth between two prices inside the grid's range. */
 function ayunan(candles: number, a: bigint, b: bigint): bigint[] {
   const out: bigint[] = [usd(600n)];
   for (let i = 0; i < candles; i++) out.push(i % 2 === 0 ? usd(a) : usd(b));

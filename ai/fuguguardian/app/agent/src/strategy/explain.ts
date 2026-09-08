@@ -1,15 +1,13 @@
 /**
- * Lapisan penjelasan. Modul ini berada DI LUAR JALUR KRITIS Guardian:
- * keputusan (`Decision`) sudah diambil secara deterministik oleh `decide()`
- * sebelum fungsi di sini dipanggil sama sekali. `explainDecision` tidak
- * pernah mengubah, menunda, atau memblokir keputusan itu — ia hanya
- * mencoba menyusun kalimat yang lebih ramah dibaca lewat LLM di dGrid.
+ * The explanation layer. This module sits OFF Guardian's CRITICAL PATH: the decision
+ * (`Decision`) has already been taken deterministically by `decide()` before any function
+ * here is called at all. `explainDecision` never changes, delays, or blocks that decision
+ * — it only tries to compose a friendlier sentence via an LLM on dGrid.
  *
- * Bila pemanggilan LLM gagal, lambat (>20 detik), atau mengembalikan teks
- * kosong, fungsi ini WAJIB mengembalikan `decision.reason` apa adanya —
- * tidak pernah melempar. Latensi dGrid terukur 3–46 detik dan bisa saja
- * timeout atau error; posisi user tidak boleh menunggu atau gagal
- * terlindungi hanya karena kalimat penjelasan gagal disusun.
+ * If the LLM call fails, is slow (>20 seconds), or returns empty text, this function MUST
+ * return `decision.reason` as-is — it never throws. dGrid latency measures 3–46 seconds
+ * and may time out or error; a user's position must not wait, or fail to be protected,
+ * just because an explanation sentence could not be written.
  */
 import { generateText } from "ai";
 import { buildModel } from "../model.js";
@@ -26,10 +24,10 @@ function buildPrompt(pos: Position, decision: Decision): string {
     decision.dropToLiquidationBps === null
       ? "tidak berlaku"
       : `${formatPercentFromBps(decision.dropToLiquidationBps)}%`;
-  // `suggestedRepayBase` adalah USD dalam basis 8 desimal Aave. Menyodorkannya
-  // mentah ke prompt (dan lewat prompt, ke mata user) pernah membuat 12345678
-  // — yang artinya $0,12 — terbaca sebagai belasan juta dolar. Selalu lewat
-  // `formatUsd8`, dan satuannya disebut eksplisit supaya model tidak menebak.
+  // `suggestedRepayBase` is USD on Aave's 8-decimal basis. Handing it to the prompt raw
+  // (and through the prompt, to the user's eyes) once made 12345678 — which means $0.12 —
+  // read as tens of millions of dollars. Always go through `formatUsd8`, and name the unit
+  // explicitly so the model does not guess.
   const repayLine =
     decision.suggestedRepayBase > 0n
       ? `Jumlah yang disarankan dibayar: ${formatUsd8(decision.suggestedRepayBase)} (dalam dolar AS).`
@@ -53,20 +51,17 @@ async function defaultGenerate(prompt: string): Promise<string> {
 }
 
 /**
- * Timer timeout dikembalikan bersama handle-nya supaya pemanggil bisa
- * `clearTimeout` begitu race selesai — menang ataupun kalah. Tanpa ini,
- * pada jalur paling umum (dGrid menjawab duluan, di bawah 20 detik), timer
- * ini tetap hidup di event loop sampai waktunya habis meski hasilnya sudah
- * tidak dipakai lagi. Guardian memanggil explainDecision berulang dalam
- * loop pemantauan posisi — timer yang tidak dibersihkan menumpuk di siklus
- * yang saling tumpang tindih dan menahan proses berumur pendek tetap hidup
- * tanpa alasan.
+ * The timeout timer is returned together with its handle so the caller can `clearTimeout`
+ * as soon as the race settles — whether it won or lost. Without this, on the most common
+ * path (dGrid answers first, under 20 seconds) the timer stays alive in the event loop
+ * until it expires even though its result is no longer used. Guardian calls
+ * explainDecision repeatedly in its position-monitoring loop — uncleaned timers pile up
+ * across overlapping cycles and keep a short-lived process alive for no reason.
  *
- * Sengaja TIDAK di-unref(): timer ini adalah satu-satunya jaminan bahwa
- * explainDecision benar-benar kembali dalam 20 detik. Meng-unref timer
- * membuat Node bebas membiarkannya tidak pernah berbunyi bila tidak ada
- * pekerjaan lain yang menahan event loop — melanggar batas waktu yang
- * dijanjikan ke pemanggil (yang sedang melindungi posisi user).
+ * Deliberately NOT unref()'d: this timer is the only guarantee that explainDecision really
+ * returns within 20 seconds. Unref'ing it would let Node leave it to never fire if nothing
+ * else is holding the event loop — breaking the deadline promised to the caller (which is
+ * busy protecting a user's position).
  */
 function timeout(ms: number): { promise: Promise<never>; handle: ReturnType<typeof setTimeout> } {
   let handle!: ReturnType<typeof setTimeout>;
@@ -77,10 +72,9 @@ function timeout(ms: number): { promise: Promise<never>; handle: ReturnType<type
 }
 
 /**
- * Menjelaskan `decision` yang sudah final dalam kalimat bahasa Indonesia.
- * TIDAK PERNAH mengubah `decision` atau `pos`, dan TIDAK PERNAH melempar —
- * kegagalan apa pun (pembuatan prompt, network, timeout, teks kosong) jatuh
- * kembali ke `decision.reason` apa adanya.
+ * Explains an already-final `decision` in an Indonesian sentence.
+ * NEVER modifies `decision` or `pos`, and NEVER throws — any failure (building the prompt,
+ * the network, a timeout, empty text) falls back to `decision.reason` as-is.
  */
 export async function explainDecision(
   pos: Position,

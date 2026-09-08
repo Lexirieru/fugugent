@@ -1,9 +1,8 @@
 /**
- * Konstruksi viem `PublicClient` bersama untuk kedua adapter on-chain
- * (Aave v3 dan Venus). Ditaruh di file sendiri karena keduanya memakainya.
- * Membaca dari BSC **mainnet** dengan sengaja — Venus dan Aave v3 hanya
- * ada di sana, tidak di testnet — sehingga health factor yang dibaca adalah
- * posisi sungguhan, bukan simulasi. Read-only, tidak ada transaksi.
+ * Builds the shared viem `PublicClient` for both on-chain adapters (Aave v3 and Venus).
+ * It lives in its own file because both use it. It reads from BSC **mainnet** on purpose —
+ * Venus and Aave v3 only exist there, not on testnet — so the health factor read is a real
+ * position, not a simulation. Read-only, no transactions.
  */
 import { createPublicClient, http, type PublicClient } from "viem";
 import { bsc } from "viem/chains";
@@ -12,7 +11,7 @@ import { readVenusLiquidity as readVenusLiquidityAdapter } from "./venus.js";
 import type { Position } from "../types.js";
 import type { VenusLiquidity } from "./venus.js";
 
-/** RPC BSC mainnet yang sudah diverifikasi live. Cadangan: bsc-rpc.publicnode.com. */
+/** A BSC mainnet RPC verified live. Backup: bsc-rpc.publicnode.com. */
 export const DEFAULT_BSC_RPC_URL = "https://bsc-dataseed.bnbchain.org";
 
 export interface Reader {
@@ -22,10 +21,10 @@ export interface Reader {
 }
 
 /**
- * Membangun `PublicClient` viem terhadap chain `bsc` dan mengembalikan
- * adapter Aave/Venus yang sudah terikat ke client tersebut. Adapter sendiri
- * (`readAavePosition`, `readVenusLiquidity`) tetap menerima `client` sebagai
- * parameter eksplisit sehingga bisa diuji terpisah dari `createReader`.
+ * Builds a viem `PublicClient` against the `bsc` chain and returns Aave/Venus adapters
+ * already bound to that client. The adapters themselves (`readAavePosition`,
+ * `readVenusLiquidity`) still take `client` as an explicit parameter so they can be tested
+ * separately from `createReader`.
  */
 export function createReader(rpcUrl: string = DEFAULT_BSC_RPC_URL): Reader {
   const client = createPublicClient({

@@ -1,18 +1,17 @@
 /**
- * Mesin keputusan Rebalancer.
+ * The Rebalancer decision engine.
  *
- * MURNI: tanpa jaringan, tanpa `Date.now()`, tanpa `process.env`, tanpa I/O.
- * Seluruh dunia luar masuk lewat argumen. Keputusan finansial tidak pernah
- * lewat LLM — modul penjelasan boleh memperindah kalimat `reason`, tidak pernah
- * mengubah angkanya.
+ * PURE: no network, no `Date.now()`, no `process.env`, no I/O. The whole outside
+ * world arrives through arguments. Financial decisions never pass through an LLM —
+ * the explanation module may polish the `reason` sentence, never its numbers.
  *
- * Dua gerbang berurutan, dan urutannya penting:
- *   1. gerbang PENYIMPANGAN — apakah portofolio cukup melenceng untuk peduli?
- *   2. gerbang BIAYA — apakah memperbaikinya lebih murah daripada membiarkannya?
- * Rebalancer yang hanya punya gerbang pertama akan menyeimbangkan setiap kali
- * menyimpang sedikit dan kalah oleh ongkos. Itu kegagalan yang paling mahal di
- * strategi ini karena ia tidak terlihat seperti kegagalan: setiap transaksinya
- * "benar", hanya saja jumlah seluruhnya merugi.
+ * Two gates in sequence, and the order matters:
+ *   1. the DEVIATION gate — is the portfolio off target enough to care?
+ *   2. the COST gate — is fixing it cheaper than leaving it?
+ * A rebalancer with only the first gate rebalances on every small drift and loses to
+ * costs. That is the most expensive failure in this strategy because it does not look
+ * like a failure: every single trade is "correct", it is only the sum of them that
+ * loses money.
  */
 import {
   computeTrades,
@@ -37,12 +36,11 @@ import {
 } from "./types.js";
 
 /**
- * Ambang wajib terurut: 0 < watch < rebalance, dan anggaran biaya harus lebih
- * besar daripada biaya proporsional. Kalau `maxRebalanceCostBps` tidak melebihi
- * `swapFeeBps + slippageBps`, TIDAK ADA ukuran turnover yang pernah lolos
- * gerbang — agent akan tampak bekerja tetapi tidak akan pernah menyeimbangkan
- * apa pun, selamanya, tanpa satu pun pesan kesalahan. Konfigurasi seperti itu
- * harus gagal keras di pintu masuk.
+ * The thresholds must be ordered: 0 < watch < rebalance, and the cost budget must be
+ * larger than the proportional cost. If `maxRebalanceCostBps` does not exceed
+ * `swapFeeBps + slippageBps`, NO turnover size ever passes the gate — the agent will
+ * look like it is working but will never rebalance anything, forever, without a
+ * single error message. A configuration like that has to fail hard at the door.
  */
 function validateThresholds(t: RebalanceThresholds, cost: CostModel): void {
   if (t.watchBandBps <= 0n || t.rebalanceBandBps <= t.watchBandBps) {
@@ -80,11 +78,10 @@ function validateCostModel(cost: CostModel): void {
 }
 
 /**
- * Portofolio yang tidak masuk akal harus gagal keras, bukan berubah diam-diam
- * menjadi saran transaksi. Bobot target yang tidak berjumlah 10.000 bps adalah
- * contohnya: kalau jumlahnya 9.000, setiap aset akan tampak kelebihan bobot dan
- * agent akan menjual sebagian dari SEMUANYA, membayar ongkos untuk memindahkan
- * portofolio ke keadaan yang tidak pernah diminta siapa pun.
+ * A nonsensical portfolio must fail hard, not turn quietly into a trade suggestion.
+ * Target weights that do not sum to 10,000 bps are the example: if they sum to 9,000,
+ * every asset looks overweight and the agent sells part of EVERYTHING, paying costs to
+ * move the portfolio into a state nobody ever asked for.
  */
 function validatePortfolio(p: Portfolio): void {
   if (p.assets.length < 2) {
@@ -160,13 +157,12 @@ function buildReason(
 }
 
 /**
- * Menentukan apakah portofolio perlu diseimbangkan, dan seberapa besar.
+ * Decides whether the portfolio needs rebalancing, and by how much.
  *
- * Pemeriksaan berjalan dari kondisi paling ringan ke paling berat sehingga
- * kasus batas (penyimpangan tepat di suatu pita) selalu jatuh ke tindakan yang
- * LEBIH aktif — berbeda arah dengan Guardian, karena di sini "lebih aktif"
- * masih dijaga oleh gerbang biaya di belakangnya, sementara membiarkan
- * portofolio hanyut tidak dijaga apa pun.
+ * The checks run from the mildest condition to the most severe, so a boundary case (a
+ * deviation exactly on a band) always falls to the MORE active action — the opposite
+ * direction from Guardian, because here "more active" is still held back by the cost
+ * gate behind it, while letting the portfolio drift is held back by nothing.
  */
 export function decide(
   portfolio: Portfolio,
@@ -197,11 +193,10 @@ export function decide(
   const trades = computeTrades(portfolio.assets, total);
   const turnover = turnoverBase(trades);
 
-  // Invarian, bukan cabang pertahanan: bila penyimpangan terbesar >= pita
-  // rebalance (> 0), pasti ada aset yang kelebihan bobot, karena jumlah seluruh
-  // selisih terhadap target adalah nol. Kalau invarian ini pernah dilanggar,
-  // ada bug aritmetika di `computeTrades` dan kita HARUS melihatnya, bukan
-  // diam-diam mengembalikan "tidak ada yang perlu dilakukan".
+  // An invariant, not a defensive branch: if the largest deviation >= the rebalance
+  // band (> 0), some asset must be overweight, because the differences from target sum
+  // to zero. If this invariant is ever violated there is an arithmetic bug in
+  // `computeTrades` and we MUST see it, not quietly return "nothing to do".
   if (turnover <= 0n) {
     throw new PortfolioError(
       `Invarian dilanggar: penyimpangan ${maxDev} bps mencapai pita rebalance ` +
@@ -220,8 +215,8 @@ export function decide(
       turnoverBase: turnover,
       estimatedCostBase: costBase,
       estimatedCostBps: costBps,
-      // Sengaja kosong. Pemanggil yang lalai memeriksa `action` tidak boleh
-      // menemukan daftar transaksi siap eksekusi di tangannya.
+      // Deliberately empty. A caller that forgets to check `action` must not end up
+      // holding a ready-to-execute trade list.
       trades: [],
       reason: buildReason(
         "BLOCKED_BY_COST",

@@ -1,26 +1,26 @@
 /**
- * Tipe dan ambang untuk strategi REBALANCING.
+ * Types and thresholds for the REBALANCING strategy.
  *
- * SATUAN — dipegang seragam di seluruh paket ini:
- *  - nilai uang: basis 8 desimal (`*Base`), 100_000_000n = $1,00
- *  - jumlah token: 18 desimal (`WAD`), karena SELURUH token di BSC 18 desimal,
- *    termasuk USDT dan USDC (bukan 6 seperti di Ethereum mainnet)
- *  - persentase: basis point (`*Bps`), 10_000n = 100%
+ * UNITS — held uniform across this whole package:
+ *  - money: 8-decimal basis (`*Base`), 100_000_000n = $1.00
+ *  - token amounts: 18 decimals (`WAD`), because EVERY token on BSC has 18 decimals,
+ *    including USDT and USDC (not 6 as on Ethereum mainnet)
+ *  - percentages: basis points (`*Bps`), 10_000n = 100%
  *
- * Modul ini tidak boleh mengimpor apa pun yang menyentuh jaringan, jam, atau
- * environment. Keputusan finansial di Fugugent tidak pernah lewat LLM.
+ * This module must not import anything that touches the network, the clock, or the
+ * environment. Financial decisions in Fugugent never pass through an LLM.
  */
 
-/** $1,00 dalam basis 8 desimal. */
+/** $1.00 in the 8-decimal basis. */
 export const USD8_ONE = 100_000_000n;
 
-/** 100% dalam basis point. */
+/** 100% in basis points. */
 export const BPS_ONE = 10_000n;
 
-/** 1 token dalam 18 desimal. Semua token BSC 18 desimal, termasuk USDT. */
+/** 1 token in 18 decimals. All BSC tokens have 18 decimals, including USDT. */
 export const WAD = 10n ** 18n;
 
-/** Aksi yang boleh diambil Rebalancer, dari paling pasif ke paling aktif. */
+/** The actions the Rebalancer may take, from most passive to most active. */
 export type RebalanceAction = "NONE" | "WATCH" | "REBALANCE" | "BLOCKED_BY_COST";
 
 export type TradeSide = "SELL" | "BUY";
@@ -28,15 +28,15 @@ export type TradeSide = "SELL" | "BUY";
 export interface Trade {
   symbol: string;
   side: TradeSide;
-  /** Nilai kaki transaksi dalam USD basis 8 desimal. */
+  /** Value of this trade leg in USD, 8-decimal basis. */
   valueBase: bigint;
 }
 
 export interface Asset {
   symbol: string;
-  /** Nilai posisi saat ini dalam USD basis 8 desimal. */
+  /** Current position value in USD, 8-decimal basis. */
   valueBase: bigint;
-  /** Bobot target dalam bps. Jumlah seluruh aset wajib tepat 10_000. */
+  /** Target weight in bps. The sum across all assets must be exactly 10_000. */
   targetWeightBps: bigint;
 }
 
@@ -47,34 +47,34 @@ export interface Portfolio {
 }
 
 /**
- * Model biaya satu kali rebalance.
+ * The cost model for a single rebalance.
  *
- * `gasCostBase` sengaja dinyatakan dalam USD basis 8 desimal, bukan gwei:
- * gerbang biaya membandingkannya dengan turnover yang juga dalam USD, dan
- * konversi gwei→USD adalah urusan lapisan chain, bukan mesin keputusan yang
- * harus tetap murni.
+ * `gasCostBase` is deliberately expressed in USD on the 8-decimal basis, not in gwei:
+ * the cost gate compares it against turnover, which is also in USD, and the gwei->USD
+ * conversion belongs to the chain layer, not to a decision engine that has to stay
+ * pure.
  */
 export interface CostModel {
-  /** Fee pool DEX. PancakeSwap v3 tier 0,05% = 5 bps. */
+  /** DEX pool fee. The PancakeSwap v3 0.05% tier = 5 bps. */
   swapFeeBps: bigint;
-  /** Dampak harga + toleransi slippage yang dipasang di kalender eksekusi. */
+  /** Price impact plus the slippage tolerance set on the execution calendar. */
   slippageBps: bigint;
-  /** Ongkos gas SELURUH rangkaian transaksi rebalance, USD basis 8 desimal. */
+  /** Gas cost of the WHOLE rebalance transaction sequence, USD on the 8-decimal basis. */
   gasCostBase: bigint;
 }
 
 export interface RebalanceThresholds {
   /**
-   * Pita pengamatan. Di bawah ini portofolio dianggap tepat sasaran.
+   * The watch band. Below it the portfolio counts as on target.
    */
   watchBandBps: bigint;
   /**
-   * Pita no-trade. Rebalance baru dipertimbangkan bila penyimpangan bobot
-   * absolut terbesar mencapai ambang ini.
+   * The no-trade band. A rebalance is only considered once the largest absolute
+   * weight deviation reaches this threshold.
    */
   rebalanceBandBps: bigint;
   /**
-   * Anggaran biaya satu rebalance, relatif terhadap turnover yang dipindahkan.
+   * The cost budget for one rebalance, relative to the turnover being moved.
    */
   maxRebalanceCostBps: bigint;
 }
@@ -82,67 +82,65 @@ export interface RebalanceThresholds {
 export interface RebalanceDecision {
   action: RebalanceAction;
   totalValueBase: bigint;
-  /** Penyimpangan bobot absolut terbesar, dipotong ke bawah. */
+  /** The largest absolute weight deviation, truncated down. */
   maxDeviationBps: bigint;
-  /** Nilai yang harus dipindahkan (hanya kaki jual, tidak dihitung dua kali). */
+  /** The value that has to move (sell legs only, never double-counted). */
   turnoverBase: bigint;
   estimatedCostBase: bigint;
-  /** Biaya relatif terhadap turnover, dibulatkan ke atas. */
+  /** Cost relative to turnover, rounded up. */
   estimatedCostBps: bigint;
-  /** Kosong kecuali `action === "REBALANCE"`. */
+  /** Empty unless `action === "REBALANCE"`. */
   trades: Trade[];
   reason: string;
 }
 
 /**
- * ============================ ALASAN ANGKA-ANGKA INI ============================
+ * ========================== WHY THESE NUMBERS ARE WHAT THEY ARE ==========================
  *
- * `watchBandBps = 250` (2,5%)
- *   Kenapa segitu: setengah dari pita rebalance. Perannya bukan memicu apa pun,
- *   melainkan memberi satu tingkat peringatan sebelum tindakan — sama seperti
- *   WARN pada Guardian — sehingga operator melihat portofolio mulai melenceng
- *   sebelum agent membelanjakan uang.
- *   Kalau salah: terlalu sempit membuat WATCH menyala hampir selalu dan kehilangan
- *   arti; terlalu lebar membuat WATCH tidak pernah menyala dan tingkat ini sia-sia.
- *   Tidak ada uang yang berpindah karena angka ini, jadi risikonya kecil.
+ * `watchBandBps = 250` (2.5%)
+ *   Why this value: half the rebalance band. Its job is not to trigger anything, but
+ *   to give one warning level before action — the same as WARN on Guardian — so an
+ *   operator sees the portfolio starting to drift before the agent spends money.
+ *   If it is wrong: too narrow and WATCH is lit almost always and means nothing; too
+ *   wide and WATCH never lights up and the level is useless.
+ *   No money moves because of this number, so the risk is small.
  *
- * `rebalanceBandBps = 500` (5% penyimpangan bobot absolut)
- *   Kenapa segitu: pita toleransi 5% adalah titik yang berulang kali muncul di
- *   literatur rebalancing portofolio (mis. Masters 2003, dan studi-studi Vanguard
- *   soal "rebalancing bands") sebagai wilayah di mana sebagian besar manfaat
- *   pengendalian risiko sudah tertangkap sementara frekuensi transaksi turun
- *   drastis dibanding rebalance kalender atau pita nol.
- *   TIDAK YAKIN: angka itu dikalibrasi untuk portofolio saham/obligasi. Aset
- *   kripto jauh lebih volatil, sehingga pita 5% akan tersentuh JAUH lebih sering
- *   di sini daripada di portofolio tradisional. Ia harus dikalibrasi ulang lewat
- *   `runBacktest` pada deret harga pasangan yang benar-benar dipakai.
- *   Kalau salah: terlalu sempit -> agent bertransaksi terus dan kalah oleh ongkos
- *   (persis kegagalan yang gerbang biaya dirancang untuk menahan); terlalu lebar
- *   -> portofolio boleh melenceng jauh dari profil risiko yang dipilih user, dan
- *   "rebalancer" itu berubah menjadi buy-and-hold yang mahal.
+ * `rebalanceBandBps = 500` (5% absolute weight deviation)
+ *   Why this value: the 5% tolerance band is the point that keeps showing up in the
+ *   portfolio rebalancing literature (e.g. Masters 2003, and the Vanguard studies on
+ *   "rebalancing bands") as the region where most of the risk-control benefit is
+ *   already captured while trade frequency drops sharply compared with calendar
+ *   rebalancing or a zero band.
+ *   NOT CONFIDENT: that number was calibrated for stock/bond portfolios. Crypto assets
+ *   are far more volatile, so a 5% band will be touched FAR more often here than in a
+ *   traditional portfolio. It has to be recalibrated via `runBacktest` on the price
+ *   series of the pair actually being used.
+ *   If it is wrong: too narrow -> the agent trades constantly and loses to costs
+ *   (exactly the failure the cost gate is designed to hold back); too wide -> the
+ *   portfolio is allowed to drift far from the risk profile the user chose, and that
+ *   "rebalancer" turns into an expensive buy-and-hold.
  *
- * `maxRebalanceCostBps = 50` (0,5% dari turnover)
- *   Kenapa segitu: manfaat rebalancing yang terukur di literatur berskala puluhan
- *   bps per TAHUN. Membayar lebih dari 50 bps dalam SATU rebalance berarti
- *   menghabiskan manfaat beberapa tahun sekaligus. Angka ini juga harus lebih
- *   besar daripada `swapFeeBps + slippageBps`, kalau tidak tidak ada ukuran
- *   turnover mana pun yang bisa lolos (lihat `minEconomicTurnoverBase`), dan
- *   `decide` menolak konfigurasi seperti itu secara keras.
- *   TIDAK YAKIN: ini keputusan produk, bukan konstanta yang diturunkan. Yang bisa
- *   dipertanggungjawabkan adalah bentuknya (biaya diukur relatif terhadap nilai
- *   yang dipindahkan, bukan nominal absolut), bukan nilai persisnya.
- *   Kalau salah: terlalu longgar -> portofolio kecil menghabiskan modalnya untuk
- *   gas; terlalu ketat -> agent tidak pernah menyeimbangkan dan bobotnya hanyut.
+ * `maxRebalanceCostBps = 50` (0.5% of turnover)
+ *   Why this value: the rebalancing benefit measured in the literature is on the order
+ *   of tens of bps per YEAR. Paying more than 50 bps in ONE rebalance means spending
+ *   several years of that benefit at once. This number must also be larger than
+ *   `swapFeeBps + slippageBps`, otherwise no turnover size whatsoever can pass (see
+ *   `minEconomicTurnoverBase`), and `decide` rejects such a configuration hard.
+ *   NOT CONFIDENT: this is a product decision, not a derived constant. What can be
+ *   defended is its shape (cost measured relative to the value being moved, not as an
+ *   absolute amount), not its exact value.
+ *   If it is wrong: too loose -> a small portfolio spends its capital on gas; too
+ *   tight -> the agent never rebalances and its weights drift.
  *
  * `DEFAULT_COST_MODEL`
- *   `swapFeeBps = 5` adalah tier 0,05% PancakeSwap v3 untuk pasangan berkorelasi.
- *   `slippageBps = 10` (0,1%) adalah toleransi yang lazim untuk ukuran kecil di
- *   pool dalam. `gasCostBase = 30_000_000` = $0,30 adalah taksiran kasar untuk
- *   satu rangkaian swap di BSC.
- *   TIDAK YAKIN: ketiganya taksiran, bukan pengukuran. Ketiganya WAJIB diganti
- *   dengan angka nyata dari lapisan chain sebelum dipakai memutuskan uang; nilai
- *   default ini hanya supaya test dan backtest punya titik awal yang masuk akal.
- * ==============================================================================
+ *   `swapFeeBps = 5` is the PancakeSwap v3 0.05% tier for correlated pairs.
+ *   `slippageBps = 10` (0.1%) is the usual tolerance for small size in a deep pool.
+ *   `gasCostBase = 30_000_000` = $0.30 is a rough estimate for one swap sequence on
+ *   BSC.
+ *   NOT CONFIDENT: all three are estimates, not measurements. All three MUST be
+ *   replaced with real numbers from the chain layer before they are used to decide
+ *   about money; these defaults only give tests and backtests a sane starting point.
+ * ======================================================================================
  */
 export const DEFAULT_THRESHOLDS: RebalanceThresholds = {
   watchBandBps: 250n,

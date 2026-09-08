@@ -1,24 +1,23 @@
 /**
- * Grant satu session key Altana ber-batas untuk Fugu Guardian.
+ * Grants one bounded Altana session key for Fugu Guardian.
  *
- * Allowlist-nya SEMPIT dengan sengaja: hanya `MockLendingPool.repay` dan
- * `mUSD.approve`, keduanya terikat kontrak DAN selector sekaligus. `calls: []`
- * atau `calls` yang hilang berarti izin TANPA BATAS di Altana, jadi daftar itu
- * dibangun dari `requiredSessionCalls()` — fungsi yang sama yang dipakai
- * `createSessionSendRepay` untuk MEMERIKSA sesi sebelum mengeksekusi. Keduanya
- * karena itu tidak bisa menyimpang satu sama lain.
+ * Its allowlist is DELIBERATELY narrow: only `MockLendingPool.repay` and `mUSD.approve`,
+ * both bound to a contract AND a selector at once. `calls: []` or a missing `calls` means
+ * UNLIMITED permission in Altana, so that list is built from `requiredSessionCalls()` — the
+ * same function `createSessionSendRepay` uses to CHECK the session before executing. The two
+ * therefore cannot drift apart.
  *
- * Cap belanja:
- *   - native 0,02 tBNB/hari — juga membayar ongkos relay (cap kekecilan
- *     membuat setiap eksekusi gagal sebelum inklusi, `FAILED` code 300);
- *   - mUSD 100/hari (18 desimal, seperti semua token di BSC) — jauh di atas
- *     satu repay demo, tetapi tetap batas yang keras.
+ * Spending caps:
+ *   - native 0.02 tBNB/day — this also pays the relay cost (a cap that is too small makes
+ *     every execution fail before inclusion, `FAILED` code 300);
+ *   - mUSD 100/day (18 decimals, like every token on BSC) — far above one demo repay, but
+ *     still a hard limit.
  *
- * Sesi disimpan ke file TERPISAH dari sesi komersial `altana-session.json`,
- * mode 0600, di dalam `.studio/` yang sudah di-gitignore. Isi `signer`-nya
- * tidak pernah dibaca, dicetak, atau disalin oleh skrip ini.
+ * The session is written to a file SEPARATE from the commercial `altana-session.json`, mode
+ * 0600, inside the already-gitignored `.studio/`. Its `signer` content is never read,
+ * printed, or copied by this script.
  *
- * Jalankan dari `ai/fuguguardian/app/agent`:
+ * Run it from `ai/fuguguardian/app/agent`:
  *   npx tsx scripts/grant-session-guardian.ts
  */
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
@@ -42,10 +41,10 @@ import { requiredSessionCalls } from "../src/strategy/chain/session.js";
 
 const ALTANA_WALLET = "0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0" as const;
 
-/** 0,02 tBNB/hari. Cap native juga membayar relay — sengaja tidak pas-pasan. */
+/** 0.02 tBNB/day. The native cap also pays the relay — deliberately not cut to the bone. */
 const NATIVE_CAP_WEI = 20_000_000_000_000_000n;
 
-/** 100 mUSD/hari. mUSD 18 desimal, seperti semua token di BSC (termasuk USDT). */
+/** 100 mUSD/day. mUSD has 18 decimals, like every token on BSC (including USDT). */
 const MUSD_CAP = 100n * 10n ** 18n;
 
 const EXPIRY_DAYS = 30;
@@ -100,7 +99,7 @@ function main(): Promise<void> {
       mkdirSync(path.dirname(GUARDIAN_SESSION_FILE), { recursive: true });
       writeFileSync(GUARDIAN_SESSION_FILE, serializeSession(session), { mode: 0o600 });
 
-      // Yang dicetak HANYA metadata publik. `session.signer` tidak pernah disentuh.
+      // ONLY public metadata is printed. `session.signer` is never touched.
       console.log("\n✔ Sesi ter-grant dan tersimpan.");
       console.log(`  walletAddress : ${session.walletAddress}`);
       console.log(`  publicKey     : ${session.publicKey}`);

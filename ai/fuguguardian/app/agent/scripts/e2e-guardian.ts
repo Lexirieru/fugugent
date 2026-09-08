@@ -1,50 +1,47 @@
 /**
- * E2E Guardian di BSC testnet — bukti, bukan simulasi.
+ * Guardian E2E on BSC testnet — proof, not simulation.
  *
- * Skrip ini TIDAK berisi logika strategi apa pun. Seluruh keputusan, batas
- * belanja, dan penjelasan datang dari modul yang sudah ada dan sudah diuji:
- * `createGuardian` (yang di dalamnya `createTestnetReader`, `decide`,
- * `executeDecision`, `createSessionSendRepay`, dan konversi satuan) diimpor apa
- * adanya. Sejak Task 9 skrip ini tidak lagi merakit rantai itu sendiri: seluruh
- * perakitan tinggal di `src/strategy/createGuardian.ts`, dan yang dipanggil di
- * sini persis composition root yang akan dipakai backend. Yang ditambahkan di
- * sini hanya tiga hal yang memang milik sebuah skrip E2E:
+ * This script contains NO strategy logic whatsoever. Every decision, spending limit, and
+ * explanation comes from modules that already exist and are already tested:
+ * `createGuardian` (which internally holds `createTestnetReader`, `decide`,
+ * `executeDecision`, `createSessionSendRepay`, and the unit conversion) is imported as-is.
+ * Since Task 9 this script no longer assembles that chain itself: the whole assembly lives
+ * in `src/strategy/createGuardian.ts`, and what is called here is exactly the composition
+ * root the backend will use. All this script adds are the three things that genuinely
+ * belong to an E2E script:
  *
- *   1. memuat rahasia dari .env (tidak pernah mencetaknya),
- *   2. mengirim transaksi sungguhan (`setAnswer`, `approve`, `repay`),
- *   3. MEMBUKTIKAN klaimnya — setiap klaim diperiksa terhadap hasil bacaan
- *      on-chain sungguhan, dan skrip mati dengan exit code bukan nol begitu
- *      satu saja klaim tidak terbukti.
+ *   1. loading secrets from .env (never printing them),
+ *   2. sending real transactions (`setAnswer`, `approve`, `repay`),
+ *   3. PROVING its claims — every claim is checked against a real on-chain reading, and the
+ *      script dies with a non-zero exit code the moment even one claim goes unproven.
  *
- * ## Dua penanda tangan, dan itulah intinya
+ * ## Two signers, and that is the whole point
  *
- * `setAnswer` (menurunkan lalu memulihkan harga) ditandatangani **EOA deployer**
- * — ia pemilik feed, dan menurunkan harga memang peran "pasar", bukan peran
- * agent. `approve` + `repay` ditandatangani **session key Altana ber-batas**
- * atas wallet `0xbdc69c2d…`, lewat `createGuardian`/`createSessionSendRepay`. Session key itu
- * hanya boleh memanggil dua selector di dua kontrak, dengan spend cap dan
- * expiry yang ditegakkan kontrak akun Altana di rantai — bukan oleh kode ini.
- * Buktinya diperiksa di LANGKAH 5, dan ada dua bagian: (a) `Repay.user` pada
- * receipt harus wallet Altana dan pengirim transaksinya bukan EOA deployer,
- * dan (b) **kontrol negatif** — objek sesi YANG SAMA, sesaat setelah berhasil
- * membayar, mencoba `mUSD.transfer` dan wajib ditolak validator Altana. Tanpa
- * (b), "ber-batas" hanya kata.
+ * `setAnswer` (lowering, then restoring, the price) is signed by the **deployer EOA** — it
+ * owns the feed, and lowering the price is the "market's" role, not the agent's.
+ * `approve` + `repay` are signed by the **bounded Altana session key** over wallet
+ * `0xbdc69c2d...`, through `createGuardian`/`createSessionSendRepay`. That session key may
+ * call only two selectors on two contracts, with a spend cap and an expiry enforced by the
+ * Altana account contract on chain — not by this code. The proof is checked in STEP 5, and
+ * it has two parts: (a) `Repay.user` on the receipt must be the Altana wallet and the
+ * transaction's sender must not be the deployer EOA, and (b) a **negative control** — the
+ * SAME session object, moments after successfully paying, attempts `mUSD.transfer` and must
+ * be refused by the Altana validator. Without (b), "bounded" is just a word.
  *
- * Posisi contoh karena itu dimiliki **wallet Altana**, bukan deployer:
- * `MockLendingPool.repay` tidak punya `onBehalfOf`, jadi hanya pemilik hutang
- * yang bisa membayarnya. Siapkan sekali dengan `scripts/setup-altana-position.ts`.
+ * The sample position is therefore owned by the **Altana wallet**, not the deployer:
+ * `MockLendingPool.repay` has no `onBehalfOf`, so only the debt's owner can repay it. Set it
+ * up once with `scripts/setup-altana-position.ts`.
  *
- * Skenario:
- *   baca posisi contoh → turunkan harga mBNB lewat `MockPriceFeed.setAnswer`
- *   sampai HF jatuh ke zona PARTIAL_REPAY → jalankan SATU siklus Guardian →
- *   cetak keputusan, jumlah yang dibayar, tx hash, dan HF sesudahnya →
- *   pastikan HF naik → kembalikan harga ke nilai semula.
+ * The scenario:
+ *   read the sample position -> lower the mBNB price via `MockPriceFeed.setAnswer` until HF
+ *   falls into the PARTIAL_REPAY zone -> run ONE Guardian cycle -> print the decision, the
+ *   amount paid, the tx hash, and the HF afterwards -> confirm the HF rose -> restore the
+ *   price to its original value.
  *
- * Aturan angka: semua nilai USD berbasis 8 desimal dan HANYA dicetak lewat
- * `formatUsd8`/`formatHf` (lihat `format.ts` — 12345678 artinya $0,12, bukan
- * dua belas juta).
+ * The rule about numbers: every USD value is on the 8-decimal basis and is ONLY printed via
+ * `formatUsd8`/`formatHf` (see `format.ts` — 12345678 means $0.12, not twelve million).
  *
- * Jalankan dari `ai/fuguguardian/app/agent`:
+ * Run it from `ai/fuguguardian/app/agent`:
  *   npx tsx scripts/e2e-guardian.ts
  */
 import { fileURLToPath } from "node:url";
@@ -94,38 +91,37 @@ import { formatHf, formatUsd8 } from "../src/strategy/format.js";
 import { DEFAULT_THRESHOLDS, HF_ONE, type Position } from "../src/strategy/types.js";
 
 // ---------------------------------------------------------------------------
-// Alamat & konstanta testnet (sumber: contracts/deployments/bsc-testnet.json)
+// Testnet addresses & constants (source: contracts/deployments/bsc-testnet.json)
 // ---------------------------------------------------------------------------
 
-/** Feed harga mBNB, 8 desimal, owner = deployer. Satu-satunya tuas untuk menurunkan HF. */
+/** The mBNB price feed, 8 decimals, owner = the deployer. The only lever for lowering HF. */
 const MOCK_PRICE_FEED_BNB = "0x0aA42416bAccdb2fd4768B61111DeB7F7D212F9B" as const;
 
 const BPS = 10_000n;
 const BSCSCAN_TX = "https://testnet.bscscan.com/tx/";
 
 /**
- * HF sasaran saat menurunkan harga: tepat di tengah zona PARTIAL_REPAY,
- * DITURUNKAN dari ambang produksi (`DEFAULT_THRESHOLDS`), bukan angka sihir.
- * PARTIAL_REPAY berlaku untuk deleverage < HF <= partialRepay.
+ * The target HF when lowering the price: exactly the middle of the PARTIAL_REPAY zone,
+ * DERIVED from the production thresholds (`DEFAULT_THRESHOLDS`), not a magic number.
+ * PARTIAL_REPAY applies for deleverage < HF <= partialRepay.
  */
 const TARGET_HF = (DEFAULT_THRESHOLDS.partialRepay + DEFAULT_THRESHOLDS.deleverage) / 2n;
 
 /**
- * Batas belanja yang dipakai `executeDecision`. Sengaja lebih longgar daripada
- * pembayaran yang diperlukan sekali ini supaya yang diuji adalah rantai
- * eksekusinya, bukan pemotongannya (pemotongan sudah punya test unit sendiri).
+ * The spending limits `executeDecision` uses. Deliberately looser than the payment needed
+ * this one time, so that what is tested is the execution chain rather than the capping
+ * (capping already has its own unit tests).
  *
- * Perhatikan bahwa angka ini BUKAN batas yang sebenarnya mengikat. Batas kode
- * di sini $2.000/hari; cap kriptografis pada sesi 100 mUSD/hari. Yang menang
- * adalah yang lebih ketat, dan itu cap sesi — bahkan bila `LIMITS` diubah,
- * dihapus, atau prosesnya dibajak. Konsekuensi yang harus diketahui: permintaan
- * di atas cap sesi tidak ditolak rapi oleh `execute.ts`, melainkan gagal di
- * relay sebagai error. Untuk demo satu repay ($8–12) jarak keduanya tidak
- * pernah tersentuh; untuk produksi keduanya harus disamakan.
+ * Note that these numbers are NOT the limits that actually bind. The code limit here is
+ * $2,000/day; the cryptographic cap on the session is 100 mUSD/day. The tighter one wins,
+ * and that is the session cap — even if `LIMITS` is changed, deleted, or the process is
+ * hijacked. A consequence worth knowing: a request above the session cap is not cleanly
+ * refused by `execute.ts`, it fails at the relay as an error. For a one-repay demo ($8-12)
+ * the gap between the two is never touched; for production the two must be made equal.
  */
 const LIMITS: ExecuteLimits = {
-  maxPerActionUsd8: 100_000_000_000n, // $1.000,00
-  maxPerDayUsd8: 200_000_000_000n, // $2.000,00
+  maxPerActionUsd8: 100_000_000_000n, // $1,000.00
+  maxPerDayUsd8: 200_000_000_000n, // $2,000.00
   minIntervalSeconds: 60,
 };
 
@@ -158,10 +154,9 @@ const PRICE_FEED_ABI = [
 
 const POOL_ABI = [
   {
-    // Dipakai HANYA untuk bacaan tertambat blok (lihat `posisiPadaBlok`), sebagai
-    // jangkar independen terhadap `readAavePosition`. Tidak ada logika yang
-    // diduplikasi: yang dibaca fungsi view yang sama persis, lalu HASILNYA
-    // dicocokkan dengan apa yang dilaporkan adapter.
+    // Used ONLY for block-anchored reads (see `posisiPadaBlok`), as an anchor independent of
+    // `readAavePosition`. No logic is duplicated: what is read is the exact same view
+    // function, and its RESULT is then matched against what the adapter reported.
     type: "function",
     name: "getUserAccountData",
     stateMutability: "view",
@@ -175,13 +170,13 @@ const POOL_ABI = [
       { name: "healthFactor", type: "uint256" },
     ],
   },
-  // CATATAN: definisi `repay` SENGAJA tidak ada di sini. Satu-satunya sumber
-  // selector repay adalah `chain/session.ts`, yang memakai konstanta yang sama
-  // untuk allowlist DAN untuk memanggil. Salinan kedua di skrip ini akan
-  // membuat keduanya bisa menyimpang tanpa ada yang memperingatkan.
+  // NOTE: the `repay` definition is DELIBERATELY absent here. The single source for the
+  // repay selector is `chain/session.ts`, which uses the same constant for the allowlist AND
+  // for making the call. A second copy in this script would let the two drift apart with
+  // nobody to warn about it.
 ] as const;
 
-/** Event `Repay` pool — sumber tunggal untuk membuktikan SIAPA yang membayar. */
+/** The pool's `Repay` event — the single source for proving WHO paid. */
 const POOL_EVENT_ABI = [
   {
     type: "event",
@@ -223,8 +218,8 @@ const ERC20_ABI = [
     outputs: [{ name: "", type: "bool" }],
   },
   {
-    // HANYA dipakai kontrol negatif di LANGKAH 5: selector ini sengaja TIDAK
-    // ada di allowlist sesi, dan panggilannya wajib ditolak validator Altana.
+    // Used ONLY by the negative control in STEP 5: this selector is deliberately NOT in the
+    // session allowlist, and the call must be refused by the Altana validator.
     type: "function",
     name: "transfer",
     stateMutability: "nonpayable",
@@ -237,7 +232,7 @@ const ERC20_ABI = [
 ] as const;
 
 // ---------------------------------------------------------------------------
-// Perkakas kecil
+// Small tools
 // ---------------------------------------------------------------------------
 
 class BuktiGagal extends Error {
@@ -248,9 +243,9 @@ class BuktiGagal extends Error {
 }
 
 /**
- * Satu-satunya cara skrip ini menyatakan sesuatu benar. Klaim yang tidak
- * terbukti WAJIB menghentikan skrip — skrip yang mencetak "berhasil" tanpa
- * membuktikan HF naik lebih buruk daripada tidak ada skrip sama sekali.
+ * The only way this script asserts that something is true. An unproven claim MUST stop the
+ * script — a script that prints "success" without proving the HF rose is worse than no
+ * script at all.
  */
 function wajib(kondisi: boolean, pesan: string): asserts kondisi {
   if (!kondisi) throw new BuktiGagal(pesan);
@@ -258,7 +253,7 @@ function wajib(kondisi: boolean, pesan: string): asserts kondisi {
 
 function butuhEnv(nama: string): string {
   const nilai = process.env[nama];
-  // Sengaja hanya menyebut NAMA variabelnya, tidak pernah nilainya.
+  // Deliberately names only the variable's NAME, never its value.
   wajib(
     typeof nilai === "string" && nilai.length > 0,
     `Variabel lingkungan ${nama} kosong; isi lewat .env, jangan di baris perintah.`,
@@ -285,14 +280,14 @@ function tautanTx(hash: Hash): string {
   return `${BSCSCAN_TX}${hash}`;
 }
 
-/** Satu transaksi yang sudah final, beserta tinggi blok tempat ia mendarat. */
+/** One finalized transaction, together with the block height it landed in. */
 interface TxTerkirim {
   hash: Hash;
-  /** Blok receipt. Ini JANGKAR untuk semua bacaan sesudahnya — lihat `posisiPadaBlok`. */
+  /** The receipt's block. This is the ANCHOR for every read afterwards — see `posisiPadaBlok`. */
   blockNumber: bigint;
 }
 
-/** Mengirim satu transaksi dan menolak keras bila receipt-nya bukan "success". */
+/** Sends one transaction and fails hard if its receipt is not "success". */
 async function kirim(
   publicClient: PublicClient,
   jalankan: () => Promise<Hash>,
@@ -312,17 +307,15 @@ async function kirim(
 }
 
 /**
- * Membaca ulang dari rantai sampai `syarat` terpenuhi, atau gagal keras.
+ * Re-reads from the chain until `syarat` holds, or fails hard.
  *
- * Ini BUKAN pelonggaran bukti: `syarat` tetap kondisi on-chain yang sama, dan
- * kalau ia tidak pernah terpenuhi skrip tetap mati dengan exit code bukan nol.
- * Yang ditoleransi hanya keterlambatan RPC. Endpoint publik BSC testnet adalah
- * kumpulan node di belakang satu nama: pada percobaan pertama skrip ini,
- * `eth_getTransactionReceipt` sudah menjawab dari node yang punya blok
- * 129832787, sementara `eth_call` berikutnya dilayani node yang masih di
- * 129832786 — sehingga harga baru "belum ada" padahal transaksinya sudah
- * final. Menyimpulkan kegagalan dari bacaan basi seperti itu akan menghasilkan
- * bukti yang salah ke dua arah.
+ * This is NOT a loosening of the proof: `syarat` is still the same on-chain condition, and
+ * if it never holds the script still dies with a non-zero exit code. All that is tolerated
+ * is RPC lag. The public BSC testnet endpoint is a pool of nodes behind one name: on this
+ * script's first run, `eth_getTransactionReceipt` answered from a node that had block
+ * 129832787, while the next `eth_call` was served by a node still at 129832786 — so the new
+ * price "did not exist" even though the transaction was final. Concluding failure from a
+ * stale read like that produces wrong evidence in both directions.
  */
 async function bacaSampai<T>(
   baca: () => Promise<T>,
@@ -342,10 +335,10 @@ async function bacaSampai<T>(
         return terakhir;
       }
     } catch (err) {
-      // Bacaan yang DITAMBATKAN ke tinggi blok tertentu ditolak oleh node yang
-      // belum punya blok itu ("header not found") — itu justru sifat yang
-      // diinginkan: node basi mengeluh, bukan diam-diam menjawab dari masa lalu.
-      // Percobaan berikutnya kemungkinan besar mendarat di node lain.
+      // A read ANCHORED to a specific block height is refused by a node that does not have
+      // that block yet ("header not found") — and that is exactly the property we want: a
+      // stale node complains rather than quietly answering from the past. The next attempt
+      // will most likely land on a different node.
       galatTerakhir = err;
     }
     await new Promise((r) => setTimeout(r, jedaMs));
@@ -361,20 +354,18 @@ async function bacaSampai<T>(
 }
 
 /**
- * `getUserAccountData` yang DITAMBATKAN ke satu tinggi blok tertentu.
+ * `getUserAccountData` ANCHORED to a specific block height.
  *
- * Ini jangkar struktural untuk seluruh bukti. `bacaSampai` sendiri hanya
- * mencoba ulang sampai kondisinya konsisten — ia menerima node pertama yang
- * setuju, dan keamanannya bertumpu pada kebetulan bahwa dalam skenario ini
- * state hanya bergerak satu arah. `eth_call` dengan `blockNumber` eksplisit
- * tidak punya celah itu: node yang belum punya blok tersebut MELEMPAR
- * ("header not found"), bukan diam-diam menjawab dari masa lalu. Jadi nilai
- * yang kembali dari sini benar-benar nilai pada blok transaksi yang dimaksud.
+ * This is the structural anchor for the whole proof. `bacaSampai` on its own only retries
+ * until the condition is consistent — it accepts the first node that agrees, and its safety
+ * rests on the coincidence that in this scenario state only moves in one direction. An
+ * `eth_call` with an explicit `blockNumber` has no such gap: a node that does not have that
+ * block THROWS ("header not found") rather than quietly answering from the past. So the
+ * value that comes back from here really is the value at the intended transaction's block.
  *
- * Tidak ada logika yang diduplikasi: yang dipanggil fungsi view yang sama
- * dengan yang dipakai `readAavePosition`, dan hasilnya justru dipakai untuk
- * MENCOCOKKAN apa yang dilaporkan adapter — kalau keduanya berbeda, skrip
- * gagal keras.
+ * No logic is duplicated: what is called is the same view function `readAavePosition` uses,
+ * and its result is used precisely to MATCH what the adapter reported — if the two differ,
+ * the script fails hard.
  */
 async function tuplePadaBlok(
   publicClient: PublicClient,
@@ -391,7 +382,7 @@ async function tuplePadaBlok(
         args: [akun],
         blockNumber: blok,
       }),
-    () => true, // yang ditunggu bukan nilainya, tapi node yang punya blok itu
+    () => true, // what we are waiting for is not the value, but a node that has that block
     `${label} (tertambat di blok ${blok})`,
   );
 }
@@ -401,12 +392,11 @@ async function tuplePadaBlok(
 // ---------------------------------------------------------------------------
 
 /**
- * Sarana pemulihan keadaan testnet. Begitu harga mBNB diturunkan, posisi contoh
- * berada di ~HF 1,15 dan akan TETAP di sana kalau skrip mati di tengah jalan —
- * itu sudah pernah terjadi (percobaan pertama), dan seorang manusia harus
- * mereset harga lewat `cast`. Objek ini dipegang pemanggil di luar `main`
- * supaya `finally` di sana bisa memulihkan harga pada jalur gagal MAUPUN sukses,
- * tanpa pernah mengubah exit code.
+ * The means of restoring testnet's state. Once the mBNB price is lowered, the sample
+ * position sits at ~HF 1.15 and will STAY there if the script dies partway through — that
+ * has already happened (the first run), and a human had to reset the price via `cast`. This
+ * object is held by the caller outside `main` so that the `finally` there can restore the
+ * price on the failure path AS WELL AS the success path, without ever changing the exit code.
  */
 interface Pemulihan {
   perlu: boolean;
@@ -414,15 +404,15 @@ interface Pemulihan {
 }
 
 async function main(pemulihan: Pemulihan): Promise<void> {
-  // --- 0. Rahasia -----------------------------------------------------------
-  // Dimuat dari file, tidak pernah dicetak, tidak pernah disalin ke mana pun.
+  // --- 0. Secrets -----------------------------------------------------------
+  // Loaded from files, never printed, never copied anywhere.
   const here = path.dirname(fileURLToPath(import.meta.url)); // .../app/agent/scripts
   const agentDir = path.resolve(here, "..");
   const repoRoot = path.resolve(agentDir, "../../../.."); // .../worktree
   loadEnv(path.join(repoRoot, "contracts/.env")); // PRIVATE_KEY, BSC_TESTNET_RPC_URL
-  loadEnv(path.resolve(agentDir, "../../.studio/.env.local")); // OPENAI_API_KEY (kunci dGrid)
+  loadEnv(path.resolve(agentDir, "../../.studio/.env.local")); // OPENAI_API_KEY (the dGrid key)
   if (!process.env.OPENAI_API_KEY) {
-    // Fallback: kunci dGrid di ai/.env memakai nama DGRID_API_KEY.
+    // Fallback: the dGrid key in ai/.env goes by the name DGRID_API_KEY.
     loadEnv(path.join(repoRoot, "ai/.env"));
     if (process.env.DGRID_API_KEY) process.env.OPENAI_API_KEY = process.env.DGRID_API_KEY;
   }
@@ -430,8 +420,8 @@ async function main(pemulihan: Pemulihan): Promise<void> {
   const rpcUrl = process.env.BSC_TESTNET_RPC_URL ?? DEFAULT_BSC_TESTNET_RPC_URL;
   const account = privateKeyToAccount(butuhEnv("PRIVATE_KEY") as `0x${string}`);
 
-  // --- 1. Klien -------------------------------------------------------------
-  // Pembaca posisi datang dari modul yang sudah ada, apa adanya.
+  // --- 1. Clients -----------------------------------------------------------
+  // The position reader comes from the existing module, as-is.
   const reader = createTestnetReader(rpcUrl);
   const publicClient: PublicClient = reader.client;
   const wallet: WalletClient = createWalletClient({
@@ -440,9 +430,9 @@ async function main(pemulihan: Pemulihan): Promise<void> {
     transport: http(rpcUrl),
   });
 
-  // Sesi Altana ber-batas. `deserializeSession` sendiri yang memverifikasi
-  // bahwa kunci di dalam file menurunkan `publicKey` yang tercatat; bagian
-  // `signer`-nya tidak pernah dibaca, dicetak, atau disalin di skrip ini.
+  // The bounded Altana session. `deserializeSession` itself verifies that the key in the
+  // file derives the recorded `publicKey`; its `signer` part is never read, printed, or
+  // copied in this script.
   armAltanaSdk();
   const session = await loadGuardianSession();
   const posisiAkun = session.walletAddress;
@@ -465,11 +455,11 @@ async function main(pemulihan: Pemulihan): Promise<void> {
     console.log(`  spend cap     : ${cap.limit} / ${cap.period}  ${cap.token ?? "(native)"}`);
   }
 
-  // Izin sesi diperiksa DI SINI, sebelum satu transaksi pun dikirim — termasuk
-  // sebelum `setAnswer` LANGKAH 2. Sesi yang terlalu longgar harus menghentikan
-  // skrip selagi keadaan testnet masih utuh, bukan setelah harga diturunkan.
-  // `createSessionSendRepay` memeriksa hal yang sama lagi saat dikonstruksi;
-  // pengulangan itu disengaja dan murah.
+  // The session permissions are checked HERE, before a single transaction is sent —
+  // including before STEP 2's `setAnswer`. A session that is too loose must stop the script
+  // while testnet's state is still intact, not after the price has been lowered.
+  // `createSessionSendRepay` checks the same thing again at construction; that repetition is
+  // deliberate and cheap.
   assertBoundedAllowlist(izinSesi, requiredSessionCalls(MOCK_LENDING_POOL_ADDRESS, REPAY_ASSET_ADDRESS));
   assertNativeSpendCap(izinSesi);
   console.log("  ✔ izin sesi diperiksa: persis repay + approve, dengan cap native — belum ada tx dikirim.");
@@ -494,7 +484,7 @@ async function main(pemulihan: Pemulihan): Promise<void> {
   console.log(`Saldo tBNB wallet Altana : ${tbnbAwal} wei`);
   console.log(`Saldo tBNB EOA deployer  : ${tbnbDeployerAwal} wei`);
 
-  // --- 2. Posisi awal -------------------------------------------------------
+  // --- 2. The starting position ---------------------------------------------
   judul("LANGKAH 1 — Posisi contoh sebelum apa pun disentuh");
   const posAwal = await reader.readPosition(posisiAkun);
   cetakPosisi("Posisi awal (dibaca lewat readAavePosition apa adanya):", posAwal);
@@ -514,16 +504,16 @@ async function main(pemulihan: Pemulihan): Promise<void> {
   const hargaAwal = hargaAwalRaw;
   console.log(`\nHarga mBNB sekarang   : ${formatUsd8(hargaAwal)} (${hargaAwal})`);
 
-  // --- 3. Hitung harga sasaran dari rumus HF --------------------------------
+  // --- 3. Compute the target price from the HF formula ----------------------
   judul("LANGKAH 2 — Menurunkan harga mBNB sampai HF masuk zona PARTIAL_REPAY");
 
-  // HF = collateral × ltBps × 1e18 / (BPS × debt), dan collateral berbanding
-  // lurus dengan harga mBNB (satu-satunya aset agunan posisi ini). Membalik
-  // rumus itu untuk harga:
-  //   hargaSasaran = hargaSekarang × TARGET_HF × BPS × debt
-  //                  / (collateral × ltBps × 1e18)
-  // Pembagian bigint membulatkan ke bawah, jadi HF hasilnya sedikit DI BAWAH
-  // TARGET_HF — arah yang aman karena menjauh dari batas atas zona.
+  // HF = collateral x ltBps x 1e18 / (BPS x debt), and collateral is directly proportional
+  // to the mBNB price (this position's only collateral asset). Inverting that formula for the
+  // price:
+  //   hargaSasaran = hargaSekarang x TARGET_HF x BPS x debt
+  //                  / (collateral x ltBps x 1e18)
+  // bigint division rounds down, so the resulting HF is slightly BELOW TARGET_HF — the safe
+  // direction, because it moves away from the zone's upper bound.
   const hargaSasaran =
     (hargaAwal * TARGET_HF * BPS * posAwal.debtBase) /
     (posAwal.collateralBase * posAwal.liquidationThresholdBps * HF_ONE);
@@ -537,9 +527,8 @@ async function main(pemulihan: Pemulihan): Promise<void> {
       `${formatUsd8(hargaAwal)}; posisi sudah berisiko?`,
   );
 
-  // Ramalan lokal SEBELUM membakar gas: kalau perhitungannya salah, gagal di
-  // sini, bukan setelah transaksi terkirim. Memakai computeHealthFactor yang
-  // sama dengan yang dipakai produksi.
+  // A local forecast BEFORE burning gas: if the calculation is wrong, fail here rather than
+  // after the transaction is sent. It uses the same computeHealthFactor production uses.
   const agunanRamalan = (posAwal.collateralBase * hargaSasaran) / hargaAwal;
   const hfRamalan = computeHealthFactor(
     agunanRamalan,
@@ -556,8 +545,8 @@ async function main(pemulihan: Pemulihan): Promise<void> {
       `transaksi dibatalkan sebelum gas terbakar.`,
   );
 
-  // Pemulihan didaftarkan SEBELUM harga diturunkan, supaya tidak ada celah
-  // antara "harga sudah jatuh" dan "ada yang tahu cara mengembalikannya".
+  // The recovery is registered BEFORE the price is lowered, so there is no gap between "the
+  // price has fallen" and "someone knows how to put it back".
   pemulihan.jalankan = async () => {
     console.log(`Mengembalikan harga ke ${formatUsd8(hargaAwal)} (${hargaAwal})`);
     await kirim(
@@ -605,17 +594,17 @@ async function main(pemulihan: Pemulihan): Promise<void> {
   );
   pemulihan.perlu = true;
 
-  // Jahitan uji untuk jalur pemulihan. Jalur `finally` hanya berguna kalau ia
-  // benar-benar berjalan, dan satu-satunya cara membuktikan itu adalah gagal
-  // dengan sengaja tepat setelah harga diturunkan — persis bentuk kegagalan
-  // yang pernah terjadi sungguhan. Tidak pernah aktif tanpa env var ini.
+  // A test seam for the recovery path. The `finally` path is only useful if it actually
+  // runs, and the only way to prove that is to fail on purpose right after the price is
+  // lowered — exactly the failure shape that really happened once. Never active without this
+  // env var.
   if (process.env.E2E_PAKSA_GAGAL_SETELAH_TURUN === "1") {
     throw new BuktiGagal(
       "Kegagalan disengaja (E2E_PAKSA_GAGAL_SETELAH_TURUN=1) untuk menguji jalur pemulihan harga.",
     );
   }
 
-  // --- 4. Assert dari bacaan on-chain sungguhan -----------------------------
+  // --- 4. Assertions from real on-chain readings ---------------------------
   console.log("");
   const posTertekan = await bacaSampai(
     () => reader.readPosition(posisiAkun),
@@ -640,7 +629,7 @@ async function main(pemulihan: Pemulihan): Promise<void> {
       `(${formatHf(DEFAULT_THRESHOLDS.deleverage)} < HF <= ${formatHf(DEFAULT_THRESHOLDS.partialRepay)}).`,
   );
 
-  // Jangkar: nilai yang sama dibaca ulang PADA BLOK transaksi penurunan harga.
+  // The anchor: the same values re-read AT THE BLOCK of the price-drop transaction.
   const [colTambat, debtTambat, , ltTambat, , hfTambat] = await tuplePadaBlok(
     publicClient,
     posisiAkun,
@@ -662,23 +651,23 @@ async function main(pemulihan: Pemulihan): Promise<void> {
   );
   console.log(`\n✔ Terbukti dari bacaan on-chain: HF ${formatHf(hfSebelum)} ada di zona PARTIAL_REPAY.`);
 
-  // --- 5. Satu siklus Guardian ---------------------------------------------
+  // --- 5. One Guardian cycle ------------------------------------------------
   judul("LANGKAH 3 — Satu siklus Guardian (decide → execute → explain)");
 
-  /** Tx repay yang benar-benar terkirim; dicatat untuk dicocokkan dengan hasil siklus. */
+  /** The repay txs actually sent; recorded so they can be matched against the cycle's result. */
   const txRepayTercatat: TxTerkirim[] = [];
 
   /**
-   * Toleransi pembulatan untuk mencocokkan jumlah, dalam satuan basis 8 desimal.
-   * 2 unit = $0,00000002. Diperlukan karena ada DUA pembulatan ke bawah yang
-   * saling bebas: USD8 → unit token di `usd8ToTokenUnits`, dan unit token →
-   * USD8 di `MockLendingPool._valueUsd8`. Masing-masing kehilangan kurang dari
-   * satu unit, jadi selisih maksimum yang sah adalah 2. Lebih besar dari itu
-   * berarti konversinya memang salah, bukan sekadar dibulatkan.
+   * The rounding tolerance for matching amounts, in 8-decimal basis units.
+   * 2 units = $0.00000002. It is needed because there are TWO independent roundings down:
+   * USD8 -> token units in `usd8ToTokenUnits`, and token units -> USD8 in
+   * `MockLendingPool._valueUsd8`. Each loses less than one unit, so the largest legitimate
+   * difference is 2. Anything larger means the conversion is genuinely wrong, not merely
+   * rounded.
    */
   const TOLERANSI_USD8 = 2n;
 
-  /** Receipt transaksi `repay` yang benar-benar mendarat; dipakai membuktikan pengirimnya. */
+  /** The receipt of the `repay` transaction that actually landed; used to prove its sender. */
   let receiptRepay: RelayResult["receipt"] = null;
 
   const logger: Logger = {
@@ -687,26 +676,25 @@ async function main(pemulihan: Pemulihan): Promise<void> {
   };
 
   /**
-   * SELURUH perakitan rantai sekarang datang dari `createGuardian` di `src/`,
-   * bukan dirakit ulang di skrip ini.
+   * The ENTIRE chain assembly now comes from `createGuardian` in `src/`, rather than being
+   * rebuilt in this script.
    *
-   * Sampai putaran sebelumnya lima potongan hanya hidup di sini — konversi
-   * USD8 → unit token, pembacaan `assets()` + feed, cek saldo, pembuatan
-   * `ExecuteState` awal, dan penyusunan `sendRepay` — sehingga runtime
-   * berikutnya (backend) mau tidak mau akan menyalinnya dari sebuah skrip demo.
-   * Sekarang yang tinggal di skrip ini hanya tiga hal yang memang miliknya:
-   * memuat rahasia, mengirim transaksi harga, dan MEMBUKTIKAN klaimnya.
+   * Until the previous round five pieces lived only here — the USD8 -> token units
+   * conversion, reading `assets()` + the feed, the balance check, building the initial
+   * `ExecuteState`, and composing `sendRepay` — so the next runtime (the backend) would
+   * inevitably have copied them out of a demo script. What is left in this script now are the
+   * three things that genuinely belong to it: loading secrets, sending the price transaction,
+   * and PROVING its claims.
    *
-   * `sendCalls` tetap disuntikkan dari sini karena ia jalur relay Altana (SDK
-   * pihak ketiga), dan pembungkusnya di bawah adalah tempat E2E menangkap
-   * receipt yang dipakai LANGKAH 5 untuk membuktikan siapa yang membayar.
+   * `sendCalls` is still injected from here because it is the Altana relay path (a
+   * third-party SDK), and the wrapper below is where the E2E script captures the receipt
+   * STEP 5 uses to prove who paid.
    */
-  // Store SUNGGUHAN, bukan memori. Skrip ini satu-satunya contoh pemanggilan
-  // `createGuardian` yang ada, jadi ia adalah yang akan disalin orang — dan
-  // contoh yang memakai store memori mewariskan C3 (anggaran, cooldown, kill
-  // switch, dan catatan repay menggantung hilang setiap restart) secara gratis
-  // kepada penyalin berikutnya. Berkasnya ada di `.studio/` yang gitignored,
-  // bersama file sesi.
+  // A REAL store, not an in-memory one. This script is the only example of calling
+  // `createGuardian` that exists, so it is the one people will copy — and an example that
+  // uses an in-memory store hands C3 (the budget, the cooldown, the kill switch, and the
+  // pending-repay record all lost on every restart) to the next copier for free. Its file
+  // lives in the gitignored `.studio/`, alongside the session file.
   const stateFile = process.env.GUARDIAN_STATE_FILE ?? path.join(WORKSPACE_ROOT, ".studio/guardian-state.json");
   const stateStore = createFileStateStore(stateFile);
   const stateSebelum = await stateStore.load();
@@ -718,8 +706,8 @@ async function main(pemulihan: Pemulihan): Promise<void> {
           `aksi terakhir ${stateSebelum.lastActionAt} · killed=${stateSebelum.killed} · ` +
           `menggantung=${stateSebelum.pendingRepay === null ? "tidak" : "YA"}`,
   );
-  // Kalau ada catatan menggantung, siklus di bawah akan menolak mengirim — itu
-  // perilaku yang benar, tapi tanpa pesan ini ia terbaca seperti regresi.
+  // If a pending record exists, the cycle below will refuse to send — that is the correct
+  // behavior, but without this message it reads like a regression.
   wajib(
     stateSebelum === null || stateSebelum.pendingRepay === null,
     `Ada repay yang belum terbukti selesai di ${stateFile} (${formatUsd8(stateSebelum?.pendingRepay?.amountUsd8 ?? 0n)}). ` +
@@ -812,21 +800,21 @@ async function main(pemulihan: Pemulihan): Promise<void> {
     outcome.nextExecuteState.spentTodayUsd8 === hasil.amountSentUsd8,
     "Anggaran harian tidak bertambah sebesar jumlah yang dikirim.",
   );
-  // Pembukuan C2 pada jalur SUNGGUHAN: repay yang selesai dengan hash tidak
-  // boleh meninggalkan catatan menggantung. Kalau ia tertinggal, siklus
-  // berikutnya akan menolak bertindak — kegagalan yang aman, tapi tetap salah.
+  // The C2 bookkeeping on the REAL path: a repay that completes with a hash must not leave
+  // a pending record behind. If one is left, the next cycle will refuse to act — a safe
+  // failure, but still wrong.
   wajib(
     outcome.nextExecuteState.pendingRepay === null,
     `Repay sudah selesai dengan hash ${hasil.txHash} tetapi catatan menggantung masih ada; ` +
       "pembukuan idempotensi tidak dibereskan.",
   );
 
-  // --- 5b. Siapa yang sebenarnya membayar ----------------------------------
-  // Ini klaim inti task ini, dan ia dibuktikan dari RECEIPT, bukan dari niat
-  // kode. `MockLendingPool.repay` hanya mengurangi hutang `msg.sender`, dan
-  // `Repay(address indexed user, ...)` mencatat `msg.sender` itu. Jadi kalau
-  // `user` pada event adalah wallet Altana, maka yang memanggil pool memang
-  // wallet Altana — lewat session key ber-batas, bukan EOA deployer.
+  // --- 5b. Who actually paid ------------------------------------------------
+  // This is this task's central claim, and it is proven from the RECEIPT, not from the code's
+  // intent. `MockLendingPool.repay` only reduces `msg.sender`'s debt, and
+  // `Repay(address indexed user, ...)` records that `msg.sender`. So if the event's `user` is
+  // the Altana wallet, then what called the pool really was the Altana wallet — through the
+  // bounded session key, not the deployer EOA.
   judul("LANGKAH 5 — Bukti: yang membayar adalah wallet Altana lewat session key");
   const receipt = receiptRepay as RelayResult["receipt"];
   wajib(receipt !== null, "Tidak ada receipt repay yang tercatat.");
@@ -873,12 +861,12 @@ async function main(pemulihan: Pemulihan): Promise<void> {
       `dan panggilan repay datang dari wallet itu lewat session key ber-batas — bukan dari EOA deployer.`,
   );
 
-  // Kontrol negatif, dengan OBJEK SESI YANG SAMA yang baru saja membayar.
-  // Tanpa ini, "ber-batas" hanya kata: sesi yang bisa repay harus terbukti
-  // TIDAK bisa melakukan apa pun di luar allowlist-nya. `mUSD.transfer` dipilih
-  // karena kontraknya justru ADA di allowlist (untuk `approve`) — jadi yang
-  // diuji adalah pengikatan pada tingkat selector, bukan sekadar kontrak.
-  // Penolakan datang dari validator akun Altana, bukan dari kode kita.
+  // The negative control, using the SAME SESSION OBJECT that just paid. Without this,
+  // "bounded" is only a word: a session that can repay must be shown to be UNABLE to do
+  // anything outside its allowlist. `mUSD.transfer` was chosen because its contract IS in the
+  // allowlist (for `approve`) — so what is tested is binding at the selector level, not
+  // merely at the contract level. The refusal comes from the Altana account validator, not
+  // from our code.
   console.log("\nKontrol negatif — sesi yang sama mencoba mUSD.transfer(EOA deployer, 1 wei):");
   const mUsdSebelumProbe = await publicClient.readContract({
     address: REPAY_ASSET_ADDRESS,
@@ -901,9 +889,9 @@ async function main(pemulihan: Pemulihan): Promise<void> {
     );
     console.error(`  ✖ LOLOS — tx ${lolos.transactionHash}`);
   } catch (err: unknown) {
-    // Menuntut alasan penolakannya, bukan sekadar keberadaan exception: relay
-    // 502, receipt timeout, dan nonce race juga melempar, dan tidak satu pun
-    // membuktikan batas sesi. Bentuk lain dilempar ulang dan mematikan E2E.
+    // It demands the reason for the refusal, not merely the existence of an exception: a
+    // relay 502, a receipt timeout, and a nonce race all throw too, and none of them proves
+    // the session boundary. Any other shape is rethrown and kills the E2E run.
     const pesan = assertSessionDenial(err, REPAY_ASSET_ADDRESS, "kontrol negatif transfer");
     probeDitolak = true;
     for (const baris of pesan.split("\n")) console.log(`    | ${baris}`);
@@ -927,7 +915,7 @@ async function main(pemulihan: Pemulihan): Promise<void> {
       `Sesi yang sama bisa repay, tidak bisa transfer.`,
   );
 
-  // --- 6. HF sesudah, dari bacaan on-chain ---------------------------------
+  // --- 6. The HF afterwards, from an on-chain reading -----------------------
   judul("LANGKAH 6 — Bukti: health factor naik setelah agent bertindak");
   wajib(
     txRepay.blockNumber > txTurun.blockNumber,
@@ -949,7 +937,7 @@ async function main(pemulihan: Pemulihan): Promise<void> {
       `transaksi repay (${txRepay.blockNumber}) — bacaan basi, bukan bukti.`,
   );
 
-  // Jangkar kedua: nilai yang sama dibaca ulang PADA BLOK transaksi repay.
+  // The second anchor: the same values re-read AT THE BLOCK of the repay transaction.
   const [colTambat2, debtTambat2, , ltTambat2, , hfTambat2] = await tuplePadaBlok(
     publicClient,
     posisiAkun,
@@ -980,21 +968,20 @@ async function main(pemulihan: Pemulihan): Promise<void> {
     `Hutang tidak berkurang: ${formatUsd8(posTertekan.debtBase)} → ${formatUsd8(posSesudah.debtBase)}.`,
   );
 
-  // Agunan tidak boleh berubah: repay hanya menyentuh sisi hutang. Kalau angka
-  // ini bergeser, ada aktor lain di posisi yang sama dan seluruh perbandingan
-  // "sebelum/sesudah" kehilangan artinya.
+  // The collateral must not change: a repay only touches the debt side. If this number
+  // moves, another actor is in the same position and the entire "before/after" comparison
+  // loses its meaning.
   wajib(
     posSesudah.collateralBase === posTertekan.collateralBase,
     `Agunan ikut berubah (${formatUsd8(posTertekan.collateralBase)} → ` +
       `${formatUsd8(posSesudah.collateralBase)}); ada yang menyentuh posisi selain skrip ini.`,
   );
 
-  // ————— Klaim yang paling akan dibaca orang: BERAPA yang dibayar. —————
-  // Sampai di sini "$…" masih semata-mata keluaran `executeDecision`. Yang
-  // membuatnya menjadi bukti adalah baris di bawah: selisih hutang yang
-  // BENAR-BENAR terjadi di rantai harus sama dengan jumlah yang diklaim.
-  // Tanpa ini, konversi satuan yang meleset satu orde membuat agent membayar
-  // sepersepuluh dari yang tercetak, sementara semua assert lain tetap lolos.
+  // ————— The claim people will read most: HOW MUCH was paid. —————
+  // Up to here "$..." is still nothing but `executeDecision`'s output. What turns it into
+  // proof is the line below: the debt delta that ACTUALLY happened on chain must equal the
+  // amount claimed. Without this, a unit conversion off by one order of magnitude makes the
+  // agent pay a tenth of what is printed, while every other assertion still passes.
   const hutangBerkurang = posTertekan.debtBase - posSesudah.debtBase;
   const selisihKlaim =
     hutangBerkurang > hasil.amountSentUsd8
@@ -1009,9 +996,9 @@ async function main(pemulihan: Pemulihan): Promise<void> {
   );
 
   const selisih = hfSesudah - hfSebelum;
-  // Label zona diambil dari `decide` yang sama dengan yang dipakai Guardian,
-  // bukan dari tangga ambang yang ditulis ulang di sini — kalau ambangnya kelak
-  // berubah, cetakan ini ikut berubah dengan sendirinya.
+  // The zone label comes from the same `decide` Guardian uses, not from a threshold ladder
+  // rewritten here — if the thresholds ever change, this printout changes with them on its
+  // own.
   const zonaSesudah = decide(posSesudah).action;
   console.log("");
   console.log(`HF sebelum intervensi  : ${formatHf(hfSebelum)}  (${hfSebelum})`);
@@ -1024,12 +1011,12 @@ async function main(pemulihan: Pemulihan): Promise<void> {
   console.log(`Keputusan decide() kini: ${zonaSesudah}`);
   console.log(`\n✔ Terbukti: hutang berkurang persis sebesar yang diklaim, dan posisi keluar dari zona PARTIAL_REPAY karena aksi agent.`);
 
-  // --- 7. Kembalikan harga --------------------------------------------------
-  // Dilakukan HANYA setelah seluruh bukti di atas terkumpul, supaya keadaan
-  // testnet bisa dipakai ulang. Biayanya satu transaksi ~30k gas.
+  // --- 7. Restore the price -------------------------------------------------
+  // Done ONLY after every proof above has been collected, so testnet's state is reusable.
+  // It costs one transaction, about 30k gas.
   judul("LANGKAH 7 — Mengembalikan harga mBNB ke nilai semula");
-  // Jalur sukses memakai penutup yang SAMA dengan jalur gagal (lihat `finally`
-  // di bawah `main`), supaya keduanya tidak bisa menyimpang satu sama lain.
+  // The success path uses the SAME closer as the failure path (see the `finally` below
+  // `main`), so the two cannot drift apart.
   await pemulihan.jalankan!();
   pemulihan.perlu = false;
 
@@ -1057,18 +1044,16 @@ async function main(pemulihan: Pemulihan): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Titik masuk
+// Entry point
 // ---------------------------------------------------------------------------
 //
-// `finally` di sini ada karena satu kegagalan yang SUDAH terjadi: percobaan
-// pertama skrip ini mati setelah harga mBNB diturunkan, meninggalkan posisi
-// contoh pada ~HF 1,15 sampai seorang manusia meresetnya lewat `cast`. Demo
-// yang mati di tengah jaringan lambat akan menampilkan posisi yang tampak
-// nyaris terlikuidasi kepada siapa pun yang membuka BscScan berikutnya.
+// The `finally` here exists because of a failure that ALREADY happened: this script's first
+// run died after the mBNB price had been lowered, leaving the sample position at ~HF 1.15
+// until a human reset it via `cast`. A demo that dies on a slow network shows a position that
+// looks nearly liquidated to whoever opens BscScan next.
 //
-// Pemulihan TIDAK PERNAH mengubah exit code: kegagalannya sendiri hanya
-// dicetak sebagai peringatan lengkap dengan perintah manualnya, dan kegagalan
-// asli tetap yang menentukan nasib proses.
+// The recovery NEVER changes the exit code: its own failure is only printed as a warning,
+// complete with the manual command, and the original failure still decides the process's fate.
 const pemulihan: Pemulihan = { perlu: false };
 
 try {

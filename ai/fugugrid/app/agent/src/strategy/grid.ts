@@ -1,40 +1,40 @@
 /**
- * Geometri grid dan aritmetika ongkos. Seluruhnya bigint murni untuk nilai uang;
- * `Number` hanya dipakai untuk indeks pita dan jumlah level, yang memang
- * hitungan kecil dan tidak pernah menyentuh nilai uang.
+ * Grid geometry and cost arithmetic. All pure bigint for money values; `Number` is
+ * used only for band indices and level counts, which are genuinely small counts and
+ * never touch a money value.
  *
- * ARAH PEMBULATAN, dan alasannya:
- *  - jarak antar-garis (`minStepBps`) dipotong ke BAWAH -> grid tidak pernah
- *    terlihat lebih menguntungkan daripada aslinya;
- *  - ongkos (`roundTripCostBps`) dibulatkan ke ATAS -> ongkos tidak pernah
- *    diremehkan;
- *  - batas breakout ATAS dipotong ke bawah dan batas breakout BAWAH dibulatkan
- *    ke atas -> keduanya bergerak MENDEKAT ke rentang grid, sehingga breakout
- *    terdeteksi lebih awal. Keluar terlalu cepat berarti kehilangan beberapa
- *    putaran dan membayar gas keluar; keluar terlalu lambat berarti memegang
- *    posisi berarah tanpa rencana, dan kerugiannya tidak dibatasi apa pun.
+ * ROUNDING DIRECTIONS, and why:
+ *  - line-to-line spacing (`minStepBps`) truncates DOWN -> the grid never looks more
+ *    profitable than it is;
+ *  - costs (`roundTripCostBps`) round UP -> a cost is never understated;
+ *  - the UPPER breakout bound truncates down and the LOWER breakout bound rounds up
+ *    -> both move CLOSER to the grid's range, so a breakout is detected earlier.
+ *    Exiting too early means losing a few round trips and paying the exit gas; exiting
+ *    too late means holding a directional position with no plan, and nothing bounds
+ *    that loss.
  */
 import { BPS_ONE, GridError, type CostModel, type GridConfig, type GridThresholds } from "./types.js";
 
 const ceilDiv = (a: bigint, b: bigint): bigint => (a + b - 1n) / b;
 
-/** Jumlah interval (= jumlah lot). Garis grid dikurangi satu. */
+/** The number of intervals (= the number of lots). Grid lines minus one. */
 export function intervalsOf(config: GridConfig): number {
   return config.levels - 1;
 }
 
-/** Lebar satu interval dalam dolar, dipotong ke bawah. */
+/** The width of one interval in dollars, truncated down. */
 export function stepBase(config: GridConfig): bigint {
   return (config.upperBase - config.lowerBase) / BigInt(intervalsOf(config));
 }
 
 /**
- * Harga garis grid ke-`i`, dari 0 (batas bawah) sampai `intervals` (batas atas).
+ * The price of grid line `i`, from 0 (the lower bound) to `intervals` (the upper
+ * bound).
  *
- * Dihitung sebagai `lower + (upper - lower) × i / intervals`, bukan sebagai
- * `lower + step × i`. Bedanya penting: cara kedua menumpuk galat pembulatan
- * `step` sebanyak i kali, sehingga garis teratas meleset dari batas atas dan
- * pita terakhir diam-diam menjadi lebih lebar daripada yang lain.
+ * Computed as `lower + (upper - lower) x i / intervals`, not as `lower + step x i`.
+ * The difference matters: the second way accumulates `step`'s rounding error i times,
+ * so the topmost line misses the upper bound and the last band quietly becomes wider
+ * than the others.
  */
 export function levelPriceBase(config: GridConfig, i: number): bigint {
   const intervals = intervalsOf(config);
@@ -45,29 +45,28 @@ export function levelPriceBase(config: GridConfig, i: number): bigint {
 }
 
 /**
- * Jarak antar-garis di titik PALING SEMPIT secara persentase, yaitu di batas
- * atas. Pada grid aritmetik, jarak dolar tetap tetapi jarak persentase mengecil
- * seiring naiknya harga; putaran yang paling tipis marginnya adalah yang di
- * puncak. Memakai jarak rata-rata di sini akan meloloskan grid yang separuh
- * atasnya berdagang di bawah ongkos.
+ * The line-to-line spacing at its NARROWEST point in percentage terms, which is at
+ * the upper bound. On an arithmetic grid the dollar spacing is constant but the
+ * percentage spacing shrinks as the price rises; the thinnest-margin round trip is the
+ * one at the top. Using the average spacing here would pass grids whose top half
+ * trades below cost.
  */
 export function minStepBps(config: GridConfig): bigint {
   return (stepBase(config) * BPS_ONE) / config.upperBase;
 }
 
-/** Nilai satu lot dalam quote, dipotong ke bawah. */
+/** The value of one lot in the quote asset, truncated down. */
 export function lotValueBase(config: GridConfig): bigint {
   return config.capitalBase / BigInt(intervalsOf(config));
 }
 
 /**
- * Ongkos satu putaran penuh beli-lalu-jual, dinyatakan dalam bps terhadap nilai
- * lot.
+ * The cost of one full buy-then-sell round trip, expressed in bps of the lot value.
  *
- * Gas MASUK ke dalam angka ini, dibagi nilai lot. Inilah sebabnya menambah
- * level tanpa menambah modal berbahaya: setiap lot mengecil, gas per lot tetap,
- * dan ongkos putaran membengkak sampai melampaui jarak antar-garis. Grid yang
- * seperti itu kehilangan uang pada setiap perdagangan yang "berhasil".
+ * Gas GOES INTO this number, divided by the lot value. This is why adding levels
+ * without adding capital is dangerous: every lot shrinks, gas per lot stays the same,
+ * and the round-trip cost swells until it exceeds the line-to-line spacing. A grid like
+ * that loses money on every "successful" trade.
  */
 export function roundTripCostBps(lotValue: bigint, cost: CostModel): bigint {
   if (lotValue <= 0n) {
@@ -80,7 +79,7 @@ export function roundTripCostBps(lotValue: bigint, cost: CostModel): bigint {
   return proporsional + gas;
 }
 
-/** Jarak antar-garis minimum yang membuat satu putaran layak dikerjakan. */
+/** The minimum line-to-line spacing that makes one round trip worth doing. */
 export function minProfitableStepBps(
   lotValue: bigint,
   cost: CostModel,
@@ -91,7 +90,7 @@ export function minProfitableStepBps(
 
 export type PricePosition = "BELOW" | "INSIDE" | "ABOVE";
 
-/** Di mana harga berada relatif terhadap rentang grid, tanpa penjepitan. */
+/** Where the price sits relative to the grid's range, with no clamping. */
 export function pricePosition(priceBase: bigint, config: GridConfig): PricePosition {
   if (priceBase < config.lowerBase) return "BELOW";
   if (priceBase >= config.upperBase) return "ABOVE";
@@ -99,12 +98,11 @@ export function pricePosition(priceBase: bigint, config: GridConfig): PricePosit
 }
 
 /**
- * Pita tempat harga berada, DIJEPIT ke 0..interval-1.
+ * The band the price is in, CLAMPED to 0..intervals-1.
  *
- * Penjepitan disengaja: harga di luar rentang tetap memetakan ke pita tepi
- * sehingga lot terakhir di tepi itu tetap sempat ditransaksikan ketika harga
- * melompat keluar dalam satu langkah. Tanpa penjepitan, lompatan harga akan
- * meninggalkan persediaan yang tidak pernah dijual.
+ * The clamping is deliberate: a price outside the range still maps to the edge band, so
+ * the last lot at that edge still gets traded when the price jumps out in one step.
+ * Without clamping, a price jump would leave inventory that is never sold.
  */
 export function bandIndexOf(priceBase: bigint, config: GridConfig): number {
   const intervals = intervalsOf(config);
@@ -114,22 +112,22 @@ export function bandIndexOf(priceBase: bigint, config: GridConfig): number {
   return Number(i);
 }
 
-/** Batas atas + buffer. Dipotong ke bawah -> breakout terdeteksi lebih awal. */
+/** Upper bound + buffer. Truncated down -> a breakout is detected earlier. */
 export function softUpperBase(config: GridConfig, t: GridThresholds): bigint {
   return (config.upperBase * (BPS_ONE + t.breakoutBufferBps)) / BPS_ONE;
 }
 
-/** Batas atas + breakout keras. Dipotong ke bawah, alasan yang sama. */
+/** Upper bound + the hard breakout. Truncated down, same reason. */
 export function hardUpperBase(config: GridConfig, t: GridThresholds): bigint {
   return (config.upperBase * (BPS_ONE + t.hardBreakoutBps)) / BPS_ONE;
 }
 
-/** Batas bawah − buffer. Dibulatkan ke ATAS -> breakout terdeteksi lebih awal. */
+/** Lower bound - buffer. Rounded UP -> a breakout is detected earlier. */
 export function softLowerBase(config: GridConfig, t: GridThresholds): bigint {
   return ceilDiv(config.lowerBase * (BPS_ONE - t.breakoutBufferBps), BPS_ONE);
 }
 
-/** Batas bawah − breakout keras. Dibulatkan ke ATAS, alasan yang sama. */
+/** Lower bound - the hard breakout. Rounded UP, same reason. */
 export function hardLowerBase(config: GridConfig, t: GridThresholds): bigint {
   return ceilDiv(config.lowerBase * (BPS_ONE - t.hardBreakoutBps), BPS_ONE);
 }

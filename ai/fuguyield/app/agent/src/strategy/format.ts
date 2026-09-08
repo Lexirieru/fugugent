@@ -1,7 +1,7 @@
 /**
- * SATU-SATUNYA pintu keluar angka domain menuju manusia (dan menuju prompt LLM).
- * Semua fungsi murni aritmetika bigint; `Number()` tidak dipakai karena nilai di
- * lapisan ini bisa melampaui Number.MAX_SAFE_INTEGER.
+ * The ONLY exit for domain numbers toward humans (and toward LLM prompts).
+ * Every function is pure bigint arithmetic; `Number()` is unused because values at this
+ * layer can exceed Number.MAX_SAFE_INTEGER.
  */
 import { USD8_ONE, WAD } from "./types.js";
 
@@ -15,7 +15,7 @@ function grupRibuan(n: bigint): string {
   return out;
 }
 
-/** Nilai uang basis 8 desimal -> dolar dua desimal. Pecahan sen DIPOTONG. */
+/** A money value on the 8-decimal basis -> dollars with two decimals. Fractions of a cent are TRUNCATED. */
 export function formatUsd8(v: bigint): string {
   const negatif = v < 0n;
   const abs = negatif ? -v : v;
@@ -25,12 +25,12 @@ export function formatUsd8(v: bigint): string {
 }
 
 /**
- * APY dalam bps -> persen DUA desimal.
+ * An APY in bps -> a percentage with TWO decimals.
  *
- * Dua desimal, bukan satu: seluruh perdebatan strategi ini berlangsung pada
- * skala puluhan bps (ambang impas $10.000 adalah 195 bps = 1,95%). Membulatkan
- * ke satu desimal akan membuat 1,95% dan 1,99% terlihat sama, padahal salah
- * satunya menutup ongkos pindah dan satunya tidak.
+ * Two decimals, not one: this whole strategy's argument plays out at the scale of tens
+ * of bps (the break-even threshold for $10,000 is 195 bps = 1.95%). Rounding to one
+ * decimal would make 1.95% and 1.99% look identical, when one of them covers the
+ * migration cost and the other does not.
  */
 export function formatApyBps(bps: bigint): string {
   const negatif = bps < 0n;
@@ -38,7 +38,7 @@ export function formatApyBps(bps: bigint): string {
   return `${negatif ? "-" : ""}${grupRibuan(abs / 100n)},${(abs % 100n).toString().padStart(2, "0")}%`;
 }
 
-/** Jumlah token 18 desimal -> enam desimal, sisanya DIPOTONG. */
+/** An 18-decimal token amount -> six decimals, the remainder TRUNCATED. */
 export function formatToken18(v: bigint): string {
   const negatif = v < 0n;
   const abs = negatif ? -v : v;
@@ -47,7 +47,7 @@ export function formatToken18(v: bigint): string {
   return `${negatif ? "-" : ""}${grupRibuan(bulat)},${pecahan.toString().padStart(6, "0")}`;
 }
 
-/** bps -> persen satu desimal. */
+/** bps -> a percentage with one decimal. */
 export function formatPercentFromBps(bps: bigint): string {
   const negatif = bps < 0n;
   const abs = negatif ? -bps : bps;
@@ -55,7 +55,7 @@ export function formatPercentFromBps(bps: bigint): string {
   return `${negatif ? "-" : ""}${persepuluh / 10n},${persepuluh % 10n}`;
 }
 
-/** bps apa adanya dengan satuannya, supaya tidak tertukar dengan persen. */
+/** bps as-is with its unit, so it is never confused with a percentage. */
 export function formatBps(bps: bigint): string {
   return `${bps.toString()} bps`;
 }

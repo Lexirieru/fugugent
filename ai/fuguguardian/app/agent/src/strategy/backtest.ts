@@ -1,55 +1,50 @@
 /**
  * ============================================================================
- * KETERBATASAN JUJUR — BACA SEBELUM MEMAKAI ANGKA DARI MODUL INI
+ * HONEST LIMITATIONS — READ BEFORE USING ANY NUMBER FROM THIS MODULE
  * ============================================================================
- * Harness ini membandingkan agent (bertindak instan) dengan manusia (bertindak
- * setelah jeda reaksi) di atas deret harga sintetis/historis. Ia dengan
- * sengaja TIDAK memodelkan:
- *   - gas fee — baik agent maupun manusia dianggap gratis saat bertransaksi
- *   - slippage — jumlah repay yang disarankan dianggap selalu terisi penuh
- *     dengan harga yang sama persis dengan candle saat itu
- *   - kegagalan transaksi (revert, nonce race, RPC down, wallet terkunci)
- *   - kongesti jaringan — waktu inklusi transaksi ke blok dianggap instan
- *   - gap harga antar-blok — hanya harga pada tiap candle yang diperiksa,
- *     pergerakan harga di antara dua candle tidak pernah terlihat oleh model
- *   - bunga hutang: hutang hanya berubah saat ada pembayaran, tidak pernah
- *     tumbuh sendiri
+ * This harness compares an agent (acting instantly) with a human (acting after a reaction
+ * delay) over a synthetic/historical price series. It deliberately does NOT model:
+ *   - gas fees — both the agent and the human transact for free
+ *   - slippage — the suggested repay amount is assumed to always fill completely at
+ *     exactly that candle's price
+ *   - failed transactions (reverts, nonce races, RPC down, a locked wallet)
+ *   - network congestion — a transaction's inclusion time is assumed instant
+ *   - price gaps between blocks — only the price at each candle is examined, movement
+ *     between two candles is never seen by the model
+ *   - debt interest: the debt only changes when a payment is made, it never grows on
+ *     its own
  *
- * Tiga penyederhanaan berikut lebih tajam lagi karena TIDAK netral — ketiganya
- * memihak agent:
+ * The three simplifications below are sharper still because they are NOT neutral — all
+ * three favor the agent:
  *
- *   (a) DELEVERAGE dimodelkan sebagai "hutang berkurang, agunan utuh", persis
- *       sama dengan PARTIAL_REPAY dan EMERGENCY. Itu semantik membayar dari
- *       dana eksternal (dompet user). DELEVERAGE yang sungguhan MENJUAL
- *       AGUNAN untuk melunasi hutang, sehingga agunan DAN hutang sama-sama
- *       turun dan lintasan HF sesudahnya berbeda (dan umumnya lebih buruk)
- *       daripada yang disimulasikan di sini. Karena agent jauh lebih sering
- *       mencapai zona DELEVERAGE daripada manusia yang lambat, distorsi ini
- *       menguntungkan agent.
+ *   (a) DELEVERAGE is modeled as "debt goes down, collateral stays intact", exactly like
+ *       PARTIAL_REPAY and EMERGENCY. That is the semantics of paying from external funds
+ *       (the user's wallet). A real DELEVERAGE SELLS COLLATERAL to repay debt, so
+ *       collateral AND debt both fall and the HF path afterwards differs from (and is
+ *       usually worse than) what is simulated here. Because the agent reaches the
+ *       DELEVERAGE zone far more often than a slow human does, this distortion favors the
+ *       agent.
  *
- *   (b) Tanpa `agentBudgetBase`, agent dianggap punya modal TAK TERBATAS dan
- *       boleh melakukan intervensi sesering apa pun, tanpa batas frekuensi
- *       maupun batas nominal. Di dunia nyata session key Altana justru
- *       membatasi keduanya. Ini bukan penyederhanaan yang menimpa kedua pihak
- *       sama rata: hanya sisi agent yang mendapat dompet ajaib. Isi
- *       `agentBudgetBase` untuk memaksa perbandingan yang jujur.
+ *   (b) Without `agentBudgetBase`, the agent is assumed to have UNLIMITED capital and may
+ *       intervene as often as it likes, with no frequency cap and no amount cap. In the
+ *       real world an Altana session key limits both. This is not a simplification that
+ *       hits both sides equally: only the agent's side gets the magic wallet. Set
+ *       `agentBudgetBase` to force an honest comparison.
  *
- *   (c) Harga hutang dianggap TETAP; hanya harga agunan yang bergerak lewat
- *       `priceSeriesBps`. Depeg atau kenaikan harga aset hutang (skenario
- *       nyata yang melikuidasi banyak posisi) tidak pernah muncul di sini,
- *       dan skenario semacam itu memukul pihak yang bertindak lambat maupun
- *       cepat — tetapi model ini menghapusnya sepenuhnya dari perbandingan.
+ *   (c) The debt's price is assumed FIXED; only the collateral price moves, via
+ *       `priceSeriesBps`. A depeg or a rise in the debt asset's price (a real scenario
+ *       that liquidates plenty of positions) never appears here, and such a scenario hits
+ *       the slow actor and the fast one alike — but this model removes it from the
+ *       comparison entirely.
  *
- * Kesimpulannya: `liquidationsAvoided` yang dihasilkan modul ini harus dibaca
- * sebagai BATAS ATAS (upper bound) dari keunggulan agent dibanding manusia —
- * bukan janji hasil di dunia nyata. Dunia nyata hanya bisa membuat keunggulan
- * ini terlihat lebih kecil, tidak pernah lebih besar dari yang dilaporkan.
+ * The conclusion: the `liquidationsAvoided` this module produces must be read as an UPPER
+ * BOUND on the agent's edge over a human — not a promise about the real world. The real
+ * world can only make this edge look smaller, never larger than reported.
  *
- * Catatan desain (memengaruhi angka hasil): jumlah repay manusia DIHITUNG
- * ULANG dari `decide()` pada candle kematangan (saat manusia benar-benar
- * bertindak), bukan dibekukan dari angka yang muncul saat kebutuhan pertama
- * terdeteksi — manusia nyata mengecek ulang situasi saat akhirnya bertindak,
- * bukan mengeksekusi rencana lama yang sudah basi.
+ * A design note (it affects the resulting numbers): the human's repay amount is
+ * RECOMPUTED from `decide()` on the candle it matures (when the human actually acts), not
+ * frozen from the number that appeared when the need was first detected — a real human
+ * re-checks the situation when they finally act, rather than executing a stale old plan.
  * ============================================================================
  */
 import { computeHealthFactor } from "./healthFactor.js";
@@ -62,23 +57,23 @@ export interface BacktestResult {
   agentLiquidations: number;
   humanLiquidations: number;
   /**
-   * humanLiquidations - agentLiquidations, jadi nilainya HANYA -1, 0, atau 1
-   * untuk satu kali `runBacktest`: tiap pihak berhenti disimulasikan setelah
-   * likuidasi pertamanya, sehingga tiap sisi paling banyak menyumbang 1.
+   * humanLiquidations - agentLiquidations, so its value is ONLY -1, 0, or 1 for a single
+   * `runBacktest`: each side stops being simulated after its first liquidation, so each
+   * side contributes at most 1.
    *
-   * Karena itu angka ini BUKAN "jumlah likuidasi yang dicegah" dalam arti
-   * hitungan kejadian. Ia adalah hasil satu perbandingan biner atas SATU
-   * lintasan harga: 1 = manusia terlikuidasi sedangkan agent selamat, 0 = nasib
-   * keduanya sama, -1 = justru agent yang terlikuidasi. Klaim seperti "agent
-   * mencegah N likuidasi" hanya sah bila N dihitung dari N kali `runBacktest`
-   * pada N lintasan harga yang berbeda, bukan dari satu run.
+   * This number is therefore NOT "the number of liquidations prevented" in the sense of
+   * an event count. It is the outcome of one binary comparison over ONE price path:
+   * 1 = the human was liquidated while the agent survived, 0 = both met the same fate,
+   * -1 = it was the agent that got liquidated. A claim like "the agent prevented N
+   * liquidations" is only valid when N is counted from N `runBacktest` calls over N
+   * different price paths, not from one run.
    */
   liquidationsAvoided: number;
   /**
-   * true bila `agentBudgetBase` diberikan DAN pada suatu candle agent butuh
-   * bertindak tetapi sisa anggarannya tidak cukup. Sejak titik itu agent tidak
-   * bertindak lagi sampai akhir simulasi, sehingga hasil run ini menggambarkan
-   * agent yang kehabisan modal — bukan agent yang tidak perlu bertindak.
+   * true when `agentBudgetBase` was given AND on some candle the agent needed to act but
+   * its remaining budget was not enough. From that point on the agent does not act again
+   * for the rest of the simulation, so this run's result describes an agent that ran out
+   * of capital — not an agent that had no need to act.
    */
   agentBudgetExhausted: boolean;
 }
@@ -91,26 +86,25 @@ export interface BacktestInput {
   humanReactionCandles: number;
   thresholds?: Thresholds;
   /**
-   * Total repay maksimum yang boleh dikeluarkan agent SELAMA SELURUH simulasi
-   * (basis 8 desimal, satuan yang sama dengan `startDebtBase`). Bila sebuah
-   * intervensi tidak muat di sisa anggaran, intervensi itu TIDAK dieksekusi
-   * sebagian — agent berhenti bertindak sama sekali untuk sisa simulasi,
-   * persis seperti manusia yang tidak pernah bertindak, dan
-   * `agentBudgetExhausted` menjadi true.
+   * The maximum total repay the agent may spend ACROSS THE WHOLE simulation (8-decimal
+   * basis, the same unit as `startDebtBase`). If an intervention does not fit in the
+   * remaining budget, that intervention is NOT partially executed — the agent stops
+   * acting entirely for the rest of the simulation, exactly like a human who never acted,
+   * and `agentBudgetExhausted` becomes true.
    *
-   * Bila dibiarkan undefined, agent dianggap bermodal tak terbatas: lihat
-   * poin (b) di kepala file. Untuk membandingkan agent dengan session key
-   * Altana yang sungguhan (yang punya batas nominal), field ini WAJIB diisi.
+   * Left undefined, the agent is treated as having unlimited capital: see point (b) at the
+   * top of this file. To compare the agent against a real Altana session key (which has an
+   * amount cap), this field MUST be set.
    */
   agentBudgetBase?: bigint;
 }
 
 const BPS = 10_000n;
 
-/** Alamat bohongan — backtest tidak pernah menyentuh chain, hanya angka murni. */
+/** A fake address — the backtest never touches the chain, only pure numbers. */
 const DUMMY_ACCOUNT = "0x0000000000000000000000000000000000000000" as const;
 
-/** Aksi yang tidak butuh respons nyata: tidak ada risiko, atau baru peringatan. */
+/** Actions that need no real response: there is no risk, or it is only a warning. */
 function actionNeedsResponse(action: string): boolean {
   return action !== "NONE" && action !== "WARN";
 }
@@ -133,25 +127,24 @@ function buildPosition(
 }
 
 /**
- * Fungsi MURNI: tidak ada network, Date.now(), process.env, atau I/O apa pun.
- * Deret harga dan seluruh parameter lain masuk lewat argumen; keluarannya
- * hanya deterministik dari argumen tersebut.
+ * A PURE function: no network, no Date.now(), no process.env, no I/O of any kind. The
+ * price series and every other parameter arrive as arguments; the output is determined
+ * only by those arguments.
  *
- * Menjalankan dua simulasi terpisah di atas `priceSeriesBps` yang sama:
- *  - agent: pada tiap candle, jika `decide` menyarankan aksi selain
- *    NONE/WARN, hutang langsung dikurangi `suggestedRepayBase` pada candle
- *    itu juga — selama `agentBudgetBase` (bila diberikan) masih mencukupi.
- *    Perhatikan bahwa DELEVERAGE pun dimodelkan hanya sebagai pengurangan
- *    hutang, agunan dibiarkan utuh; lihat poin (a) di kepala file.
- *  - manusia: aksi baru benar-benar dieksekusi `humanReactionCandles` candle
- *    setelah aksi PERTAMA KALI dibutuhkan (candle-candle berikutnya yang
- *    masih membutuhkan aksi sebelum jeda itu selesai tidak mengulang
- *    hitungan mundur).
+ * It runs two separate simulations over the same `priceSeriesBps`:
+ *  - the agent: on each candle, if `decide` suggests anything other than NONE/WARN, the
+ *    debt is reduced by `suggestedRepayBase` on that same candle — as long as
+ *    `agentBudgetBase` (when given) still covers it. Note that even DELEVERAGE is modeled
+ *    as nothing but a debt reduction, with collateral left intact; see point (a) at the
+ *    top of this file.
+ *  - the human: an action is only actually executed `humanReactionCandles` candles after
+ *    an action was FIRST needed (later candles that still need action before that delay
+ *    elapses do not restart the countdown).
  *
- * Likuidasi dicatat untuk suatu pihak bila HF-nya sudah ≤ HF_ONE pada suatu
- * candle SEBELUM pihak itu sempat menindaklanjuti kebutuhan yang muncul di
- * candle itu atau sebelumnya. Begitu likuidasi tercatat, simulasi pihak itu
- * berhenti (posisinya sudah disita, tidak ada lagi hutang untuk dikelola).
+ * A liquidation is recorded for a side when its HF is already <= HF_ONE on some candle
+ * BEFORE that side got to act on a need that arose on that candle or earlier. Once a
+ * liquidation is recorded, that side's simulation stops (its position has been seized,
+ * there is no debt left to manage).
  */
 export function runBacktest(input: BacktestInput): BacktestResult {
   const {
@@ -164,7 +157,7 @@ export function runBacktest(input: BacktestInput): BacktestResult {
     agentBudgetBase,
   } = input;
 
-  // --- simulasi agent: bertindak pada candle yang sama saat dibutuhkan ---
+  // --- agent simulation: acts on the same candle the need appears ---
   let agentDebt = startDebtBase;
   let agentLiquidated = false;
   let agentInterventions = 0;
@@ -184,11 +177,11 @@ export function runBacktest(input: BacktestInput): BacktestResult {
 
     const decision = decide(buildPosition(collateral, agentDebt, liquidationThresholdBps, hf), thresholds);
     if (actionNeedsResponse(decision.action)) {
-      // Anggaran habis = agent lumpuh untuk SISA simulasi, bukan sekadar
-      // melewatkan satu candle. Sengaja tidak ada pembayaran sebagian dari
-      // sisa anggaran: repay setengah jalan tidak mengembalikan HF ke target
-      // dan akan membuat model kembali melebih-lebihkan apa yang bisa dicapai
-      // agent dengan modal yang tidak dimilikinya.
+      // An exhausted budget = the agent is paralyzed for the REST of the simulation, not
+      // merely skipping one candle. There is deliberately no partial payment from what is
+      // left of the budget: a half-way repay does not bring HF back to target and would
+      // once again have the model overstate what the agent can achieve with capital it
+      // does not have.
       if (agentBudgetExhausted) continue;
 
       if (agentBudgetBase !== undefined && agentSpent + decision.suggestedRepayBase > agentBudgetBase) {
@@ -202,7 +195,7 @@ export function runBacktest(input: BacktestInput): BacktestResult {
     }
   }
 
-  // --- simulasi manusia: bertindak humanReactionCandles setelah kebutuhan pertama muncul ---
+  // --- human simulation: acts humanReactionCandles after the first need appears ---
   let humanDebt = startDebtBase;
   let humanLiquidated = false;
   let pendingSince: number | null = null;

@@ -1,35 +1,32 @@
 /**
- * Composition root Guardian: satu tempat yang merakit rantai lengkap
- * baca posisi → `decide` → `executeDecision` → kirim lewat session key,
- * beserta persistensi state dan kill switch-nya.
+ * Guardian's composition root: the one place that assembles the full chain read position
+ * -> `decide` -> `executeDecision` -> send via the session key, together with its state
+ * persistence and kill switch.
  *
- * ## Kenapa modul ini ada
+ * ## Why this module exists
  *
- * Sampai sekarang perakitan itu hanya hidup di dalam `scripts/e2e-guardian.ts`
- * sebagai ±200 baris yang tidak bisa dipakai ulang dan tidak dijaga test apa
- * pun. Lima potongan tidak punya padanan di `src/` sama sekali: konversi USD8 →
- * unit token, pembacaan `assets()` + feed harga, cek saldo sebelum kirim,
- * pembuatan `ExecuteState` awal, dan penyusunan `sendRepay`. Siapa pun yang
- * menyambungkan runtime berikutnya akan menyalinnya dari sebuah skrip demo, dan
- * salinan pertama yang meleset satu orde pada konversi satuan tidak akan
- * tertangkap satu test pun.
+ * Until now that assembly only lived inside `scripts/e2e-guardian.ts` as roughly 200 lines
+ * that could not be reused and were guarded by no test at all. Five pieces had no
+ * equivalent in `src/` whatsoever: the USD8 -> token units conversion, reading `assets()` +
+ * the price feed, the balance check before sending, building the initial `ExecuteState`, and
+ * composing `sendRepay`. Whoever wired up the next runtime would have copied them out of a
+ * demo script, and the first copy that was off by one order of magnitude on the unit
+ * conversion would not have been caught by a single test.
  *
- * Sekarang `createGuardian` yang memilikinya, E2E memanggilnya, dan backend
- * akan memanggil yang sama.
+ * Now `createGuardian` owns it, the E2E script calls it, and the backend will call the same
+ * thing.
  *
- * ## Yang SENGAJA tetap di luar
+ * ## What is DELIBERATELY left outside
  *
- * `sendCalls` — jalur relay Altana (`AltanaWalletProvider._relayExecute`) —
- * disuntikkan, tidak dirakit di sini. Dua alasan: modul di `src/strategy/`
- * tidak boleh menarik dependensi SDK pihak ketiga, dan jalur itu memakai API
- * internal SDK yang bisa berubah tanpa pemberitahuan. Batas suntikannya adalah
- * batas yang sama yang dipakai `chain/session.ts`, sehingga seluruh modul ini
- * bisa diuji tanpa menyentuh jaringan sama sekali.
+ * `sendCalls` — the Altana relay path (`AltanaWalletProvider._relayExecute`) — is injected,
+ * not assembled here. Two reasons: modules in `src/strategy/` must not pull in third-party
+ * SDK dependencies, and that path uses internal SDK APIs that can change without notice.
+ * The injection boundary is the same boundary `chain/session.ts` uses, so this entire
+ * module can be tested without touching the network at all.
  *
- * `explainDecision` juga disuntikkan dan default-nya BUKAN LLM, melainkan
- * `decision.reason` apa adanya. dGrid butuh 3–46 detik; memasangnya secara
- * diam-diam sebagai default akan menaruhnya di jalur yang dipakai backend
- * tanpa ada yang memintanya (CLAUDE.md #1).
+ * `explainDecision` is injected too, and its default is NOT an LLM but `decision.reason`
+ * as-is. dGrid takes 3–46 seconds; quietly wiring it in as the default would place it on
+ * the path the backend uses without anyone asking for it (CLAUDE.md #1).
  */
 import type { PublicClient } from "viem";
 import { readAavePosition } from "./chain/aave.js";
@@ -126,7 +123,7 @@ const ERC20_ABI = [
   },
 ] as const;
 
-/** Kesalahan perakitan Guardian: selalu berarti "jangan mulai loop sama sekali". */
+/** A Guardian assembly error: it always means "do not start the loop at all". */
 export class GuardianConfigError extends Error {
   constructor(message: string) {
     super(message);
@@ -135,43 +132,42 @@ export class GuardianConfigError extends Error {
 }
 
 export interface GuardianConfig {
-  /** Wallet pemilik posisi — yang hutangnya dibayar, dan atas nama siapa sesi bertindak. */
+  /** The position owner's wallet — whose debt is repaid, and on whose behalf the session acts. */
   account: `0x${string}`;
-  /** Client viem read-only untuk rantai tempat posisi berada. */
+  /** A read-only viem client for the chain the position lives on. */
   client: PublicClient;
-  /** Pool ber-ABI `getUserAccountData` Aave v3. */
+  /** A pool with Aave v3's `getUserAccountData` ABI. */
   pool: `0x${string}`;
-  /** Token hutang yang boleh dibayar. */
+  /** The debt token that may be repaid. */
   repayAsset: `0x${string}`;
-  /** Izin sesi apa adanya dari file sesi; diperiksa saat konstruksi. */
+  /** The session permissions exactly as they came from the session file; checked at construction. */
   permissions: SessionPermissions;
-  /** Pengirim batch lewat sesi Altana. Lihat catatan "Yang SENGAJA tetap di luar". */
+  /** The batch sender via the Altana session. See the "What is DELIBERATELY left outside" note. */
   sendCalls: SessionRepayDeps["sendCalls"];
   limits: ExecuteLimits;
   logger: Logger;
   /**
-   * Persistensi state. **WAJIB, dan sengaja tanpa default.**
+   * State persistence. **REQUIRED, and deliberately without a default.**
    *
-   * Default memori pernah ada di sini dan itu keliru: ia membuat pilihan paling
-   * berbahaya (batas harian, cooldown, kill switch, dan catatan repay
-   * menggantung hilang setiap restart) menjadi pilihan yang didapat orang tanpa
-   * mengetiknya. Sekarang setiap pemanggil harus menyebutkannya —
-   * `createFileStateStore(path)` untuk proses sungguhan,
-   * `createMemoryStateStore()` untuk test, dan yang kedua terbaca sebagai
-   * keputusan di tempat pemanggilan, bukan sebagai kelalaian.
+   * An in-memory default used to live here and it was wrong: it made the most dangerous
+   * option (the daily cap, the cooldown, the kill switch, and the pending-repay record all
+   * lost on every restart) the one people got without typing anything. Now every caller has
+   * to name it — `createFileStateStore(path)` for a real process,
+   * `createMemoryStateStore()` for tests — and the second reads as a decision at the call
+   * site rather than as an oversight.
    */
   stateStore: ExecuteStateStore;
-  /** Jam dalam detik epoch; disuntikkan agar bisa dikontrol penuh saat test. */
+  /** The clock in epoch seconds; injected so it is fully controllable in tests. */
   now?: () => number;
-  /** Default: `decision.reason` apa adanya, TANPA LLM. */
+  /** Default: `decision.reason` as-is, NO LLM. */
   explainDecision?: ExplainFn;
   thresholds?: Thresholds;
   onCycle?: (result: CycleResult) => void;
-  /** Catatan rinci jalur sesi (konversi satuan, approve). Default: senyap. */
+  /** Detailed notes about the session path (unit conversion, approve). Default: silent. */
   log?: (message: string) => void;
 }
 
-/** Konfigurasi aset repay yang dibaca dari rantai saat konstruksi, bukan diasumsikan. */
+/** The repay asset's configuration, read from the chain at construction rather than assumed. */
 export interface RepayAssetInfo {
   readonly asset: `0x${string}`;
   readonly feed: `0x${string}`;
@@ -179,15 +175,15 @@ export interface RepayAssetInfo {
 }
 
 export interface Guardian {
-  /** Konfigurasi aset repay apa adanya dari rantai — dicetak skrip, dipakai backend. */
+  /** The repay asset's configuration exactly as read from the chain — printed by the script, used by the backend. */
   readonly repayAsset: RepayAssetInfo;
-  /** Membaca posisi terkini, ditambatkan ke satu blok (lihat `chain/aave.ts`). */
+  /** Reads the current position, anchored to a single block (see `chain/aave.ts`). */
   readPosition(): Promise<Position>;
-  /** Menjalankan SATU siklus, mengalirkan dan mempersist state-nya sendiri. */
+  /** Runs ONE cycle, flowing and persisting its own state. */
   runOnce(): Promise<GuardCycleOutcome>;
-  /** Menjalankan loop; handle-nya punya `kill()` yang sungguhan (lihat `guard.ts`). */
+  /** Runs the loop; its handle has a real `kill()` (see `guard.ts`). */
   start(intervalMs: number): GuardLoopHandle;
-  /** State eksekusi terkini (anggaran, cooldown, kill switch, repay menggantung). */
+  /** The current execution state (budget, cooldown, kill switch, pending repay). */
   getExecuteState(): ExecuteState;
 }
 
@@ -199,12 +195,12 @@ function requireHexAddress(value: unknown, label: string): `0x${string}` {
 }
 
 /**
- * Merakit Guardian yang siap dijalankan.
+ * Assembles a ready-to-run Guardian.
  *
- * Semua pembacaan konfigurasi aset terjadi DI SINI, saat konstruksi, bukan saat
- * transaksi pertama: aset yang tidak aktif, desimal yang tidak konsisten, feed
- * yang bukan 8 desimal, atau izin sesi yang terlalu longgar harus terlihat
- * sebelum siklus pertama berjalan — bukan setelah agent memutuskan membayar.
+ * Every read of the asset configuration happens HERE, at construction, not on the first
+ * transaction: an inactive asset, inconsistent decimals, a feed that is not 8 decimals, or
+ * session permissions that are too broad must all be visible before the first cycle runs —
+ * not after the agent has decided to pay.
  */
 export async function createGuardian(config: GuardianConfig): Promise<Guardian> {
   const now = config.now ?? (() => Math.floor(Date.now() / 1000));
@@ -212,7 +208,7 @@ export async function createGuardian(config: GuardianConfig): Promise<Guardian> 
   const store = config.stateStore;
   const explain: ExplainFn = config.explainDecision ?? (async (_pos, decision) => decision.reason);
 
-  // --- Konfigurasi aset repay, dibaca dari pool ------------------------------
+  // --- The repay asset's configuration, read from the pool -------------------
   const [feedRaw, , , tokenDecimalsFromPool, enabled] = (await config.client.readContract({
     address: config.pool,
     abi: POOL_ASSETS_ABI,
@@ -227,9 +223,9 @@ export async function createGuardian(config: GuardianConfig): Promise<Guardian> 
   }
   const feed = requireHexAddress(feedRaw, `Feed harga aset ${config.repayAsset}`);
 
-  // Dua sumber independen untuk desimal token, dan feed yang wajib 8 desimal.
-  // Inilah pengganti "cek bolak-balik" tautologis yang dulu ada di skrip E2E —
-  // lihat catatan lengkapnya di kepala `units.ts`.
+  // Two independent sources for the token's decimals, plus a feed that must be 8 decimals.
+  // This replaces the tautological "round-trip check" that used to be in the E2E script —
+  // see the full note at the top of `units.ts`.
   const tokenDecimals = Number(
     (await config.client.readContract({
       address: config.repayAsset,
@@ -248,7 +244,7 @@ export async function createGuardian(config: GuardianConfig): Promise<Guardian> 
   );
   assertFeedIsUsd8(feedDecimals, config.repayAsset);
 
-  /** Harga aset repay, dibaca SEGAR setiap konversi — bukan disimpan saat konstruksi. */
+  /** The repay asset's price, read FRESH on every conversion — not cached at construction. */
   async function readRepayPriceUsd8(): Promise<bigint> {
     const [, answer] = (await config.client.readContract({
       address: feed,
@@ -263,10 +259,10 @@ export async function createGuardian(config: GuardianConfig): Promise<Guardian> 
     return answer;
   }
 
-  // Gagal cepat kalau feed-nya memang tidak bisa dibaca sama sekali.
+  // Fail fast if the feed genuinely cannot be read at all.
   await readRepayPriceUsd8();
 
-  // --- Jembatan satuan + cek saldo -----------------------------------------
+  // --- The units bridge + the balance check ---------------------------------
   const toTokenUnits: SessionRepayDeps["toTokenUnits"] = async (asset, amountUsd8) => {
     const priceUsd8 = await readRepayPriceUsd8();
     const units = usd8ToTokenUnits(amountUsd8, tokenDecimals, priceUsd8);
@@ -279,8 +275,8 @@ export async function createGuardian(config: GuardianConfig): Promise<Guardian> 
       args: [config.account],
     })) as bigint;
     if (saldo < units) {
-      // Gagal SEBELUM kirim, bukan membiarkan transaksi revert on-chain dan
-      // membakar gas untuk sesuatu yang sudah bisa diketahui dari satu bacaan.
+      // Fail BEFORE sending, rather than letting the transaction revert on chain and burn
+      // gas for something one read could already have told us.
       throw new GuardianConfigError(
         `Saldo token repay kurang: ${saldo} unit < ${units} unit yang dibutuhkan.`,
       );
@@ -288,10 +284,10 @@ export async function createGuardian(config: GuardianConfig): Promise<Guardian> 
     return units;
   };
 
-  // --- Penanda tangan repay lewat session key ------------------------------
-  // `createSessionSendRepay` memeriksa allowlist sesi saat dikonstruksi dan
-  // menolak berjalan sama sekali bila `calls` kosong/hilang (= izin tanpa batas
-  // di Altana) atau lebih luas daripada repay + approve.
+  // --- The repay signer via the session key --------------------------------
+  // `createSessionSendRepay` checks the session allowlist at construction and refuses to
+  // run at all when `calls` is empty or missing (= unlimited permission in Altana) or is
+  // broader than repay + approve.
   const sendRepay = createSessionSendRepay({
     walletAddress: config.account,
     pool: config.pool,
@@ -309,7 +305,7 @@ export async function createGuardian(config: GuardianConfig): Promise<Guardian> 
     log,
   });
 
-  // --- State: dimuat dari store, BUKAN direset setiap start -----------------
+  // --- State: loaded from the store, NOT reset on every start ---------------
   const tersimpan = await store.load();
   let currentState: ExecuteState = tersimpan ?? initialExecuteState(now());
   if (tersimpan === null) {
@@ -333,10 +329,10 @@ export async function createGuardian(config: GuardianConfig): Promise<Guardian> 
       repayAsset: config.repayAsset,
       sendRepay,
       now,
-      // Catatan menggantung disimpan SEBELUM transaksi berangkat, bukan setelah
-      // siklus selesai: `waitForTransactionReceipt` menunggu sampai 180 detik,
-      // dan proses yang mati di dalam jendela itu tidak boleh meninggalkan
-      // berkas state pra-siklus yang membuat restart membayar lagi.
+      // The pending record is saved BEFORE the transaction departs, not after the cycle
+      // finishes: `waitForTransactionReceipt` waits up to 180 seconds, and a process that
+      // dies inside that window must not leave behind a pre-cycle state file that makes a
+      // restart pay again.
       persistBeforeSend: async (state) => {
         await store.save(state);
         currentState = state;
@@ -364,10 +360,10 @@ export async function createGuardian(config: GuardianConfig): Promise<Guardian> 
       try {
         await store.save(currentState);
       } catch (err) {
-        // Sama seperti di dalam loop: kegagalan menyimpan dilaporkan, bukan
-        // dibiarkan menghentikan perlindungan posisi. Lewat `logError` yang
-        // membungkam exception logger — logger yang melempar di dalam `catch`
-        // ini akan membuat `runOnce()` melempar setelah state sudah maju.
+        // Same as inside the loop: a persistence failure is reported, not allowed to stop
+        // protecting the position. Via `logError`, which swallows logger exceptions — a
+        // logger that threw inside this `catch` would make `runOnce()` throw after the state
+        // had already advanced.
         logError(config.logger, "guardian: gagal menyimpan state eksekusi", {
           account: config.account,
           error: err instanceof Error ? err.message : String(err),

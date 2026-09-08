@@ -11,20 +11,20 @@ import {
 } from "./types.js";
 
 /**
- * Menyusun kalimat penjelasan dari angka-angka keputusan. Kode ini, bukan
- * LLM, yang menentukan isi kalimat — modul penjelasan LLM (task terpisah)
- * hanya boleh memperindah kalimat ini, tidak pernah mengubah angkanya.
+ * Builds the explanation sentence from the decision's numbers. This code, not an LLM,
+ * determines what the sentence says — the LLM explanation module (a separate task) may
+ * only polish this sentence, never change its numbers.
  */
 function buildReason(action: Action, hf: bigint | null, dropBps: bigint | null): string {
   if (hf === null) {
     return "Tidak ada hutang sehingga tidak ada risiko likuidasi.";
   }
 
-  // `dropBps` di sini TIDAK PERNAH null: `dropToLiquidationBps` hanya
-  // mengembalikan null untuk hf === null, dan kasus itu sudah keluar di atas.
-  // Dulu tempat ini punya cabang fallback "0,0" yang tidak pernah tercapai —
-  // cabang mati seperti itu menyamarkan pelanggaran invarian jadi kalimat yang
-  // terlihat normal ("boleh turun 0,0%"). Sekarang ia gagal keras dan terlihat.
+  // `dropBps` here is NEVER null: `dropToLiquidationBps` returns null only for
+  // hf === null, and that case already returned above. This spot used to have a "0,0"
+  // fallback branch that was never reached — a dead branch like that disguises a broken
+  // invariant as a sentence that looks normal ("may fall 0,0%"). Now it fails hard and
+  // visibly.
   if (dropBps === null) {
     throw new PositionError(
       `Invariant dilanggar: dropToLiquidationBps null padahal health factor ${hf} bukan null.`,
@@ -50,11 +50,11 @@ function buildReason(action: Action, hf: bigint | null, dropBps: bigint | null):
 }
 
 /**
- * Memastikan ambang terurut secara aman: warn > partialRepay > deleverage > HF_ONE.
- * Ambang yang tidak terurut atau menyentuh/di bawah titik likuidasi (HF_ONE)
- * membuat rantai pemeriksaan di `decide` menghasilkan keputusan yang tidak
- * terdefinisi secara diam-diam — untuk agent yang membelanjakan uang user,
- * ini harus gagal keras dan segera, bukan lolos tanpa terdeteksi.
+ * Ensures the thresholds are safely ordered: warn > partialRepay > deleverage > HF_ONE.
+ * Thresholds that are out of order, or that touch or fall below the liquidation point
+ * (HF_ONE), make the check chain in `decide` produce a silently undefined decision — for
+ * an agent that spends a user's money this must fail hard and immediately, not slip
+ * through undetected.
  */
 function validateThresholds(t: Thresholds): void {
   if (t.warn <= t.partialRepay || t.partialRepay <= t.deleverage || t.deleverage <= HF_ONE) {
@@ -66,18 +66,17 @@ function validateThresholds(t: Thresholds): void {
 }
 
 /**
- * Memastikan `Position` masuk akal sebelum dipakai menghitung apa pun.
+ * Ensures a `Position` makes sense before anything is computed from it.
  *
- * `decide` sebelumnya memvalidasi ambang tetapi mempercayai `Position` bulat-
- * bulat. Akibatnya `liquidationThresholdBps: 0n` — nilai yang muncul dari
- * pembacaan on-chain yang gagal sebagian, mock test yang lupa diisi, atau
- * pasar yang di-freeze — menghasilkan HF 0 sehingga posisi yang sebenarnya
- * sehat dinilai EMERGENCY dan disarankan melunasi SELURUH hutang. Untuk agent
- * yang membelanjakan uang user, input tak masuk akal harus gagal keras di
- * pintu masuk, bukan berubah jadi saran pembayaran maksimal.
+ * `decide` used to validate the thresholds but trust `Position` completely. The result
+ * was that `liquidationThresholdBps: 0n` — a value that shows up from a partially failed
+ * on-chain read, a test mock someone forgot to fill in, or a frozen market — produced an
+ * HF of 0, so a genuinely healthy position was judged EMERGENCY and advised to repay ALL
+ * of its debt. For an agent that spends a user's money, nonsensical input must fail hard
+ * at the door, not turn into a recommendation to pay the maximum.
  *
- * Ambang likuidasi valid adalah 0 < bps ≤ 10000 (10000 bps = 100%, batas atas
- * fisik: agunan tidak bisa menjamin lebih dari nilainya sendiri).
+ * A valid liquidation threshold is 0 < bps <= 10000 (10000 bps = 100%, the physical upper
+ * bound: collateral cannot secure more than its own value).
  */
 function validatePosition(pos: Position): void {
   if (pos.liquidationThresholdBps <= 0n || pos.liquidationThresholdBps > 10_000n) {
@@ -95,10 +94,9 @@ function validatePosition(pos: Position): void {
 }
 
 /**
- * Mesin keputusan Guardian. Murni: tanpa network, Date.now(), process.env,
- * atau I/O apa pun. Memeriksa dari kondisi paling gawat ke paling ringan
- * supaya kasus batas (persis di suatu ambang) selalu jatuh ke tindakan yang
- * lebih aman, bukan yang lebih longgar.
+ * The Guardian decision engine. Pure: no network, no Date.now(), no process.env, no I/O
+ * of any kind. It checks from the most severe condition to the mildest, so a boundary
+ * case (exactly on a threshold) always falls to the safer action, not the looser one.
  */
 export function decide(pos: Position, thresholds: Thresholds = DEFAULT_THRESHOLDS): Decision {
   validateThresholds(thresholds);

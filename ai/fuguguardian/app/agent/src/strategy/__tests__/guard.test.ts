@@ -30,8 +30,8 @@ const SAFE_POSITION: Position = {
   blockNumber: 1n,
 };
 
-// HF 1,05e18 > HF_ONE (1e18) tetapi <= ambang deleverage default (1,1e18) ->
-// `decide` menghasilkan DELEVERAGE, bukan EMERGENCY (yang butuh HF <= 1,0e18).
+// HF 1.05e18 > HF_ONE (1e18) but <= the default deleverage threshold (1.1e18) ->
+// `decide` produces DELEVERAGE, not EMERGENCY (which needs HF <= 1.0e18).
 const RISKY_POSITION: Position = {
   ...SAFE_POSITION,
   debtBase: 500_000_000_000n,
@@ -104,10 +104,10 @@ function expectFail(result: CycleResult): asserts result is CycleResult & { ok: 
 
 describe("runGuardCycle", () => {
   it("siklus normal menghasilkan catatan lengkap", async () => {
-    // RISKY_POSITION (aksi != NONE) sengaja dipakai di sini, bukan
-    // SAFE_POSITION, supaya `explainDecision` benar-benar dipanggil dan
-    // catatan memuat penjelasan dari mock, bukan fallback `decision.reason`
-    // (lihat aturan #2 di kepala modul: NONE melewati explainDecision).
+    // RISKY_POSITION (action != NONE) is used here on purpose rather than SAFE_POSITION, so
+    // that `explainDecision` really is called and the record carries the mock's explanation
+    // instead of the `decision.reason` fallback (see rule #2 at the top of the module: NONE
+    // skips explainDecision).
     const deps = baseDeps({ readPosition: vi.fn(async () => RISKY_POSITION) });
     const { result, nextExecuteState } = await runGuardCycle(deps, execState());
 
@@ -123,7 +123,7 @@ describe("runGuardCycle", () => {
     expect(result.reason.length).toBeGreaterThan(0);
     expect(typeof result.executeReason).toBe("string");
     expect(result.explanation).toBe("Penjelasan ramah dari LLM.");
-    // Tidak ada eksekusi nyata di siklus ini -> state eksekusi tidak berubah.
+    // There is no real execution in this cycle -> the execution state does not change.
     expect(nextExecuteState).toEqual(execState());
   });
 
@@ -166,9 +166,9 @@ describe("runGuardCycle", () => {
     expectFail(result);
     expect(result.error).toContain("eksekusi ditolak");
     expect(explainDecisionSpy).not.toHaveBeenCalled();
-    // Kontrak execute.ts: state hanya berubah SETELAH kirim berhasil. Kalau
-    // executeDecision melempar, tidak ada state baru -- state lama diteruskan
-    // apa adanya, bukan diam-diam dianggap berubah.
+    // The execute.ts contract: state only changes AFTER a send succeeds. If executeDecision
+    // throws there is no new state -- the old state is passed through as-is, not quietly
+    // treated as changed.
     expect(nextExecuteState).toEqual(startingState);
   });
 
@@ -191,13 +191,13 @@ describe("runGuardCycle", () => {
     const { result, nextExecuteState } = await runGuardCycle(deps, execState());
 
     expectOk(result);
-    // Hasil eksekusi tetap utuh walau penjelasan gagal.
+    // The execution result stays intact even when the explanation fails.
     expect(result.sent).toBe(true);
     expect(result.amountSentUsd8).toBe(42_000_000n);
     expect(result.txHash).toBe("0xdeadbeef");
     expect(nextExecuteState).toEqual(successResult.state);
-    // Penjelasan jatuh kembali PERSIS ke alasan mentah dari keputusan, bukan
-    // ke pesan error yang bocor atau string generik lain.
+    // The explanation falls back to EXACTLY the decision's raw reason, not to a leaked error
+    // message or some other generic string.
     expect(result.explanation).toBe(result.reason);
   });
 
@@ -292,21 +292,21 @@ describe("runGuardCycle", () => {
     expectOk(first.result);
     expect(first.result.sent).toBe(true);
     expect(sendRepay).toHaveBeenCalledTimes(1);
-    // Anggaran harian sudah habis dan cooldown baru mulai -- state HARUS
-    // membawa ini ke siklus berikutnya, bukan direset ke `initialState`.
+    // The daily budget is spent and the cooldown has just begun -- the state MUST carry this
+    // into the next cycle, not reset to `initialState`.
     expect(first.nextExecuteState.spentTodayUsd8).toBeGreaterThan(0n);
     expect(first.nextExecuteState.lastActionAt).toBe(clock);
 
-    // Siklus kedua, 60 detik kemudian (mensimulasikan intervalMs = 60_000
-    // di startGuardLoop) -- BUKAN 1 jam, jadi masih dalam cooldown DAN
-    // anggaran harian sudah habis dari siklus pertama.
+    // The second cycle, 60 seconds later (simulating intervalMs = 60_000 in startGuardLoop)
+    // -- NOT 1 hour, so it is still inside the cooldown AND the daily budget was already
+    // spent by the first cycle.
     clock += 60;
     const second = await runGuardCycle(deps, first.nextExecuteState);
     expectOk(second.result);
     expect(second.result.sent).toBe(false);
     expect(second.result.amountSentUsd8).toBe(0n);
-    // sendRepay TIDAK dipanggil lagi -- inilah pembuktian bahwa state
-    // benar-benar mengalir, bukan direset diam-diam setiap siklus.
+    // sendRepay is NOT called again -- this is the proof that the state really flows rather
+    // than being quietly reset every cycle.
     expect(sendRepay).toHaveBeenCalledTimes(1);
   });
 
@@ -362,11 +362,11 @@ describe("runGuardCycle", () => {
     expect(result.sent).toBe(false);
     expect(result.amountSentUsd8).toBe(0n);
     expect(sendRepay).not.toHaveBeenCalled();
-    // Alasan keputusan bicara soal health factor/likuidasi...
+    // The decision reason talks about the health factor/liquidation...
     expect(result.reason).toMatch(/likuidasi|darurat/i);
-    // ...sedangkan alasan eksekusi harus secara eksplisit bicara soal kill switch
-    // -- pembaca catatan harus bisa membedakan "tidak dikirim karena kill
-    // switch" dari "tidak dikirim karena cooldown/anggaran habis".
+    // ...while the execution reason must explicitly talk about the kill switch -- whoever
+    // reads the record has to be able to tell "not sent because of the kill switch" from
+    // "not sent because of the cooldown / an exhausted budget".
     expect(result.executeReason).toMatch(/kill switch/i);
     expect(result.executeReason).not.toBe(result.reason);
   });
@@ -381,7 +381,7 @@ describe("startGuardLoop", () => {
 
       const handle = startGuardLoop(deps, 1_000, execState());
 
-      // Siklus pertama berjalan segera.
+      // The first cycle runs immediately.
       await vi.advanceTimersByTimeAsync(0);
       expect(readPosition).toHaveBeenCalledTimes(1);
 
@@ -437,18 +437,18 @@ describe("startGuardLoop", () => {
 
       const handle = startGuardLoop(deps, 1_000, execState());
 
-      // Siklus pertama sudah dimulai (readPosition dipanggil) tapi belum
-      // selesai -- stop() dipanggil DI TENGAH siklus yang sedang berjalan.
+      // The first cycle has started (readPosition was called) but has not finished --
+      // stop() is called IN THE MIDDLE of a cycle in flight.
       await vi.advanceTimersByTimeAsync(0);
       expect(readPosition).toHaveBeenCalledTimes(1);
       handle.stop();
 
-      // Siklus pertama akhirnya selesai...
+      // The first cycle finally finishes...
       resolveReadPosition(SAFE_POSITION);
       await vi.advanceTimersByTimeAsync(0);
 
-      // ...tetapi karena stop() sudah dipanggil sebelum selesai, tidak ada
-      // siklus baru yang dijadwalkan sesudahnya.
+      // ...but because stop() was called before it finished, no new cycle is scheduled after
+      // it.
       await vi.advanceTimersByTimeAsync(10_000);
       expect(readPosition).toHaveBeenCalledTimes(1);
     } finally {
@@ -503,13 +503,12 @@ describe("startGuardLoop", () => {
   });
 
   it("startGuardLoop mengalirkan state eksekusi antar siklus: anggaran habis di siklus 1 menolak siklus 2, sendRepay hanya sekali", async () => {
-    // Round 2 review: test dua-siklus sebelumnya memanggil runGuardCycle
-    // langsung dan mengalirkan state secara manual di level test -- itu
-    // mengunci kontrak runGuardCycle, TAPI TIDAK mengunci bahwa startGuardLoop
-    // benar-benar melakukan pengaliran itu sendiri. Test ini menjalankan dua
-    // siklus lewat startGuardLoop sungguhan (fake timers), sehingga kalau
-    // baris yang menyimpan `outcome.nextExecuteState` ke `currentExecuteState`
-    // dihapus, test ini (bukan hanya test level runGuardCycle) yang gagal.
+    // Round 2 review: the earlier two-cycle test called runGuardCycle directly and flowed
+    // the state by hand at the test level -- that locks in runGuardCycle's contract, BUT it
+    // does NOT lock in that startGuardLoop actually does that flowing itself. This test runs
+    // two cycles through the real startGuardLoop (fake timers), so if the line that stores
+    // `outcome.nextExecuteState` into `currentExecuteState` is deleted, it is this test (not
+    // just the runGuardCycle-level one) that fails.
     vi.useFakeTimers();
     try {
       const sendRepay = vi.fn(async () => "0xdeadbeef" as `0x${string}`);
@@ -517,7 +516,7 @@ describe("startGuardLoop", () => {
       const theLimits = limits({
         maxPerActionUsd8: 100_000_000_000n, // $1000
         maxPerDayUsd8: 100_000_000_000n, // $1000/hari -- habis dalam satu kirim
-        minIntervalSeconds: 0, // isolasi murni pada anggaran harian, bukan cooldown
+        minIntervalSeconds: 0, // isolates the daily budget alone, not the cooldown
       });
       const execFn: ExecuteFn = (decision, pos, state) =>
         executeDecision(decision, pos, theLimits, state, execDeps);
@@ -530,14 +529,14 @@ describe("startGuardLoop", () => {
 
       const handle = startGuardLoop(deps, 1_000, execState({ dayStartedAt: 1_700_000_000 }));
 
-      // Siklus 1 (segera): anggaran penuh -> kirim, menghabiskan seluruh
-      // anggaran harian dalam satu transaksi.
+      // Cycle 1 (immediately): a full budget -> send, spending the entire daily budget in one
+      // transaction.
       await vi.advanceTimersByTimeAsync(0);
       expect(sendRepay).toHaveBeenCalledTimes(1);
 
-      // Siklus 2, dijadwalkan SENDIRI oleh loop 1000ms kemudian. Bila state
-      // eksekusi siklus 1 mengalir dengan benar ke siklus ini, anggaran
-      // harian sudah nol -> tidak boleh mengirim lagi.
+      // Cycle 2, scheduled BY THE LOOP ITSELF 1000ms later. If cycle 1's execution state
+      // flows correctly into this one, the daily budget is already zero -> it must not send
+      // again.
       await vi.advanceTimersByTimeAsync(1_000);
       expect(sendRepay).toHaveBeenCalledTimes(1);
 
@@ -616,8 +615,8 @@ describe("startGuardLoop", () => {
 
 describe("C2 — kegagalan setelah transaksi mendarat tidak pernah membayar dua kali", () => {
   it("runGuardCycle meneruskan state dari RepaySendError, bukan state lama", async () => {
-    // Bentuk kegagalan yang menjadi alasan aturan ini ada: transaksinya sudah
-    // mendarat di blok, yang gagal hanya `waitForTransactionReceipt`.
+    // The failure shape that is the whole reason this rule exists: the transaction landed in
+    // a block, only `waitForTransactionReceipt` failed.
     const sendRepay = vi.fn(async () => {
       throw new Error("waitForTransactionReceipt timeout setelah 180s");
     });
@@ -633,10 +632,10 @@ describe("C2 — kegagalan setelah transaksi mendarat tidak pernah membayar dua 
     const { result, nextExecuteState } = await runGuardCycle(deps, execState());
 
     expectFail(result);
-    // Anggaran DAN cooldown bergerak walau siklusnya tercatat gagal...
+    // The budget AND the cooldown both move even though the cycle is recorded as failed...
     expect(nextExecuteState.spentTodayUsd8).toBeGreaterThan(0n);
     expect(nextExecuteState.lastActionAt).toBe(1_700_000_000);
-    // ...dan repay dicatat menggantung dengan jangkar rekonsiliasinya.
+    // ...and the repay is recorded as pending, with its reconciliation anchors.
     expect(nextExecuteState.pendingRepay).not.toBeNull();
     expect(nextExecuteState.pendingRepay?.debtBaseBeforeSend).toBe(EMERGENCY_POSITION.debtBase);
     expect(nextExecuteState.pendingRepay?.blockNumberBeforeSend).toBe(EMERGENCY_POSITION.blockNumber);
@@ -645,24 +644,24 @@ describe("C2 — kegagalan setelah transaksi mendarat tidak pernah membayar dua 
   it("INTI TASK: sendRepay melempar setelah tx mendarat -> siklus berikutnya TIDAK mengirim ulang", async () => {
     vi.useFakeTimers();
     try {
-      // Satu-satunya hal yang boleh menahan siklus kedua di test ini adalah
-      // catatan repay menggantung: cooldown nol, anggaran harian jauh lebih
-      // besar daripada satu pembayaran, kill switch mati, dan posisi tetap
-      // berada di zona EMERGENCY sehingga `decide` tetap meminta bayar.
+      // The only thing allowed to hold back the second cycle in this test is the pending
+      // repay record: the cooldown is zero, the daily budget is far larger than one payment,
+      // the kill switch is off, and the position stays in the EMERGENCY zone so `decide` keeps
+      // asking to pay.
       const sendRepay = vi.fn(async () => {
         throw new Error("waitForTransactionReceipt timeout setelah 180s");
       });
       const execDeps: ExecuteDeps = { repayAsset: REPAY_ASSET, sendRepay, now: () => 1_700_000_000 };
       const theLimits = limits({
         maxPerActionUsd8: 100_000_000_000n,
-        maxPerDayUsd8: 100_000_000_000_000n, // tak akan habis oleh satu bayaran
+        maxPerDayUsd8: 100_000_000_000_000n, // one payment cannot exhaust it
         minIntervalSeconds: 0,
       });
       const execFn: ExecuteFn = (decision, pos, state) =>
         executeDecision(decision, pos, theLimits, state, execDeps);
 
-      // Rantai belum menunjukkan hutang berkurang (node basi / receipt belum
-      // terlihat) — persis keadaan di mana versi lama membayar untuk kedua kalinya.
+      // The chain does not yet show the debt falling (a stale node / a receipt not yet seen) —
+      // exactly the state in which the old version paid a second time.
       const deps = baseDeps({
         readPosition: vi.fn(async () => EMERGENCY_POSITION),
         executeDecision: execFn,
@@ -676,7 +675,7 @@ describe("C2 — kegagalan setelah transaksi mendarat tidak pernah membayar dua 
 
       await vi.advanceTimersByTimeAsync(1_000);
       await vi.advanceTimersByTimeAsync(1_000);
-      // Tiga siklus, satu pengiriman. Inilah yang dibeli oleh seluruh perubahan C2.
+      // Three cycles, one send. This is what the whole C2 change buys.
       expect(sendRepay).toHaveBeenCalledTimes(1);
       expect(handle.getExecuteState().pendingRepay).not.toBeNull();
 
@@ -701,12 +700,10 @@ describe("C2 — kegagalan setelah transaksi mendarat tidak pernah membayar dua 
       const execFn: ExecuteFn = (decision, pos, state) =>
         executeDecision(decision, pos, theLimits, state, execDeps);
 
-      // Siklus 1 membaca posisi apa adanya; siklus berikutnya membaca posisi
-      // dengan hutang yang berkurang PERSIS sebesar yang kita bayar, pada blok
-      // yang lebih baru — bukti on-chain bahwa transaksi yang tadi "gagal"
-      // sebenarnya mendarat. Jumlahnya diambil dari catatan menggantung itu
-      // sendiri, bukan angka yang diketik ulang, supaya test ini tetap mengikat
-      // kalau ambang `decide` berubah.
+      // Cycle 1 reads the position as-is; the following cycles read a position whose debt has
+      // fallen by EXACTLY what we paid, at a newer block — on-chain proof that the transaction
+      // that "failed" actually landed. The amount is taken from the pending record itself
+      // rather than retyped, so this test keeps binding if `decide`'s thresholds change.
       let handle: GuardLoopHandle | undefined;
       const readPosition = vi.fn(async () => {
         const menggantung = handle?.getExecuteState().pendingRepay;
@@ -725,9 +722,9 @@ describe("C2 — kegagalan setelah transaksi mendarat tidak pernah membayar dua 
       expect(sendRepay).toHaveBeenCalledTimes(1);
       expect(handle.getExecuteState().pendingRepay).not.toBeNull();
 
-      // Siklus 2: rekonsiliasi membereskan catatan, dan karena posisinya masih
-      // di zona EMERGENCY, agent boleh mencoba lagi. Guardian tidak membeku
-      // selamanya hanya karena satu receipt hilang.
+      // Cycle 2: reconciliation clears the record, and because the position is still in the
+      // EMERGENCY zone the agent may try again. Guardian does not freeze forever just because
+      // one receipt went missing.
       await vi.advanceTimersByTimeAsync(1_000);
       expect(sendRepay).toHaveBeenCalledTimes(2);
 
@@ -801,9 +798,9 @@ describe("C3 — kill switch punya tuas, dan state dipersist", () => {
       await vi.advanceTimersByTimeAsync(0);
       expect(readPosition).toHaveBeenCalledTimes(1);
 
-      // Kill ditarik selagi siklus 1 masih menunggu RPC. Siklus itu akan
-      // selesai membawa state dengan `killed: false` -- state itu TIDAK boleh
-      // membatalkan kill yang sudah ditarik.
+      // The kill is pulled while cycle 1 is still waiting on RPC. That cycle will finish
+      // carrying a state with `killed: false` -- that state MUST NOT undo a kill already
+      // pulled.
       handle.kill();
       lepas(EMERGENCY_POSITION);
       await vi.advanceTimersByTimeAsync(0);
@@ -812,8 +809,8 @@ describe("C3 — kill switch punya tuas, dan state dipersist", () => {
       expect(handle.getExecuteState().killed).toBe(true);
 
       await vi.advanceTimersByTimeAsync(1_000);
-      // Siklus 1 sempat mengirim (kill datang setelah ia lewat aturan 1);
-      // siklus 2 tidak boleh mengirim sama sekali.
+      // Cycle 1 did get to send (the kill arrived after it passed rule 1); cycle 2 must not
+      // send at all.
       expect(sendRepay).toHaveBeenCalledTimes(1);
 
       handle.stop();
@@ -893,10 +890,10 @@ describe("C3 — kill switch punya tuas, dan state dipersist", () => {
 
 describe("guard mengenali kegagalan-setelah-kirim tanpa bergantung pada instanceof", () => {
   it("galat pembungkus yang membawa penanda tetap memajukan state, bukan mengembalikan state lama", async () => {
-    // Skenario backend: `executeDecision` dibungkus untuk telemetri/retry, dan
-    // pembungkusnya melempar galat lain dengan `cause`. Kalau guard.ts memakai
-    // `instanceof`, galat ini jatuh ke cabang "state lama" — anggaran tidak
-    // bergerak, catatan menggantung hilang, dan bug C2 kembali diam-diam.
+    // The backend scenario: `executeDecision` is wrapped for telemetry/retry, and the wrapper
+    // throws a different error with a `cause`. If guard.ts used `instanceof`, this error would
+    // fall into the "old state" branch — the budget would not move, the pending record would
+    // be lost, and bug C2 would come back silently.
     const stateSetelahKirim: ExecuteState = execState({
       spentTodayUsd8: 42_000_000n,
       lastActionAt: 1_700_000_000,

@@ -1,45 +1,42 @@
 /**
- * Persistensi `ExecuteState` — anggaran harian, cooldown, kill switch, dan
- * catatan repay yang menggantung.
+ * Persistence for `ExecuteState` — the daily budget, the cooldown, the kill switch, and
+ * the pending-repay record.
  *
- * ## Kenapa ini ada
+ * ## Why this exists
  *
- * Sampai putaran sebelumnya seluruh state itu hanya hidup di memori satu
- * proses. Akibatnya tidak terlihat dari dalam modul mana pun, tetapi fatal dari
- * luar: **restart mereset seluruh batas.** `spentTodayUsd8` kembali ke nol,
- * `dayStartedAt` ke sekarang, dan `lastActionAt` ke 0 — yang berarti cooldown
- * langsung terpenuhi karena `now - 0` besar. Proses yang crash-loop
- * membelanjakan `maxPerDayUsd8` PER RESTART, bukan per hari, dan "batas
- * $2.000/hari" praktis tidak mengikat apa pun.
+ * Until the previous round all of that state lived only in one process's memory. From
+ * inside any single module that was invisible, but from outside it was fatal: **a restart
+ * reset every limit.** `spentTodayUsd8` went back to zero, `dayStartedAt` to now, and
+ * `lastActionAt` to 0 — which means the cooldown is instantly satisfied because `now - 0`
+ * is large. A process in a crash loop spends `maxPerDayUsd8` PER RESTART, not per day, and
+ * a "$2,000/day limit" binds essentially nothing.
  *
- * ## Bentuk antarmuka
+ * ## The shape of the interface
  *
- * `ExecuteStateStore` sengaja hanya punya `load`/`save` dan tidak tahu apa pun
- * tentang file: implementasi file JSON di sini cukup untuk agent yang berjalan
- * sendiri, dan backend bisa menggantinya dengan Postgres tanpa menyentuh satu
- * baris pun di `execute.ts`/`guard.ts`.
+ * `ExecuteStateStore` deliberately has only `load`/`save` and knows nothing about files:
+ * the JSON-file implementation here is enough for an agent running on its own, and the
+ * backend can swap in Postgres without touching a single line in `execute.ts`/`guard.ts`.
  *
- * ## Kenapa serialisasinya ditulis tangan
+ * ## Why the serialization is hand-written
  *
- * `JSON.stringify` tidak bisa menulis `bigint` sama sekali, dan `JSON.parse`
- * mengembalikan angka sebagai float — nilai uang di lapisan ini bisa melewati
- * `Number.MAX_SAFE_INTEGER` dan digit terakhirnya (persis digit sen) hilang
- * diam-diam. Semua bigint karena itu ditulis sebagai string desimal dan dibaca
- * kembali lewat `BigInt(...)`.
+ * `JSON.stringify` cannot write a `bigint` at all, and `JSON.parse` returns numbers as
+ * floats — money values at this layer can exceed `Number.MAX_SAFE_INTEGER` and their last
+ * digit (exactly the cents digit) is silently lost. Every bigint is therefore written as a
+ * decimal string and read back through `BigInt(...)`.
  *
- * ## Kenapa isi rusak GAGAL KERAS
+ * ## Why corrupt content FAILS HARD
  *
- * File state yang rusak, bila dibaca sebagai "belum ada", akan mengembalikan
- * anggaran ke nol dan cooldown ke terpenuhi — yaitu MELEPAS seluruh batas tanpa
- * satu pun peringatan, tepat pada saat sesuatu sudah jelas tidak beres. `load()`
- * karena itu membedakan "file tidak ada" (→ `null`, wajar pada jalan pertama)
- * dari "file ada tapi tidak bisa dipercaya" (→ melempar `StateStoreError`).
+ * A corrupt state file, if read as "does not exist yet", would put the budget back to zero
+ * and the cooldown back to satisfied — that is, RELEASING every limit with no warning at
+ * all, at exactly the moment something is clearly already wrong. `load()` therefore
+ * distinguishes "the file does not exist" (-> `null`, normal on a first run) from "the file
+ * exists but cannot be trusted" (-> throws `StateStoreError`).
  */
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { ExecuteState, PendingRepay } from "../execute.js";
 
-/** Versi format berkas. Naikkan bila bentuknya berubah; versi asing ditolak. */
+/** The file format version. Bump it when the shape changes; an unknown version is rejected. */
 const FORMAT_VERSION = 1;
 
 export class StateStoreError extends Error {
@@ -50,12 +47,12 @@ export class StateStoreError extends Error {
 }
 
 export interface ExecuteStateStore {
-  /** State tersimpan, atau `null` bila memang belum pernah ada. Isi rusak MELEMPAR. */
+  /** The stored state, or `null` when there genuinely never was one. Corrupt content THROWS. */
   load(): Promise<ExecuteState | null>;
   save(state: ExecuteState): Promise<void>;
 }
 
-/** State awal yang bersih. Dipakai hanya bila store benar-benar kosong. */
+/** A clean starting state. Used only when the store is genuinely empty. */
 export function initialExecuteState(nowSeconds: number): ExecuteState {
   return {
     spentTodayUsd8: 0n,
@@ -181,9 +178,9 @@ export function parseExecuteState(raw: string): ExecuteState {
 }
 
 /**
- * Store di memori untuk test dan untuk pemanggil yang memang tidak mau
- * persistensi. Menyimpan SALINAN, bukan referensi: state yang sudah tersimpan
- * tidak boleh bisa berubah karena pemanggil memutasi objeknya sendiri.
+ * An in-memory store for tests and for callers that genuinely do not want persistence. It
+ * stores a COPY, not a reference: state already saved must not be able to change because
+ * the caller mutated its own object.
  */
 export function createMemoryStateStore(initial: ExecuteState | null = null): ExecuteStateStore {
   let current: string | null = initial === null ? null : serializeExecuteState(initial);
@@ -196,11 +193,10 @@ export function createMemoryStateStore(initial: ExecuteState | null = null): Exe
 }
 
 /**
- * Store berkas JSON. Penulisannya atomik (tulis ke berkas sementara di
- * direktori yang sama lalu `rename`): proses yang mati di tengah `write` tidak
- * boleh meninggalkan berkas state yang terpotong, karena berkas terpotong akan
- * ditolak `parseExecuteState` dan menghentikan Guardian sampai ada yang
- * memperbaikinya dengan tangan.
+ * A JSON-file store. Its writes are atomic (write to a temporary file in the same
+ * directory, then `rename`): a process that dies mid-`write` must not leave behind a
+ * truncated state file, because a truncated file is rejected by `parseExecuteState` and
+ * would stop Guardian until someone fixed it by hand.
  */
 export function createFileStateStore(filePath: string): ExecuteStateStore {
   return {

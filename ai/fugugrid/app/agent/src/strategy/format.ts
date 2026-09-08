@@ -1,8 +1,8 @@
 /**
- * SATU-SATUNYA pintu keluar angka domain menuju manusia (dan menuju prompt LLM).
- * Semua fungsi murni aritmetika bigint; `Number()` tidak dipakai karena nilai di
- * lapisan ini bisa melampaui Number.MAX_SAFE_INTEGER dan konversi ke float akan
- * diam-diam menghilangkan digit terakhir.
+ * The ONLY exit for domain numbers toward humans (and toward LLM prompts).
+ * Every function is pure bigint arithmetic; `Number()` is unused because values at this
+ * layer can exceed Number.MAX_SAFE_INTEGER and converting to float silently drops the
+ * last digit.
  */
 import { USD8_ONE, WAD } from "./types.js";
 
@@ -16,7 +16,7 @@ function grupRibuan(n: bigint): string {
   return out;
 }
 
-/** Nilai uang basis 8 desimal -> dolar dua desimal. Pecahan sen DIPOTONG. */
+/** A money value on the 8-decimal basis -> dollars with two decimals. Fractions of a cent are TRUNCATED. */
 export function formatUsd8(v: bigint): string {
   const negatif = v < 0n;
   const abs = negatif ? -v : v;
@@ -26,14 +26,13 @@ export function formatUsd8(v: bigint): string {
 }
 
 /**
- * HARGA basis 8 desimal -> dolar dengan desimal secukupnya (2 sampai 8).
+ * A PRICE on the 8-decimal basis -> dollars with as many decimals as needed (2 to 8).
  *
- * Harga punya formatter sendiri karena `formatUsd8` memotong pada dua desimal,
- * dan grid pada token berharga $0,00012345 akan menampilkan SELURUH garisnya
- * sebagai "$0,00" — seluruh keputusan menjadi tidak terbaca. Nol di belakang
- * dipangkas supaya harga besar tetap ringkas, tetapi minimal dua desimal
- * dipertahankan supaya "$600" tidak pernah terbaca sebagai bilangan bulat yang
- * sudah dibulatkan.
+ * Prices get their own formatter because `formatUsd8` truncates at two decimals, and a
+ * grid on a token priced at $0.00012345 would render EVERY one of its lines as "$0,00"
+ * — the whole decision becomes unreadable. Trailing zeros are trimmed so large prices
+ * stay compact, but at least two decimals are kept so "$600" is never read as an
+ * already-rounded integer.
  */
 export function formatPriceUsd8(v: bigint): string {
   const negatif = v < 0n;
@@ -45,8 +44,8 @@ export function formatPriceUsd8(v: bigint): string {
 }
 
 /**
- * Jumlah token 18 desimal -> enam desimal, sisanya DIPOTONG sehingga jumlah
- * yang ditampilkan tidak pernah melebihi jumlah yang benar-benar berpindah.
+ * An 18-decimal token amount -> six decimals, the remainder TRUNCATED so the amount
+ * shown never exceeds the amount that actually moves.
  */
 export function formatToken18(v: bigint): string {
   const negatif = v < 0n;
@@ -56,7 +55,7 @@ export function formatToken18(v: bigint): string {
   return `${negatif ? "-" : ""}${grupRibuan(bulat)},${pecahan.toString().padStart(6, "0")}`;
 }
 
-/** bps -> persen satu desimal. */
+/** bps -> a percentage with one decimal. */
 export function formatPercentFromBps(bps: bigint): string {
   const negatif = bps < 0n;
   const abs = negatif ? -bps : bps;
@@ -64,7 +63,7 @@ export function formatPercentFromBps(bps: bigint): string {
   return `${negatif ? "-" : ""}${persepuluh / 10n},${persepuluh % 10n}`;
 }
 
-/** bps apa adanya dengan satuannya, supaya tidak tertukar dengan persen. */
+/** bps as-is with its unit, so it is never confused with a percentage. */
 export function formatBps(bps: bigint): string {
   return `${bps.toString()} bps`;
 }

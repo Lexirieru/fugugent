@@ -53,7 +53,7 @@ describe("geometri grid", () => {
 
 describe("minStepBps — jarak antar-garis di titik paling sempit", () => {
   it("diukur di batas ATAS karena di sanalah jarak persentasenya paling kecil", () => {
-    // $20 / $700 = 2,857% -> 285 bps (dipotong ke bawah)
+    // $20 / $700 = 2.857% -> 285 bps (truncated down)
     expect(minStepBps(grid)).toBe(285n);
   });
 
@@ -80,7 +80,7 @@ describe("lotValueBase", () => {
 
 describe("roundTripCostBps — ongkos satu putaran beli-lalu-jual", () => {
   it("dua kali biaya proporsional ditambah dua kali gas yang diukur terhadap nilai lot", () => {
-    // 2*(5+10) = 30 bps, ditambah 2*$0,05 gas atas lot $100 = 10 bps
+    // 2*(5+10) = 30 bps, plus 2*$0.05 of gas on a $100 lot = 10 bps
     expect(roundTripCostBps(usd(100n), biaya)).toBe(40n);
   });
 
@@ -171,7 +171,7 @@ describe("batas breakout", () => {
   });
 
   it("batas bawah dibulatkan ke ATAS supaya breakout terdeteksi lebih awal, bukan lebih lambat", () => {
-    // 3 * 9800 / 10000 = 2,94 -> 3, bukan 2
+    // 3 * 9800 / 10000 = 2.94 -> 3, not 2
     expect(softLowerBase({ ...grid, lowerBase: 3n, upperBase: 9n }, t)).toBe(3n);
   });
 });

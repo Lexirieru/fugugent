@@ -1,18 +1,18 @@
 /**
- * Mesin keputusan Grid.
+ * The Grid decision engine.
  *
- * MURNI: tanpa jaringan, tanpa `Date.now()`, tanpa `process.env`, tanpa I/O.
- * Bentuknya reducer — `(config, state, observation) -> decision` dengan state
- * berikutnya ikut dikembalikan, sehingga seluruh ingatan grid hidup di luar
- * modul ini dan setiap keputusan bisa diputar ulang persis dari argumennya.
+ * PURE: no network, no `Date.now()`, no `process.env`, no I/O. Its shape is a reducer —
+ * `(config, state, observation) -> decision` with the next state returned alongside, so
+ * the grid's entire memory lives outside this module and every decision can be replayed
+ * exactly from its arguments.
  *
- * Grid yang tidak tahu kapan berhenti adalah cara kehilangan uang secara
- * perlahan, jadi modul ini punya DUA lapis penghentian:
- *   1. breakout lunak  — harga di luar buffer selama N pengamatan berturut-turut
- *   2. breakout keras  — harga sangat jauh di luar; keluar seketika tanpa menunggu
- * dan satu lapis pencegahan yang bekerja sebelum grid sempat berjalan:
- *   3. validasi profitabilitas — grid yang jarak garisnya lebih sempit daripada
- *      ongkos putaran DITOLAK, bukan dijalankan lalu merugi diam-diam.
+ * A grid that does not know when to stop is a way to lose money slowly, so this module
+ * has TWO layers of stopping:
+ *   1. soft breakout — the price is outside the buffer for N consecutive observations
+ *   2. hard breakout — the price is very far outside; exit at once, no waiting
+ * plus one layer of prevention that works before the grid ever runs:
+ *   3. profitability validation — a grid whose line spacing is narrower than its
+ *      round-trip cost is REJECTED, not run and then quietly loss-making.
  */
 import {
   bandIndexOf,
@@ -73,11 +73,11 @@ function validateThresholds(t: GridThresholds): void {
 }
 
 /**
- * Konfigurasi grid yang tidak bisa untung harus GAGAL, bukan berjalan. Ini
- * pemeriksaan terpenting di seluruh paket: grid yang jarak garisnya lebih
- * sempit daripada ongkos satu putaran akan tampak sibuk dan berhasil — setiap
- * beli terisi, setiap jual terisi — sambil menggerus modal pada setiap putaran.
- * Kegagalan seperti itu tidak terlihat seperti kegagalan sampai modalnya habis.
+ * A grid configuration that cannot turn a profit must FAIL, not run. This is the most
+ * important check in the whole package: a grid whose line spacing is narrower than one
+ * round trip's cost will look busy and successful — every buy fills, every sell fills —
+ * while eating the capital on every round trip. A failure like that does not look like a
+ * failure until the capital is gone.
  */
 function validateConfig(config: GridConfig, cost: CostModel, t: GridThresholds): void {
   if (config.lowerBase <= 0n) {
@@ -148,9 +148,9 @@ function validateState(state: GridState, config: GridConfig): void {
   if (!Number.isInteger(state.consecutiveOutside) || state.consecutiveOutside < 0) {
     throw new GridError(`consecutiveOutside=${state.consecutiveOutside} harus bilangan bulat >= 0.`);
   }
-  // State mustahil: menghitung pelanggaran tanpa tahu arahnya. Kalau ini lolos,
-  // pengamatan di atas dan di bawah bisa saling menumpuk menjadi "konfirmasi"
-  // yang tidak pernah benar-benar terjadi ke satu arah.
+  // An impossible state: counting a breach without knowing its direction. If this got
+  // through, observations above and below could stack into a "confirmation" that never
+  // actually happened in either single direction.
   if ((state.consecutiveOutside > 0) !== (state.outsideSide !== null)) {
     throw new GridError(
       `State tidak konsisten: consecutiveOutside=${state.consecutiveOutside} dengan outsideSide=${state.outsideSide}.`,
@@ -213,9 +213,9 @@ export function decide(
   const band = bandIndexOf(price, config);
 
   const keluar = (action: "EXIT_ABOVE" | "EXIT_BELOW", side: "ABOVE" | "BELOW", hitungan: number): GridDecision => {
-    // Keluar SELALU membongkar seluruh persediaan. Grid yang sudah tidak berlaku
-    // tetapi masih memegang lot bukan lagi grid: ia posisi berarah tanpa aturan
-    // keluar, yaitu persis keadaan yang seluruh modul ini dibuat untuk dihindari.
+    // Exiting ALWAYS unwinds the entire inventory. A grid that is no longer valid but
+    // still holds lots is not a grid any more: it is a directional position with no exit
+    // rule, which is exactly the state this whole module exists to avoid.
     const lots = state.lotsHeld;
     return {
       action,
@@ -231,29 +231,29 @@ export function decide(
     };
   };
 
-  // --- lapis 2: breakout keras, keluar seketika tanpa menunggu konfirmasi ---
+  // --- layer 2: hard breakout, exit at once with no waiting for confirmation ---
   if (price >= hardUpperBase(config, thresholds)) return keluar("EXIT_ABOVE", "ABOVE", state.consecutiveOutside + 1);
   if (price <= hardLowerBase(config, thresholds)) return keluar("EXIT_BELOW", "BELOW", state.consecutiveOutside + 1);
 
-  // --- lapis 1: breakout lunak, butuh konfirmasi berturut-turut ---
+  // --- layer 1: soft breakout, needs consecutive confirmation ---
   const diAtas = price >= softUpperBase(config, thresholds);
   const diBawah = price <= softLowerBase(config, thresholds);
   const sisi: "ABOVE" | "BELOW" | null = diAtas ? "ABOVE" : diBawah ? "BELOW" : null;
 
-  // Berbalik arah MERESET hitungan: satu pengamatan di atas lalu satu di bawah
-  // bukan dua pengamatan yang menuju kesimpulan yang sama, itu pasar yang
-  // bergejolak di sekitar rentang — justru keadaan yang grid ini layani.
+  // Flipping direction RESETS the count: one observation above followed by one below is
+  // not two observations pointing to the same conclusion, it is a market churning around
+  // the range — precisely the condition this grid is built to serve.
   const hitungan = sisi === null ? 0 : sisi === state.outsideSide ? state.consecutiveOutside + 1 : 1;
 
   if (sisi !== null && hitungan >= thresholds.breakoutConfirmObservations) {
     return keluar(sisi === "ABOVE" ? "EXIT_ABOVE" : "EXIT_BELOW", sisi, hitungan);
   }
 
-  // --- perdagangan biasa ---
-  // Pita dihitung dari harga yang sudah dijepit, sehingga harga yang melompat
-  // keluar rentang tetap menuntaskan transaksi di tepi sebelum breakout
-  // dikonfirmasi. Tanpa ini, satu lilin yang melompat keluar akan meninggalkan
-  // persediaan yang tidak pernah dijual di harga grid.
+  // --- ordinary trading ---
+  // The band is computed from the clamped price, so a price that jumps outside the range
+  // still completes the trade at the edge before the breakout is confirmed. Without this,
+  // a single candle that jumps out would leave inventory that is never sold at a grid
+  // price.
   const delta = band - state.bandIndex;
   const intervals = intervalsOf(config);
 
@@ -292,10 +292,10 @@ export function decide(
     roundTripCostBps: rt,
     minStepBps: step,
     nextState: {
-      // Pita SELALU maju ke posisi harga sekarang, walaupun lot yang diinginkan
-      // tidak seluruhnya bisa dieksekusi. Kalau pita ditahan, persilangan yang
-      // sama akan terdeteksi lagi pada setiap pengamatan berikutnya dan grid
-      // akan mencoba transaksi yang sama berulang-ulang selamanya.
+      // The band ALWAYS advances to where the price is now, even when the wanted lots
+      // could not all be executed. If the band were held back, the same crossing would be
+      // detected again on every following observation and the grid would retry the same
+      // trade over and over, forever.
       bandIndex: band,
       lotsHeld: lotsHeldBerikutnya,
       consecutiveOutside: hitungan,

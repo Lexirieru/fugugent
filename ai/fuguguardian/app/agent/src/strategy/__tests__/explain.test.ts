@@ -68,9 +68,8 @@ describe("explainDecision", () => {
         generate: async () => "Selesai lebih dulu daripada timeout.",
       });
       expect(teks).toBe("Selesai lebih dulu daripada timeout.");
-      // Bila timer timeout 20 detik tidak di-clearTimeout setelah generate
-      // menang, ia akan tetap terdaftar di sini walau hasilnya sudah tidak
-      // dipakai lagi.
+      // If the 20-second timeout timer is not cleared once generate wins, it stays
+      // registered here even though its result is no longer used.
       expect(vi.getTimerCount()).toBe(0);
     } finally {
       vi.useRealTimers();
@@ -78,9 +77,8 @@ describe("explainDecision", () => {
   });
 
   it("jumlah repay muncul sebagai dolar terbaca, bukan angka basis mentah", async () => {
-    // 12345678 basis 8 desimal = $0,12. Sebelum perbaikan, angka mentah ini
-    // masuk ke prompt apa adanya dan bisa dibacakan ke user sebagai belasan
-    // juta dolar.
+    // 12345678 on the 8-decimal basis = $0.12. Before the fix this raw number went into
+    // the prompt as-is and could be read back to the user as tens of millions of dollars.
     const keputusanRepay: Decision = {
       action: "PARTIAL_REPAY",
       healthFactor: 1_150_000_000_000_000_000n,
@@ -101,8 +99,8 @@ describe("explainDecision", () => {
   });
 
   it("angka di prompt identik dengan angka di reason deterministik", async () => {
-    // Kedua sisi memakai satu-satunya sumber format (src/strategy/format.ts),
-    // sehingga user tidak mungkin melihat dua versi angka yang sama.
+    // Both sides use the single formatting source (src/strategy/format.ts), so the user
+    // cannot possibly see two versions of the same number.
     const p: Position = {
       protocol: "aave",
       account: "0x0000000000000000000000000000000000000001",

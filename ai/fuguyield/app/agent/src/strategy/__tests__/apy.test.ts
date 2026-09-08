@@ -15,7 +15,7 @@ const biaya: SwitchCostModel = { swapFeeBps: 5n, slippageBps: 10n, gasCostBase: 
 
 describe("switchCostBase", () => {
   it("biaya proporsional atas pokok ditambah gas tetap", () => {
-    // 15 bps dari $10.000 = $15, ditambah gas $1 = $16
+    // 15 bps of $10,000 = $15, plus $1 of gas = $16
     expect(switchCostBase(POKOK, biaya)).toBe(usd(16n));
   });
 
@@ -34,7 +34,7 @@ describe("breakEvenSpreadBps — inti seluruh strategi ini", () => {
   });
 
   it("horizon lebih pendek menuntut selisih JAUH lebih besar", () => {
-    // Ongkos yang sama harus terbayar dalam waktu lebih singkat.
+    // The same cost has to be repaid over a shorter time.
     expect(breakEvenSpreadBps(POKOK, usd(16n), 7n)).toBeGreaterThan(
       breakEvenSpreadBps(POKOK, usd(16n), 30n),
     );

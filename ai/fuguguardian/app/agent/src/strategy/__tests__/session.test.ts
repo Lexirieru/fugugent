@@ -38,7 +38,7 @@ function deps(overrides: Partial<SessionRepayDeps> = {}): SessionRepayDeps {
     pool: POOL,
     repayAsset: MUSD,
     permissions: permissions(),
-    // $1,00 (basis 8 desimal) = 1 token 18 desimal, harga $1.
+    // $1.00 (8-decimal basis) = 1 token at 18 decimals, price $1.
     toTokenUnits: (_asset, amountUsd8) => (amountUsd8 * 10n ** 18n) / 100_000_000n,
     readAllowance: async () => 0n,
     sendCalls: async () => ({ transactionHash: `0x${"11".repeat(32)}`, status: 1 }),
@@ -170,8 +170,8 @@ describe("createSessionSendRepay", () => {
 
     const hash = await sendRepay(MUSD, 1_167_000_000n); // $11,67
 
-    // SATU batch, bukan dua transaksi: guarded executor Porto mengembalikan
-    // allowance ke nol di akhir userOp, jadi approve harus menyatu dengan repay.
+    // ONE batch, not two transactions: Porto's guarded executor returns the allowance to
+    // zero at the end of the userOp, so approve has to travel with repay.
     expect(batches).toHaveLength(1);
     const calls = batches[0]!;
     expect(calls).toHaveLength(2);
@@ -247,11 +247,11 @@ describe("createSessionSendRepay", () => {
 });
 
 /**
- * Modul ini satu-satunya yang tahu di mana batas jaringan berada, jadi ia yang
- * menyatakannya lewat `neverSent`. `execute.ts` membaca pernyataan itu untuk
- * memutuskan apakah anggaran ikut terpotong: galat bertanda = "tidak terjadi",
- * galat tanpa tanda = "mungkin sudah terjadi" (lihat catatan C2 di execute.ts).
- * Salah menandai satu saja di sini akan membuat agent membayar dua kali.
+ * This module is the only one that knows where the network boundary lies, so it is the one
+ * that declares it via `neverSent`. `execute.ts` reads that declaration to decide whether
+ * the budget gets deducted: a marked error = "did not happen", an unmarked error = "may
+ * have happened" (see the C2 note in execute.ts). Mis-marking even one of these makes the
+ * agent pay twice.
  */
 describe("penandaan batas jaringan (neverSent)", () => {
   async function galatDari(jalankan: () => Promise<unknown>): Promise<SessionPermissionError> {
@@ -307,8 +307,8 @@ describe("penandaan batas jaringan (neverSent)", () => {
   });
 
   it("receipt yang bukan sukses TIDAK ditandai neverSent — batch sudah punya hash", async () => {
-    // Node basi yang melaporkan status salah tetap meninggalkan transaksi yang
-    // mendarat. Menandainya "tidak terjadi" akan mengembalikan bug bayar-ganda.
+    // A stale node reporting the wrong status still leaves a transaction that landed.
+    // Marking it "did not happen" would bring the double-pay bug back.
     const err = await galatDari(() =>
       createSessionSendRepay(
         deps({
@@ -337,10 +337,9 @@ describe("penandaan batas jaringan (neverSent)", () => {
 });
 
 /**
- * Galat penolakan yang BENAR-BENAR dikembalikan relay Altana pada jalan
- * 2026-09-08 (disalin verbatim dari keluaran `probe-session-boundary.ts`).
- * Dipakai apa adanya supaya test ini menguji bentuk yang nyata, bukan bentuk
- * yang kita bayangkan.
+ * The denial error the Altana relay ACTUALLY returned on the 2026-09-08 run (copied verbatim
+ * from `probe-session-boundary.ts`'s output). Used as-is so this test exercises the real
+ * shape rather than the shape we imagine.
  */
 const GALAT_UNAUTHORIZED = `An error occurred while executing calls.
 

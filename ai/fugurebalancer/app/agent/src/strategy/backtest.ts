@@ -1,48 +1,45 @@
 /**
  * ============================================================================
- * KETERBATASAN JUJUR — BACA SEBELUM MEMAKAI ANGKA DARI MODUL INI
+ * HONEST LIMITATIONS — READ BEFORE USING ANY NUMBER FROM THIS MODULE
  * ============================================================================
- * Harness ini menjalankan tiga kebijakan di atas deret harga yang SAMA:
- *   - `banded` : kebijakan yang sesungguhnya (`decide`), pita + gerbang biaya
- *   - `always` : rebalance ke target pada SETIAP candle, apa pun ongkosnya
- *   - `never`  : beli lalu diamkan (buy and hold)
- * Tujuannya satu: menunjukkan secara terukur bahwa menyeimbangkan setiap kali
- * menyimpang sedikit MERUGI karena ongkos, dan bahwa pita itu bukan hiasan.
+ * This harness runs three policies over the SAME price series:
+ *   - `banded` : the real policy (`decide`), bands + the cost gate
+ *   - `always` : rebalance to target on EVERY candle, whatever it costs
+ *   - `never`  : buy and sit still (buy and hold)
+ * It has one purpose: to show measurably that rebalancing on every small drift LOSES
+ * money to costs, and that the bands are not decoration.
  *
- * Yang sengaja TIDAK dimodelkan:
- *   - dampak harga yang tidak linear: biaya dimodelkan sebagai persentase tetap
- *     dari turnover ditambah gas tetap. Transaksi besar di pool dangkal jauh
- *     lebih mahal daripada itu, sehingga backtest ini MEREMEHKAN ongkos
- *     kebijakan yang bertransaksi besar/sering — artinya keunggulan `banded`
- *     atas `always` di dunia nyata paling banter sebesar yang dilaporkan di
- *     sini, dan umumnya lebih besar.
- *   - transaksi gagal, revert, RPC mati, nonce race, sesi Altana kedaluwarsa
- *   - gas yang berubah-ubah: `gasCostBase` tetap sepanjang simulasi
- *   - pergerakan harga DI ANTARA dua candle; hanya harga di tiap candle dilihat
- *   - imbal hasil, rebate, atau biaya pendanaan dari memegang aset
- *   - pajak dan pelaporan
- *   - eksekusi parsial: rebalance dianggap terisi penuh pada harga candle itu
+ * What is deliberately NOT modeled:
+ *   - non-linear price impact: cost is modeled as a fixed percentage of turnover plus
+ *     fixed gas. Large trades in a shallow pool cost far more than that, so this
+ *     backtest UNDERSTATES the cost of policies that trade large/often — meaning
+ *     `banded`'s edge over `always` in the real world is at best what is reported
+ *     here, and usually larger.
+ *   - failed transactions, reverts, dead RPC, nonce races, expired Altana sessions
+ *   - varying gas: `gasCostBase` is constant for the whole simulation
+ *   - price movement BETWEEN two candles; only the price at each candle is seen
+ *   - yield, rebates, or funding costs from holding an asset
+ *   - taxes and reporting
+ *   - partial fills: a rebalance is assumed fully filled at that candle's price
  *
- * Satu penyederhanaan yang TIDAK netral: biaya dipotong dari nilai total
- * portofolio pada saat rebalance, lalu bobot ditetapkan tepat ke target. Di
- * dunia nyata ongkos itu dibayar dari salah satu kaki dan menyisakan bobot yang
- * sedikit meleset. Distorsi ini menguntungkan kebijakan yang sering
- * bertransaksi (yaitu `always`), jadi arahnya melawan kesimpulan yang ingin
- * ditunjukkan — bukan mendukungnya.
+ * One simplification that is NOT neutral: the cost is deducted from the portfolio's
+ * total value at rebalance time, then the weights are set exactly to target. In the
+ * real world that cost is paid out of one leg and leaves the weights slightly off.
+ * This distortion favors the policy that trades often (that is, `always`), so it
+ * points against the conclusion we want to show — not in its favor.
  *
- * TEMUAN YANG HARUS DIBACA BERSAMA HASILNYA (diukur lewat __tests__/backtest.test.ts):
- * pita TIDAK selalu mengungguli rebalance-selalu. Pada pasar yang berayun dengan
- * amplitudo jauh lebih besar daripada biaya, rebalance-selalu memanen volatilitas
- * (menjual yang naik, membeli yang turun) lebih banyak daripada ongkos yang
- * dibayarnya, dan pita melewatkan panen itu. Keunggulan pita muncul justru di
- * tempat yang berlawanan: portofolio kecil (gas tetap melahap turnover) dan
- * ayunan kecil (tidak ada yang layak dipanen). Keduanya diuji, keduanya ada di
- * suite. Siapa pun yang memasang `rebalanceBandBps` untuk pasangan token baru
- * wajib menjalankan backtest ini pada deret harga pasangan itu sendiri, bukan
- * mengasumsikan pita selalu menang.
+ * A FINDING THAT MUST BE READ ALONGSIDE THE RESULTS (measured in __tests__/backtest.test.ts):
+ * the bands DO NOT always beat rebalance-always. In a market that swings with an
+ * amplitude far larger than the cost, rebalance-always harvests more volatility
+ * (selling what rose, buying what fell) than the costs it pays, and the bands miss
+ * that harvest. The bands' edge shows up in exactly the opposite place: small
+ * portfolios (fixed gas eats the turnover) and small swings (there is nothing worth
+ * harvesting). Both are tested, both are in the suite. Anyone setting
+ * `rebalanceBandBps` for a new token pair must run this backtest on that pair's own
+ * price series rather than assuming the bands always win.
  *
- * Deret harga adalah masukan, bukan sesuatu yang dibangkitkan di dalam modul
- * ini: seluruh fungsi di sini murni dan deterministik.
+ * The price series is an input, not something generated inside this module: every
+ * function here is pure and deterministic.
  * ============================================================================
  */
 import { decide } from "./decide.js";
@@ -73,9 +70,9 @@ export interface BacktestAsset {
 export interface BacktestInput {
   startAssets: BacktestAsset[];
   /**
-   * `priceSeriesBps[candle][indeksAset]` — harga relatif terhadap harga awal,
-   * dalam bps. 10_000n berarti harga sama dengan saat mulai, 12_000n berarti
-   * naik 20%. Panjang setiap baris wajib sama dengan jumlah aset.
+   * `priceSeriesBps[candle][assetIndex]` — the price relative to the starting price,
+   * in bps. 10_000n means the price is unchanged since the start, 12_000n means it is
+   * up 20%. The length of every row must equal the number of assets.
    */
   priceSeriesBps: bigint[][];
   cost?: CostModel;
@@ -86,7 +83,7 @@ export interface PolicyResult {
   finalValueBase: bigint;
   rebalances: number;
   totalCostBase: bigint;
-  /** Penyimpangan bobot terbesar yang pernah dialami sepanjang simulasi. */
+  /** The largest weight deviation seen at any point in the simulation. */
   maxDeviationBps: bigint;
 }
 
@@ -96,10 +93,9 @@ export interface BacktestResult {
   always: PolicyResult;
   never: PolicyResult;
   /**
-   * Perbandingan nilai akhir `banded` vs `always` pada SATU lintasan harga.
-   * Ini bukan bukti statistik: satu lintasan hanya satu sampel. Klaim seperti
-   * "pita mengungguli rebalance-selalu" baru sah bila dihitung dari banyak
-   * lintasan yang berbeda.
+   * Comparison of the final value of `banded` vs `always` on ONE price path.
+   * This is not statistical proof: one path is one sample. A claim like "the bands
+   * beat rebalance-always" is only valid when computed over many different paths.
    */
   bandedBeatsAlways: boolean;
 }
@@ -107,11 +103,11 @@ export interface BacktestResult {
 const AKUN = "0x0000000000000000000000000000000000000000" as const;
 
 /**
- * Posisi dinyatakan sebagai "unit pada harga awal": nilai pada candle t adalah
- * unit × harga_t / 10000. Menyimpan unit (bukan nilai) berarti pergerakan harga
- * tidak pernah diakumulasi lewat pembagian berantai yang errornya menumpuk;
- * setiap candle dihitung ulang dari harga awal. Pembulatan ke bawah terjadi
- * sekali per konversi, besarnya di bawah satu unit basis (1e-8 dolar).
+ * A position is expressed as "units at the starting price": the value at candle t is
+ * units x price_t / 10000. Storing units (not values) means price movement is never
+ * accumulated through a chain of divisions whose error compounds; every candle is
+ * recomputed from the starting price. Rounding down happens once per conversion, and
+ * is under one basis unit (1e-8 dollars).
  */
 interface Holding {
   symbol: string;
@@ -130,7 +126,7 @@ function snapshot(holdings: readonly Holding[], prices: readonly bigint[]): Asse
   }));
 }
 
-/** Menetapkan ulang seluruh bobot ke target setelah membayar `costBase`. */
+/** Resets every weight to target after paying `costBase`. */
 function applyRebalance(holdings: Holding[], assets: readonly Asset[], prices: readonly bigint[], costBase: bigint): void {
   const totalSetelahBiaya = totalValueBase(assets) - costBase;
   if (totalSetelahBiaya <= 0n) {
@@ -169,8 +165,8 @@ function validate(input: BacktestInput): void {
 }
 
 /**
- * Fungsi MURNI: tanpa jaringan, jam, atau environment. Seluruh keluaran
- * ditentukan sepenuhnya oleh argumen.
+ * A PURE function: no network, clock, or environment. The output is determined
+ * entirely by the arguments.
  */
 export function runBacktest(input: BacktestInput): BacktestResult {
   validate(input);
@@ -214,10 +210,9 @@ export function runBacktest(input: BacktestInput): BacktestResult {
         continue;
       }
 
-      // mode "always": rebalance tanpa gerbang apa pun, persis kesalahan yang
-      // ingin dibuktikan mahal. Turnover nol berarti portofolio sudah tepat
-      // pada target dan tidak ada transaksi yang dikirim — bukan pengecualian
-      // kebijakan, hanya ketiadaan sesuatu untuk dikirim.
+      // mode "always": rebalance with no gate at all, exactly the mistake we want to
+      // prove expensive. Zero turnover means the portfolio is already exactly on target
+      // and no transaction is sent — not a policy exception, just nothing to send.
       const turnover = turnoverBase(computeTrades(assets, total));
       if (turnover <= 0n) continue;
       const biaya = estimateCostBase(turnover, cost);

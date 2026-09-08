@@ -25,9 +25,9 @@ function state(overrides: Partial<ExecuteState> = {}): ExecuteState {
 
 describe("serialisasi ExecuteState", () => {
   it("bolak-balik mempertahankan bigint apa adanya, bukan lewat Number()", () => {
-    // Nilai di atas Number.MAX_SAFE_INTEGER: kalau serialisasinya lewat
-    // JSON.parse biasa (float), digit terakhir hilang diam-diam — persis digit
-    // yang menentukan berapa dolar sudah dibelanjakan.
+    // A value above Number.MAX_SAFE_INTEGER: if serialization went through a plain
+    // JSON.parse (float), the last digit would be silently lost — exactly the digit that
+    // decides how many dollars have been spent.
     const besar = 9_007_199_254_740_993n; // MAX_SAFE_INTEGER + 2
     const asli = state({ spentTodayUsd8: besar });
     const balik = parseExecuteState(serializeExecuteState(asli));
@@ -70,9 +70,9 @@ describe("serialisasi ExecuteState", () => {
       '{"version":99,"spentTodayUsd8":"0","dayStartedAt":1,"lastActionAt":0,"killed":false}',
     ],
   ])("menolak isi rusak (%s) alih-alih diam-diam mereset batas", (_label, raw) => {
-    // Sebuah file rusak yang dibaca sebagai "state kosong" akan mengembalikan
-    // spentTodayUsd8 ke nol dan lastActionAt ke 0 -- yaitu MELEPAS seluruh
-    // batas harian dan cooldown tanpa satu pun peringatan. Gagal keras.
+    // A corrupt file read as "empty state" would put spentTodayUsd8 back to zero and
+    // lastActionAt back to 0 -- that is, RELEASING the entire daily cap and the cooldown
+    // with no warning at all. Fail hard.
     expect(() => parseExecuteState(raw)).toThrow(StateStoreError);
   });
 });

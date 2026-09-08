@@ -1,43 +1,42 @@
 /**
- * Jembatan satuan: USD basis 8 desimal ↔ unit token.
+ * The units bridge: USD on the 8-decimal basis <-> token units.
  *
- * Seluruh lapisan strategi berhitung dalam basis 8 desimal Aave (`*Base`,
- * `suggestedRepayBase`, `maxPerDayUsd8`). Rantai berhitung dalam unit token
- * (18 desimal untuk semua token BSC, termasuk stablecoin — lihat CLAUDE.md #2).
- * Konversi di antara keduanya adalah aritmetika paling menentukan di seluruh
- * rantai: meleset satu orde berarti agent membayar sepersepuluh atau sepuluh
- * kali lipat dari yang dilaporkannya, dan semua assert lain tetap lolos.
+ * The entire strategy layer computes in Aave's 8-decimal basis (`*Base`,
+ * `suggestedRepayBase`, `maxPerDayUsd8`). The chain computes in token units (18 decimals
+ * for every BSC token, stablecoins included — see CLAUDE.md #2). The conversion between
+ * the two is the single most decisive piece of arithmetic in the whole chain: being off
+ * by one order of magnitude means the agent pays a tenth or ten times what it reports,
+ * and every other assertion still passes.
  *
- * Sampai sekarang satu-satunya implementasinya hidup di dalam `scripts/e2e-guardian.ts`
- * — tidak punya unit test, tidak bisa dipakai ulang, dan siapa pun yang
- * menyambungkan runtime akan menyalinnya dari sebuah skrip demo.
+ * Until now the only implementation lived inside `scripts/e2e-guardian.ts` — with no unit
+ * tests, not reusable, and anyone wiring up the runtime would have copied it out of a
+ * demo script.
  *
- * ## Soal "cek bolak-balik" yang dulu ada di skrip itu
+ * ## About the "round-trip check" that used to be in that script
  *
- * Skrip lama memeriksa konversinya dengan menghitung balik:
+ * The old script verified its conversion by computing back:
  *
- *     jumlahToken  = amountUsd8 * 10^d / p
- *     balikanUsd8  = jumlahToken * p / 10^d   ≈ amountUsd8
+ *     tokenAmount  = amountUsd8 * 10^d / p
+ *     backToUsd8   = tokenAmount * p / 10^d   ~= amountUsd8
  *
- * dan komentarnya mengklaim ini menangkap `d` yang terbaca 17 atau `p` dari
- * feed yang salah. Klaim itu tidak benar: `d` dan `p` yang SAMA dipakai di
- * kedua arah, jadi keduanya saling meniadakan dan kesamaan itu berlaku untuk
- * `d` dan `p` APA PUN. Cek tersebut tidak pernah bisa gagal karena alasan yang
- * disebutkannya — ia hanya mengukur pembulatan.
+ * and its comment claimed this catches a `d` that read as 17, or a `p` from the wrong
+ * feed. That claim is false: the SAME `d` and `p` are used in both directions, so they
+ * cancel out and the equality holds for ANY `d` and `p`. That check could never fail for
+ * the reason it named — all it measured was rounding.
  *
- * Yang benar-benar bisa menangkap kesalahan itu adalah membandingkan **dua
- * sumber berbeda** untuk angka yang sama, dan itulah `assertTokenDecimalsAgree`
- * (konfigurasi pool vs `decimals()` token itu sendiri) dan `assertFeedIsUsd8`
- * (feed yang bukan 8 desimal tidak boleh dibaca sebagai USD basis 8).
+ * What actually catches those mistakes is comparing **two different sources** for the
+ * same number, and that is what `assertTokenDecimalsAgree` (the pool's asset config vs
+ * the token's own `decimals()`) and `assertFeedIsUsd8` (a feed that is not 8 decimals
+ * must not be read as USD on the 8-decimal basis) do.
  */
 
-/** 1 USD dalam basis 8 desimal Aave (`*Base`). */
+/** 1 USD in Aave's 8-decimal basis (`*Base`). */
 export const USD8_ONE = 100_000_000n;
 
-/** Batas atas desimal token yang masuk akal; di atas ini pasti salah baca. */
+/** The upper bound on a plausible token decimals value; above this it is certainly a misread. */
 const MAX_TOKEN_DECIMALS = 36;
 
-/** Desimal yang WAJIB dimiliki feed harga agar jawabannya boleh dibaca sebagai USD basis 8. */
+/** The decimals a price feed MUST have before its answer may be read as USD on the 8-decimal basis. */
 const FEED_DECIMALS_USD8 = 8;
 
 export class UnitConversionError extends Error {
@@ -64,11 +63,10 @@ function assertPrice(priceUsd8: bigint): void {
 }
 
 /**
- * USD basis 8 desimal → unit token.
+ * USD on the 8-decimal basis -> token units.
  *
- * Pembulatan KE BAWAH dan itu disengaja: hasilnya adalah jumlah yang
- * benar-benar dikirim ke rantai, dan agent tidak boleh pernah mengirim lebih
- * banyak daripada yang diputuskan lapisan strategi.
+ * It rounds DOWN, deliberately: the result is the amount actually sent to the chain, and
+ * the agent must never send more than the strategy layer decided.
  */
 export function usd8ToTokenUnits(
   amountUsd8: bigint,
@@ -84,9 +82,9 @@ export function usd8ToTokenUnits(
 }
 
 /**
- * Unit token → USD basis 8 desimal. Dipakai untuk MELAPORKAN nilai sebuah
- * jumlah token (mis. saldo), bukan untuk memeriksa `usd8ToTokenUnits` —
- * memeriksanya dengan ini adalah tautologi (lihat catatan di kepala modul).
+ * Token units -> USD on the 8-decimal basis. Used to REPORT the value of a token amount
+ * (e.g. a balance), not to verify `usd8ToTokenUnits` — verifying it with this is a
+ * tautology (see the note at the top of this module).
  */
 export function tokenUnitsToUsd8(
   units: bigint,
@@ -102,11 +100,10 @@ export function tokenUnitsToUsd8(
 }
 
 /**
- * Menuntut dua sumber independen sepakat soal desimal sebuah token:
- * `tokenDecimals` pada konfigurasi aset di pool, dan `decimals()` milik kontrak
- * token itu sendiri. Inilah cek yang benar-benar menangkap "desimal terbaca 17"
- * — dua angka dari dua kontrak berbeda, bukan satu angka dibandingkan dengan
- * dirinya sendiri.
+ * Demands that two independent sources agree on a token's decimals: `tokenDecimals` in
+ * the pool's asset config, and the token contract's own `decimals()`. This is the check
+ * that really catches "decimals read as 17" — two numbers from two different contracts,
+ * not one number compared against itself.
  */
 export function assertTokenDecimalsAgree(
   fromPoolConfig: number,
@@ -126,10 +123,10 @@ export function assertTokenDecimalsAgree(
 }
 
 /**
- * Menuntut feed harga benar-benar 8 desimal sebelum jawabannya dibaca sebagai
- * USD basis 8. `MockPriceFeed` menerima `decimals_` sebagai parameter
- * konstruktor, jadi feed 6 atau 18 desimal bukan hipotesis — dan `latestRoundData()`
- * yang dibaca mentah tidak menormalkan apa pun.
+ * Demands that a price feed really is 8 decimals before its answer is read as USD on the
+ * 8-decimal basis. `MockPriceFeed` takes `decimals_` as a constructor parameter, so a 6-
+ * or 18-decimal feed is not hypothetical — and a raw `latestRoundData()` read normalizes
+ * nothing.
  */
 export function assertFeedIsUsd8(feedDecimals: number, asset: `0x${string}`): void {
   if (!Number.isInteger(feedDecimals) || feedDecimals !== FEED_DECIMALS_USD8) {

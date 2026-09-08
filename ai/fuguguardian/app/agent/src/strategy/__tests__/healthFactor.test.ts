@@ -57,12 +57,12 @@ describe("dropToLiquidationBps", () => {
   });
 
   it("margin ke likuidasi tidak pernah melebihi batas sebenarnya", () => {
-    // collateral=1300, debt=1000, ltBps=10000 -> HF tepat 1.3e18.
+    // collateral=1300, debt=1000, ltBps=10000 -> HF is exactly 1.3e18.
     const p = pos(1300n, 1000n, 10000n);
     expect(dropToLiquidationBps(p.healthFactor)).toBe(2307n);
-    // Turun tepat 2307 bps: masih di atas atau tepat di ambang.
+    // A fall of exactly 2307 bps: still above or exactly on the threshold.
     expect(healthFactorAfterPriceDrop(p, 2307n)! >= HF_ONE).toBe(true);
-    // Satu bps lebih jauh (2308) sudah melewati ambang likuidasi.
+    // One bps further (2308) is already past the liquidation threshold.
     expect(healthFactorAfterPriceDrop(p, 2308n)! < HF_ONE).toBe(true);
   });
 });
@@ -83,9 +83,9 @@ describe("healthFactorAfterPriceDrop", () => {
   });
 
   it("HF dari angka yang tidak habis dibagi tetap floor-down", () => {
-    // collateral=1000, debt=333, ltBps=7777 -> tidak habis dibagi.
-    // 1000n * 7777n * HF_ONE / (10000n * 333n) dihitung manual dengan bigint:
-    // = 7777000n * HF_ONE / 3330000n = 2_335_435_435_435_435_435n (floor).
+    // collateral=1000, debt=333, ltBps=7777 -> does not divide evenly.
+    // 1000n * 7777n * HF_ONE / (10000n * 333n) computed by hand in bigint:
+    // = 7777000n * HF_ONE / 3330000n = 2_335_435_435_435_435_435n (floored).
     expect(computeHealthFactor(1000n, 333n, 7777n)).toBe(2_335_435_435_435_435_435n);
   });
 });
@@ -94,7 +94,7 @@ describe("repayToReachTarget", () => {
   it("menghitung pembayaran yang membawa HF ke target", () => {
     const p = pos(1000n, 800n); // HF 1.0
     const repay = repayToReachTarget(p, 1_600_000_000_000_000_000n);
-    expect(repay).toBe(300n); // sisa hutang 500 memberi HF 1.6
+    expect(repay).toBe(300n); // a remaining debt of 500 gives HF 1.6
   });
 
   it("posisi yang sudah lebih aman dari target tidak perlu membayar apa pun", () => {
@@ -107,7 +107,7 @@ describe("repayToReachTarget", () => {
 
   it("repay yang disarankan tidak pernah kurang dari kebutuhan sebenarnya", () => {
     // collateral=1000, debt=800, ltBps=8000, target=1.1 -> debtTarget=727
-    // (tidak habis dibagi: nilai kontinu sebenarnya adalah 727.27...).
+    // (does not divide evenly: the true continuous value is 727.27...).
     const target = 1_100_000_000_000_000_000n;
     const p = pos(1000n, 800n, 8000n);
     const repay = repayToReachTarget(p, target);

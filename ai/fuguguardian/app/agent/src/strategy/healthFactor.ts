@@ -2,14 +2,14 @@ import { HF_ONE, type Position } from "./types.js";
 
 const BPS = 10_000n;
 
-/** Pembagian bigint yang dibulatkan ke atas (a dan b harus positif). */
+/** bigint division rounded up (a and b must be positive). */
 const ceilDiv = (a: bigint, b: bigint): bigint => (a + b - 1n) / b;
 
 /**
- * Health factor gaya Aave v3, basis 1e18.
- * Mengembalikan null bila tidak ada hutang — itu bukan angka besar, melainkan
- * ketiadaan risiko. Aave sendiri mengembalikan 2^256-1 untuk kasus ini; kita
- * menormalkannya jadi null supaya pemanggil tidak pernah salah membandingkannya.
+ * The Aave v3-style health factor, on a 1e18 basis.
+ * Returns null when there is no debt — that is not a large number, it is the absence of
+ * risk. Aave itself returns 2^256-1 for this case; we normalize it to null so a caller
+ * can never compare it wrongly.
  */
 export function computeHealthFactor(
   collateralBase: bigint,
@@ -21,12 +21,12 @@ export function computeHealthFactor(
 }
 
 /**
- * Berapa basis point harga agunan boleh turun sebelum HF menyentuh 1.0.
- * Bagian dalam (BPS × HF_ONE / hf) harus dibulatkan ke ATAS: itu adalah bps
- * yang "tersisa" setelah turun, jadi kalau dibulatkan ke bawah (floor),
- * hasil pengurangannya (margin turun) membesar dan melebih-lebihkan seberapa
- * jauh harga boleh jatuh — bisa mendaratkan posisi di bawah HF 1.0 padahal
- * dilaporkan masih aman. ceilDiv membuat margin ini mengecil, arah yang aman.
+ * How many basis points the collateral price may fall before HF touches 1.0.
+ * The inner term (BPS x HF_ONE / hf) must be rounded UP: it is the bps "remaining" after
+ * the fall, so if it were floored, the subtraction's result (the fall margin) would grow
+ * and overstate how far the price may drop — which could land the position below HF 1.0
+ * while it is reported as still safe. ceilDiv makes this margin smaller, the safe
+ * direction.
  */
 export function dropToLiquidationBps(hf: bigint | null): bigint | null {
   if (hf === null) return null;
@@ -34,7 +34,7 @@ export function dropToLiquidationBps(hf: bigint | null): bigint | null {
   return BPS - ceilDiv(BPS * HF_ONE, hf);
 }
 
-/** HF seandainya harga agunan turun sebesar `dropBps`. */
+/** The HF if the collateral price fell by `dropBps`. */
 export function healthFactorAfterPriceDrop(pos: Position, dropBps: bigint): bigint | null {
   if (pos.debtBase === 0n) return null;
   const sisa = dropBps >= BPS ? 0n : BPS - dropBps;
@@ -45,7 +45,7 @@ export function healthFactorAfterPriceDrop(pos: Position, dropBps: bigint): bigi
   );
 }
 
-/** Jumlah yang harus dibayar agar HF mencapai `targetHf`; 0n bila sudah aman. */
+/** The amount that must be repaid for HF to reach `targetHf`; 0n when it is already safe. */
 export function repayToReachTarget(pos: Position, targetHf: bigint): bigint {
   if (pos.debtBase === 0n || targetHf === 0n) return 0n;
   const hutangTarget =

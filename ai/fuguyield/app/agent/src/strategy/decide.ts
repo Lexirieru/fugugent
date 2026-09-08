@@ -1,24 +1,23 @@
 /**
- * Mesin keputusan Yield.
+ * The Yield decision engine.
  *
- * MURNI: tanpa jaringan, tanpa `Date.now()`, tanpa `process.env`, tanpa I/O.
- * Umur data APY masuk sebagai angka di dalam `Pool`, bukan dibaca dari jam,
- * supaya setiap keputusan bisa diputar ulang persis dan di-backtest.
+ * PURE: no network, no `Date.now()`, no `process.env`, no I/O. The age of the APY data
+ * arrives as a number inside `Pool` rather than being read from the clock, so every
+ * decision can be replayed exactly and backtested.
  *
- * Urutan gerbang, dan urutan ini adalah inti desainnya:
- *   1. KESELAMATAN posisi sekarang — kalau tempat kita berdiri sudah tidak aman,
- *      kita pergi, berapa pun selisih APY-nya. Keselamatan mengalahkan ekonomi.
- *   2. KESEGARAN data posisi sekarang — tanpa APY sekarang yang tepercaya,
- *      selisih tidak bisa dihitung; menolak menghitung lebih baik daripada
- *      menghitung salah.
- *   3. RISIKO kandidat — pool disaring SEBELUM APY-nya dilihat, sehingga APY
- *      tinggi tidak pernah bisa "membeli" kelonggaran risiko.
- *   4. EKONOMI — selisih APY harus melampaui ambang yang DITURUNKAN dari ongkos
- *      pindah, pokok, dan horizon.
- *   5. KONFIRMASI — selisih itu harus bertahan beberapa pengamatan.
+ * The order of the gates, and this order is the core of the design:
+ *   1. SAFETY of the current position — if where we stand is no longer safe, we leave,
+ *      whatever the APY spread is. Safety beats economics.
+ *   2. FRESHNESS of the current position's data — without a trustworthy current APY the
+ *      spread cannot be computed; refusing to compute is better than computing wrong.
+ *   3. RISK of the candidates — pools are filtered BEFORE their APY is looked at, so a
+ *      high APY can never "buy" leniency on risk.
+ *   4. ECONOMICS — the APY spread must exceed a threshold DERIVED from the migration
+ *      cost, the principal, and the horizon.
+ *   5. CONFIRMATION — that spread has to persist across several observations.
  *
- * APY tertinggi bukan jawaban yang benar, dan modul ini disusun supaya angka
- * tertinggi tidak pernah bisa melewati gerbang 1 sampai 3.
+ * The highest APY is not the right answer, and this module is arranged so the highest
+ * number can never get past gates 1 through 3.
  */
 import {
   breakEvenSpreadBps,
@@ -92,10 +91,9 @@ function validateThresholds(t: YieldThresholds): void {
 }
 
 /**
- * Pool yang bentuknya tidak masuk akal harus gagal keras, bukan diperlakukan
- * sebagai pool berisiko. Bedanya penting: `riskScore: 200` bukan pool yang
- * sangat berisiko, itu pembacaan yang rusak, dan memperlakukannya sebagai
- * "sangat berisiko" berarti diam-diam menerima data yang tidak dipahami.
+ * A pool whose shape is nonsensical must fail hard, not be treated as a risky pool. The
+ * difference matters: `riskScore: 200` is not a very risky pool, it is a broken reading,
+ * and treating it as "very risky" means quietly accepting data we do not understand.
  */
 function validatePool(p: Pool, label: string): void {
   if (p.apyBps < 0n) {
@@ -135,8 +133,8 @@ function validateObservation(o: YieldObservation): void {
 }
 
 /**
- * Gerbang risiko. Dijalankan SEBELUM APY dibandingkan, sehingga APY setinggi
- * apa pun tidak pernah bisa membeli kelonggaran di sini.
+ * The risk gates. Run BEFORE any APY is compared, so no APY however high can buy
+ * leniency here.
  */
 function rejectionOf(
   pool: Pool,
@@ -152,11 +150,10 @@ function rejectionOf(
 }
 
 /**
- * Gerbang keselamatan untuk posisi yang SEDANG dipegang. Sengaja tidak memakai
- * `rejectionOf` apa adanya: data APY yang basi bukan alasan untuk meninggalkan
- * pool yang sehat (uangnya sudah di sana, tidak ada yang berubah karena
- * angkanya terlambat), sedangkan pool yang dibekukan atau menyusut adalah
- * alasan untuk pergi sekarang juga.
+ * The safety gate for the position we are CURRENTLY holding. It deliberately does not
+ * reuse `rejectionOf` as-is: stale APY data is not a reason to leave a healthy pool (the
+ * money is already there, nothing changed just because the number arrived late), while a
+ * pool that is frozen or shrinking is a reason to leave right now.
  */
 function currentPoolIsUnsafe(pool: Pool, principalBase: bigint, t: YieldThresholds): boolean {
   if (!pool.isActive) return true;
@@ -218,7 +215,7 @@ export function decide(
   const impas = breakEvenSpreadBps(principal, biayaPindah, thresholds.expectedHoldingDays);
   const wajib = requiredSpreadBps(impas, thresholds.spreadSafetyMultipleBps);
 
-  // --- gerbang 3: saring kandidat berdasarkan risiko, sebelum melihat APY ---
+  // --- gate 3: filter candidates on risk, before looking at any APY ---
   const rejected: RejectedPool[] = [];
   const eligible: Pool[] = [];
   for (const c of candidates) {
@@ -231,10 +228,10 @@ export function decide(
     else rejected.push({ poolId: c.poolId, why: alasan });
   }
 
-  // Urutan deterministik: APY menurun, lalu poolId menaik. Tanpa pemecah seri
-  // yang tegas, dua pool ber-APY sama akan dipilih menurut urutan masukan —
-  // dan urutan masukan datang dari indexer, yang tidak dijamin stabil. Keputusan
-  // uang tidak boleh bergantung pada urutan baris yang kebetulan.
+  // Deterministic ordering: APY descending, then poolId ascending. Without a strict
+  // tiebreaker, two pools with equal APY would be picked by input order — and the input
+  // order comes from an indexer, which is not guaranteed to be stable. A decision about
+  // money must not depend on which row happened to come first.
   const urut = [...eligible].sort((a, b) =>
     a.apyBps === b.apyBps ? (a.poolId < b.poolId ? -1 : a.poolId > b.poolId ? 1 : 0) : a.apyBps > b.apyBps ? -1 : 1,
   );
@@ -270,15 +267,15 @@ export function decide(
     ),
   });
 
-  // --- gerbang 1: keselamatan posisi sekarang mengalahkan seluruh ekonomi ---
+  // --- gate 1: the current position's safety beats all economics ---
   if (currentPoolIsUnsafe(current, principal, thresholds)) {
     if (best === null) return hasil("EXIT", "NO_ELIGIBLE_POOL", null);
-    // Tanpa menunggu konfirmasi: menunggu berarti membiarkan uang tetap berada
-    // di tempat yang sudah dinilai tidak aman selama beberapa pengamatan lagi.
+    // No waiting for confirmation: waiting means leaving the money in a place already
+    // judged unsafe for several more observations.
     return hasil("MIGRATE", "CURRENT_POOL_UNSAFE", best.poolId);
   }
 
-  // --- gerbang 2: data posisi sekarang harus cukup segar untuk dibandingkan ---
+  // --- gate 2: the current position's data must be fresh enough to compare against ---
   if (current.apyAgeSeconds > thresholds.maxApyAgeSeconds) {
     return hasil("STAY", "CURRENT_DATA_STALE", best?.poolId ?? null);
   }
@@ -286,10 +283,10 @@ export function decide(
   if (best === null) return hasil("STAY", "NO_CANDIDATE", null);
   if (spread <= 0n) return hasil("STAY", "NO_BETTER_POOL", best.poolId);
 
-  // --- gerbang 4: ekonomi ---
+  // --- gate 4: economics ---
   if (!spreadQualifies) return hasil("STAY", "SPREAD_BELOW_BREAKEVEN", best.poolId);
 
-  // --- gerbang 5: konfirmasi ---
+  // --- gate 5: confirmation ---
   if (consecutiveFavorable < thresholds.minConsecutiveFavorable) {
     return hasil("STAY", "SPREAD_NOT_CONFIRMED", best.poolId);
   }

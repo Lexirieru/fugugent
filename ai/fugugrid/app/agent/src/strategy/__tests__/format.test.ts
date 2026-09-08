@@ -25,8 +25,8 @@ describe("formatPriceUsd8", () => {
   });
 
   it("harga token murah TIDAK dipotong menjadi $0,00", () => {
-    // Inilah alasan harga punya formatter sendiri: seluruh garis grid pada token
-    // berharga sepersepuluh ribu dolar akan tampak identik lewat formatUsd8.
+    // This is why prices get their own formatter: every grid line on a token priced at a
+    // ten-thousandth of a dollar would look identical through formatUsd8.
     expect(formatPriceUsd8(12_345n)).toBe("$0,00012345");
     expect(formatUsd8(12_345n)).toBe("$0,00");
   });

@@ -1,25 +1,24 @@
 /**
- * Adapter Venus, membaca likuiditas akun sungguhan di BSC **mainnet**.
- * Venus dan Aave v3 hanya ada di BSC mainnet (chain 56), tidak di testnet,
- * jadi pembacaan ini sengaja menyasar mainnet. Read-only lewat `eth_call`,
- * tidak ada transaksi dan tidak berbiaya. Eksekusi transaksi agent tetap
- * berjalan di testnet — hanya pembacaan posisi ini yang lintas ke mainnet.
+ * The Venus adapter, reading a real account's liquidity on BSC **mainnet**.
+ * Venus and Aave v3 only exist on BSC mainnet (chain 56), not on testnet, so this read
+ * deliberately targets mainnet. Read-only via `eth_call`, no transactions and no cost. The
+ * agent's transaction execution still runs on testnet — only this position read crosses to
+ * mainnet.
  *
- * BELUM TERHUBUNG KE `decide()` — dan itu disengaja. `decide()` bekerja di atas
- * `Position`, yang butuh health factor dan satu ambang likuidasi agregat.
- * Comptroller Venus tidak menyediakan keduanya: `getAccountLiquidity` hanya
- * memberi selisih likuiditas/shortfall dalam USD, tanpa health factor dan
- * tanpa collateral factor gabungan. Untuk menyusun `Position` dari Venus,
- * kita harus mengambil data PER-MARKET (daftar vToken lewat `getAssetsIn`,
- * `markets(vToken).collateralFactorMantissa`, saldo snapshot tiap vToken, dan
- * harga tiap aset dari oracle) lalu menjumlahkannya sendiri — data yang belum
- * diambil sama sekali oleh adapter ini. Sampai itu ada, angka Venus di sini
- * hanya untuk pemantauan/diagnostik, BUKAN masukan keputusan.
+ * NOT YET WIRED INTO `decide()` — and that is deliberate. `decide()` works on `Position`,
+ * which needs a health factor and one aggregate liquidation threshold. The Venus
+ * comptroller provides neither: `getAccountLiquidity` only gives the liquidity/shortfall
+ * delta in USD, with no health factor and no combined collateral factor. To build a
+ * `Position` from Venus we would have to fetch PER-MARKET data (the vToken list via
+ * `getAssetsIn`, `markets(vToken).collateralFactorMantissa`, each vToken's snapshot
+ * balance, and each asset's price from the oracle) and aggregate it ourselves — data this
+ * adapter does not fetch at all. Until that exists, the Venus numbers here are for
+ * monitoring/diagnostics only, NOT decision input.
  */
 import type { PublicClient } from "viem";
 import { PositionError } from "../types.js";
 
-/** Alamat Venus Comptroller di BSC mainnet, terverifikasi live. */
+/** The Venus Comptroller address on BSC mainnet, verified live. */
 export const VENUS_COMPTROLLER_ADDRESS = "0xfD36E2c2a6789Db23113685031d7F16329158384" as const;
 
 const VENUS_COMPTROLLER_ABI = [
@@ -37,29 +36,27 @@ const VENUS_COMPTROLLER_ABI = [
 ] as const;
 
 /**
- * PERHATIAN SATUAN: skala di sini BERBEDA dari `Position`.
+ * UNITS WARNING: the scale here is DIFFERENT from `Position`.
  *
- * Semua field `*Base` pada `Position` memakai basis 8 desimal Aave (1e8 = $1),
- * sedangkan Venus mengembalikan nilai USD dalam mantissa 1e18 (1e18 = $1) —
- * selisihnya 10^10. Karena itu field di bawah TIDAK memakai sufiks `Base`:
- * nama `liquidityBase` sebelumnya membuat nilai ini tampak bisa langsung
- * dibandingkan atau dijumlahkan dengan `collateralBase`/`debtBase`, padahal
- * hasilnya akan meleset sepuluh miliar kali lipat. Konversi eksplisit
- * (bagi 10^10) wajib dilakukan sebelum nilai ini bertemu angka bergaya Aave.
+ * Every `*Base` field on `Position` uses Aave's 8-decimal basis (1e8 = $1), while Venus
+ * returns USD values in a 1e18 mantissa (1e18 = $1) — a factor of 10^10 apart. That is why
+ * the fields below do NOT carry the `Base` suffix: the earlier name `liquidityBase` made
+ * these values look directly comparable to, or summable with, `collateralBase`/`debtBase`,
+ * when the result would be off by ten billion. An explicit conversion (divide by 10^10) is
+ * mandatory before this value meets an Aave-style number.
  */
 export interface VenusLiquidity {
-  /** Sisa likuiditas akun dalam USD, mantissa 1e18 (bukan basis 8 desimal Aave). */
+  /** The account's remaining liquidity in USD, 1e18 mantissa (not Aave's 8-decimal basis). */
   liquidityUsd18: bigint;
-  /** Kekurangan agunan akun dalam USD, mantissa 1e18; > 0 berarti sudah bisa dilikuidasi. */
+  /** The account's collateral shortfall in USD, 1e18 mantissa; > 0 means it is already liquidatable. */
   shortfallUsd18: bigint;
   blockNumber: bigint;
 }
 
 /**
- * Membaca likuiditas Venus satu akun pada blok terbaru mainnet.
- * Bila kode `error` yang dikembalikan comptroller bukan 0n, lempar
- * `PositionError` yang menyebut kode itu — pemanggil bisa menanganinya
- * tanpa harus menebak arti angka mentah.
+ * Reads one account's Venus liquidity at mainnet's latest block.
+ * If the `error` code the comptroller returns is not 0n, it throws a `PositionError` naming
+ * that code — a caller can handle it without having to guess what a raw number means.
  */
 export async function readVenusLiquidity(
   client: PublicClient,

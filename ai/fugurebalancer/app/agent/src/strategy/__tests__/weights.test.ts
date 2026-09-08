@@ -43,7 +43,7 @@ describe("weightBps", () => {
   });
 
   it("dibulatkan ke bawah, bukan ke atas", () => {
-    // 1/3 = 3333,33 bps -> 3333
+    // 1/3 = 3333.33 bps -> 3333
     expect(weightBps(1n, 3n)).toBe(3_333n);
   });
 
@@ -62,7 +62,7 @@ describe("absDeviationBps", () => {
   });
 
   it("dipotong ke bawah supaya penyimpangan tidak pernah dilebih-lebihkan", () => {
-    // nilai 1, target 5000 bps, total 3 -> |1*10000 - 3*5000| / 3 = 5000/3 = 1666,67 -> 1666
+    // value 1, target 5000 bps, total 3 -> |1*10000 - 3*5000| / 3 = 5000/3 = 1666.67 -> 1666
     expect(absDeviationBps(1n, 5_000n, 3n)).toBe(1_666n);
   });
 });
@@ -122,12 +122,12 @@ describe("turnoverBase", () => {
 
 describe("estimateCostBase", () => {
   it("biaya = bagian proporsional + gas tetap", () => {
-    // 15 bps dari $1.000 = $1,50; ditambah gas $0,30 = $1,80
+    // 15 bps of $1,000 = $1.50; plus $0.30 of gas = $1.80
     expect(estimateCostBase(usd(1_000n), biaya)).toBe(180_000_000n);
   });
 
   it("bagian proporsional dibulatkan ke ATAS supaya biaya tidak pernah diremehkan", () => {
-    // 15 bps dari 1 unit basis = 0,0015 -> dibulatkan jadi 1
+    // 15 bps of 1 basis unit = 0.0015 -> rounded up to 1
     expect(estimateCostBase(1n, { ...biaya, gasCostBase: 0n })).toBe(1n);
   });
 
@@ -152,9 +152,9 @@ describe("costBpsOfTurnover", () => {
 
 describe("minEconomicTurnoverBase", () => {
   it("mengembalikan turnover yang DIJAMIN lolos gerbang biaya", () => {
-    // Batas analitis murni adalah gas*10000/(maxCostBps - (fee+slip)) = 30_000_000*10000/35.
-    // Karena estimateCostBase membulatkan bagian proporsional ke ATAS, batas itu
-    // masih bisa gagal; rumusnya memakai (gas + 1) supaya pembulatan selalu tertutupi.
+    // The purely analytic bound is gas*10000/(maxCostBps - (fee+slip)) = 30_000_000*10000/35.
+    // Because estimateCostBase rounds the proportional part UP, that bound can still
+    // fail; the formula uses (gas + 1) so the rounding is always covered.
     expect(minEconomicTurnoverBase(biaya, 50n)).toBe(8_571_428_858n);
   });
 

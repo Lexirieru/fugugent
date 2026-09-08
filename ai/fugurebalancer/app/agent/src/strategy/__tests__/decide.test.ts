@@ -16,7 +16,7 @@ function portfolio(assets: Asset[]): Portfolio {
   return { account: AKUN, assets, blockNumber: 1n };
 }
 
-/** Dua aset target 50/50 dengan nilai yang ditentukan pemanggil. */
+/** Two assets targeting 50/50, with values chosen by the caller. */
 function duaAset(a: bigint, b: bigint): Portfolio {
   return portfolio([
     { symbol: "WBNB", valueBase: a, targetWeightBps: 5_000n },
@@ -35,7 +35,7 @@ describe("decide — kemurnian dan gerbang penyimpangan", () => {
   });
 
   it("penyimpangan di bawah pita pengamatan tetap NONE", () => {
-    // 5100/4900 -> penyimpangan 100 bps
+    // 5100/4900 -> a 100 bps deviation
     const d = decide(duaAset(usd(5_100n), usd(4_900n)), murah);
     expect(d.action).toBe("NONE");
     expect(d.maxDeviationBps).toBe(100n);
@@ -84,7 +84,7 @@ describe("decide — kemurnian dan gerbang penyimpangan", () => {
 
 describe("decide — gerbang biaya", () => {
   it("penyimpangan besar pada portofolio kecil ditolak karena gas melahap turnover", () => {
-    // total $100, turnover $10, gas $0,30 saja sudah 300 bps dari turnover
+    // $100 total, $10 turnover; the $0.30 of gas alone is already 300 bps of turnover
     const d = decide(duaAset(usd(60n), usd(40n)), murah);
     expect(d.action).toBe("BLOCKED_BY_COST");
     expect(d.estimatedCostBps).toBeGreaterThan(DEFAULT_THRESHOLDS.maxRebalanceCostBps);
@@ -106,8 +106,8 @@ describe("decide — gerbang biaya", () => {
   });
 
   it("biaya tepat di ambang maksimum masih dieksekusi", () => {
-    // gas dipilih supaya costBps persis 50: turnover $1.000 -> 15 bps proporsional,
-    // sisa 35 bps harus datang dari gas = 35/10000 * 1e11 = 350_000_000
+    // gas chosen so costBps lands exactly on 50: $1,000 of turnover -> 15 bps
+    // proportional, so the remaining 35 bps must come from gas = 35/10000 * 1e11 = 350_000_000
     const d = decide(duaAset(usd(6_000n), usd(4_000n)), { ...murah, gasCostBase: 350_000_000n });
     expect(d.estimatedCostBps).toBe(50n);
     expect(d.action).toBe("REBALANCE");

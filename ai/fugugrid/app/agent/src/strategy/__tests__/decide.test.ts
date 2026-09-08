@@ -145,7 +145,7 @@ describe("decide — kapan grid berhenti berlaku", () => {
   });
 
   it("harga di antara batas atas dan buffer masih boleh menjual sisa lot", () => {
-    // $705 di atas $700 tetapi di bawah $714: pita dijepit ke 9, penjualan tetap terjadi
+    // $705 is above $700 but below $714: the band clamps to 9 and the sale still happens
     const d = lihat(705n, state({ bandIndex: 5, lotsHeld: 5 }));
     expect(d.action).toBe("SELL");
     expect(d.lots).toBe(4);

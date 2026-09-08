@@ -12,7 +12,7 @@ const usd = (n: bigint) => n * 100_000_000n;
 const POKOK = usd(10_000n);
 const biaya: SwitchCostModel = { swapFeeBps: 5n, slippageBps: 10n, gasCostBase: usd(1n) };
 
-/** Ambang wajib untuk pokok $10.000: impas 195 bps, dikali 2,00x = 390 bps. */
+/** The required threshold for a $10,000 principal: 195 bps break-even, times 2.00x = 390 bps. */
 const AMBANG = 390n;
 
 function pool(over: Partial<Pool> & { poolId: string }): Pool {

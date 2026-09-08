@@ -1,31 +1,31 @@
 /**
- * Pemformatan angka untuk konsumsi manusia. SATU-SATUNYA tempat angka domain
- * diubah menjadi teks.
+ * Number formatting for human consumption. The ONLY place a domain number is turned
+ * into text.
  *
- * Sebelumnya `formatHf` dan `formatPercentFromBps` diduplikasi di `decide.ts`
- * dan `explain.ts`. Duplikat seperti itu berbahaya secara diam-diam: kalau
- * salah satu salinan berubah (pembulatan, jumlah desimal, pemisah), angka di
- * `Decision.reason` dan angka di prompt LLM bisa berbeda untuk posisi yang
- * sama persis — user melihat dua versi kebenaran tentang uangnya sendiri.
- * Menaruhnya di sini membuat perbedaan itu mustahil secara struktural.
+ * `formatHf` and `formatPercentFromBps` used to be duplicated in `decide.ts` and
+ * `explain.ts`. Duplicates like that are dangerous quietly: if one copy changes
+ * (rounding, decimal count, separator), the number in `Decision.reason` and the number
+ * in the LLM prompt can differ for the exact same position — the user sees two versions
+ * of the truth about their own money. Putting them here makes that difference
+ * structurally impossible.
  *
- * Semua fungsi di sini murni aritmetika bigint. `Number()` sengaja TIDAK
- * dipakai: nilai uang di lapisan ini bisa melebihi Number.MAX_SAFE_INTEGER
- * dan konversi ke float akan diam-diam kehilangan presisi pada digit
- * terakhir — persis digit yang menentukan berapa rupiah/dolar dibayar.
+ * Every function here is pure bigint arithmetic. `Number()` is deliberately NOT used:
+ * money values at this layer can exceed Number.MAX_SAFE_INTEGER, and converting to float
+ * silently loses precision on the last digit — exactly the digit that decides how many
+ * dollars get paid.
  */
 import { HF_ONE } from "./types.js";
-// Satu sumber untuk konstanta satuan: `units.ts` sudah memilikinya karena ia
-// yang mengonversi USD8 <-> unit token. Salinan lokal di sini pernah ada dan
-// tidak boleh kembali — dua definisi "satu dolar" adalah cara paling sunyi
-// untuk membuat angka di log berbeda dari angka yang dikirim.
+// One source for the unit constants: `units.ts` already owns them, because it is what
+// converts USD8 <-> token units. A local copy existed here once and must not come back —
+// two definitions of "one dollar" are the quietest way to make the number in the log
+// differ from the number that was sent.
 import { USD8_ONE } from "./units.js";
 
 /**
- * Format health factor (basis 1e18) menjadi string dua desimal dengan koma,
- * mis. 1_300_000_000_000_000_000n -> "1,30". Dipotong (floor), tidak
- * dibulatkan: HF 1,299 ditampilkan sebagai "1,29", bukan "1,30" — arah yang
- * aman, karena posisi tidak pernah terlihat lebih sehat daripada aslinya.
+ * Formats a health factor (1e18 basis) into a two-decimal string with a comma, e.g.
+ * 1_300_000_000_000_000_000n -> "1,30". Truncated (floored), not rounded: an HF of 1,299
+ * shows as "1,29", not "1,30" — the safe direction, because a position never looks
+ * healthier than it really is.
  */
 export function formatHf(hf: bigint): string {
   const bulat = hf / HF_ONE;
@@ -35,17 +35,17 @@ export function formatHf(hf: bigint): string {
 }
 
 /**
- * Format basis point (basis 10_000 = 100%) menjadi persen satu desimal
- * dengan koma, mis. 2000n -> "20,0".
+ * Formats basis points (10_000 = 100%) into a percentage with one decimal and a comma,
+ * e.g. 2000n -> "20,0".
  */
 export function formatPercentFromBps(bps: bigint): string {
-  const persepuluhPersen = bps / 10n; // bps/10 = persentase dikali 10
+  const persepuluhPersen = bps / 10n; // bps/10 = the percentage times 10
   const bulat = persepuluhPersen / 10n;
   const desimal = persepuluhPersen % 10n;
   return `${bulat},${desimal}`;
 }
 
-/** Sisipkan pemisah ribuan gaya Indonesia: 1234567n -> "1.234.567". */
+/** Insert Indonesian-style thousands separators: 1234567n -> "1.234.567". */
 function grupRibuan(n: bigint): string {
   const s = n.toString();
   let out = "";
@@ -57,18 +57,17 @@ function grupRibuan(n: bigint): string {
 }
 
 /**
- * Format nilai uang basis 8 desimal Aave (semua field `*Base` pada `Position`
- * dan `Decision.suggestedRepayBase`) menjadi string dolar AS yang terbaca:
- * 12_345_678n -> "$0,12" dan 100_000_000n -> "$1,00".
+ * Formats a money value on Aave's 8-decimal basis (every `*Base` field on `Position`,
+ * plus `Decision.suggestedRepayBase`) into a readable US dollar string:
+ * 12_345_678n -> "$0,12" and 100_000_000n -> "$1,00".
  *
- * Ini BUKAN kosmetik. Nilai mentah 12345678 terbaca oleh manusia sebagai
- * "dua belas juta" padahal artinya dua belas sen — selisih 10^8 pada angka
- * yang dipakai user untuk memutuskan membayar hutang. Setiap kali nilai
- * `*Base` keluar ke manusia (prompt LLM, UI, log yang dibaca orang), ia harus
- * melewati fungsi ini.
+ * This is NOT cosmetic. The raw value 12345678 reads to a human as "twelve million" when
+ * it means twelve cents — a factor of 10^8 on the number a user relies on to decide
+ * whether to repay a debt. Every time a `*Base` value goes out to a human (an LLM prompt,
+ * the UI, a log a person reads), it must pass through this function.
  *
- * Pecahan sen dipotong, bukan dibulatkan, dan pemisah desimalnya koma
- * mengikuti konvensi Indonesia yang dipakai `formatHf`/`formatPercentFromBps`.
+ * Fractions of a cent are truncated, not rounded, and the decimal separator is a comma,
+ * following the Indonesian convention used by `formatHf`/`formatPercentFromBps`.
  */
 export function formatUsd8(v: bigint): string {
   const negatif = v < 0n;

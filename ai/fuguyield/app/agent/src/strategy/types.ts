@@ -1,71 +1,71 @@
 /**
- * Tipe dan ambang untuk strategi YIELD.
+ * Types and thresholds for the YIELD strategy.
  *
- * SATUAN — seragam di seluruh paket ini:
- *  - nilai uang: basis 8 desimal (`*Base`), 100_000_000n = $1,00
- *  - jumlah token: 18 desimal (`WAD`) — SELURUH token di BSC 18 desimal,
- *    termasuk USDT dan USDC
- *  - APY dan persentase: basis point (`*Bps`), 10_000n = 100%
+ * UNITS — uniform across this whole package:
+ *  - money: 8-decimal basis (`*Base`), 100_000_000n = $1.00
+ *  - token amounts: 18 decimals (`WAD`) — EVERY token on BSC has 18 decimals,
+ *    including USDT and USDC
+ *  - APY and percentages: basis points (`*Bps`), 10_000n = 100%
  *
- * Modul ini murni: tanpa jaringan, jam, atau environment. Umur data APY masuk
- * lewat `Pool.apyAgeSeconds`, BUKAN dihitung dari `Date.now()` — kalau modul
- * ini membaca jam, keputusan yang sama tidak bisa diputar ulang dan tidak bisa
- * di-backtest.
+ * This module is pure: no network, clock, or environment. The age of the APY reading
+ * arrives through `Pool.apyAgeSeconds`, it is NOT computed from `Date.now()` — if this
+ * module read the clock, the same decision could not be replayed and could not be
+ * backtested.
  */
 
 export const USD8_ONE = 100_000_000n;
 export const BPS_ONE = 10_000n;
 export const WAD = 10n ** 18n;
 
-/** Protokol lending memakai basis 365 hari untuk APY, bukan 360. */
+/** Lending protocols use a 365-day basis for APY, not 360. */
 export const DAYS_PER_YEAR = 365n;
 
 export interface Pool {
   poolId: string;
   protocol: string;
-  /** APY dalam bps. 500n = 5,00% setahun. */
+  /** APY in bps. 500n = 5.00% per year. */
   apyBps: bigint;
-  /** Total value locked pool, USD basis 8 desimal. */
+  /** The pool's total value locked, USD on the 8-decimal basis. */
   tvlBase: bigint;
   /**
-   * Skor risiko 0..100 dari allowlist/riset kita sendiri. Modul ini TIDAK
-   * menghitungnya dan tidak berpura-pura bisa: risiko protokol adalah penilaian
-   * manusia (audit, umur, rekam jejak, kualitas oracle) yang masuk sebagai data.
+   * A 0..100 risk score from our own allowlist/research. This module does NOT compute
+   * it and does not pretend it could: protocol risk is a human judgment (audits, age,
+   * track record, oracle quality) that arrives here as data.
    */
   riskScore: number;
-  /** false bila pool dijeda, dihentikan, atau ditandai deprecated protokolnya. */
+  /** false when the pool is paused, shut down, or marked deprecated by its protocol. */
   isActive: boolean;
-  /** Umur pembacaan APY dalam detik pada saat pengamatan ini diambil. */
+  /** The age of the APY reading in seconds at the moment this observation was taken. */
   apyAgeSeconds: number;
 }
 
 export interface YieldPosition {
-  /** Pokok yang dikelola, USD basis 8 desimal. */
+  /** The principal under management, USD on the 8-decimal basis. */
   principalBase: bigint;
   current: Pool;
 }
 
 export interface YieldObservation {
   position: YieldPosition;
-  /** Pool alternatif. Pool yang sama dengan posisi sekarang diabaikan. */
+  /** Alternative pools. A pool identical to the current position is ignored. */
   candidates: Pool[];
   /**
-   * Berapa pengamatan BERTURUT-TURUT kandidat terbaik yang sama sudah memenuhi
-   * ambang selisih. Dihitung oleh pemanggil (penjadwal), bukan oleh modul ini —
-   * modul ini murni dan tidak punya ingatan. Aturan menghitungnya tegas:
-   * naikkan bila `spreadQualifies` true DAN `targetPoolId` sama dengan
-   * pengamatan sebelumnya; selain itu setel ke nol.
+   * How many CONSECUTIVE observations the same best candidate has met the spread
+   * threshold. Counted by the caller (the scheduler), not by this module — this module
+   * is pure and has no memory. The counting rule is strict: increment when
+   * `spreadQualifies` is true AND `targetPoolId` matches the previous observation;
+   * otherwise set it to zero.
    */
   consecutiveFavorable: number;
   blockNumber: bigint;
 }
 
 export interface SwitchCostModel {
-  /** Fee pool DEX untuk menukar aset saat berpindah. */
+  /** The DEX pool fee for swapping assets during a migration. */
   swapFeeBps: bigint;
-  /** Dampak harga + toleransi slippage. */
+  /** Price impact plus slippage tolerance. */
   slippageBps: bigint;
-  /** Gas SELURUH rangkaian pindah (tarik, tukar, setor), USD basis 8 desimal. */
+  /** Gas for the WHOLE migration sequence (withdraw, swap, deposit), USD on the 8-decimal basis. */
   gasCostBase: bigint;
 }
 
@@ -97,20 +97,20 @@ export interface RejectedPool {
 export interface YieldDecision {
   action: YieldAction;
   reasonCode: YieldReasonCode;
-  /** Kandidat terbaik yang lolos gerbang risiko; null bila tidak ada. */
+  /** The best candidate that passed the risk gates; null if there is none. */
   targetPoolId: string | null;
   currentApyBps: bigint;
   bestApyBps: bigint | null;
-  /** APY kandidat terbaik dikurangi APY sekarang; 0 bila tidak ada kandidat. */
+  /** The best candidate's APY minus the current APY; 0 when there is no candidate. */
   spreadBps: bigint;
-  /** Selisih APY yang persis menutup ongkos pindah selama horizon. */
+  /** The APY spread that exactly covers the migration cost over the horizon. */
   breakEvenSpreadBps: bigint;
-  /** Ambang impas dikali pengali keamanan. */
+  /** The break-even threshold times the safety multiple. */
   requiredSpreadBps: bigint;
-  /** true bila `spreadBps >= requiredSpreadBps`. Dipakai pemanggil untuk menghitung konfirmasi. */
+  /** true when `spreadBps >= requiredSpreadBps`. The caller uses it to count confirmations. */
   spreadQualifies: boolean;
   switchCostBase: bigint;
-  /** Taksiran keuntungan bersih selama horizon; bisa negatif. */
+  /** The estimated net gain over the horizon; can be negative. */
   netGainBase: bigint;
   rejected: RejectedPool[];
   reason: string;
@@ -127,91 +127,86 @@ export interface YieldThresholds {
 }
 
 /**
- * ============================ ALASAN ANGKA-ANGKA INI ============================
+ * ========================== WHY THESE NUMBERS ARE WHAT THEY ARE ==========================
  *
  * `expectedHoldingDays = 30`
- *   Kenapa ada: ambang "selisih APY minimum yang membenarkan perpindahan" TIDAK
- *   BISA dihitung tanpa horizon. Ongkos pindah dibayar sekali; selisih APY
- *   dibayar per hari. Tanpa asumsi berapa lama posisi akan bertahan, pertanyaan
- *   "apakah pindah ini sepadan" tidak punya jawaban.
- *   Kenapa 30: kira-kira selama itu APY pasar lending bertahan sebelum
- *   re-rating besar, dan cukup pendek untuk tidak melebih-lebihkan.
- *   Kalau salah: horizon terlalu PANJANG membuat ambang impas kecil sehingga
- *   agent berpindah untuk selisih tipis yang belum tentu bertahan selama itu —
- *   ini arah yang berbahaya karena kerugiannya nyata dan keuntungannya
- *   hipotetis. Horizon terlalu PENDEK membuat ambang begitu tinggi sehingga
- *   agent tidak pernah pindah dan tidak melakukan apa-apa.
- *   TIDAK YAKIN: ini asumsi, dan asumsi ini yang paling menentukan seluruh
- *   perilaku strategi. Ia harus diuji ulang terhadap berapa lama posisi
- *   BENAR-BENAR bertahan di produksi; kalau ternyata rata-ratanya 7 hari,
- *   angka ini harus 7 dan ambangnya melonjak dari ratusan ke ribuan bps.
+ *   Why it exists: the threshold "the minimum APY spread that justifies a migration"
+ *   CANNOT be computed without a horizon. The migration cost is paid once; the APY spread
+ *   is earned per day. Without an assumption about how long the position will last, the
+ *   question "is this move worth it" has no answer.
+ *   Why 30: roughly how long a lending market's APY holds up before a major re-rating,
+ *   and short enough not to overstate things.
+ *   If it is wrong: a horizon that is too LONG makes the break-even threshold small, so
+ *   the agent migrates for a thin spread that may not last that long — a dangerous
+ *   direction, because the loss is real and the gain is hypothetical. A horizon that is
+ *   too SHORT makes the threshold so high that the agent never migrates and does nothing.
+ *   NOT CONFIDENT: this is an assumption, and it is the assumption that determines the
+ *   strategy's whole behavior. It must be re-tested against how long positions ACTUALLY
+ *   last in production; if the average turns out to be 7 days, this number must be 7 and
+ *   the threshold jumps from hundreds to thousands of bps.
  *
- * `spreadSafetyMultipleBps = 20_000` (2,00x ambang impas)
- *   Kenapa ada: APY bukan janji, melainkan potret sesaat. Ia turun begitu modal
- *   masuk (deposit kita sendiri ikut menurunkannya), sebagiannya sering berupa
- *   emisi token hadiah yang harganya sendiri jatuh, dan ia dihitung dari
- *   utilisasi yang berubah setiap blok. Pindah tepat di titik impas berarti
- *   bertaruh bahwa angka rapuh itu bertahan persis.
- *   Kenapa 2,00x: perpindahan tetap sepadan walau selisih yang benar-benar
- *   terealisasi hanya setengah dari yang dikutip.
- *   Kalau salah: terlalu kecil -> agent berpindah mengejar angka yang menguap
- *   sebelum ongkosnya kembali; terlalu besar -> agent tidak pernah pindah dan
- *   membiarkan selisih nyata lewat.
- *   TIDAK YAKIN: 2,00x keputusan produk, bukan turunan.
+ * `spreadSafetyMultipleBps = 20_000` (2.00x the break-even threshold)
+ *   Why it exists: an APY is not a promise, it is a snapshot. It drops the moment capital
+ *   arrives (our own deposit pushes it down too), part of it is often reward-token
+ *   emissions whose own price is falling, and it is computed from a utilization that
+ *   changes every block. Migrating right at break-even means betting that a fragile
+ *   number holds exactly.
+ *   Why 2.00x: the migration is still worth it even if the spread actually realized is
+ *   only half of what was quoted.
+ *   If it is wrong: too small -> the agent migrates chasing a number that evaporates
+ *   before the cost is recovered; too large -> the agent never migrates and lets real
+ *   spreads go by.
+ *   NOT CONFIDENT: 2.00x is a product decision, not derived.
  *
- * `maxPoolShareBps = 1_000` (pokok maksimal 10% dari TVL pool)
- *   Kenapa ada: APY tertinggi biasanya ada di pool terkecil, dan itu bukan
- *   kebetulan — APY dihitung dari utilisasi, dan pool kecil mudah terlihat
- *   memikat. Menyetor ke pool yang kita kuasai berarti APY yang kita kejar
- *   berubah menjadi pantulan modal kita sendiri, dan saat ingin keluar tidak
- *   ada likuiditas keluar selain diri kita.
- *   Kenapa 10%: diikat ke POKOK, bukan ke angka dolar absolut, sehingga ia ikut
- *   menyesuaikan diri saat modal bertambah.
- *   Kalau salah: terlalu longgar -> agent menjadi likuiditas keluar bagi orang
- *   lain; terlalu ketat -> hanya pool raksasa yang lolos dan imbal hasilnya
- *   nyaris sama dengan diam saja.
+ * `maxPoolShareBps = 1_000` (principal at most 10% of the pool's TVL)
+ *   Why it exists: the highest APY is usually in the smallest pool, and that is no
+ *   coincidence — APY is computed from utilization, and a small pool is easy to make look
+ *   attractive. Depositing into a pool we dominate means the APY we are chasing turns
+ *   into a reflection of our own capital, and when we want out there is no exit
+ *   liquidity but ourselves.
+ *   Why 10%: it is tied to the PRINCIPAL, not to an absolute dollar figure, so it scales
+ *   itself as the capital grows.
+ *   If it is wrong: too loose -> the agent becomes someone else's exit liquidity; too
+ *   tight -> only giant pools pass and the yield is barely better than sitting still.
  *
- * `maxPlausibleApyBps = 100_000` (1.000% setahun)
- *   Kenapa ada: angka di atas ini hampir selalu emisi hadiah yang tidak
- *   berkelanjutan, kesalahan desimal di indexer, atau pool yang sengaja dibuat
- *   untuk memancing. Menolaknya sebagai DATA RUSAK lebih benar daripada
- *   mengejarnya.
- *   Kalau salah: terlalu rendah -> peluang nyata tapi jarang ikut tertolak;
- *   terlalu tinggi -> agent mengejar fatamorgana.
- *   TIDAK YAKIN: batas ini heuristik, bukan hasil pengukuran distribusi APY.
+ * `maxPlausibleApyBps = 100_000` (1,000% per year)
+ *   Why it exists: a number above this is almost always unsustainable reward emissions, a
+ *   decimals bug in an indexer, or a pool built deliberately as bait. Rejecting it as
+ *   BROKEN DATA is more correct than chasing it.
+ *   If it is wrong: too low -> real but rare opportunities get rejected too; too high ->
+ *   the agent chases a mirage.
+ *   NOT CONFIDENT: this bound is a heuristic, not the result of measuring the APY
+ *   distribution.
  *
  * `maxRiskScore = 50`
- *   Titik tengah skala 0..100 yang datang dari riset manusia. Modul ini tidak
- *   menghitung skornya; ia hanya menolak yang melampaui ambang.
- *   Kalau salah: terlalu longgar -> agent menaruh uang di protokol yang belum
- *   diaudit demi beberapa ratus bps; terlalu ketat -> hanya satu-dua protokol
- *   yang lolos dan strategi ini kehilangan alasan keberadaannya.
+ *   The midpoint of a 0..100 scale that comes from human research. This module does not
+ *   compute the score; it only rejects anything above the threshold.
+ *   If it is wrong: too loose -> the agent puts money in an unaudited protocol for a few
+ *   hundred bps; too tight -> only one or two protocols pass and this strategy loses its
+ *   reason to exist.
  *
- * `maxApyAgeSeconds = 3_600` (satu jam)
- *   Kenapa ada: APY pasar lending bergerak mengikuti utilisasi, yang berubah
- *   setiap blok. Bertindak atas angka satu jam lalu adalah bertindak atas angka
- *   yang sudah berubah. Menolak data basi lebih baik daripada memindahkan uang
- *   berdasarkan angka yang sudah tidak berlaku.
- *   Kalau salah: terlalu ketat -> data hampir tidak pernah cukup segar dan
- *   agent lumpuh; terlalu longgar -> perpindahan dibayar untuk selisih yang
- *   sudah tidak ada.
+ * `maxApyAgeSeconds = 3_600` (one hour)
+ *   Why it exists: a lending market's APY moves with utilization, which changes every
+ *   block. Acting on an hour-old number is acting on a number that has already changed.
+ *   Rejecting stale data is better than moving money on a number that no longer holds.
+ *   If it is wrong: too tight -> data is almost never fresh enough and the agent is
+ *   paralyzed; too loose -> a migration is paid for a spread that no longer exists.
  *
  * `minConsecutiveFavorable = 3`
- *   Kenapa ada: satu lonjakan APY biasanya adalah satu pinjaman besar yang baru
- *   mendarat dan akan diarbitrase dalam hitungan menit. Menuntut selisih itu
- *   BERTAHAN mencegah agent bolak-balik antara dua pool (setiap bolak-balik
- *   membayar ongkos penuh dua kali).
- *   Kalau salah: terlalu kecil -> mengejar lonjakan sesaat; terlalu besar ->
- *   peluang nyata sudah habis diambil orang lain sebelum konfirmasi selesai.
- *   TIDAK YAKIN: sama seperti pada Grid, nilai yang benar terikat pada CADENS
- *   penjadwal yang tidak diketahui modul ini. Tiga pengamatan per jam adalah
- *   tiga jam; per hari adalah tiga hari.
+ *   Why it exists: a single APY spike is usually one large loan that just landed and will
+ *   be arbitraged away within minutes. Demanding that the spread PERSIST stops the agent
+ *   from ping-ponging between two pools (each round trip pays the full cost twice).
+ *   If it is wrong: too small -> it chases momentary spikes; too large -> the real
+ *   opportunity has been taken by someone else before confirmation completes.
+ *   NOT CONFIDENT: as with Grid, the right value is tied to the scheduler's CADENCE,
+ *   which this module does not know. Three observations at hourly cadence is three hours;
+ *   at daily cadence it is three days.
  *
  * `DEFAULT_SWITCH_COST`
- *   TIDAK YAKIN: taksiran, bukan pengukuran. `gasCostBase = $1` mewakili
- *   rangkaian tarik + tukar + setor di BSC. Wajib diganti dengan angka nyata
- *   dari lapisan chain sebelum memutuskan uang.
- * ==============================================================================
+ *   NOT CONFIDENT: an estimate, not a measurement. `gasCostBase = $1` represents a
+ *   withdraw + swap + deposit sequence on BSC. It must be replaced with real numbers from
+ *   the chain layer before deciding about money.
+ * ======================================================================================
  */
 export const DEFAULT_YIELD_THRESHOLDS: YieldThresholds = {
   expectedHoldingDays: 30n,

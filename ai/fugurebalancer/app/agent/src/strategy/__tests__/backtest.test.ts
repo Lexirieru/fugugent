@@ -5,7 +5,7 @@ import { DEFAULT_THRESHOLDS, PortfolioError, type CostModel } from "../types.js"
 const usd = (n: bigint) => n * 100_000_000n;
 const biaya: CostModel = { swapFeeBps: 5n, slippageBps: 10n, gasCostBase: 30_000_000n };
 
-/** Harga aset 0 berayun naik-turun; aset 1 adalah stablecoin yang harganya tetap. */
+/** Asset 0's price swings up and down; asset 1 is a stablecoin with a fixed price. */
 function ayunan(candles: number, amplitudoBps: bigint): bigint[][] {
   const out: bigint[][] = [];
   for (let i = 0; i < candles; i++) {
@@ -45,7 +45,7 @@ describe("runBacktest — biaya adalah alasan pita ada", () => {
   });
 
   it("pada ayunan kecil di dalam pita, kebijakan berpita tidak bertransaksi sama sekali", () => {
-    // amplitudo 100 bps -> penyimpangan bobot jauh di bawah pita 500 bps
+    // a 100 bps amplitude -> the weight deviation stays far below the 500 bps band
     const r = runBacktest(input({ priceSeriesBps: ayunan(40, 100n) }));
     expect(r.banded.rebalances).toBe(0);
     expect(r.banded.totalCostBase).toBe(0n);
@@ -53,9 +53,9 @@ describe("runBacktest — biaya adalah alasan pita ada", () => {
   });
 
   it("pada portofolio kecil, gas SAJA menghancurkan modal kebijakan 'rebalance selalu'", () => {
-    // $100 total. Turnover per rebalance sekitar $0,50, gas $0,30 per rebalance.
-    // Ongkos tetap yang tidak menyusut bersama ukuran portofolio adalah cara
-    // paling cepat kehilangan uang secara perlahan.
+    // $100 total. Turnover per rebalance is about $0.50, gas is $0.30 per rebalance.
+    // A fixed cost that does not shrink with portfolio size is the fastest way to lose
+    // money slowly.
     const r = runBacktest(
       input({
         startAssets: [
@@ -71,12 +71,12 @@ describe("runBacktest — biaya adalah alasan pita ada", () => {
   });
 
   it("KEJUJURAN: pada ayunan besar di portofolio besar, 'rebalance selalu' justru unggul — pita ada ongkosnya", () => {
-    // Rebalancing memanen volatilitas (jual yang naik, beli yang turun). Ketika
-    // amplitudo jauh lebih besar daripada biaya, panen itu melebihi ongkosnya
-    // dan pita justru melewatkannya. Ini bukan bug pada pita, melainkan harga
-    // yang dibayar pita: ia menukar sebagian panen volatilitas dengan kepastian
-    // tidak boros ongkos. Test ini ada supaya klaim "pita selalu lebih baik"
-    // tidak pernah ditulis di mana pun tanpa terbantahkan di sini.
+    // Rebalancing harvests volatility (sell what rose, buy what fell). When the
+    // amplitude is far larger than the cost, that harvest exceeds what it costs and the
+    // bands miss it. This is not a bug in the bands, it is the price the bands pay:
+    // they trade away part of the volatility harvest for the certainty of not wasting
+    // money on costs. This test exists so that the claim "the bands are always better"
+    // can never be written anywhere without being contradicted here.
     const r = runBacktest(input({ priceSeriesBps: ayunan(40, 500n) }));
     expect(r.always.finalValueBase).toBeGreaterThan(r.banded.finalValueBase);
     expect(r.bandedBeatsAlways).toBe(false);

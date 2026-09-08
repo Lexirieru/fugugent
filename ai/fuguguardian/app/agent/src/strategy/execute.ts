@@ -1,69 +1,61 @@
 /**
- * Eksekusi ber-batas: pertahanan kedua sebelum transaksi repay dikirim
- * lewat session key Altana. Session key membatasi belanja di sisi rantai,
- * tetapi keselamatan dana user tidak boleh bergantung pada satu lapisan
- * saja — batas di modul ini adalah lapisan kedua, dan kill switch adalah
- * jalan keluar user.
+ * Bounded execution: the second line of defense before a repay transaction goes out
+ * through an Altana session key. The session key caps spending on the chain side, but the
+ * safety of a user's money must not rest on one layer alone — the limits in this module
+ * are the second layer, and the kill switch is the user's way out.
  *
- * Modul ini sendiri bebas I/O: waktu sekarang, alamat aset, dan pengiriman
- * transaksi disuntikkan lewat `deps`, sehingga seluruh aturan bisa diuji
- * tanpa menyentuh jaringan sama sekali dan tanpa satu pun alamat rantai
- * tertanam di sini.
+ * This module itself is I/O-free: the current time, the asset address, and sending the
+ * transaction are all injected through `deps`, so every rule can be tested without
+ * touching the network at all and without a single chain address embedded here.
  *
- * Ketujuh aturan berikut ditegakkan SEBELUM transaksi dikirim, tepat dalam
- * urutan ini:
- *   1. `state.killed` → tidak pernah mengirim apa pun. Mutlak, diperiksa
- *      paling awal, mengalahkan segalanya.
- *   2. `state.pendingRepay` belum direkonsiliasi → tidak mengirim apa pun.
- *      Lihat "Kenapa kegagalan kirim justru MEMOTONG anggaran" di bawah.
- *   3. Aksi `NONE`/`WARN` → tidak mengirim (tidak memerlukan eksekusi).
- *   4. Jumlah melebihi `maxPerActionUsd8` → dipotong ke batas itu, bukan
- *      ditolak; dicatat lewat `cappedPerAction`.
- *   5. Jumlah melebihi sisa `maxPerDayUsd8` → dipotong ke sisa lewat
- *      `cappedPerDay`; bila sisa nol, tidak mengirim.
- *   6. Masih dalam `minIntervalSeconds` sejak `lastActionAt` → tidak
- *      mengirim (cooldown).
- *   7. Anggaran, cooldown, dan catatan `pendingRepay` dicatat SEBELUM
- *      `sendRepay` dipanggil — dan, bila `deps.persistBeforeSend` diisi,
- *      DISIMPAN lebih dulu juga, sehingga proses yang mati selama menunggu
- *      receipt tetap meninggalkan jejak. `pendingRepay` dibereskan hanya bila
- *      `sendRepay` benar-benar kembali dengan hash.
+ * The seven rules below are enforced BEFORE a transaction is sent, in exactly this order:
+ *   1. `state.killed` -> never send anything. Absolute, checked first, beats everything.
+ *   2. `state.pendingRepay` not yet reconciled -> send nothing.
+ *      See "Why a failed send DEDUCTS the budget" below.
+ *   3. A `NONE`/`WARN` action -> do not send (it needs no execution).
+ *   4. The amount exceeds `maxPerActionUsd8` -> capped to that limit, not rejected;
+ *      recorded via `cappedPerAction`.
+ *   5. The amount exceeds what is left of `maxPerDayUsd8` -> capped to the remainder via
+ *      `cappedPerDay`; when the remainder is zero, do not send.
+ *   6. Still inside `minIntervalSeconds` since `lastActionAt` -> do not send (cooldown).
+ *   7. The budget, the cooldown, and the `pendingRepay` record are all written BEFORE
+ *      `sendRepay` is called — and, when `deps.persistBeforeSend` is provided, SAVED first
+ *      as well, so a process that dies while waiting for a receipt still leaves a trace.
+ *      `pendingRepay` is cleared only when `sendRepay` actually returns a hash.
  *
- * ## Kenapa kegagalan kirim justru MEMOTONG anggaran
+ * ## Why a failed send DEDUCTS the budget
  *
- * Sampai putaran sebelumnya modul ini hanya mengubah state SETELAH `sendRepay`
- * berhasil, dan `guard.ts` mengembalikan state lama begitu `sendRepay`
- * melempar. Untuk sebuah fungsi murni itu benar; untuk PENGIRIMAN JARINGAN itu
- * terbalik. `waitForTransactionReceipt` yang timeout, RPC yang putus, atau
- * receipt yang datang dari node basi semuanya melempar SESUDAH transaksinya
- * mendarat di blok. Dengan aturan lama, anggaran harian dan `lastActionAt`
- * tidak bergerak, siklus berikutnya melihat posisi yang (mungkin) masih
- * berisiko, dan agent membayar LAGI — berulang sampai cap sesi habis. Setiap
- * pembayaran itu uang sungguhan.
+ * Until the previous round this module only changed state AFTER `sendRepay` succeeded, and
+ * `guard.ts` returned the old state as soon as `sendRepay` threw. For a pure function that
+ * is correct; for a NETWORK SEND it is backwards. A `waitForTransactionReceipt` that times
+ * out, an RPC that drops, or a receipt coming from a stale node all throw AFTER the
+ * transaction landed in a block. Under the old rule, the daily budget and `lastActionAt`
+ * did not move, the next cycle saw a position that was (possibly) still at risk, and the
+ * agent paid AGAIN — over and over until the session cap ran out. Every one of those
+ * payments is real money.
  *
- * Aturan yang benar untuk pengiriman jaringan: **"gagal" tidak berarti "tidak
- * terjadi".** Karena itu:
+ * The correct rule for a network send: **"failed" does not mean "did not happen".** So:
  *
- *   - Anggaran, `lastActionAt`, dan sebuah catatan `pendingRepay` disusun
- *     SEBELUM `sendRepay` dipanggil.
- *   - Bila `sendRepay` melempar, modul ini melempar `RepaySendError` yang
- *     MEMBAWA state itu (`stateAfterSend`), sehingga pemanggil meneruskannya
- *     ke siklus berikutnya alih-alih pura-pura tidak terjadi apa-apa.
- *   - Selama `pendingRepay` belum dibereskan, aturan 2 menolak mengirim apa
- *     pun. Guardian memilih diam daripada membayar dua kali.
+ *   - The budget, `lastActionAt`, and a `pendingRepay` record are all assembled BEFORE
+ *     `sendRepay` is called.
+ *   - If `sendRepay` throws, this module throws a `RepaySendError` that CARRIES that state
+ *     (`stateAfterSend`), so the caller passes it into the next cycle instead of
+ *     pretending nothing happened.
+ *   - While `pendingRepay` is unresolved, rule 2 refuses to send anything. Guardian
+ *     chooses silence over paying twice.
  *
- * Satu-satunya pengecualian adalah galat yang PASTI belum menyentuh jaringan
- * (`NeverSentError`): validasi aset/jumlah dan pembacaan on-chain yang gagal
- * sebelum batch dikirim. Yang menandainya adalah `chain/session.ts`, satu-satunya
- * modul yang tahu di mana persis batas jaringan itu. Galat yang TIDAK bertanda
- * selalu dianggap "mungkin sudah terkirim" — asumsi yang mahal ke arah yang
- * aman, bukan ke arah yang membayar dua kali.
+ * The only exception is an error that CERTAINLY has not touched the network
+ * (`NeverSentError`): asset/amount validation and on-chain reads that fail before the
+ * batch goes out. What marks it is `chain/session.ts`, the only module that knows exactly
+ * where the network boundary is. An error that is NOT marked is always treated as "may
+ * already have been sent" — an expensive assumption in the safe direction, rather than in
+ * the direction that pays twice.
  */
 import type { Action, Decision, Position } from "./types.js";
 
 const SECONDS_PER_DAY = 86_400;
 
-/** Aksi yang secara definisi memerlukan pembayaran (lihat decide.ts). */
+/** Actions that by definition require a payment (see decide.ts). */
 const ACTIONS_REQUIRING_REPAY: ReadonlySet<Action> = new Set([
   "PARTIAL_REPAY",
   "DELEVERAGE",
@@ -71,109 +63,104 @@ const ACTIONS_REQUIRING_REPAY: ReadonlySet<Action> = new Set([
 ]);
 
 export interface ExecuteLimits {
-  /** Batas dolar (basis 8 desimal, sama seperti Position.collateralBase) per satu aksi. */
+  /** The dollar cap (8-decimal basis, same as Position.collateralBase) per single action. */
   maxPerActionUsd8: bigint;
-  /** Batas dolar total yang boleh dibelanjakan dalam satu hari berjalan. */
+  /** The total dollar cap that may be spent within one rolling day. */
   maxPerDayUsd8: bigint;
-  /** Jarak minimum dalam detik sejak aksi terakhir sebelum aksi berikutnya boleh dikirim. */
+  /** The minimum gap in seconds since the last action before the next one may be sent. */
   minIntervalSeconds: number;
 }
 
 export interface ExecuteDeps {
   /**
-   * Alamat token hutang yang dibayar. DISUNTIKKAN, tidak lagi konstanta modul:
-   * modul ini murni dan tidak boleh terikat pada satu aset di satu chain.
-   * Alamat testnetnya ada di `chain/testnet.ts` bersama alamat rantai lain.
+   * The address of the debt token being repaid. INJECTED, no longer a module constant:
+   * this module is pure and must not be tied to one asset on one chain. Its testnet address
+   * lives in `chain/testnet.ts` alongside the other chain addresses.
    */
   repayAsset: `0x${string}`;
-  /** Mengirim transaksi repay sungguhan; disuntikkan agar modul ini tidak menyentuh jaringan. */
+  /** Sends the real repay transaction; injected so this module never touches the network. */
   sendRepay: (asset: `0x${string}`, amount: bigint) => Promise<`0x${string}`>;
-  /** Jam sekarang dalam detik epoch; disuntikkan agar waktu bisa dikontrol penuh saat test. */
+  /** The current clock in epoch seconds; injected so time is fully controllable in tests. */
   now: () => number;
   /**
-   * Menyimpan state SEBELUM `sendRepay` dipanggil — termasuk catatan
-   * `pendingRepay`-nya.
+   * Persists state BEFORE `sendRepay` is called — including its `pendingRepay` record.
    *
-   * Tanpa kait ini, catatan menggantung baru menyentuh disk setelah siklus
-   * selesai, sementara `waitForTransactionReceipt` menunggu sampai 180 detik.
-   * Proses yang mati di dalam jendela 180 detik itu meninggalkan berkas state
-   * PRA-SIKLUS: anggaran lama, `lastActionAt` lama, `pendingRepay: null` —
-   * dan restart berikutnya membayar lagi. Itu bug C2 lewat pintu yang lebih
-   * sempit, dan kait ini menutupnya.
+   * Without this hook, the pending record only reaches disk after the cycle finishes,
+   * while `waitForTransactionReceipt` waits up to 180 seconds. A process that dies inside
+   * that 180-second window leaves behind a PRE-CYCLE state file: the old budget, the old
+   * `lastActionAt`, `pendingRepay: null` — and the next restart pays again. That is bug C2
+   * through a narrower door, and this hook closes it.
    *
-   * GAGAL TERTUTUP: kalau penyimpanan gagal, transaksi TIDAK dikirim sama
-   * sekali dan galatnya bertanda `neverSent` — lebih baik tidak membayar
-   * daripada membayar tanpa jejak yang bisa menahan pembayaran kedua.
+   * FAILS CLOSED: if persisting fails, the transaction is NOT sent at all and the error is
+   * marked `neverSent` — better not to pay than to pay with no trace that could hold back a
+   * second payment.
    *
-   * Jendela yang tersisa, dinyatakan terbuka: proses bisa mati setelah
-   * penyimpanan berhasil tetapi sebelum panggilan jaringan berangkat. Yang
-   * tertinggal adalah catatan menggantung untuk transaksi yang tidak pernah
-   * ada — Guardian menahan diri sampai operator memanggil `clearPendingRepay`.
-   * Arah kegagalan itu disengaja.
+   * The window that remains, stated openly: the process can die after persisting succeeds
+   * but before the network call departs. What is left behind is a pending record for a
+   * transaction that never existed — Guardian holds off until an operator calls
+   * `clearPendingRepay`. That failure direction is deliberate.
    */
   persistBeforeSend?: (state: ExecuteState) => Promise<void> | void;
 }
 
 /**
- * Catatan satu repay yang sudah dicoba dikirim tetapi belum terbukti selesai.
- * Selama ini tidak null, `executeDecision` menolak mengirim apa pun.
+ * The record of one repay that has been attempted but not yet proven complete.
+ * While this is not null, `executeDecision` refuses to send anything.
  */
 export interface PendingRepay {
   readonly asset: `0x${string}`;
-  /** Jumlah yang dicoba dibayar, basis 8 desimal. */
+  /** The amount attempted, on the 8-decimal basis. */
   readonly amountUsd8: bigint;
-  /** Detik epoch saat `sendRepay` dipanggil. */
+  /** The epoch second at which `sendRepay` was called. */
   readonly startedAt: number;
-  /** Hash bila sempat diketahui; null bila kegagalan terjadi sebelum hash ada. */
+  /** The hash if it became known; null when the failure happened before any hash existed. */
   readonly txHash: `0x${string}` | null;
-  /** `debtBase` tepat sebelum kirim — jangkar rekonsiliasi (lihat `reconcilePendingRepay`). */
+  /** `debtBase` immediately before sending — the reconciliation anchor (see `reconcilePendingRepay`). */
   readonly debtBaseBeforeSend: bigint;
-  /** Blok posisi tepat sebelum kirim — jangkar kedua. */
+  /** The position's block immediately before sending — the second anchor. */
   readonly blockNumberBeforeSend: bigint;
 }
 
 export interface ExecuteState {
-  /** Total yang sudah dibelanjakan sejak `dayStartedAt`, basis 8 desimal. */
+  /** The total spent since `dayStartedAt`, on the 8-decimal basis. */
   spentTodayUsd8: bigint;
-  /** Detik epoch mulai hari anggaran berjalan saat ini. */
+  /** The epoch second at which the current budget day started. */
   dayStartedAt: number;
-  /** Detik epoch aksi terakhir yang berhasil dikirim; 0 berarti belum pernah. */
+  /** The epoch second of the last successfully sent action; 0 means never. */
   lastActionAt: number;
-  /** Kill switch user. Saat true, tidak ada aksi apa pun yang boleh dikirim. */
+  /** The user's kill switch. While true, no action whatsoever may be sent. */
   killed: boolean;
   /**
-   * Repay yang sudah dicoba dikirim tetapi belum terbukti mendarat. null berarti
-   * tidak ada yang menggantung dan Guardian bebas bertindak.
+   * A repay that has been attempted but not yet proven to have landed. null means nothing
+   * is pending and Guardian is free to act.
    */
   pendingRepay: PendingRepay | null;
 }
 
 export interface ExecuteResult {
   sent: boolean;
-  /** Penjelasan singkat kenapa terkirim atau tidak. */
+  /** A short explanation of why it was or was not sent. */
   reason: string;
-  /** Jumlah sungguhan yang dikirim, basis 8 desimal. 0n bila tidak terkirim. */
+  /** The amount actually sent, on the 8-decimal basis. 0n when nothing was sent. */
   amountSentUsd8: bigint;
-  /** true bila jumlah dipotong oleh batas per-aksi. */
+  /** true when the amount was capped by the per-action limit. */
   cappedPerAction: boolean;
-  /** true bila jumlah dipotong oleh sisa anggaran harian. */
+  /** true when the amount was capped by what is left of the daily budget. */
   cappedPerDay: boolean;
-  /** Hash transaksi bila terkirim, null bila tidak. */
+  /** The transaction hash when sent, null when not. */
   txHash: `0x${string}` | null;
-  /** State baru yang harus dipersist oleh pemanggil — modul ini tidak memutasi `state` masukan. */
+  /** The new state the caller must persist — this module never mutates the `state` it was given. */
   state: ExecuteState;
 }
 
 /**
- * Galat yang DIJAMIN terjadi sebelum apa pun menyentuh jaringan, sehingga aman
- * diperlakukan sebagai "tidak terjadi": anggaran tidak terpotong dan tidak ada
- * `pendingRepay` yang tertinggal.
+ * An error GUARANTEED to have happened before anything touched the network, so it is safe
+ * to treat as "did not happen": no budget is deducted and no `pendingRepay` is left behind.
  *
- * Yang boleh menandai sebuah galat seperti ini hanyalah modul yang tahu persis
- * di mana batas jaringan berada — `chain/session.ts`. Ditandai lewat properti
- * (`neverSent`), bukan `instanceof`, supaya galat milik modul lain
- * (mis. `SessionPermissionError`) bisa ikut menyatakannya tanpa harus mewarisi
- * kelas dari sini.
+ * The only thing allowed to mark an error like this is the module that knows exactly where
+ * the network boundary lies — `chain/session.ts`. It is marked via a property
+ * (`neverSent`), not `instanceof`, so errors belonging to other modules
+ * (e.g. `SessionPermissionError`) can declare it too without inheriting a class from here.
  */
 export class NeverSentError extends Error {
   readonly neverSent = true as const;
@@ -184,10 +171,10 @@ export class NeverSentError extends Error {
 }
 
 /**
- * Apakah `err` menyatakan dirinya belum menyentuh jaringan sama sekali?
- * Default-nya SELALU false: galat yang tidak menyatakan apa-apa diperlakukan
- * sebagai "mungkin sudah terkirim". Arah asumsi ini yang menentukan apakah
- * agent membayar dua kali.
+ * Does `err` declare that it never touched the network at all?
+ * The default is ALWAYS false: an error that declares nothing is treated as "may already
+ * have been sent". The direction of this assumption is what decides whether the agent pays
+ * twice.
  */
 export function wasNeverSent(err: unknown): boolean {
   return (
@@ -196,21 +183,20 @@ export function wasNeverSent(err: unknown): boolean {
 }
 
 /**
- * `sendRepay` melempar setelah — atau mungkin setelah — transaksi menyentuh
- * jaringan. Membawa state yang WAJIB dipakai pemanggil untuk siklus berikutnya:
- * anggaran sudah terpotong dan `pendingRepay` sudah tercatat.
+ * `sendRepay` threw after — or possibly after — the transaction touched the network. It
+ * carries the state the caller MUST use for the next cycle: the budget is already deducted
+ * and `pendingRepay` is already recorded.
  */
 export class RepaySendError extends Error {
   /**
-   * Penanda duck-typed, sengaja sama bentuknya dengan `neverSent`.
+   * A duck-typed marker, deliberately the same shape as `neverSent`.
    *
-   * `guard.ts` mengenali galat ini lewat `asRepaySendFailure()`, BUKAN
-   * `instanceof`. Alasannya bukan gaya: backend akan membungkus
-   * `executeDecision` (telemetri, retry, tracing), dan sebuah pembungkus yang
-   * melempar ulang galat lain — atau dua salinan modul ini di pohon
-   * dependensi — akan membuat `instanceof` gagal DIAM-DIAM. Yang terjadi
-   * kemudian adalah `guard.ts` jatuh ke cabang "state lama", anggaran tidak
-   * bergerak, dan bug C2 kembali tanpa satu test pun berteriak.
+   * `guard.ts` recognizes this error via `asRepaySendFailure()`, NOT `instanceof`. The
+   * reason is not stylistic: the backend will wrap `executeDecision` (telemetry, retry,
+   * tracing), and a wrapper that rethrows a different error — or two copies of this module
+   * in the dependency tree — would make `instanceof` fail SILENTLY. What happens next is
+   * that `guard.ts` falls into the "old state" branch, the budget does not move, and bug C2
+   * comes back without a single test shouting.
    */
   readonly repaySendFailure = true as const;
   readonly stateAfterSend: ExecuteState;
@@ -221,7 +207,7 @@ export class RepaySendError extends Error {
   }
 }
 
-/** Kedalaman maksimum penelusuran rantai `cause` — pembungkus yang wajar tidak sedalam ini. */
+/** The maximum depth to walk the `cause` chain — reasonable wrappers do not nest this deep. */
 const MAX_CAUSE_DEPTH = 8;
 
 function looksLikeExecuteState(value: unknown): value is ExecuteState {
@@ -231,14 +217,13 @@ function looksLikeExecuteState(value: unknown): value is ExecuteState {
 }
 
 /**
- * Menemukan kegagalan-setelah-kirim di dalam `err` ATAU di dalam rantai
- * `cause`-nya, dan mengembalikan state yang harus dipakai siklus berikutnya.
+ * Finds a failure-after-send inside `err` OR inside its `cause` chain, and returns the
+ * state the next cycle must use.
  *
- * Rantai `cause` ikut ditelusuri karena pembungkus yang benar
- * (`new Error(msg, { cause })`) adalah cara paling wajar backend menambahkan
- * konteks — dan kehilangan `stateAfterSend` di situ berarti membayar dua kali.
- * `null` berarti "ini bukan kegagalan setelah kirim", dan pemanggil harus
- * memperlakukan state lama sebagai yang berlaku.
+ * The `cause` chain is walked because a correct wrapper (`new Error(msg, { cause })`) is
+ * the most natural way for the backend to add context — and losing `stateAfterSend` there
+ * means paying twice. `null` means "this is not a failure after send", and the caller must
+ * treat the old state as the one in force.
  */
 export function asRepaySendFailure(err: unknown): { stateAfterSend: ExecuteState } | null {
   const terlihat = new Set<unknown>();
@@ -276,58 +261,53 @@ function messageOf(err: unknown): string {
 }
 
 /**
- * Toleransi pencocokan jumlah saat rekonsiliasi, dalam satuan USD basis 8 desimal.
+ * The amount-matching tolerance used during reconciliation, in USD on the 8-decimal basis.
  *
- * 2 unit = $0,00000002. Angkanya bukan kelonggaran melainkan konsekuensi dua
- * pembulatan KE BAWAH yang saling bebas: USD8 → unit token saat mengirim, dan
- * unit token → USD8 saat pool menghitung nilai hutang. Masing-masing kehilangan
- * kurang dari satu unit. Ini toleransi yang sama yang dipakai skrip E2E untuk
- * mencocokkan jumlah yang diklaim dengan selisih hutang on-chain, dan di sana
- * selisih sungguhannya terukur **0**.
+ * 2 units = $0.00000002. The number is not slack, it is the consequence of two independent
+ * roundings DOWN: USD8 -> token units when sending, and token units -> USD8 when the pool
+ * values the debt. Each loses less than one unit. This is the same tolerance the E2E script
+ * uses to match the claimed amount against the on-chain debt delta, and there the real
+ * difference measured **0**.
  */
 export const RECONCILE_TOLERANCE_USD8 = 2n;
 
 /**
- * Membereskan `pendingRepay` bila posisi TERBARU membuktikan repay-nya mendarat.
+ * Clears `pendingRepay` when the LATEST position proves its repay landed.
  *
- * Buktinya dua-duanya wajib, dan keduanya dibaca dari rantai, bukan dari niat:
- *   1. posisi dibaca pada blok yang lebih baru daripada blok sebelum kirim, dan
- *   2. hutangnya berkurang **sebesar yang kita bayar** — bukan sekadar berkurang.
+ * Both pieces of proof are required, and both are read from the chain, not from intent:
+ *   1. the position was read at a block newer than the block before sending, and
+ *   2. the debt fell **by exactly what we paid** — not merely fell.
  *
- * Syarat kedua sengaja diketatkan. "Hutang berkurang" saja bukan bukti bahwa
- * transaksi KITA yang mendarat: user bisa membayar sendiri dari dompetnya
- * selagi tx kita tersangkut di mempool, pihak ketiga bisa melikuidasi sebagian,
- * dan `debtBase` adalah nilai USD sehingga harga aset hutang yang turun pun
- * mengecilkannya. Ketiganya akan membereskan catatan kita terlalu dini,
- * membebaskan Guardian bertindak, lalu tx pertama mendarat — dua pembayaran,
- * persis kegagalan yang mekanisme ini ada untuk mencegahnya.
+ * The second condition is deliberately strict. "The debt fell" alone is not proof that OUR
+ * transaction landed: the user can pay from their own wallet while our tx is stuck in the
+ * mempool, a third party can partially liquidate, and `debtBase` is a USD value so a drop
+ * in the debt asset's price shrinks it too. All three would clear our record too early,
+ * free Guardian to act, and then the first tx lands — two payments, exactly the failure
+ * this mechanism exists to prevent.
  *
- * Pencocokannya DUA SISI (`|selisih - amountUsd8| <= RECONCILE_TOLERANCE_USD8`),
- * dan sisi atasnya juga disengaja: penurunan yang LEBIH BESAR daripada yang kita
- * bayar berarti ada pembayar lain di posisi yang sama, dan pada saat itu kita
- * tidak lagi bisa memisahkan "punya kita mendarat juga" dari "hanya punya dia".
- * Arah kegagalannya aman — catatan tetap menggantung, Guardian menahan diri, dan
- * operator yang membereskannya lewat `clearPendingRepay` setelah melihat rantai.
+ * The match is TWO-SIDED (`|delta - amountUsd8| <= RECONCILE_TOLERANCE_USD8`), and the
+ * upper side is deliberate too: a drop LARGER than what we paid means someone else paid
+ * into the same position, and at that point we can no longer separate "ours landed as
+ * well" from "only theirs did". The failure direction is safe — the record stays pending,
+ * Guardian holds off, and an operator clears it via `clearPendingRepay` after looking at
+ * the chain.
  *
- * Kalau hutang belum berkurang, `pendingRepay` sengaja DIBIARKAN. Transaksi yang
- * masih di mempool bisa mendarat kapan saja, jadi "belum terlihat" tidak pernah
- * berarti "tidak akan terjadi", dan membersihkannya karena bosan menunggu persis
- * mengembalikan bug yang aturan ini ada untuk mencegahnya.
+ * If the debt has not fallen, `pendingRepay` is deliberately LEFT ALONE. A transaction
+ * still in the mempool can land at any moment, so "not seen yet" never means "will not
+ * happen", and clearing it out of impatience brings back exactly the bug this rule exists
+ * to prevent.
  *
- * Konsekuensinya dinyatakan terbuka: repay yang benar-benar TIDAK PERNAH mendarat
- * membuat Guardian berhenti bertindak sampai seorang operator membereskannya
- * (`clearPendingRepay`). Guardian yang diam adalah kegagalan yang terlihat; agent
- * yang membayar dua kali adalah kegagalan yang tidak terlihat sampai uangnya habis.
+ * The consequence, stated openly: a repay that truly NEVER lands makes Guardian stop
+ * acting until an operator clears it (`clearPendingRepay`). A silent Guardian is a visible
+ * failure; an agent that pays twice is an invisible failure until the money is gone.
  *
- * Anggaran yang sudah terpotong TIDAK PERNAH dikembalikan di sini — kalau
- * transaksinya ternyata mendarat, pengembalian itu justru membuka jalan bayar
- * ganda yang sama.
+ * A budget already deducted is NEVER refunded here — if the transaction did land after
+ * all, that refund would open the very same double-pay path.
  */
 export function reconcilePendingRepay(state: ExecuteState, pos: Position): ExecuteState {
   const pending = state.pendingRepay;
-  // `== null` bukan `=== null`: state bisa datang dari store versi lama yang
-  // sama sekali tidak punya field ini, dan `undefined` di sini tidak boleh
-  // membuat rekonsiliasi melempar.
+  // `== null`, not `=== null`: state can come from an older store version that does not
+  // have this field at all, and an `undefined` here must not make reconciliation throw.
   if (pending == null) return state;
   if (pos.blockNumber <= pending.blockNumberBeforeSend) return state;
   const turun = pending.debtBaseBeforeSend - pos.debtBase;
@@ -337,10 +317,9 @@ export function reconcilePendingRepay(state: ExecuteState, pos: Position): Execu
 }
 
 /**
- * Jalan keluar operator untuk `pendingRepay` yang tidak akan pernah bisa
- * dibuktikan mendarat. Sengaja eksplisit dan sengaja TIDAK otomatis: ia
- * menyatakan sebuah keputusan manusia ("saya sudah memeriksa rantai, transaksi
- * itu tidak ada"), bukan sebuah timeout.
+ * The operator's way out for a `pendingRepay` that can never be proven to have landed.
+ * Deliberately explicit and deliberately NOT automatic: it states a human decision ("I
+ * have checked the chain, that transaction does not exist"), not a timeout.
  */
 export function clearPendingRepay(state: ExecuteState): ExecuteState {
   return { ...state, pendingRepay: null };
@@ -355,16 +334,16 @@ export async function executeDecision(
 ): Promise<ExecuteResult> {
   const now = deps.now();
 
-  // 0. Rekonsiliasi dulu: kalau rantai sudah membuktikan repay sebelumnya
-  // mendarat, catatan menggantungnya dibereskan sebelum aturan apa pun dibaca.
+  // 0. Reconcile first: if the chain already proves the previous repay landed, its pending
+  // record is cleared before any rule is read.
   const state = reconcilePendingRepay(inputState, pos);
 
-  // 1. Kill switch mutlak — diperiksa paling awal, mengalahkan segalanya.
+  // 1. The absolute kill switch — checked first, beats everything.
   if (state.killed) {
     return notSent("Kill switch aktif: eksekusi dihentikan total.", state);
   }
 
-  // 2. Repay yang belum terbukti selesai menghalangi SEMUA pengiriman baru.
+  // 2. A repay not yet proven complete blocks ALL new sends.
   if (state.pendingRepay != null) {
     const p = state.pendingRepay;
     return notSent(
@@ -375,7 +354,7 @@ export async function executeDecision(
     );
   }
 
-  // 3. Aksi yang tidak memerlukan pembayaran tidak pernah mengirim.
+  // 3. An action that needs no payment never sends.
   if (!ACTIONS_REQUIRING_REPAY.has(d.action)) {
     return notSent(`Aksi ${d.action} tidak memerlukan eksekusi transaksi.`, state);
   }
@@ -384,14 +363,14 @@ export async function executeDecision(
   let cappedPerAction = false;
   let cappedPerDay = false;
 
-  // 4. Potong ke batas per-aksi, jangan tolak.
+  // 4. Cap to the per-action limit, do not reject.
   if (amount > limits.maxPerActionUsd8) {
     amount = limits.maxPerActionUsd8;
     cappedPerAction = true;
   }
 
-  // 5. Potong ke sisa anggaran harian. Reset harian dievaluasi di sini agar
-  // pemeriksaan batas memakai anggaran yang sudah segar.
+  // 5. Cap to what is left of the daily budget. The daily reset is evaluated here so the
+  // limit check uses an already-refreshed budget.
   const dayElapsed = now - state.dayStartedAt >= SECONDS_PER_DAY;
   const effectiveSpentToday = dayElapsed ? 0n : state.spentTodayUsd8;
   const remainingToday = limits.maxPerDayUsd8 - effectiveSpentToday;
@@ -408,7 +387,7 @@ export async function executeDecision(
     return notSent("Tidak ada jumlah tersisa untuk dieksekusi setelah pemotongan.", state);
   }
 
-  // 6. Cooldown sejak aksi terakhir.
+  // 6. Cooldown since the last action.
   const sinceLastAction = now - state.lastActionAt;
   if (sinceLastAction < limits.minIntervalSeconds) {
     return notSent(
@@ -418,9 +397,9 @@ export async function executeDecision(
     );
   }
 
-  // 7. Anggaran, cooldown, dan catatan menggantung disusun SEBELUM kirim.
-  // Inilah inti perbaikan C2: begitu `sendRepay` dipanggil, uangnya harus
-  // dianggap sudah bergerak sampai rantai membuktikan sebaliknya.
+  // 7. The budget, the cooldown, and the pending record are assembled BEFORE sending.
+  // This is the core of the C2 fix: the moment `sendRepay` is called, the money must be
+  // treated as already moved until the chain proves otherwise.
   const stateAfterSend: ExecuteState = {
     spentTodayUsd8: effectiveSpentToday + amount,
     dayStartedAt: dayElapsed ? now : state.dayStartedAt,
@@ -440,11 +419,9 @@ export async function executeDecision(
     try {
       await deps.persistBeforeSend(stateAfterSend);
     } catch (err) {
-      // GAGAL TERTUTUP. Mengirim tanpa jejak yang bisa menahan pembayaran kedua
-      // lebih buruk daripada tidak mengirim sama sekali: yang pertama berujung
-      // pada uang user yang terbayar dua kali, yang kedua hanya pada satu
-      // siklus yang terlewat. Bertanda `neverSent` karena memang belum ada
-      // apa pun yang dikirim.
+      // FAIL CLOSED. Sending with no trace that could hold back a second payment is worse
+      // than not sending at all: the first ends with the user's money paid twice, the second
+      // with one missed cycle. Marked `neverSent` because nothing has in fact been sent.
       throw new NeverSentError(
         `Catatan repay menggantung gagal disimpan sebelum kirim; menolak mengirim apa pun. ` +
           `Galat asli: ${messageOf(err)}`,
@@ -458,8 +435,8 @@ export async function executeDecision(
     txHash = await deps.sendRepay(deps.repayAsset, amount);
   } catch (err) {
     if (wasNeverSent(err)) {
-      // Satu-satunya jalan di mana "gagal" benar-benar berarti "tidak terjadi":
-      // modul pengirim menyatakan sendiri bahwa jaringan belum tersentuh.
+      // The only path on which "failed" really does mean "did not happen": the sending
+      // module declares for itself that the network was never touched.
       throw err;
     }
     throw new RepaySendError(
@@ -470,8 +447,8 @@ export async function executeDecision(
     );
   }
 
-  // Hash di tangan berarti relay sudah mengonfirmasi inklusi (pengirim yang
-  // menunggu receipt-nya), jadi tidak ada lagi yang menggantung.
+  // A hash in hand means the relay has confirmed inclusion (the sender is the one that
+  // waits for the receipt), so nothing is pending any more.
   const newState: ExecuteState = { ...stateAfterSend, pendingRepay: null };
 
   return {

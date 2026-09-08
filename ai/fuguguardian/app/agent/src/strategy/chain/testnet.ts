@@ -1,31 +1,29 @@
 /**
- * Adapter testnet, membaca posisi di `MockLendingPool` BSC testnet.
- * Memakai `readAavePosition` yang sudah ada apa adanya — hanya alamat pool
- * yang berbeda. Mock ini sengaja dibuat ABI-kompatibel dengan
- * `getUserAccountData` Aave v3 (diverifikasi manual lewat `cast call`
- * sebelum file ini ditulis), sehingga logika pembacaan tidak perlu ditulis
- * ulang atau disalin sama sekali.
+ * The testnet adapter, reading positions from `MockLendingPool` on BSC testnet.
+ * It uses the existing `readAavePosition` as-is — only the pool address differs. That mock
+ * is deliberately ABI-compatible with Aave v3's `getUserAccountData` (verified by hand via
+ * `cast call` before this file was written), so the reading logic does not have to be
+ * rewritten or copied at all.
  */
 import { createPublicClient, http, type PublicClient } from "viem";
 import { bscTestnet } from "viem/chains";
 import { readAavePosition as readAavePositionAdapter } from "./aave.js";
 import type { Position } from "../types.js";
 
-/** RPC BSC testnet yang sudah diverifikasi live. */
+/** A BSC testnet RPC verified live. */
 export const DEFAULT_BSC_TESTNET_RPC_URL = "https://data-seed-prebsc-1-s1.bnbchain.org:8545";
 
-/** Alamat `MockLendingPool` di BSC testnet, terverifikasi live. */
+/** The `MockLendingPool` address on BSC testnet, verified live. */
 export const MOCK_LENDING_POOL_ADDRESS = "0xb3e1F06Ac529aded2aA20aA38F4C0b4AD317e5F5" as const;
 
 /**
- * Alamat token hutang yang dibayar Guardian di testnet: `MockTokenUSD` (mUSD),
- * 18 desimal, satu-satunya aset hutang pada `MockLendingPool`.
+ * The address of the debt token Guardian repays on testnet: `MockTokenUSD` (mUSD),
+ * 18 decimals, the only debt asset on `MockLendingPool`.
  *
- * Rumahnya di sini, bukan di `execute.ts`. Modul eksekusi murni dan bebas I/O;
- * sebuah alamat rantai di dalamnya mengikatnya pada satu aset di satu chain,
- * sehingga agent kedua, protokol kedua, atau mainnet tidak bisa memakainya
- * tanpa mengedit file. `executeDecision` sekarang menerima asetnya lewat
- * `ExecuteDeps.repayAsset`.
+ * Its home is here, not in `execute.ts`. The execution module is pure and I/O-free; a chain
+ * address inside it would tie it to one asset on one chain, so a second agent, a second
+ * protocol, or mainnet could not use it without editing the file. `executeDecision` now
+ * receives its asset via `ExecuteDeps.repayAsset`.
  */
 export const REPAY_ASSET_ADDRESS = "0x932E82632E80b06318ca969e33F99A54F1a04b10" as const;
 
@@ -35,10 +33,9 @@ export interface TestnetReader {
 }
 
 /**
- * Membangun `PublicClient` viem terhadap `bscTestnet` dan mengembalikan
- * `readPosition` yang terikat ke `MockLendingPool`. Tidak ada logika
- * pembacaan baru di sini — hanya konstruksi client dan penyuntikan alamat
- * pool ke `readAavePosition`.
+ * Builds a viem `PublicClient` against `bscTestnet` and returns a `readPosition` bound to
+ * `MockLendingPool`. There is no new reading logic here — only client construction and
+ * injecting the pool address into `readAavePosition`.
  */
 export function createTestnetReader(
   rpcUrl: string = DEFAULT_BSC_TESTNET_RPC_URL,

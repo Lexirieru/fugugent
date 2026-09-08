@@ -1,27 +1,26 @@
 /**
- * Aritmetika imbal hasil dan ongkos berpindah. Bigint murni: nilai uang di
- * lapisan ini bisa melampaui Number.MAX_SAFE_INTEGER dan konversi ke float akan
- * diam-diam menghilangkan digit terakhir.
+ * Yield and migration-cost arithmetic. Pure bigint: money values at this layer can
+ * exceed Number.MAX_SAFE_INTEGER and converting to float silently drops the last digit.
  *
- * ARAH PEMBULATAN, dan alasannya:
- *  - ongkos pindah dan ambang selisih dibulatkan ke ATAS   -> menuntut lebih;
- *  - imbal hasil yang diharapkan dipotong ke BAWAH          -> menjanjikan kurang;
- *  - pangsa pool dibulatkan ke ATAS                         -> kita tidak pernah
- *    terlihat lebih kecil di dalam pool daripada aslinya.
- * Ketiganya menuju sisi yang sama: TETAP DI TEMPAT. Diam adalah pilihan yang
- * bisa dibatalkan pada pengamatan berikutnya; perpindahan sudah membayar gas
- * dan slippage dan tidak bisa ditarik kembali.
+ * ROUNDING DIRECTIONS, and why:
+ *  - migration costs and spread thresholds round UP     -> they demand more;
+ *  - expected yield truncates DOWN                      -> it promises less;
+ *  - our pool share rounds UP                           -> we never look smaller
+ *    inside a pool than we really are.
+ * All three point the same way: STAY PUT. Staying put is a choice you can reverse on
+ * the next observation; a migration has already paid gas and slippage and cannot be
+ * taken back.
  *
- * Bunga dihitung SEDERHANA (tidak majemuk). Penyederhanaan ini meremehkan kedua
- * sisi perbandingan, tetapi meremehkan sisi ber-APY tinggi sedikit lebih
- * banyak — artinya ia membuat perpindahan tampak sedikit KURANG menarik
- * daripada aslinya, arah yang sama dengan seluruh modul ini.
+ * Interest is computed as SIMPLE interest (not compounded). This simplification
+ * understates both sides of the comparison, but it understates the high-APY side
+ * slightly more — meaning it makes a migration look slightly LESS attractive than it
+ * is, the same direction as the rest of this module.
  */
 import { BPS_ONE, DAYS_PER_YEAR, YieldError, type SwitchCostModel } from "./types.js";
 
 const ceilDiv = (a: bigint, b: bigint): bigint => (a + b - 1n) / b;
 
-/** Ongkos satu kali berpindah pool: proporsional atas pokok + gas tetap. */
+/** The one-off cost of moving pools: proportional on the principal + fixed gas. */
 export function switchCostBase(principalBase: bigint, cost: SwitchCostModel): bigint {
   if (principalBase <= 0n) {
     throw new YieldError(`Pokok ${principalBase} tidak positif: tidak ada yang bisa dipindahkan.`);
@@ -30,19 +29,18 @@ export function switchCostBase(principalBase: bigint, cost: SwitchCostModel): bi
 }
 
 /**
- * SELISIH APY MINIMUM yang persis menutup ongkos pindah selama `days` hari.
- * Ini konstanta terpenting di seluruh strategi, dan ia DITURUNKAN, bukan
- * ditebak: ongkos dibayar sekali, selisih dibayar per hari, jadi
+ * The MINIMUM APY SPREAD that exactly covers the migration cost over `days` days.
+ * This is the most important constant in the whole strategy, and it is DERIVED, not
+ * guessed: the cost is paid once, the spread is earned per day, so
  *
- *     ongkos = pokok × selisihBps × hari / (10000 × 365)
- *  => selisihBps = ongkos × 10000 × 365 / (pokok × hari)
+ *     cost = principal x spreadBps x days / (10000 x 365)
+ *  => spreadBps = cost x 10000 x 365 / (principal x days)
  *
- * Konsekuensi yang harus dipahami sebelum menyetel apa pun: ambang ini
- * berbanding TERBALIK dengan pokok dan dengan horizon. Memindahkan $200 butuh
- * selisih puluhan kali lebih besar daripada memindahkan $200.000, dan horizon
- * seminggu menuntut sekitar empat kali lipat horizon sebulan. "APY tertinggi"
- * karena itu bukan jawaban — jawabannya bergantung pada berapa besar uangnya
- * dan berapa lama ia akan tinggal.
+ * A consequence to understand before tuning anything: this threshold is INVERSELY
+ * proportional to the principal and to the horizon. Moving $200 needs a spread tens of
+ * times larger than moving $200,000, and a one-week horizon demands roughly four times
+ * what a one-month horizon does. "Highest APY" is therefore not the answer — the answer
+ * depends on how much money it is and how long it will stay.
  */
 export function breakEvenSpreadBps(
   principalBase: bigint,
@@ -60,17 +58,17 @@ export function breakEvenSpreadBps(
   return ceilDiv(switchCost * BPS_ONE * DAYS_PER_YEAR, principalBase * days);
 }
 
-/** Ambang impas dikali pengali keamanan, dibulatkan ke atas. */
+/** The break-even threshold times the safety multiple, rounded up. */
 export function requiredSpreadBps(breakEvenBps: bigint, safetyMultipleBps: bigint): bigint {
   return ceilDiv(breakEvenBps * safetyMultipleBps, BPS_ONE);
 }
 
-/** Imbal hasil sederhana (tidak majemuk) selama `days` hari, dipotong ke bawah. */
+/** Simple (non-compounded) yield over `days` days, truncated down. */
 export function yieldOverPeriodBase(principalBase: bigint, apyBps: bigint, days: bigint): bigint {
   return (principalBase * apyBps * days) / (BPS_ONE * DAYS_PER_YEAR);
 }
 
-/** Keuntungan bersih perpindahan selama horizon; negatif bila tidak sepadan. */
+/** The net gain of a migration over the horizon; negative when it is not worth it. */
 export function netGainBase(
   principalBase: bigint,
   spreadBps: bigint,
@@ -80,7 +78,7 @@ export function netGainBase(
   return yieldOverPeriodBase(principalBase, spreadBps, days) - switchCost;
 }
 
-/** Pangsa kita di dalam pool, dibulatkan ke atas. */
+/** Our share of the pool, rounded up. */
 export function poolShareBps(principalBase: bigint, tvlBase: bigint): bigint {
   if (tvlBase <= 0n) {
     throw new YieldError(`TVL ${tvlBase} tidak positif: itu bukan pool, itu pembacaan yang gagal.`);

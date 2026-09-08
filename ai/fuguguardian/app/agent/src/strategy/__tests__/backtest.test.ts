@@ -27,7 +27,7 @@ describe("runBacktest", () => {
   });
 
   it("penurunan tajam melikuidasi manusia yang lambat tetapi tidak melikuidasi agent", () => {
-    // agunan jatuh 45% dalam dua candle; manusia baru bereaksi lima candle kemudian
+    // collateral falls 45% over two candles; the human only reacts five candles later
     const r = runBacktest({
       ...dasar,
       priceSeriesBps: [10_000n, 7_000n, 5_500n, 5_400n, 5_300n, 5_200n],
@@ -56,10 +56,10 @@ describe("runBacktest", () => {
   });
 
   it("backtest meneruskan kegagalan validasi ambang, bukan menelannya", () => {
-    // Ambang tidak berurutan (deleverage > partialRepay) membuat decide()
-    // melempar PositionError. Gagal keras di sini disengaja: hasil parsial
-    // dari ambang yang salah lebih berbahaya daripada tidak ada hasil sama
-    // sekali, karena orang bisa mengira angka setengah-jalan itu valid.
+    // Out-of-order thresholds (deleverage > partialRepay) make decide() throw a
+    // PositionError. Failing hard here is deliberate: a partial result from wrong thresholds
+    // is more dangerous than no result at all, because someone could mistake that half-way
+    // number for a valid one.
     const ambangTidakValid = {
       warn: 1_500_000_000_000_000_000n,
       partialRepay: 1_200_000_000_000_000_000n,
@@ -77,13 +77,11 @@ describe("runBacktest", () => {
 
   it("humanReactionCandles negatif diperlakukan sebagai tidak pernah bertindak", () => {
     const seri = [10_000n, 7_000n, 5_500n, 5_400n, 5_300n, 5_200n];
-    // Pilihan desain: nilai negatif TIDAK ditolak/divalidasi. Countdown
-    // kematangan manusia adalah `i - pendingSince === humanReactionCandles`;
-    // karena `i - pendingSince` tidak pernah negatif, syarat itu tidak akan
-    // pernah terpenuhi bila humanReactionCandles negatif, sehingga manusia
-    // efektif tidak pernah bertindak. Ini konsisten dengan "reaksi sangat
-    // lambat" yang sudah dimodelkan lewat angka besar, jadi tidak perlu jalur
-    // penolakan terpisah.
+    // A design choice: negative values are NOT rejected or validated. The human's maturity
+    // countdown is `i - pendingSince === humanReactionCandles`; because `i - pendingSince`
+    // is never negative, that condition can never be met when humanReactionCandles is
+    // negative, so the human effectively never acts. This is consistent with the "very slow
+    // reaction" already modeled by a large number, so no separate rejection path is needed.
     expect(() =>
       runBacktest({ ...dasar, priceSeriesBps: seri, humanReactionCandles: -1 }),
     ).not.toThrow();
@@ -99,10 +97,9 @@ describe("runBacktest", () => {
   });
 
   it("anggaran agent yang habis menghentikan intervensi", () => {
-    // Deret yang sama dengan skenario unggulan di atas. Tanpa anggaran, agent
-    // membayar 1267 lalu 800 dan selamat. Dengan anggaran 1000 — lebih kecil
-    // daripada intervensi pertama yang dibutuhkan — agent tidak bisa bertindak
-    // sama sekali dan ikut terlikuidasi persis seperti manusia yang lambat.
+    // The same series as the winning scenario above. With no budget the agent pays 1267 then
+    // 800 and survives. With a budget of 1000 — smaller than the first intervention it needs
+    // — the agent cannot act at all and gets liquidated exactly like the slow human.
     const seri = [10_000n, 7_000n, 5_500n, 5_400n, 5_300n, 5_200n];
     const r = runBacktest({
       ...dasar,
@@ -113,15 +110,15 @@ describe("runBacktest", () => {
     expect(r.agentBudgetExhausted).toBe(true);
     expect(r.agentInterventions).toBe(0);
     expect(r.agentLiquidations).toBe(1);
-    // Keunggulan agent lenyap begitu modalnya dibatasi: inilah yang
-    // disembunyikan oleh backtest tanpa anggaran.
+    // The agent's edge vanishes as soon as its capital is capped: this is what a backtest
+    // with no budget hides.
     expect(r.liquidationsAvoided).toBe(0);
   });
 
   it("anggaran yang hanya cukup untuk satu intervensi berhenti setelah intervensi itu", () => {
-    // 1267 adalah persis biaya intervensi pertama; intervensi kedua (800)
-    // tidak muat lagi, jadi agent lumpuh sesudahnya. Tidak ada pembayaran
-    // sebagian dari sisa anggaran (sisa 0).
+    // 1267 is exactly the cost of the first intervention; the second one (800) no longer
+    // fits, so the agent is paralyzed afterwards. There is no partial payment from what is
+    // left of the budget (0 left).
     const seri = [10_000n, 7_000n, 5_500n, 5_400n, 5_300n, 5_200n];
     const r = runBacktest({
       ...dasar,
@@ -134,16 +131,16 @@ describe("runBacktest", () => {
   });
 
   it("tanpa anggaran, agent bertindak tanpa batas", () => {
-    // Field agentBudgetBase dibiarkan kosong: agent boleh membayar berapa pun,
-    // sesering apa pun. Ini yang membuat angka keunggulan agent harus dibaca
-    // sebagai batas atas, bukan hasil yang bisa dijanjikan.
+    // The agentBudgetBase field is left empty: the agent may pay any amount, as often as it
+    // likes. This is what makes the agent's edge a number to be read as an upper bound, not
+    // as a result that can be promised.
     const seri = [10_000n, 7_000n, 5_500n, 5_400n, 5_300n, 5_200n];
     const r = runBacktest({ ...dasar, priceSeriesBps: seri, humanReactionCandles: 5 });
     expect(r.agentBudgetExhausted).toBe(false);
     expect(r.agentInterventions).toBeGreaterThan(1);
     expect(r.agentLiquidations).toBe(0);
 
-    // Anggaran yang sangat besar berperilaku identik dengan tanpa anggaran.
+    // A very large budget behaves identically to no budget at all.
     const berlimpah = runBacktest({
       ...dasar,
       priceSeriesBps: seri,
@@ -168,8 +165,8 @@ describe("runBacktest", () => {
   });
 
   it("liquidationsAvoided satu run selalu di rentang -1..1", () => {
-    // Dokumentasi eksekutabel untuk komentar pada field itu: satu run hanya
-    // bisa membandingkan satu nasib lawan satu nasib.
+    // Executable documentation for that field's comment: one run can only compare one fate
+    // against one fate.
     const kasus = [
       { priceSeriesBps: [10_000n, 10_050n], humanReactionCandles: 0 },
       { priceSeriesBps: [10_000n, 7_000n, 5_500n, 5_400n, 5_300n, 5_200n], humanReactionCandles: 5 },

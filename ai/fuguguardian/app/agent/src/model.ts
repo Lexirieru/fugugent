@@ -3,22 +3,22 @@ import { createOpenAI } from "@ai-sdk/openai";
 import type { LanguageModel } from "ai";
 
 /**
- * Otak Fugu Guardian berjalan di dGrid — gateway OpenAI-compatible ke 200+ model.
+ * The Fugu Guardian brain runs on dGrid — an OpenAI-compatible gateway to 200+ models.
  *
- * Tiga hal di bawah ini WAJIB dan masing-masing sudah memakan waktu untuk ditemukan;
- * jangan disederhanakan tanpa mengujinya lebih dulu (lihat docs/research/07-gate-teknis.md):
+ * The three points below are MANDATORY and each one took real time to find; do not
+ * simplify any of them without testing first (see docs/research/07-gate-teknis.md):
  *
- * 1. `.chat()` — tanpa ini @ai-sdk/openai memakai Responses API, dan dGrid menjawab
- *    dengan benar tetapi dalam format lebih ramping sehingga SDK melempar AI_APICallError.
- * 2. Header User-Agent browser — tanpa ini dGrid membalas HTTP 403.
- * 3. `@ai-sdk/openai` harus jadi dependency eksplisit; ia cuma transitif milik `ai`,
- *    dan pnpm strict menolak import langsung.
+ * 1. `.chat()` — without it @ai-sdk/openai uses the Responses API, and dGrid answers
+ *    correctly but in a leaner format, so the SDK throws AI_APICallError.
+ * 2. A browser User-Agent header — without it dGrid replies HTTP 403.
+ * 3. `@ai-sdk/openai` must be an explicit dependency; it is only a transitive dep of
+ *    `ai`, and pnpm strict refuses a direct import.
  *
- * Model ini TIDAK PERNAH mengambil keputusan finansial. Seluruh keputusan Guardian —
- * kapan menambah agunan, kapan membayar sebagian utang — adalah kode deterministik di
- * src/strategy/ yang bisa di-backtest. LLM hanya menjelaskan keputusan yang sudah
- * diambil, secara asinkron. Latensi dGrid terukur 3–46 detik; menempatkannya di jalur
- * kritis berarti posisi user bisa terlikuidasi sambil menunggu kalimat penjelasan.
+ * This model NEVER makes a financial decision. Every Guardian decision — when to add
+ * collateral, when to repay part of the debt — is deterministic, backtestable code in
+ * src/strategy/. The LLM only explains decisions already taken, asynchronously. dGrid
+ * latency measures 3–46 seconds; putting it on the critical path means the user's
+ * position can be liquidated while waiting for a sentence of explanation.
  */
 const BROWSER_UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";

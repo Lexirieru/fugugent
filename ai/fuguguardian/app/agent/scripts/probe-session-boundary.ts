@@ -1,21 +1,21 @@
 /**
- * Bukti bahwa batas session key itu NYATA, bukan sekadar dijanjikan kode kita.
+ * Proof that the session key's boundary is REAL, not merely promised by our own code.
  *
- * Skrip ini memakai **sesi yang sama persis** dengan yang dipakai Guardian
- * untuk repay, lalu mencoba dua panggilan yang berada DI LUAR allowlist:
+ * This script uses the **exact same session** Guardian uses to repay, then attempts two
+ * calls that lie OUTSIDE the allowlist:
  *
- *   1. `mUSD.transfer(...)` — kontraknya di-allowlist (untuk `approve`), tetapi
- *      selector-nya tidak. Ini menguji pengikatan pada tingkat **selector**.
- *   2. `mBNB.approve(...)` — selector-nya di-allowlist (untuk mUSD), tetapi
- *      kontraknya tidak. Ini menguji pengikatan pada tingkat **kontrak**.
+ *   1. `mUSD.transfer(...)` — the contract is allowlisted (for `approve`), but its selector
+ *      is not. This tests binding at the **selector** level.
+ *   2. `mBNB.approve(...)` — the selector is allowlisted (for mUSD), but the contract is
+ *      not. This tests binding at the **contract** level.
  *
- * Keduanya WAJIB ditolak. Kalau salah satu lolos, skrip keluar dengan exit code
- * bukan nol — karena berarti klaim utama produk ini tidak benar.
+ * Both MUST be refused. If either gets through, the script exits with a non-zero exit code —
+ * because it would mean this product's central claim is false.
  *
- * Saldo mUSD dan mBNB wallet dibaca sebelum dan sesudah: penolakan yang
- * sungguhan tidak memindahkan apa pun.
+ * The wallet's mUSD and mBNB balances are read before and after: a genuine refusal moves
+ * nothing.
  *
- * Jalankan dari `ai/fuguguardian/app/agent`:
+ * Run it from `ai/fuguguardian/app/agent`:
  *   npx tsx scripts/probe-session-boundary.ts
  */
 import path from "node:path";
@@ -96,8 +96,8 @@ async function main(): Promise<void> {
 
   armAltanaSdk();
   const session = await loadGuardianSession();
-  // Sesi yang diuji WAJIB sesi yang sama dengan yang dipakai repay: kalau
-  // allowlist-nya bukan yang itu, penolakan di bawah tidak membuktikan apa pun.
+  // The session under test MUST be the same one repay uses: if its allowlist is a different
+  // one, the refusals below prove nothing.
   assertBoundedAllowlist(
     session.permissions,
     requiredSessionCalls(MOCK_LENDING_POOL_ADDRESS, REPAY_ASSET_ADDRESS),
@@ -165,11 +165,11 @@ async function main(): Promise<void> {
           "Batas sesi TIDAK ditegakkan.",
       );
     } catch (err: unknown) {
-      // "Ada exception" BUKAN bukti. Relay yang balas 502, receipt yang timeout,
-      // atau nonce race juga melempar — dan tidak satu pun menguji batas sesi.
-      // `assertSessionDenial` menuntut galatnya benar-benar `UnauthorizedCall`
-      // DAN menyebut kontrak yang kita coba panggil; bentuk lain dilempar ulang
-      // sebagai kegagalan uji, bukan diterima sebagai bukti.
+      // "An exception happened" is NOT proof. A relay answering 502, a timed-out receipt, or
+      // a nonce race all throw too — and none of them tests the session boundary.
+      // `assertSessionDenial` demands the error really is `UnauthorizedCall` AND names the
+      // contract we tried to call; any other shape is rethrown as a test failure rather than
+      // accepted as evidence.
       const pesan = assertSessionDenial(err, probe.call.address, probe.label);
       console.log(`  ✔ DITOLAK oleh validator akun Altana (UnauthorizedCall). Galat apa adanya:`);
       for (const baris of pesan.split("\n")) console.log(`    | ${baris}`);

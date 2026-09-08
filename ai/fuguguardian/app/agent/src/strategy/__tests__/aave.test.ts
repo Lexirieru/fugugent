@@ -6,7 +6,7 @@ import { PositionError } from "../types.js";
 const AKUN = "0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E" as const;
 const POOL_LAIN = "0xb3e1F06Ac529aded2aA20aA38F4C0b4AD317e5F5" as const;
 
-/** Tuple `getUserAccountData`: agunan $7.500, hutang $3.125, LT 75%, HF 1,8. */
+/** The `getUserAccountData` tuple: $7,500 collateral, $3,125 debt, LT 75%, HF 1.8. */
 const TUPLE = [
   750_000_000_000n,
   312_500_000_000n,
@@ -17,10 +17,9 @@ const TUPLE = [
 ] as const;
 
 /**
- * Client palsu — test ini SENGAJA tidak menyentuh jaringan (bandingkan dengan
- * `chain.test.ts`/`testnet.test.ts` yang memang memanggil RPC sungguhan).
- * Yang diuji di sini adalah bentuk pemanggilannya, dan itu justru tidak bisa
- * dilihat dari hasil sebuah bacaan sungguhan.
+ * A fake client — this test DELIBERATELY does not touch the network (compare with
+ * `chain.test.ts`/`testnet.test.ts`, which do call a real RPC). What is tested here is the
+ * shape of the call, and that is precisely what the result of a real read cannot show.
  */
 function fakeClient(overrides: { blockNumber?: bigint; tuple?: readonly bigint[] } = {}) {
   const readContract = vi.fn(async () => overrides.tuple ?? TUPLE);
@@ -36,7 +35,7 @@ describe("readAavePosition ditambatkan ke satu blok", () => {
     const pos = await readAavePosition(client, AKUN);
 
     expect(getBlockNumber).toHaveBeenCalledOnce();
-    // Inti I4: blok yang dilaporkan Position HARUS blok tempat angkanya dibaca.
+    // The heart of I4: the block Position reports MUST be the block its numbers were read at.
     expect(readContract).toHaveBeenCalledWith(
       expect.objectContaining({ blockNumber: 129_912_345n, args: [AKUN] }),
     );
