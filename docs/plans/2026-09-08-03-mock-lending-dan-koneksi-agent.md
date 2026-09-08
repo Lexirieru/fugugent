@@ -194,3 +194,49 @@ Script yang menjalankan skenario penuh di testnet dan mencetak buktinya:
 - [ ] Spend cap, cooldown, dan kill switch ditegakkan di kode dan diuji
 - [ ] HF posisi terbukti naik setelah intervensi agent
 - [ ] `docs/STATUS.md` diperbarui jujur
+
+---
+
+### Task 8: Repay lewat session key Altana yang ber-batas
+
+**Kenapa task ini ada:** Task 7 membuktikan rantai strateginya bekerja, tetapi repay-nya
+ditandatangani **EOA deployer** — sebuah kunci dengan kuasa penuh. Itu tidak memenuhi butir
+Definition of Done "Guardian mengeksekusi repay sungguhan lewat session key". Batas belanja,
+cooldown, dan kill switch saat ini hanya ditegakkan di kode kita sendiri; siapa pun yang
+memegang kunci itu bisa melewatinya. Nilai jual utama Fugugent adalah sebaliknya: **agent
+yang secara kriptografis tidak bisa melampaui izinnya**, bahkan bila kodenya dibajak.
+
+**Files:**
+- Create: `ai/fuguguardian/app/agent/src/strategy/chain/session.ts`
+- Modify: `ai/fuguguardian/app/agent/scripts/e2e-guardian.ts` (ganti penandatangan `sendRepay`)
+- Test: `ai/fuguguardian/app/agent/src/strategy/__tests__/session.test.ts`
+- Docs: `docs/e2e/2026-09-08-e2e-testnet.md`, `docs/STATUS.md`
+
+**Interfaces:**
+- Consumes: `ensureAltanaSessionLoaded`, `getWallet` dari `@bnbagent/studio-runtime/wallet`
+  (sudah dipakai `dualMain.ts:63,266`); `REPAY_ASSET_ADDRESS`, `ExecuteDeps.sendRepay`
+  dari `execute.ts`; `MOCK_LENDING_POOL_ADDRESS` dari `chain/testnet.ts`.
+- Produces: `createSessionSendRepay(...): ExecuteDeps["sendRepay"]` — pengganti drop-in
+  bagi penandatangan EOA di skrip E2E.
+
+**Batasan yang mengikat:**
+- `calls: []` kosong berarti **izin tanpa batas**. Allowlist wajib eksplisit: hanya
+  `MockLendingPool.repay` dan `mUSD.approve`, tidak lebih.
+- Jangan pernah print, parse, atau salin bagian `signer` dari file sesi.
+- Cap native juga membayar ongkos relay — perhitungkan, jangan pas-pasan.
+- Testnet only (chainId 97).
+
+- [ ] **Step 1: Grant sesi ber-batas.** `bag wallet session grant` dengan allowlist eksplisit,
+      spend cap, dan expiry. Catat parameternya di `docs/e2e/` (bukan isi sesinya).
+- [ ] **Step 2: Tulis `session.ts`** — membangun `sendRepay` yang menandatangani lewat sesi.
+      Tidak ada logika strategi di sini; hanya penandatanganan dan pengiriman.
+- [ ] **Step 3: Test unit** dengan sesi di-mock: allowlist diteruskan apa adanya, dan
+      `calls` kosong **ditolak** oleh kode kita sendiri sebelum sampai ke SDK.
+- [ ] **Step 4: Jalankan E2E ulang** memakai `createSessionSendRepay`. Buktikan dari receipt
+      bahwa pengirimnya **alamat sesi, bukan EOA deployer**.
+- [ ] **Step 5: Bukti penolakan** — kirim satu panggilan di luar allowlist (mis. `transfer`
+      mUSD ke alamat lain) lewat sesi yang sama, dan buktikan **ditolak**. Ini bukti
+      terpenting task ini: batasnya nyata, bukan sekadar dijanjikan kode kita.
+- [ ] **Step 6: Perbarui `docs/e2e/` dan `docs/STATUS.md`** — pindahkan butir session key
+      dari BELUM ke SUDAH, dengan tx hash keberhasilan dan bukti penolakan.
+- [ ] **Step 7: Commit.** `feat(guardian): repay lewat session key Altana ber-batas`
