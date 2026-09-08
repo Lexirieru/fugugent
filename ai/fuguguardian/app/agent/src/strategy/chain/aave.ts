@@ -40,6 +40,13 @@ const AAVE_POOL_ABI = [
 export async function readAavePosition(
   client: PublicClient,
   account: `0x${string}`,
+  /**
+   * Alamat pool `getUserAccountData`. Default ke Aave v3 mainnet supaya
+   * pemanggil lama tetap jalan tanpa perubahan. Adapter testnet
+   * (`chain/testnet.ts`) menyuntikkan alamat `MockLendingPool` di sini —
+   * logika pembacaan di bawah ini tidak berubah sama sekali.
+   */
+  poolAddress: `0x${string}` = AAVE_V3_POOL_ADDRESS,
 ): Promise<Position> {
   if (!client.chain) {
     throw new PositionError("Client viem tidak memiliki konfigurasi chain.");
@@ -50,7 +57,7 @@ export async function readAavePosition(
     blockNumber,
   ] = await Promise.all([
     client.readContract({
-      address: AAVE_V3_POOL_ADDRESS,
+      address: poolAddress,
       abi: AAVE_POOL_ABI,
       functionName: "getUserAccountData",
       args: [account],
