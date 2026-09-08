@@ -1,0 +1,985 @@
+/**
+ * Fallback berjenjang — **inti nilai produk**.
+ *
+ * Upstream 8004scan terbukti membalas `500 DATABASE_ERROR` secara intermiten
+ * (4 dari 5 percobaan gagal saat riset). Test di berkas ini adalah bukti bahwa
+ * kegagalan itu tidak pernah sampai ke pengguna sebagai marketplace kosong,
+ * **dan** tidak pernah disamarkan: setiap hasil membawa `source` + `ageSeconds`.
+ *
+ * Yang dikunci:
+ * 1. Keempat tingkat dipicu **berurutan** pada satu instance yang sama.
+ * 2. `source` benar di tiap tingkat, dan tingkat berikutnya tidak pernah
+ *    disentuh selama tingkat sebelumnya masih menjawab.
+ * 3. Tiap tingkat yang **melempar** (bukan hanya kosong) ditangani — sampai
+ *    keempat-empatnya melempar sekaligus, dan pemanggil tetap tidak kena
+ *    exception.
+ * 4. `DEFAULT_SPAM_FILTERS` yang mengosongkan chain 97 adalah kasus normal,
+ *    bukan kegagalan.
+ */
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { OnchainSource } from "../../sources/onchain.js";
+import type { Scan8004Source } from "../../sources/scan8004.js";
+import {
+  makeAgentKey,
+  type AgentDetailResult,
+  type AgentListPage,
+  type AgentRecord,
+  type Category,
+  type SourceHealth,
+} from "../../types.js";
+import {
+  CATEGORY_SEMANTIC_QUERIES,
+  createAgentService,
+  type AgentCachePort,
+  type AgentServiceDeps,
+} from "../agents.js";
+
+// ---------------------------------------------------------------------------
+// Perkakas
+// ---------------------------------------------------------------------------
+
+const NOW = new Date("2026-09-10T12:00:00.000Z");
+const now = () => NOW;
+const CHAIN_ID = 97;
+
+/** Jejak urutan pemanggilan — inilah yang membuktikan "berurutan", bukan mock.toHaveBeenCalled. */
+let trace: string[] = [];
+
+function record(partial: Partial<AgentRecord> & { tokenId: string }): AgentRecord {
+  return {
+    id: makeAgentKey(CHAIN_ID, partial.tokenId),
+    chainId: CHAIN_ID,
+    registryAddress: null,
+    agentId: null,
+    name: "Grid Runner",
+    description: "Deterministic grid trading bot placing laddered grid orders on PancakeSwap v3.",
+    imageUrl: null,
+    agentType: null,
+    tags: [],
+    categories: [],
+    skills: [],
+    domains: [],
+    supportedProtocols: [],
+    ownerAddress: null,
+    ownerUsername: null,
+    ownerPublisherTier: null,
+    agentWallet: null,
+    isActive: true,
+    isVerified: false,
+    isEndpointVerified: false,
+    x402Supported: false,
+    reputation: {
+      totalScore: null,
+      healthScore: null,
+      totalFeedbacks: 0,
+      averageScore: null,
+      starCount: 0,
+    },
+    classification: null,
+    fuguListing: null,
+    source: "scan8004",
+    fetchedAt: NOW.toISOString(),
+    createdAt: null,
+    updatedAt: null,
+    similarityScore: null,
+    ...partial,
+  };
+}
+
+function page(items: AgentRecord[], overrides: Partial<AgentListPage> = {}): AgentListPage {
+  return {
+    items,
+    total: items.length,
+    limit: 20,
+    offset: 0,
+    source: "scan8004",
+    healthy: true,
+    reason: null,
+    fetchedAt: NOW.toISOString(),
+    ...overrides,
+  };
+}
+
+/** Sumber 8004scan palsu yang bisa dipindah-pindah keadaannya di tengah test. */
+class FakeScan implements Scan8004Source {
+  page: AgentListPage = page([]);
+  detail: AgentDetailResult = {
+    agent: null,
+    source: "scan8004",
+    healthy: true,
+    reason: null,
+    fetchedAt: NOW.toISOString(),
+  };
+  throws: Error | null = null;
+  queries: string[] = [];
+
+  async listAgents(): Promise<AgentListPage> {
+    trace.push("scan8004.listAgents");
+    if (this.throws) throw this.throws;
+    return this.page;
+  }
+
+  async semanticSearch(query: string): Promise<AgentListPage> {
+    trace.push("scan8004.semanticSearch");
+    this.queries.push(query);
+    if (this.throws) throw this.throws;
+    return this.page;
+  }
+
+  async getAgent(): Promise<AgentDetailResult> {
+    trace.push("scan8004.getAgent");
+    if (this.throws) throw this.throws;
+    return this.detail;
+  }
+}
+
+class FakeCache implements AgentCachePort {
+  items: AgentRecord[] = [];
+  healthy = true;
+  reason: string | null = null;
+  throws: Error | null = null;
+  saved: AgentRecord[][] = [];
+  recorded: SourceHealth[] = [];
+  latest: SourceHealth[] = [];
+
+  async getAgents(): Promise<AgentListPage & { ageSeconds: number | null; stale: boolean }> {
+    trace.push("cache.getAgents");
+    if (this.throws) throw this.throws;
+    const ages = this.items.map((i) => Math.floor((NOW.getTime() - Date.parse(i.fetchedAt)) / 1000));
+    return {
+      ...page(this.items, {
+        source: "cache",
+        healthy: this.healthy,
+        reason: this.reason,
+      }),
+      ageSeconds: ages.length === 0 ? null : Math.max(...ages),
+      stale: false,
+    };
+  }
+
+  async getAgent(id: string): Promise<AgentDetailResult & { ageSeconds: number | null }> {
+    trace.push("cache.getAgent");
+    if (this.throws) throw this.throws;
+    const hit = this.items.find((i) => i.id === id) ?? null;
+    return {
+      agent: hit,
+      source: "cache",
+      healthy: this.healthy,
+      reason: this.reason,
+      fetchedAt: NOW.toISOString(),
+      ageSeconds:
+        hit === null ? null : Math.floor((NOW.getTime() - Date.parse(hit.fetchedAt)) / 1000),
+    };
+  }
+
+  async saveAgents(records: AgentRecord[]): Promise<number> {
+    trace.push("cache.saveAgents");
+    this.saved.push(records);
+    return records.length;
+  }
+
+  async recordHealth(health: SourceHealth): Promise<void> {
+    this.recorded.push(health);
+  }
+
+  async latestHealth(): Promise<SourceHealth[]> {
+    return this.latest;
+  }
+}
+
+class FakeOnchain implements OnchainSource {
+  page: AgentListPage = page([], { source: "onchain" });
+  throws: Error | null = null;
+
+  async readFuguListings(): Promise<AgentListPage> {
+    trace.push("onchain.readFuguListings");
+    if (this.throws) throw this.throws;
+    return this.page;
+  }
+
+  async readFuguListing(): Promise<AgentDetailResult> {
+    trace.push("onchain.readFuguListing");
+    if (this.throws) throw this.throws;
+    return {
+      agent: null,
+      source: "onchain",
+      healthy: true,
+      reason: null,
+      fetchedAt: NOW.toISOString(),
+    };
+  }
+}
+
+interface Harness {
+  scan: FakeScan;
+  cache: FakeCache;
+  onchain: FakeOnchain;
+  service: ReturnType<typeof createAgentService>;
+}
+
+function harness(overrides: Partial<AgentServiceDeps> = {}): Harness {
+  const scan = new FakeScan();
+  const cache = new FakeCache();
+  const onchain = new FakeOnchain();
+  const service = createAgentService({
+    scan8004: scan,
+    cache,
+    onchain,
+    chainId: CHAIN_ID,
+    now,
+    ...overrides,
+  });
+  return { scan, cache, onchain, service };
+}
+
+/** Record on-chain lengkap dengan listing bigint — untuk membuktikan uang tetap bigint. */
+function onchainRecord(tokenId: string, category: Category): AgentRecord {
+  return record({
+    tokenId,
+    name: `Agent #${tokenId}`,
+    description: "",
+    source: "onchain",
+    classification: { category, confidence: 1, reason: "kategori on-chain dari FuguRegistry" },
+    fuguListing: {
+      listingId: 1n,
+      erc8004AgentId: BigInt(tokenId),
+      owner: "0x1111111111111111111111111111111111111111",
+      agentWallet: "0x2222222222222222222222222222222222222222",
+      category,
+      priceUsd8PerPeriod: 1_500_000_000n,
+      periodSeconds: 2_592_000,
+      active: true,
+      curated: true,
+      metadataURI: "ipfs://x",
+    },
+  });
+}
+
+beforeEach(() => {
+  trace = [];
+});
+
+// ---------------------------------------------------------------------------
+// Tingkat demi tingkat
+// ---------------------------------------------------------------------------
+
+describe("getAgentsByCategory — tingkat 1: 8004scan", () => {
+  it("memakai 8004scan saat sehat dan tidak menyentuh tingkat berikutnya sama sekali", async () => {
+    const h = harness();
+    h.scan.page = page([record({ tokenId: "1" }), record({ tokenId: "2" })]);
+    h.cache.items = [record({ tokenId: "999", source: "cache" })];
+    h.onchain.page = page([onchainRecord("500", "GRID")], { source: "onchain" });
+
+    const result = await h.service.getAgentsByCategory("GRID");
+
+    expect(result.source).toBe("scan8004");
+    expect(result.items.map((i) => i.tokenId)).toEqual(["1", "2"]);
+    expect(result.healthy).toBe(true);
+    expect(result.stale).toBe(false);
+    expect(result.degraded).toBe(false);
+    expect(result.ageSeconds).toBe(0);
+    expect(trace).not.toContain("cache.getAgents");
+    expect(trace).not.toContain("onchain.readFuguListings");
+  });
+
+  it("mengirim query semantic milik kategori yang diminta", async () => {
+    const h = harness();
+    h.scan.page = page([record({ tokenId: "1" })]);
+    await h.service.getAgentsByCategory("GRID");
+    expect(h.scan.queries).toEqual([CATEGORY_SEMANTIC_QUERIES.GRID]);
+  });
+
+  it("mengklasifikasi hasil upstream dan membuang yang bukan kategori diminta", async () => {
+    const h = harness();
+    h.scan.page = page([
+      record({ tokenId: "1" }), // grid trading — cocok
+      record({
+        tokenId: "2",
+        name: "Health Guard",
+        description: "Monitors the health factor of Venus borrowing positions to avoid liquidation.",
+      }),
+    ]);
+
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.items.map((i) => i.tokenId)).toEqual(["1"]);
+    expect(result.items[0]!.classification?.category).toBe("GRID");
+    // Total yang dilaporkan adalah yang benar-benar bisa kita pertanggungjawabkan.
+    expect(result.total).toBe(1);
+  });
+
+  it("menulis balik hasil segar ke cache supaya tingkat 2 punya isi lain kali", async () => {
+    const h = harness();
+    h.scan.page = page([record({ tokenId: "1" })]);
+    await h.service.getAgentsByCategory("GRID");
+    expect(h.cache.saved).toHaveLength(1);
+    expect(h.cache.saved[0]!.map((i) => i.tokenId)).toEqual(["1"]);
+    expect(h.cache.saved[0]![0]!.classification?.category).toBe("GRID");
+  });
+
+  it("kegagalan tulis-balik cache tidak menjatuhkan hasil yang sudah didapat", async () => {
+    const h = harness();
+    h.scan.page = page([record({ tokenId: "1" })]);
+    h.cache.saveAgents = async () => {
+      throw new Error("disk penuh");
+    };
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.source).toBe("scan8004");
+    expect(result.items).toHaveLength(1);
+  });
+});
+
+describe("getAgentsByCategory — tingkat 2: cache Postgres", () => {
+  it("turun ke cache saat 8004scan tidak sehat, dan menandainya stale", async () => {
+    const h = harness();
+    h.scan.page = page([], { healthy: false, reason: "UpstreamError 500: DATABASE_ERROR" });
+    h.cache.items = [
+      record({ tokenId: "7", source: "cache", fetchedAt: "2026-09-10T11:55:00.000Z" }),
+    ];
+
+    const result = await h.service.getAgentsByCategory("GRID");
+
+    expect(result.source).toBe("cache");
+    expect(result.stale).toBe(true);
+    expect(result.degraded).toBe(true);
+    expect(result.healthy).toBe(true);
+    expect(result.ageSeconds).toBe(300);
+    expect(trace).toEqual(["scan8004.semanticSearch", "cache.getAgents"]);
+  });
+
+  it("alasan kegagalan tingkat 1 ikut terbawa di jejak, supaya bisa diperiksa", async () => {
+    const h = harness();
+    h.scan.page = page([], { healthy: false, reason: "UpstreamError 500: DATABASE_ERROR" });
+    h.cache.items = [record({ tokenId: "7", source: "cache" })];
+
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.trail[0]).toMatchObject({ source: "scan8004", outcome: "unhealthy" });
+    expect(result.trail[0]!.reason).toContain("DATABASE_ERROR");
+    expect(result.trail[1]).toMatchObject({ source: "cache", outcome: "ok" });
+  });
+
+  it("turun ke cache juga saat 8004scan sehat tapi kosong", async () => {
+    const h = harness();
+    h.scan.page = page([]);
+    h.cache.items = [record({ tokenId: "7", source: "cache" })];
+
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.source).toBe("cache");
+    expect(result.trail[0]).toMatchObject({ source: "scan8004", outcome: "empty" });
+  });
+
+  it("tidak menulis balik cache dari cache", async () => {
+    const h = harness();
+    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.cache.items = [record({ tokenId: "7", source: "cache" })];
+    await h.service.getAgentsByCategory("GRID");
+    expect(h.cache.saved).toHaveLength(0);
+  });
+});
+
+describe("getAgentsByCategory — tingkat 3: on-chain FuguRegistry", () => {
+  it("turun ke on-chain saat cache kosong", async () => {
+    const h = harness();
+    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.cache.items = [];
+    h.onchain.page = page([onchainRecord("500", "GRID")], { source: "onchain" });
+
+    const result = await h.service.getAgentsByCategory("GRID");
+
+    expect(result.source).toBe("onchain");
+    expect(result.items).toHaveLength(1);
+    expect(result.degraded).toBe(true);
+    expect(result.ageSeconds).toBe(0);
+    expect(result.stale).toBe(false);
+    expect(trace).toEqual([
+      "scan8004.semanticSearch",
+      "cache.getAgents",
+      "onchain.readFuguListings",
+      "cache.saveAgents",
+    ]);
+  });
+
+  it("menyaring listing on-chain per kategori", async () => {
+    const h = harness();
+    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.onchain.page = page(
+      [onchainRecord("500", "GRID"), onchainRecord("501", "YIELD")],
+      { source: "onchain" },
+    );
+
+    const result = await h.service.getAgentsByCategory("YIELD");
+    expect(result.items.map((i) => i.tokenId)).toEqual(["501"]);
+    expect(result.total).toBe(1);
+  });
+
+  it("uang on-chain tetap bigint sepanjang jalur layanan", async () => {
+    const h = harness();
+    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.onchain.page = page([onchainRecord("500", "GRID")], { source: "onchain" });
+
+    const result = await h.service.getAgentsByCategory("GRID");
+    const listing = result.items[0]!.fuguListing!;
+    expect(typeof listing.priceUsd8PerPeriod).toBe("bigint");
+    expect(listing.priceUsd8PerPeriod).toBe(1_500_000_000n);
+    expect(typeof listing.listingId).toBe("bigint");
+  });
+
+  it("turun ke on-chain saat cache tidak sehat (bukan hanya kosong)", async () => {
+    const h = harness();
+    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.cache.healthy = false;
+    h.cache.reason = "cache Postgres gagal: connection refused";
+    h.cache.items = [record({ tokenId: "7", source: "cache" })];
+    h.onchain.page = page([onchainRecord("500", "GRID")], { source: "onchain" });
+
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.source).toBe("onchain");
+    expect(result.trail[1]).toMatchObject({ source: "cache", outcome: "unhealthy" });
+  });
+});
+
+describe("getAgentsByCategory — tingkat 4: seed terkurasi", () => {
+  it("turun ke seed saat ketiga tingkat sebelumnya tidak memberi apa-apa", async () => {
+    const h = harness();
+    h.scan.page = page([], { healthy: false, reason: "mati" });
+
+    const result = await h.service.getAgentsByCategory("GRID");
+
+    expect(result.source).toBe("seed");
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]!.name).toBe("FuguGrid");
+    expect(result.items[0]!.source).toBe("seed");
+    expect(result.degraded).toBe(true);
+    expect(result.healthy).toBe(true);
+    // Umur seed dilaporkan apa adanya: ia memang data kurasi, bukan data segar.
+    expect(result.ageSeconds).toBeGreaterThan(0);
+    expect(result.stale).toBe(true);
+  });
+
+  it("tidak pernah menulis seed ke cache — cache harus tetap berisi data nyata", async () => {
+    const h = harness();
+    h.scan.page = page([], { healthy: false, reason: "mati" });
+    await h.service.getAgentsByCategory("GRID");
+    expect(h.cache.saved).toHaveLength(0);
+  });
+
+  it("keempat kategori punya isi di seed — marketplace tidak pernah kosong", async () => {
+    const categories: Category[] = ["REBALANCING", "GRID", "YIELD", "HEALTH_FACTOR"];
+    for (const category of categories) {
+      const h = harness();
+      h.scan.page = page([], { healthy: false, reason: "mati" });
+      const result = await h.service.getAgentsByCategory(category);
+      expect(result.source).toBe("seed");
+      expect(result.items.length).toBeGreaterThan(0);
+      expect(result.items[0]!.classification?.category).toBe(category);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Keempat tingkat, berurutan, pada satu instance
+// ---------------------------------------------------------------------------
+
+describe("keempat tingkat dipicu berurutan", () => {
+  it("menurun satu tingkat setiap kali tingkat di atasnya berhenti menjawab", async () => {
+    const h = harness();
+
+    // Tingkat 1.
+    h.scan.page = page([record({ tokenId: "1" })]);
+    h.cache.items = [record({ tokenId: "7", source: "cache" })];
+    h.onchain.page = page([onchainRecord("500", "GRID")], { source: "onchain" });
+    const lvl1 = await h.service.getAgentsByCategory("GRID");
+
+    // Tingkat 2 — upstream tumbang.
+    trace = [];
+    h.scan.page = page([], { healthy: false, reason: "500 DATABASE_ERROR" });
+    const lvl2 = await h.service.getAgentsByCategory("GRID");
+
+    // Tingkat 3 — cache ikut kosong.
+    trace = [];
+    h.cache.items = [];
+    const lvl3 = await h.service.getAgentsByCategory("GRID");
+
+    // Tingkat 4 — registry on-chain pun belum berisi.
+    trace = [];
+    h.onchain.page = page([], { source: "onchain" });
+    const lvl4 = await h.service.getAgentsByCategory("GRID");
+
+    expect([lvl1.source, lvl2.source, lvl3.source, lvl4.source]).toEqual([
+      "scan8004",
+      "cache",
+      "onchain",
+      "seed",
+    ]);
+    // Tiap tingkat menyisakan jejak sepanjang tingkat yang ia tempuh.
+    expect(lvl1.trail.map((t) => t.source)).toEqual(["scan8004"]);
+    expect(lvl2.trail.map((t) => t.source)).toEqual(["scan8004", "cache"]);
+    expect(lvl3.trail.map((t) => t.source)).toEqual(["scan8004", "cache", "onchain"]);
+    expect(lvl4.trail.map((t) => t.source)).toEqual([
+      "scan8004",
+      "cache",
+      "onchain",
+      "seed",
+    ]);
+    // Dan tidak ada satu pun hasil tanpa provenance.
+    for (const result of [lvl1, lvl2, lvl3, lvl4]) {
+      expect(result.source).toBeTruthy();
+      expect(result.ageSeconds).not.toBeUndefined();
+      expect(result.items.length).toBeGreaterThan(0);
+    }
+    expect(trace).toEqual([
+      "scan8004.semanticSearch",
+      "cache.getAgents",
+      "onchain.readFuguListings",
+    ]);
+  });
+
+  it("DEFAULT_SPAM_FILTERS yang mengosongkan chain 97 bukan kegagalan — ia justru alasan tingkat 3 dan 4 ada", async () => {
+    // Persis peringatan implementer Task 2: `is_registered` + `min_score:10` +
+    // `has_a2a` realistis menyisakan NOL agent di testnet. Upstream sehat,
+    // jawabannya sah, isinya kosong.
+    const h = harness();
+    h.scan.page = page([], { healthy: true, reason: null, total: 0 });
+    h.cache.items = [];
+    h.onchain.page = page([], { source: "onchain" });
+
+    const result = await h.service.getAgentsByCategory("HEALTH_FACTOR");
+
+    expect(result.trail.map((t) => t.outcome)).toEqual(["empty", "empty", "empty", "ok"]);
+    expect(result.source).toBe("seed");
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]!.name).toBe("FuguGuardian");
+    expect(result.healthy).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tiap tingkat MELEMPAR, bukan hanya kosong
+// ---------------------------------------------------------------------------
+
+describe("tidak pernah melempar ke pemanggil", () => {
+  it("tingkat 1 melempar → turun ke tingkat 2", async () => {
+    const h = harness();
+    h.scan.throws = new Error("socket hang up");
+    h.cache.items = [record({ tokenId: "7", source: "cache" })];
+
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.source).toBe("cache");
+    expect(result.trail[0]).toMatchObject({ source: "scan8004", outcome: "threw" });
+    expect(result.trail[0]!.reason).toContain("socket hang up");
+  });
+
+  it("tingkat 2 melempar → turun ke tingkat 3", async () => {
+    const h = harness();
+    h.scan.throws = new Error("mati");
+    h.cache.throws = new Error("connection terminated unexpectedly");
+    h.onchain.page = page([onchainRecord("500", "GRID")], { source: "onchain" });
+
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.source).toBe("onchain");
+    expect(result.trail[1]).toMatchObject({ source: "cache", outcome: "threw" });
+  });
+
+  it("tingkat 3 melempar → turun ke tingkat 4", async () => {
+    const h = harness();
+    h.scan.throws = new Error("mati");
+    h.cache.throws = new Error("mati");
+    h.onchain.throws = new Error("HttpRequestError: RPC menolak");
+
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.source).toBe("seed");
+    expect(result.items).toHaveLength(1);
+    expect(result.trail[2]).toMatchObject({ source: "onchain", outcome: "threw" });
+  });
+
+  it("tingkat 4 melempar → halaman kosong yang jujur, bukan exception", async () => {
+    const h = harness({
+      seed: {
+        async listAgents() {
+          trace.push("seed.listAgents");
+          throw new Error("berkas seed rusak");
+        },
+        async getAgent() {
+          throw new Error("berkas seed rusak");
+        },
+      },
+    });
+    h.scan.throws = new Error("mati");
+    h.cache.throws = new Error("mati");
+    h.onchain.throws = new Error("mati");
+
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.items).toEqual([]);
+    expect(result.source).toBe("seed");
+    expect(result.healthy).toBe(false);
+    expect(result.reason).toContain("berkas seed rusak");
+    expect(result.ageSeconds).toBeNull();
+    expect(result.trail.map((t) => t.outcome)).toEqual(["threw", "threw", "threw", "threw"]);
+  });
+
+  it("keempat tingkat melempar sekaligus tetap tidak melempar ke pemanggil", async () => {
+    const h = harness({
+      seed: {
+        async listAgents() {
+          throw new Error("seed rusak");
+        },
+        async getAgent() {
+          throw new Error("seed rusak");
+        },
+      },
+    });
+    h.scan.throws = new Error("a");
+    h.cache.throws = new Error("b");
+    h.onchain.throws = new Error("c");
+
+    await expect(h.service.getAgentsByCategory("GRID")).resolves.toBeDefined();
+    await expect(h.service.getAgentDetail("97:1")).resolves.toBeDefined();
+    await expect(h.service.getHealth()).resolves.toBeDefined();
+  });
+
+  it("sumber yang melempar sesuatu yang bukan Error pun tidak lolos", async () => {
+    const h = harness();
+    h.scan.semanticSearch = async () => {
+      throw "bukan Error";
+    };
+    h.cache.items = [record({ tokenId: "7", source: "cache" })];
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.source).toBe("cache");
+    expect(result.trail[0]!.outcome).toBe("threw");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tingkat yang tidak dipasang
+// ---------------------------------------------------------------------------
+
+describe("tingkat yang tidak tersedia", () => {
+  it("tanpa cache dan tanpa on-chain, layanan tetap menjawab dari seed", async () => {
+    const service = createAgentService({
+      scan8004: new FakeScan(),
+      chainId: CHAIN_ID,
+      now,
+    });
+    const result = await service.getAgentsByCategory("YIELD");
+    expect(result.source).toBe("seed");
+    expect(result.items[0]!.name).toBe("FuguYield");
+    expect(result.trail.map((t) => t.outcome)).toEqual([
+      "empty",
+      "unavailable",
+      "unavailable",
+      "ok",
+    ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Paging
+// ---------------------------------------------------------------------------
+
+describe("paging", () => {
+  it("meneruskan limit/offset ke 8004scan", async () => {
+    const seen: unknown[] = [];
+    const h = harness();
+    h.scan.semanticSearch = async (query: string, opts?: unknown) => {
+      seen.push(opts);
+      return page([record({ tokenId: "1" })]);
+    };
+    await h.service.getAgentsByCategory("GRID", { limit: 5, offset: 10 });
+    expect(seen[0]).toMatchObject({ limit: 5, offset: 10 });
+  });
+
+  it("memotong sendiri hasil on-chain dan seed sesuai limit/offset", async () => {
+    const h = harness();
+    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.onchain.page = page(
+      [onchainRecord("1", "GRID"), onchainRecord("2", "GRID"), onchainRecord("3", "GRID")],
+      { source: "onchain" },
+    );
+
+    const first = await h.service.getAgentsByCategory("GRID", { limit: 2, offset: 0 });
+    expect(first.items.map((i) => i.tokenId)).toEqual(["1", "2"]);
+    expect(first.total).toBe(3);
+
+    const second = await h.service.getAgentsByCategory("GRID", { limit: 2, offset: 2 });
+    expect(second.items.map((i) => i.tokenId)).toEqual(["3"]);
+    expect(second.total).toBe(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getAgentDetail
+// ---------------------------------------------------------------------------
+
+describe("getAgentDetail", () => {
+  const detail = (agent: AgentRecord): AgentDetailResult => ({
+    agent,
+    source: "scan8004",
+    healthy: true,
+    reason: null,
+    fetchedAt: NOW.toISOString(),
+  });
+
+  it("tingkat 1: 8004scan", async () => {
+    const h = harness();
+    h.scan.detail = detail(record({ tokenId: "42" }));
+    const result = await h.service.getAgentDetail("97:42");
+    expect(result.source).toBe("scan8004");
+    expect(result.agent?.tokenId).toBe("42");
+    expect(result.ageSeconds).toBe(0);
+    expect(result.stale).toBe(false);
+    expect(trace).toEqual(["scan8004.getAgent", "cache.saveAgents"]);
+  });
+
+  it("tingkat 2: cache, ditandai stale", async () => {
+    const h = harness();
+    h.scan.detail = { ...detail(record({ tokenId: "42" })), agent: null, healthy: false, reason: "500" };
+    h.cache.items = [
+      record({ tokenId: "42", source: "cache", fetchedAt: "2026-09-10T11:00:00.000Z" }),
+    ];
+    const result = await h.service.getAgentDetail("97:42");
+    expect(result.source).toBe("cache");
+    expect(result.stale).toBe(true);
+    expect(result.ageSeconds).toBe(3600);
+  });
+
+  it("tingkat 3: on-chain, dicari lewat listing FuguRegistry", async () => {
+    const h = harness();
+    h.scan.detail = { ...detail(record({ tokenId: "42" })), agent: null, healthy: false, reason: "500" };
+    h.onchain.page = page([onchainRecord("42", "GRID"), onchainRecord("43", "YIELD")], {
+      source: "onchain",
+    });
+    const result = await h.service.getAgentDetail("97:42");
+    expect(result.source).toBe("onchain");
+    expect(result.agent?.tokenId).toBe("42");
+    expect(typeof result.agent?.fuguListing?.priceUsd8PerPeriod).toBe("bigint");
+  });
+
+  it("tingkat 4: seed", async () => {
+    const h = harness();
+    h.scan.detail = { ...detail(record({ tokenId: "1" })), agent: null, healthy: false, reason: "500" };
+    const result = await h.service.getAgentDetail("97:seed-fugurebalancer");
+    expect(result.source).toBe("seed");
+    expect(result.agent?.name).toBe("FuguRebalancer");
+    expect(result.ageSeconds).toBeGreaterThan(0);
+  });
+
+  it("id yang tidak dikenal di mana pun: jawaban kosong yang jujur, bukan exception", async () => {
+    const h = harness();
+    h.scan.detail = { ...detail(record({ tokenId: "1" })), agent: null, healthy: false, reason: "500" };
+    const result = await h.service.getAgentDetail("97:123456");
+    expect(result.agent).toBeNull();
+    expect(result.source).toBe("seed");
+    expect(result.healthy).toBe(true);
+    expect(result.ageSeconds).toBeNull();
+    expect(result.trail).toHaveLength(4);
+  });
+
+  it("id berbentuk salah melewati tingkat yang butuh chainId/tokenId, bukan melempar", async () => {
+    const h = harness();
+    h.cache.items = [];
+    const result = await h.service.getAgentDetail("bukan-id");
+    expect(result.agent).toBeNull();
+    expect(result.healthy).toBe(true);
+    expect(result.trail[0]).toMatchObject({ source: "scan8004", outcome: "unavailable" });
+    expect(result.trail[2]).toMatchObject({ source: "onchain", outcome: "unavailable" });
+    expect(trace).not.toContain("scan8004.getAgent");
+  });
+
+  it("setiap tingkat yang melempar diturunkan, tidak dilemparkan", async () => {
+    const h = harness();
+    h.scan.throws = new Error("mati");
+    h.cache.throws = new Error("mati");
+    h.onchain.throws = new Error("mati");
+    const result = await h.service.getAgentDetail("97:seed-fuguyield");
+    expect(result.source).toBe("seed");
+    expect(result.agent?.name).toBe("FuguYield");
+    expect(result.trail.map((t) => t.outcome)).toEqual(["threw", "threw", "threw", "ok"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getHealth
+// ---------------------------------------------------------------------------
+
+describe("getHealth", () => {
+  it("melaporkan status tiap sumber apa adanya setelah dipakai", async () => {
+    const h = harness();
+    h.scan.page = page([], { healthy: false, reason: "500 DATABASE_ERROR" });
+    h.cache.items = [record({ tokenId: "7", source: "cache" })];
+    await h.service.getAgentsByCategory("GRID");
+
+    const health = await h.service.getHealth();
+    const bySource = Object.fromEntries(health.sources.map((s) => [s.source, s]));
+    expect(bySource.scan8004!.healthy).toBe(false);
+    expect(bySource.scan8004!.reason).toContain("DATABASE_ERROR");
+    expect(bySource.cache!.healthy).toBe(true);
+    expect(health.degraded).toBe(true);
+    expect(health.healthy).toBe(true);
+    expect(health.checkedAt).toBe(NOW.toISOString());
+  });
+
+  it("seed selalu sehat — itulah gunanya", async () => {
+    const h = harness();
+    const health = await h.service.getHealth();
+    const seed = health.sources.find((s) => s.source === "seed");
+    expect(seed?.healthy).toBe(true);
+  });
+
+  it("mengambil status yang tersimpan di DB untuk sumber yang belum dipakai proses ini", async () => {
+    const h = harness();
+    h.cache.latest = [
+      { source: "onchain", healthy: false, reason: "RPC timeout", checkedAt: "2026-09-10T11:00:00.000Z" },
+    ];
+    const health = await h.service.getHealth();
+    const onchain = health.sources.find((s) => s.source === "onchain");
+    expect(onchain).toMatchObject({ healthy: false, reason: "RPC timeout" });
+  });
+
+  it("status dalam proses ini menang atas riwayat DB yang lebih tua", async () => {
+    const h = harness();
+    h.cache.latest = [
+      { source: "scan8004", healthy: true, reason: null, checkedAt: "2026-09-10T10:00:00.000Z" },
+    ];
+    h.scan.page = page([], { healthy: false, reason: "500 DATABASE_ERROR" });
+    await h.service.getAgentsByCategory("GRID");
+
+    const health = await h.service.getHealth();
+    expect(health.sources.find((s) => s.source === "scan8004")?.healthy).toBe(false);
+  });
+
+  it("tidak melempar walau cache mati", async () => {
+    const h = harness();
+    h.cache.latestHealth = async () => {
+      throw new Error("mati");
+    };
+    const health = await h.service.getHealth();
+    expect(health.sources.length).toBeGreaterThan(0);
+    expect(health.healthy).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Kredensial
+// ---------------------------------------------------------------------------
+
+describe("kredensial tidak pernah bocor", () => {
+  const SECRET = "sk-8004-super-rahasia-abcdef0123456789";
+
+  it("API key yang ikut di pesan error upstream disunting dari jejak dan alasan", async () => {
+    const h = harness();
+    h.scan.throws = new Error(
+      `fetch gagal: GET https://api.8004scan.io/api/v1/agents?x-api-key=${SECRET}`,
+    );
+    h.cache.items = [record({ tokenId: "7", source: "cache" })];
+
+    const result = await h.service.getAgentsByCategory("GRID");
+    const serialized = JSON.stringify(result, (_k, v) =>
+      typeof v === "bigint" ? v.toString() : v,
+    );
+    expect(serialized).not.toContain(SECRET);
+    expect(result.trail[0]!.reason).toContain("[redacted]");
+  });
+
+  it("header Authorization di pesan error juga disunting", async () => {
+    const h = harness();
+    h.scan.throws = new Error(`UpstreamError 401: Authorization: Bearer ${SECRET}`);
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(JSON.stringify(result.trail)).not.toContain(SECRET);
+  });
+
+  it("alasan yang sangat panjang dipotong supaya log tidak jadi tempat sampah", async () => {
+    const h = harness();
+    h.scan.throws = new Error("x".repeat(5000));
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.trail[0]!.reason!.length).toBeLessThanOrEqual(400);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Kesehatan dicatat
+// ---------------------------------------------------------------------------
+
+describe("riwayat kesehatan sumber", () => {
+  it("mencatat tiap tingkat yang ditempuh ke tabel source_health", async () => {
+    const h = harness();
+    h.scan.page = page([], { healthy: false, reason: "500 DATABASE_ERROR" });
+    h.cache.items = [record({ tokenId: "7", source: "cache" })];
+    await h.service.getAgentsByCategory("GRID");
+
+    expect(h.cache.recorded.map((r) => r.source)).toEqual(["scan8004", "cache"]);
+    expect(h.cache.recorded[0]!.healthy).toBe(false);
+    expect(h.cache.recorded[0]!.checkedAt).toBe(NOW.toISOString());
+  });
+
+  it("bisa dimatikan lewat opsi, dan mematikannya tidak mengubah hasil", async () => {
+    const h = harness({ persistHealth: false });
+    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.cache.items = [record({ tokenId: "7", source: "cache" })];
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(h.cache.recorded).toHaveLength(0);
+    expect(result.source).toBe("cache");
+  });
+
+  it("kegagalan mencatat kesehatan tidak menjatuhkan permintaan", async () => {
+    const h = harness();
+    h.cache.recordHealth = async () => {
+      throw new Error("tabel hilang");
+    };
+    h.scan.page = page([record({ tokenId: "1" })]);
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.source).toBe("scan8004");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Invariant lintas tingkat
+// ---------------------------------------------------------------------------
+
+describe("invariant yang berlaku di semua tingkat", () => {
+  it("setiap hasil membawa source, ageSeconds, fetchedAt, dan jejak", async () => {
+    const setups: Array<() => Harness> = [
+      () => {
+        const h = harness();
+        h.scan.page = page([record({ tokenId: "1" })]);
+        return h;
+      },
+      () => {
+        const h = harness();
+        h.scan.page = page([], { healthy: false, reason: "mati" });
+        h.cache.items = [record({ tokenId: "7", source: "cache" })];
+        return h;
+      },
+      () => {
+        const h = harness();
+        h.scan.page = page([], { healthy: false, reason: "mati" });
+        h.onchain.page = page([onchainRecord("500", "GRID")], { source: "onchain" });
+        return h;
+      },
+      () => {
+        const h = harness();
+        h.scan.page = page([], { healthy: false, reason: "mati" });
+        return h;
+      },
+    ];
+
+    const seenSources: string[] = [];
+    for (const setup of setups) {
+      const result = await setup().service.getAgentsByCategory("GRID");
+      expect(["scan8004", "cache", "onchain", "seed"]).toContain(result.source);
+      expect(typeof result.fetchedAt).toBe("string");
+      expect(result.ageSeconds === null || typeof result.ageSeconds === "number").toBe(true);
+      expect(result.trail.length).toBeGreaterThan(0);
+      // Setiap item mengaku dari sumber yang sama dengan halamannya.
+      for (const item of result.items) expect(item.source).toBe(result.source);
+      seenSources.push(result.source);
+    }
+    expect(seenSources).toEqual(["scan8004", "cache", "onchain", "seed"]);
+  });
+
+  it("tidak pernah memanggil sumber setelah tingkat yang menjawab", async () => {
+    const h = harness();
+    h.scan.page = page([record({ tokenId: "1" })]);
+    const spy = vi.spyOn(h.onchain, "readFuguListings");
+    await h.service.getAgentsByCategory("GRID");
+    expect(spy).not.toHaveBeenCalled();
+  });
+});
