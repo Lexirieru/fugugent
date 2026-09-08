@@ -109,6 +109,23 @@ describe("executeDecision", () => {
     expect(result.sent).toBe(true);
     expect(result.cappedPerDay).toBe(true);
     expect(result.amountSentUsd8).toBe(50_000_000_000n); // sisa $500
+    expect(dep.sendRepay).toHaveBeenCalledWith(expect.anything(), 50_000_000_000n);
+  });
+
+  it("pemotongan per-aksi dan harian berlaku bersamaan", async () => {
+    // suggestedRepayBase ($2000) > maxPerActionUsd8 ($1000) > sisa harian ($300)
+    const d = decisionWith("PARTIAL_REPAY", 200_000_000_000n);
+    const s = state({ spentTodayUsd8: 470_000_000_000n }); // sisa dari $5000: $300
+    const dep = deps();
+    const result = await executeDecision(d, POS, limits(), s, dep);
+
+    expect(result.sent).toBe(true);
+    expect(result.cappedPerAction).toBe(true);
+    expect(result.cappedPerDay).toBe(true);
+    // Jumlah yang benar-benar terkirim adalah sisa harian ($300), bukan
+    // batas per-aksi ($1000) — pemotongan kedua lebih ketat dari yang pertama.
+    expect(result.amountSentUsd8).toBe(30_000_000_000n);
+    expect(dep.sendRepay).toHaveBeenCalledWith(expect.anything(), 30_000_000_000n);
   });
 
   it("aturan 4: sisa anggaran harian nol -> tidak mengirim", async () => {
@@ -171,5 +188,28 @@ describe("executeDecision", () => {
     const dep = deps();
     await executeDecision(d, POS, limits(), state(), dep);
     expect(dep.sendRepay).toHaveBeenCalledTimes(1);
+  });
+
+  it("kegagalan kirim tidak menghabiskan anggaran", async () => {
+    const d = decisionWith("PARTIAL_REPAY", 10_000_000_000n);
+    const s = state({ spentTodayUsd8: 5_000_000_000n, dayStartedAt: 1_000_000, lastActionAt: 0 });
+    const spentTodaySebelum = s.spentTodayUsd8;
+    const lastActionAtSebelum = s.lastActionAt;
+    const dep = deps({
+      sendRepay: vi.fn(async () => {
+        throw new Error("RPC menolak transaksi");
+      }),
+      now: () => 1_000_500,
+    });
+
+    // Kegagalan tidak boleh ditelan diam-diam — pemanggil harus melihatnya.
+    await expect(executeDecision(d, POS, limits(), s, dep)).rejects.toThrow(
+      "RPC menolak transaksi",
+    );
+
+    // State yang dipegang pemanggil sama sekali tidak berubah: anggaran
+    // tidak boleh terpakai untuk transaksi yang gagal dikirim.
+    expect(s.spentTodayUsd8).toBe(spentTodaySebelum);
+    expect(s.lastActionAt).toBe(lastActionAtSebelum);
   });
 });
