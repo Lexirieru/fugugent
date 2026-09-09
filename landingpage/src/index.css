@@ -521,12 +521,23 @@ body {
   padding-inline: clamp(24px, 3vw, 56px);
 
   /*
-   * The list is rendered three times and the keyframe travels exactly one third,
-   * so the row returns to a position identical to where it began and the loop has
-   * no visible seam. Scroll position is deliberately not part of this: a rail that
-   * moves only while you happen to be scrolling reads as broken when you stop.
+   * The list is rendered nine times and the keyframe travels exactly one third —
+   * three whole copies — so the row returns to a position identical to where it
+   * began and the loop has no visible seam. Scroll position is deliberately not
+   * part of this: a rail that moves only while you happen to be scrolling reads
+   * as broken the moment you stop.
+   *
+   * Nine copies rather than three because the travel distance is subtracted from
+   * the row's coverage: with three copies the row is ~1130px and it slides 376px,
+   * so on any screen wider than ~750px a blank gap opens at the right-hand edge
+   * partway through the cycle. Nine copies slide 1130px and still cover 2260px.
+   *
+   * 18s, not 42s. Three copies at 42s worked out to nine pixels a second, which
+   * is slow enough that the row reads as a static strip — the exact bug this
+   * animation was written to fix, arrived at a second way. Now it travels about
+   * 63px/s: unmistakably moving, still calm enough to read the logos.
    */
-  animation: marquee-drift 42s linear infinite;
+  animation: marquee-drift 18s linear infinite;
   will-change: transform;
 }
 
@@ -959,16 +970,10 @@ body {
 /* ── Reduced motion ─────────────────────────────────────────────── */
 
 /*
- * The scroll listener in RailMarquee bails out before it is ever attached when
- * this matches, and every entry animation renders in its finished state. This
- * block is the belt to that pair of braces: it also freezes the marquee if a
- * transform was already written before the preference changed.
+ * Every entry animation renders in its finished state when this matches. The
+ * marquee is stopped by its own rule further up, where the animation is defined.
  */
 @media (prefers-reduced-motion: reduce) {
-  .marquee-row {
-    transform: none !important;
-  }
-
   *,
   *::before,
   *::after {
