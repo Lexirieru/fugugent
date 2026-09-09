@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
+import { LiveData } from "@/components/live-data";
 import { ButtonLink } from "@/components/ui";
-import { formatAge, outcomeLabel } from "@/lib/provenance";
+import { outcomeLabel } from "@/lib/provenance";
 import {
   SKILL_SOURCE_LABEL,
   SKILL_SOURCE_MEANING,
@@ -30,8 +31,12 @@ export function SkillProvenanceRow({
   className?: string;
 }) {
   const weight = skillWeightOf(provenance);
-  const age = formatAge(provenance.ageSeconds);
   const label = SKILL_SOURCE_LABEL[provenance.source];
+  // The same live age and the same refresh as the agent marketplace. Both halves of
+  // this product are served by one backend, so one freshness check answers for both.
+  const live = (
+    <LiveData fetchedAt={provenance.fetchedAt} maxAgeSeconds={provenance.maxAgeSeconds} />
+  );
 
   if (weight === "failure") {
     return (
@@ -79,7 +84,7 @@ export function SkillProvenanceRow({
       >
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
           <span className="font-medium text-fg">Served from {label}</span>
-          {age ? <span className="tnum text-muted">· {age}</span> : null}
+          <span className="text-muted">{live}</span>
           {provenance.stale ? (
             <span className="text-[var(--risk-3)]">· not confirmed fresh</span>
           ) : null}
@@ -104,7 +109,7 @@ export function SkillProvenanceRow({
         <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--risk-1)]" />
         Live from {label}
       </span>
-      {age ? <span className="tnum">· {age}</span> : null}
+      {live}
       <Trail provenance={provenance} inline />
     </div>
   );

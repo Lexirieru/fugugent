@@ -1,8 +1,8 @@
+import { LiveData } from "@/components/live-data";
 import { ButtonLink } from "@/components/ui";
 import {
   SOURCE_LABEL,
   SOURCE_MEANING,
-  formatAge,
   outcomeLabel,
   weightOf,
   type Provenance,
@@ -32,8 +32,13 @@ export function DataProvenance({
   className?: string;
 }) {
   const weight = weightOf(provenance);
-  const age = formatAge(provenance.ageSeconds);
   const label = SOURCE_LABEL[provenance.source];
+  // The age is counted in the browser from the timestamp the server sent, so it
+  // moves with the clock instead of freezing at whatever it was when the HTML was
+  // built. The seed path keeps the static age: its data is the build, not a reading.
+  const live = (
+    <LiveData fetchedAt={provenance.fetchedAt} maxAgeSeconds={provenance.maxAgeSeconds} />
+  );
 
   if (weight === "failure") {
     return (
@@ -77,7 +82,7 @@ export function DataProvenance({
       >
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
           <span className="font-medium text-fg">Served from {label}</span>
-          {age ? <span className="tnum text-muted">· {age}</span> : null}
+          <span className="text-muted">{live}</span>
           {provenance.stale ? (
             <span className="text-[var(--risk-3)]">· not confirmed fresh</span>
           ) : null}
@@ -102,7 +107,7 @@ export function DataProvenance({
         <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--risk-1)]" />
         Live from {label}
       </span>
-      {age ? <span className="tnum">· {age}</span> : null}
+      {live}
       <Trail provenance={provenance} inline />
     </div>
   );

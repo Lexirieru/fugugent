@@ -71,6 +71,10 @@ function LiveCheck({ keystore, wallet, keyHash }: PermissionCheckProps) {
     functionName: "isValidKey",
     args: [wallet as `0x${string}`, keyHash as `0x${string}`],
     chainId: CHAIN.id,
+    // A permission is a thing that runs out. Re-reading it every minute, and again
+    // whenever the tab comes back to the front, is what stops this panel from
+    // telling somebody a permission is live an hour after it stopped being.
+    query: { refetchInterval: 60_000, refetchOnWindowFocus: true },
   });
 
   const link = (

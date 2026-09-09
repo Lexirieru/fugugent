@@ -93,7 +93,10 @@ export function useSubscription(listingId: bigint | null): SubscriptionState {
     abi: SUBSCRIPTION_ABI,
     functionName: "subCount",
     chainId: CHAIN.id,
-    query: { enabled },
+    // A subscription starts, runs and ends without this tab doing anything, so the
+    // `Hired` badge is re-read on a timer as well as on demand. 30 seconds is well
+    // inside the shortest period this marketplace sells (120 seconds).
+    query: { enabled, refetchInterval: 30_000 },
   });
 
   const ids = useMemo(() => {
@@ -113,7 +116,7 @@ export function useSubscription(listingId: bigint | null): SubscriptionState {
       args: [id] as const,
       chainId: CHAIN.id,
     })),
-    query: { enabled: enabled && ids.length > 0 },
+    query: { enabled: enabled && ids.length > 0, refetchInterval: 30_000 },
   });
 
   const refetch = () => {

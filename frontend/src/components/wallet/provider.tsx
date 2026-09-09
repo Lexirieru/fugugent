@@ -21,10 +21,15 @@
  * and we get nobody's address leaking into somebody else's page, plus
  * deterministic server HTML, so there is no hydration mismatch either.
  *
- * With no project id, this provider passes `children` straight through, no
- * `WagmiProvider`, no modal, no button. Components that need a wallet check
- * `walletEnabled` before calling any wagmi hook, so no hook is ever called outside
- * its provider.
+ * With no project id there is no `WagmiProvider`, no modal and no button.
+ * Components that need a wallet check `walletEnabled` before calling any wagmi
+ * hook, so no hook is ever called outside its provider.
+ *
+ * **`QueryClientProvider` is mounted either way.** It used to sit inside the wallet
+ * branch, which meant a build without Reown credentials had no query client at all
+ * and any TanStack Query in the tree threw. The two are separate concerns: wagmi
+ * happens to be built on TanStack Query, but the catalogue freshness poll is not a
+ * wallet feature and has to work in a build with no wallet.
  */
 
 import { createAppKit } from "@reown/appkit/react";
@@ -65,13 +70,24 @@ if (wagmiAdapter) {
 export function WalletProvider({ children }: { children: ReactNode }) {
   // One QueryClient per app mount, created through `useState` rather than at module
   // level: a module-level client would be shared across requests on the server.
-  const [queryClient] = useState(() => new QueryClient());
-
-  if (!walletEnabled || !wagmiAdapter) return <>{children}</>;
-
-  return (
-    <WagmiProvider config={wagmiAdapter.wagmiConfig as Config}>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    </WagmiProvider>
+  //
+  // The defaults live here so no call site has to remember them. `staleTime` is
+  // deliberately short: everything this client fetches is either a chain read or a
+  // freshness check, and both are worth re-reading. Retries are capped at one,
+  // because a read that fails twice should surface as the honest failure state the
+  // components already draw rather than hide behind a spinner that keeps trying.
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: { staleTime: 10_000, retry: 1, refetchOnWindowFocus: true },
+        },
+      }),
   );
+
+  const withQuery = <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+
+  if (!walletEnabled || !wagmiAdapter) return withQuery;
+
+  return <WagmiProvider config={wagmiAdapter.wagmiConfig as Config}>{withQuery}</WagmiProvider>;
 }
