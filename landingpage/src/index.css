@@ -41,15 +41,15 @@
 
 html {
   background-color: var(--cream);
-  min-height: 100%;
-  overflow-x: hidden;
+  height: 100%;
+  overflow: hidden;
 }
 
 body {
   background-color: var(--cream);
-  min-height: 100%;
+  height: 100%;
   margin: 0;
-  overflow-x: hidden;
+  overflow: hidden;
   color: var(--ink);
   font-family: 'Geist:Medium', ui-sans-serif, system-ui, sans-serif;
   font-weight: 500;
@@ -59,20 +59,39 @@ body {
 
 #root {
   background-color: var(--cream);
-  min-height: 100%;
+  height: 100%;
 }
 
 .page {
   background-color: var(--cream);
-  min-height: 100svh;
-  overflow-x: hidden;
+  /*
+   * The stage. The video fills it as an absolutely positioned background layer and
+   * the header and hero float on top, which is the only arrangement that fits the
+   * whole composition in one screen — see the note on .media-placeholder.
+   */
+  position: relative;
+  height: 100svh;
+  overflow: hidden;
+}
+
+/*
+ * `main` sits between `.page` and the video, so it has to pass the leftover height
+ * through instead of absorbing it. Without this the video keeps its own 16:9 height,
+ * overflows, and `.page`'s `overflow: hidden` quietly clips the bottom of the frame —
+ * which is exactly the wing you want to see.
+ */
+/* The header and hero float above the video; only the video itself is in the back layer. */
+.site-header,
+.page > main {
+  position: relative;
+  z-index: 1;
 }
 
 /* ── Header ─────────────────────────────────────────────────────── */
 
 .site-header {
-  width: min(1200px, calc(100% - 48px));
-  height: 64px;
+  width: min(75vw, calc(100% - 48px));
+  height: clamp(64px, 4vw, 84px);
   margin: 15px auto 0;
   display: flex;
   justify-content: space-between;
@@ -94,7 +113,7 @@ body {
 
 .logo-word {
   font-family: 'Geist:Medium', ui-sans-serif, system-ui, sans-serif;
-  font-size: 20px;
+  font-size: clamp(20px, 1.25vw, 26px);
   font-weight: 500;
   color: var(--ink);
   text-decoration: none;
@@ -103,18 +122,12 @@ body {
 
 /* Logo mark: 12 CSS dots on a 22 × 22 modular grid */
 .logo-mark {
-  position: relative;
   width: 22px;
   height: 22px;
   flex: none;
-}
-
-.logo-mark i {
-  position: absolute;
-  width: 4.35px;
-  height: 4.35px;
-  border-radius: 50%;
-  background-color: var(--accent);
+  display: block;
+  /* The asset is a rounded black square; keep its own corners rather than clipping. */
+  object-fit: contain;
 }
 
 /* ── Download button ────────────────────────────────────────────── */
@@ -129,7 +142,7 @@ body {
   border: none;
   color: #fff;
   font-family: 'Geist:SemiBold', ui-sans-serif, system-ui, sans-serif;
-  font-size: 14px;
+  font-size: clamp(14px, 0.875vw, 18px);
   font-weight: 600;
   line-height: 1;
   cursor: pointer;
@@ -166,19 +179,19 @@ body {
 
 .hero {
   position: relative;
-  width: min(1200px, calc(100% - 48px));
-  min-height: 266px;
+  width: min(75vw, calc(100% - 48px));
+  min-height: clamp(266px, 16.6vw, 350px);
   margin: 34px auto 0;
 }
 
 .hero-left {
-  width: 651px;
+  width: min(40.7vw, 100%);
   padding-top: 20px;
 }
 
 .hero-eyebrow {
   font-family: 'Kalam:Bold', cursive;
-  font-size: 16px;
+  font-size: clamp(16px, 1vw, 21px);
   font-weight: 700;
   color: var(--accent);
   letter-spacing: -0.352px;
@@ -190,7 +203,7 @@ body {
   font-family: 'Geist:SemiBold', ui-sans-serif, system-ui, sans-serif;
   color: var(--ink);
   max-width: 483px;
-  font-size: 40px;
+  font-size: clamp(40px, 2.5vw, 52px);
   font-weight: 600;
   letter-spacing: -2px;
   line-height: 1.1;
@@ -200,12 +213,12 @@ body {
 .hero-desc {
   position: absolute;
   right: 0;
-  top: 184px;
-  width: 394px;
+  top: clamp(184px, 11.5vw, 242px);
+  width: min(24.6vw, 512px);
   margin: 0;
   font-family: 'Geist:Medium', ui-sans-serif, system-ui, sans-serif;
   color: var(--muted);
-  font-size: 16px;
+  font-size: clamp(16px, 1vw, 21px);
   font-weight: 500;
   letter-spacing: -0.1068px;
   line-height: 1.4;
@@ -216,7 +229,21 @@ body {
 .media-placeholder {
   display: block;
   width: 100%;
-  height: auto;
+  /*
+   * Fills the whole viewport, with the header and hero floating over it.
+   *
+   * Stacking them is what makes the arithmetic work. Laid out one after the other, a
+   * 16:9 video at full width leaves the hero about 20 px on a 2000 px window — nothing
+   * fits. Overlaid, the video gets the entire screen and is cropped by roughly 2%
+   * instead of 34%, so the clouds along the top and the wing at the bottom are both
+   * visible at once. The upper-left of the frame is empty sky, which is exactly where
+   * the headline sits.
+   */
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  object-fit: cover;
+  object-position: center bottom;
   margin: 0;
   padding: 0;
   border: 0;
@@ -290,5 +317,41 @@ body {
 
   .hero-desc {
     top: 300px;
+  }
+}
+
+/* ── Short viewports: scrolling beats clipping ──────────────────── */
+
+/*
+ * Fitting everything in one screen is the intent, not a promise worth breaking
+ * the page for. Below roughly the height the header and hero actually need, a
+ * fixed 100svh page with `overflow: hidden` would cut the headline off — the one
+ * thing a visitor must be able to read. There, the page goes back to normal flow:
+ * the video returns to its own aspect ratio and the reader scrolls.
+ */
+@media (max-height: 620px) {
+  html,
+  body {
+    height: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  #root {
+    height: auto;
+  }
+
+  .page {
+    position: static;
+    height: auto;
+    min-height: 100svh;
+    overflow: visible;
+  }
+
+  .media-placeholder {
+    position: static;
+    inset: auto;
+    height: auto;
+    object-fit: fill;
   }
 }

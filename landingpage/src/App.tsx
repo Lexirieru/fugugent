@@ -1,32 +1,14 @@
-const MARK_DOTS: Array<{ left: number; top: number }> = [
-  // left column
-  { left: 0, top: 0 },
-  { left: 0, top: 5.88 },
-  { left: 0, top: 11.77 },
-  { left: 0, top: 17.65 },
-  // right column
-  { left: 17.65, top: 0 },
-  { left: 17.65, top: 5.88 },
-  { left: 17.65, top: 11.77 },
-  { left: 17.65, top: 17.65 },
-  // two inset dots near the top
-  { left: 5.88, top: 5.88 },
-  { left: 11.77, top: 5.88 },
-  // central dots toward the lower part
-  { left: 5.88, top: 11.77 },
-  { left: 11.77, top: 11.77 },
-];
-
 function LogoMark() {
   return (
-    <span className="logo-mark" aria-hidden="true">
-      {MARK_DOTS.map((dot) => (
-        <i
-          key={`${dot.left}-${dot.top}`}
-          style={{ left: `${dot.left}px`, top: `${dot.top}px` }}
-        />
-      ))}
-    </span>
+    <img
+      className="logo-mark"
+      src="/logos/hellofugu-logo.webp"
+      alt=""
+      aria-hidden="true"
+      width={22}
+      height={22}
+      decoding="async"
+    />
   );
 }
 
@@ -47,7 +29,7 @@ function AppleIcon() {
 
 function DownloadButton() {
   return (
-    <button type="button" className="download-btn" aria-label="Download Metricra">
+    <button type="button" className="download-btn" aria-label="Download HelloFugu">
       <AppleIcon />
       <span className="download-btn-label">Download</span>
     </button>
@@ -57,10 +39,28 @@ function DownloadButton() {
 export default function App() {
   return (
     <div className="page" id="top">
+      {/* Background layer. It sits outside <main> on purpose: as a child of <main> an
+          absolutely positioned video anchors to <main>, which is only as tall as the
+          hero, so it collapses into a band and paints over the headline. */}
+      <video
+        className="media-placeholder"
+        aria-label="HelloFugu product preview"
+        autoPlay
+        loop
+        muted
+        playsInline
+        preload="metadata"
+      >
+        <source
+          src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260801_022931_e13cbef4-690a-42d2-b5ee-5b3b1f483c83.mp4"
+          type="video/mp4"
+        />
+      </video>
+
       <header className="site-header">
-        <a className="logo" href="#top" aria-label="Metricra home">
+        <a className="logo" href="#top" aria-label="HelloFugu home">
           <LogoMark />
-          <span className="logo-word">Metricra</span>
+          <span className="logo-word">HelloFugu</span>
         </a>
         <DownloadButton />
       </header>
@@ -79,21 +79,6 @@ export default function App() {
             specific problem professionally.
           </p>
         </section>
-
-        <video
-          className="media-placeholder"
-          aria-label="Metricra product preview"
-          autoPlay
-          loop
-          muted
-          playsInline
-          preload="metadata"
-        >
-          <source
-            src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260801_022931_e13cbef4-690a-42d2-b5ee-5b3b1f483c83.mp4"
-            type="video/mp4"
-          />
-        </video>
       </main>
     </div>
   );
