@@ -119,7 +119,7 @@ export function buildServer(env: NodeJS.ProcessEnv = process.env): BuiltServer {
 
   const handle = dbHandle;
   return {
-    app: createApp({ service, skills }),
+    app: createApp({ service, skills, allowedOrigins: config.allowedOrigins }),
     config,
     hasCache: handle !== null,
     close: async (): Promise<void> => {

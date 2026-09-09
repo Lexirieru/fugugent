@@ -28,6 +28,29 @@ export const CONTRACT_ADDRESSES = {
 } as const;
 
 /** Requests-per-minute tier without an API key. Rises automatically once a key is set. */
+/**
+ * Browser origins allowed to read this API cross-site.
+ *
+ * What this does and does not buy, said plainly: CORS is enforced by browsers,
+ * so it stops another website's page from reading this API with a visitor's
+ * browser. It stops nothing else. `curl`, a script, or any non-browser client
+ * ignores it entirely, and it is not an authentication check. The reason to
+ * narrow it from `*` anyway is `POST /api/skills`, the one route that writes:
+ * with a wildcard, any page anyone visits could register a skill on their
+ * behalf.
+ *
+ * Localhost is on the list because the marketplace is developed against a
+ * backend running here. That is a development convenience with a real cost, so
+ * it is written down rather than left implicit: a page served from localhost on
+ * a developer's machine can read this API.
+ */
+export const DEFAULT_ALLOWED_ORIGINS = [
+  "https://hellofugu.xyz",
+  "https://www.hellofugu.xyz",
+  "https://app.hellofugu.xyz",
+  "http://localhost:3000",
+] as const;
+
 export const ANONYMOUS_RATE_LIMIT_PER_MINUTE = 30;
 export const AUTHENTICATED_RATE_LIMIT_PER_MINUTE = 120;
 
@@ -43,6 +66,8 @@ export interface UpstreamSourceConfig {
 export interface FugugentConfig {
   chainId: number;
   rpcUrl: string;
+  /** See `DEFAULT_ALLOWED_ORIGINS`. Never empty: an empty list would allow nothing. */
+  allowedOrigins: readonly string[];
   contracts: ContractAddresses;
   scan8004: UpstreamSourceConfig;
   dgrid: UpstreamSourceConfig;
@@ -75,6 +100,23 @@ function buildUpstreamConfig(baseUrl: string, apiKey: string | undefined): Upstr
 }
 
 /**
+ * Splits `ALLOWED_ORIGINS` on commas.
+ *
+ * A value that is set but contains no usable entry falls back to the defaults
+ * rather than to an empty list. An empty list allows no origin at all, which
+ * would take the marketplace down; a typo in a deploy variable should not be
+ * able to do that silently.
+ */
+export function parseAllowedOrigins(raw: string | undefined): readonly string[] {
+  if (raw === undefined) return DEFAULT_ALLOWED_ORIGINS;
+  const parsed = raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+  return parsed.length > 0 ? parsed : DEFAULT_ALLOWED_ORIGINS;
+}
+
+/**
  * Loads the configuration from the environment (`process.env` by default).
  * Never throws — every value has a safe testnet default.
  */
@@ -82,6 +124,7 @@ export function loadConfig(env: EnvLike = process.env): FugugentConfig {
   return {
     chainId: CHAIN_ID,
     rpcUrl: readEnv(env, "RPC_URL") ?? DEFAULT_RPC_URL,
+    allowedOrigins: parseAllowedOrigins(readEnv(env, "ALLOWED_ORIGINS")),
     contracts: CONTRACT_ADDRESSES,
     scan8004: buildUpstreamConfig(
       readEnv(env, "SCAN8004_BASE_URL") ?? DEFAULT_SCAN8004_BASE_URL,

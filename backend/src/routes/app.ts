@@ -8,6 +8,7 @@
  */
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { DEFAULT_ALLOWED_ORIGINS } from "../config.js";
 import { redact, type AgentService } from "../service/agents.js";
 import type { SkillService } from "../skills/service.js";
 import { createAgentRoutes } from "./agents.js";
@@ -16,6 +17,12 @@ import { createSkillRoutes } from "./skills.js";
 
 export interface ApiDeps {
   service: AgentService;
+  /**
+   * Browser origins allowed to read this API cross-site. Defaults to
+   * `DEFAULT_ALLOWED_ORIGINS`, so a caller that forgets to pass it gets the
+   * production list rather than a wildcard.
+   */
+  allowedOrigins?: readonly string[];
   /**
    * The audited-skill marketplace. **Optional**: an instance without it serves
    * the agent routes exactly as before, and `/api/skills` answers 404 like any
@@ -31,10 +38,36 @@ export interface ApiDeps {
 export function createApp(deps: ApiDeps): Hono {
   const app = new Hono();
 
-  // The marketplace is served from another domain (`app.hellofugu.xyz` → `api.hellofugu.xyz`).
-  // `POST` is allowed for exactly one route — `POST /api/skills`, which registers
-  // a skill for audit. Every other endpoint is still read-only.
-  app.use("/api/*", cors({ origin: "*", allowMethods: ["GET", "POST", "OPTIONS"] }));
+  // The marketplace is served from another domain (`app.hellofugu.xyz` calling
+  // `api.hellofugu.xyz`), so it needs CORS at all. `POST` is allowed for exactly
+  // one route, `POST /api/skills`, which registers a skill for audit. Every other
+  // endpoint is read-only.
+  //
+  // The list is an allowlist rather than `*`. What that is worth is written at
+  // `DEFAULT_ALLOWED_ORIGINS` in config.ts, including what it does not protect.
+  //
+  // Hono's `origin` callback returns the origin to echo back, or `undefined` to
+  // send no `Access-Control-Allow-Origin` header at all. Returning `undefined`
+  // is what makes the browser refuse the response; returning the request's own
+  // origin unconditionally would be a wildcard wearing a disguise.
+  const allowed = new Set(deps.allowedOrigins ?? DEFAULT_ALLOWED_ORIGINS);
+  app.use(
+    "/api/*",
+    cors({
+      origin: (origin) => (allowed.has(origin) ? origin : undefined),
+      allowMethods: ["GET", "POST", "OPTIONS"],
+      // Without this, a proxy or CDN could hand a response cached for one
+      // allowed origin to a page on another.
+      credentials: false,
+    }),
+  );
+  app.use("/api/*", async (c, next) => {
+    await next();
+    // The response body is identical for every origin, but the
+    // `Access-Control-Allow-Origin` header is not. Anything caching by URL alone
+    // would serve one origin's header to another.
+    c.header("Vary", "Origin", { append: true });
+  });
 
   app.route("/api", createAgentRoutes(deps));
   app.route("/api", createHealthRoutes(deps));

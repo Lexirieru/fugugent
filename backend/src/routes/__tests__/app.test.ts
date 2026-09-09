@@ -55,3 +55,58 @@ describe("app.onError", () => {
     expect(body.message).toContain("an ordinary failure");
   });
 });
+
+/**
+ * The CORS allowlist.
+ *
+ * These tests exist because the previous value was `origin: "*"`, which reads as
+ * harmless on a read-only API and is not: `POST /api/skills` writes, and with a
+ * wildcard any page a visitor happens to open could register a skill using their
+ * browser. The tests below fail if the allowlist is widened back to a wildcard,
+ * or if the callback is changed to echo whatever origin asked.
+ */
+describe("CORS allowlist", () => {
+  const ALLOWED = ["https://app.hellofugu.xyz"] as const;
+
+  function app() {
+    return createApp({ service: fakeService(), allowedOrigins: ALLOWED });
+  }
+
+  it("echoes an allowed origin back", async () => {
+    const res = await app().request("http://api.test/api/agents", {
+      headers: { Origin: "https://app.hellofugu.xyz" },
+    });
+
+    expect(res.headers.get("access-control-allow-origin")).toBe("https://app.hellofugu.xyz");
+  });
+
+  it("sends no allow-origin header for an origin that is not on the list", async () => {
+    const res = await app().request("http://api.test/api/agents", {
+      headers: { Origin: "https://not-ours.example" },
+    });
+
+    // Not a 403: the request itself is fine, and the API answers it. What stops
+    // the other page reading the answer is the missing header.
+    expect(res.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
+  it("refuses the preflight for a POST from an origin that is not on the list", async () => {
+    const res = await app().request("http://api.test/api/skills", {
+      method: "OPTIONS",
+      headers: {
+        Origin: "https://not-ours.example",
+        "Access-Control-Request-Method": "POST",
+      },
+    });
+
+    expect(res.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
+  it("varies on Origin, so a cache cannot serve one origin's header to another", async () => {
+    const res = await app().request("http://api.test/api/agents", {
+      headers: { Origin: "https://app.hellofugu.xyz" },
+    });
+
+    expect(res.headers.get("vary") ?? "").toContain("Origin");
+  });
+});
