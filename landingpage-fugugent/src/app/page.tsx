@@ -162,12 +162,20 @@ function HeroStat({
 
 /* ------------------------------------------------------ how to read a fugu */
 
+/*
+ * Two scales, two questions. `state` is the puff level — how puffed the fish is, and
+ * therefore how risky the position is. `name` is the action identifier taken verbatim
+ * from the decision engine (decide.ts), so it cannot imply an action the code does not
+ * have. Rendering them in different registers — prose for the state, a code token for
+ * the action — is what keeps a reader from mistaking one for the other; two prose
+ * scales cannot be told apart by careful word choice alone.
+ */
 const SCALE = [
-  { puff: 0, band: "HF > 1.50", name: "Calm", note: "Agent watches. Spends nothing." },
-  { puff: 0.34, band: "1.20 – 1.50", name: "Watching", note: "Explains itself, touches nothing." },
-  { puff: 0.62, band: "1.10 – 1.20", name: "Repaying", note: "Repays back up to 1.50. No further." },
-  { puff: 0.86, band: "1.00 – 1.10", name: "Deleveraging", note: "Collateral has to come down." },
-  { puff: 1, band: "≤ 1.00", name: "Liquidatable", note: "Past the point an agent can save." },
+  { puff: 0, band: "HF > 1.50", state: "Calm", name: "NONE", note: "Agent watches. Spends nothing." },
+  { puff: 0.34, band: "1.20 – 1.50", state: "Watchful", name: "WARN", note: "Explains itself, touches nothing." },
+  { puff: 0.62, band: "1.10 – 1.20", state: "Strained", name: "PARTIAL_REPAY", note: "Repays back up to 1.50. No further." },
+  { puff: 0.86, band: "1.00 – 1.10", state: "Critical", name: "DELEVERAGE", note: "Collateral has to come down." },
+  { puff: 1, band: "≤ 1.00", state: "Emergency", name: "EMERGENCY", note: "Past the point an agent can save." },
 ];
 
 const PUFF_METRICS = [
@@ -198,7 +206,8 @@ function HowToRead() {
           >
             <Fugu puff={s.puff} className="h-20 w-20" animated={false} />
             <span className="mt-3 font-mono text-[11px] tabular-nums text-faint">{s.band}</span>
-            <span className="mt-1 text-sm font-medium">{s.name}</span>
+            <span className="mt-1 text-sm font-medium">{s.state}</span>
+            <span className="mt-0.5 font-mono text-[11px] tracking-wide text-faint">{s.name}</span>
             <span className="mt-1 text-xs leading-snug text-muted">{s.note}</span>
           </li>
         ))}

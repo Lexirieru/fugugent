@@ -153,6 +153,24 @@ the safest state look like data that failed to load.
 many people that sentence is more actionable than "HF 1.18", and the code already computes it.
 On a 48 px card only the HF number fits; the percentage appears on hover and on the detail page.
 
+**Two scales, two registers — a rendering rule, not a preference.** The puff level and the
+`Action` are different answers to different questions: *how dangerous is this position right
+now* versus *what will the agent do about it*. Both matter before someone pays, and neither
+can stand in for the other.
+
+They must never be rendered as two prose labels side by side. When we tried that, the scales
+read as "Watchful" and "Watching" — two words nobody can tell apart, meaning two different
+things. No amount of careful word choice fixes that; the failure is structural.
+
+The rule: **the puff level is prose, the action is a code token.** The level appears as a
+title-case name in a rounded pill next to the fugu. The action appears as the identifier
+copied verbatim from `decide.ts` — `NONE`, `WARN`, `PARTIAL_REPAY`, `DELEVERAGE`,
+`EMERGENCY` — in uppercase monospace, in a square-cornered box, with no fugu beside it.
+Verbatim identifiers carry a second benefit: the UI cannot name an action the code does not
+have.
+
+Label each scale with the question it answers rather than trusting the reader to infer it.
+
 **Stale data state.** If the on-chain read fails or is older than 2× the poll interval, do not
 show any level at all. Show a **hollow fugu silhouette (outline only, no fill)** with the chip
 `stale data · last read 4m ago`. Guessing a level from old data is the most expensive lie in

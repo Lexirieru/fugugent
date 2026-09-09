@@ -28,31 +28,31 @@ const BANDS: Band[] = [
   {
     min: 150,
     action: "NONE",
-    headline: "Calm",
+    headline: "Watches, spends nothing",
     body: "Nothing to do. The agent watches and spends nothing.",
   },
   {
     min: 120,
     action: "WARN",
-    headline: "Watching",
+    headline: "Explains, touches nothing",
     body: "Close enough to explain itself, still far enough not to touch your money.",
   },
   {
     min: 110,
     action: "PARTIAL_REPAY",
-    headline: "Repaying",
+    headline: "Repays back to 1.50",
     body: "Repays just enough debt to bring the position back to 1.50 — not a wei more.",
   },
   {
     min: 100,
     action: "DELEVERAGE",
-    headline: "Deleveraging",
+    headline: "Also reduces collateral",
     body: "Repaying alone is no longer enough; collateral has to come down too.",
   },
   {
     min: 0,
     action: "EMERGENCY",
-    headline: "Liquidatable",
+    headline: "Past what an agent can save",
     body: "Below 1.00 the position can be liquidated by anyone. Past the point an agent can save.",
   },
 ];
@@ -107,7 +107,11 @@ export function PuffMeter() {
             <span className="text-xs uppercase tracking-[0.18em] text-faint">health factor</span>
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+          <p className="mt-3 text-xs font-medium uppercase tracking-wide text-faint">
+            What the agent does about it
+          </p>
+
+          <div className="mt-1 flex flex-wrap items-center gap-2">
             <span
               className="rounded-full px-2.5 py-1 font-mono text-[11px] tracking-wide"
               style={{ background: `color-mix(in srgb, ${tone} 18%, transparent)`, color: tone }}
