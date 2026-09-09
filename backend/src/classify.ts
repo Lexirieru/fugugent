@@ -361,6 +361,89 @@ const RULES: Readonly<Record<Category, readonly Rule[]>> = {
     { label: "borrow / debt", tier: "weak", pattern: /\bborrow\w*\b|\bdebts?\b/ },
     { label: "lending / loan", tier: "weak", pattern: /\blending\b|\bloans?\b/ },
   ],
+  /**
+   * HIRING is an agent that hires and pays OTHER AGENTS. The homonym is obvious
+   * and common: "hiring" in the recruiting sense, an agent that screens human
+   * candidates. Every decisive cue here therefore names an agent as the thing
+   * being hired or paid, never the act of hiring alone.
+   */
+  HIRING: [
+    { label: "hires/pays another agent", tier: "decisive", pattern: /\b(?:hir\w*|employ\w*|commission\w*|subcontract\w*|delegat\w*)\s+(?:other\s+|another\s+|third[\s-]party\s+)?(?:ai\s+)?agents?\b/ },
+    { label: "agent-to-agent hiring/marketplace", tier: "decisive", pattern: /\bagent[\s-]hiring\b|\bhiring\s+marketplace\s+for\s+agents?\b|\bmarketplace\s+(?:of|for)\s+(?:ai\s+)?agents?\b/ },
+    { label: "ERC-8183 buyer side", tier: "decisive", pattern: /\berc[\s-]?8183\b|\bhireerc8183agent\b/ },
+    { label: "[category:hiring] marker", tier: "decisive", pattern: /\[\s*category:\s*(?:hiring|broker)\s*\]/ },
+    { label: "escrowed payment to an agent", tier: "strong", pattern: /\bescrow\w*\s+(?:payment|funds?|the\s+fee)\b.{0,40}\bagents?\b|\bagents?\b.{0,40}\bescrow\w*\s+(?:payment|funds?)\b/ },
+    { label: "orchestrates a fleet of agents", tier: "strong", pattern: /\borchestrat\w*\s+(?:a\s+)?(?:fleet|team|swarm|network)\s+of\s+agents?\b/ },
+    { label: "buyer side of an agent deal", tier: "weak", pattern: /\bbuyer[\s-]side\b|\bbuys?\s+(?:the\s+)?services?\s+of\b/ },
+  ],
+
+  /**
+   * COMMERCE is one agent buying inference or data from another, one call at a
+   * time, with neither side holding the other's keys. The homonym is
+   * e-commerce: a shopping assistant that buys goods for a person. The decisive
+   * cues are therefore the per-call payment protocols, not the word "commerce".
+   */
+  COMMERCE: [
+    { label: "x402 / b402 payment", tier: "decisive", pattern: /\b[xb]402\b|\bhttp\s*402\b|\b402\s+payment\s+required\b/ },
+    { label: "pay per API/inference call", tier: "decisive", pattern: /\bpay(?:s|ment)?[\s-]per[\s-](?:call|request|query|token|inference)\b|\bper[\s-]call\s+(?:payment|billing|pricing)\b/ },
+    { label: "buys inference or data", tier: "decisive", pattern: /\bbuys?\s+(?:ai\s+)?(?:inference|compute|model\s+outputs?|data\s+feeds?)\b/ },
+    { label: "machine-to-machine payment", tier: "decisive", pattern: /\bmachine[\s-]to[\s-]machine\s+payments?\b|\bagent[\s-]to[\s-]agent\s+(?:commerce|payments?)\b/ },
+    { label: "[category:commerce] marker", tier: "decisive", pattern: /\[\s*category:\s*(?:commerce|a2a[\s-]?commerce)\s*\]/ },
+    { label: "monetised API for agents", tier: "strong", pattern: /\bmonetis\w*\s+(?:an?\s+)?api\b|\bsells?\s+(?:api\s+)?(?:access|inference|data)\s+to\s+agents?\b/ },
+    { label: "no shared custody of keys", tier: "weak", pattern: /\bneither\s+side\s+holds\b|\bwithout\s+(?:sharing|holding)\s+(?:private\s+)?keys\b/ },
+  ],
+
+  /**
+   * AUTONOMOUS is the category with the weakest natural boundary in this table,
+   * because "rebalances, lends, stakes, copy-trades" overlaps REBALANCING and
+   * YIELD word for word. What actually separates it is the CAP: an agent that
+   * acts on its own inside a limit it cannot exceed. So every decisive cue names
+   * the limit or the absence of a human, never the DeFi action, and the DeFi
+   * verbs sit at `weak` where they cannot carry a classification alone.
+   *
+   * Do not promote the `weak` rules here. A yield optimiser mentioning "stake"
+   * would then land in two categories at once, and the tie-break would decide
+   * the marketplace's shelf by coin flip.
+   */
+  AUTONOMOUS: [
+    { label: "spending cap it cannot exceed", tier: "decisive", pattern: /\bspend(?:ing)?\s+(?:cap|limit)s?\b|\bcannot\s+exceed\b.{0,30}\b(?:cap|limit|budget)\b|\bbudget\s+it\s+cannot\s+exceed\b/ },
+    { label: "acts without human approval", tier: "decisive", pattern: /\bwithout\s+(?:a\s+)?human\s+(?:approval|in\s+the\s+loop|intervention|sign[\s-]?off)\b|\bno\s+human\s+approves?\b/ },
+    { label: "copy trading", tier: "decisive", pattern: /\bcopy[\s-]trad\w*\b|\bmirror\s+trad\w*\b/ },
+    { label: "[category:autonomous] marker", tier: "decisive", pattern: /\[\s*category:\s*autonom\w*\s*\]/ },
+    { label: "autonomous DeFi agent", tier: "strong", pattern: /\bautonomous\w*\s+(?:defi|trading|treasury|portfolio)\b|\bfully\s+autonomous\s+agent\b/ },
+    { label: "session permissions bounded on chain", tier: "strong", pattern: /\bbounded\s+(?:session|permissions?|authority)\b|\ballowlist\w*\s+(?:of\s+)?(?:calls?|contracts?|functions?)\b/ },
+    { label: "lends / stakes / swaps", tier: "weak", pattern: /\blends?\b|\bstak(?:e|es|ing)\b|\bswaps?\b/ },
+  ],
+
+  /**
+   * STREAMING is payment by the second, the call or the unit, continuously. The
+   * homonym is the loud one: video and music streaming. Every decisive cue names
+   * money, and the bare word "stream" is not a rule at all.
+   */
+  STREAMING: [
+    { label: "streaming/continuous payment", tier: "decisive", pattern: /\b(?:payment|money|salary|token)\s+streams?\b|\bstream(?:s|ing|ed)?\s+(?:payments?|funds?|money|tokens?|value)\b/ },
+    { label: "per-second / per-unit billing", tier: "decisive", pattern: /\bper[\s-]second\s+(?:billing|payment|pricing)\b|\bmeter(?:ed|ing)\s+billing\b|\bpay[\s-]as[\s-]you[\s-]go\s+(?:billing|payments?)\b/ },
+    { label: "micropayment", tier: "decisive", pattern: /\bmicro[\s-]?payments?\b|\bmicro[\s-]?transactions?\b/ },
+    { label: "[category:streaming] marker", tier: "decisive", pattern: /\[\s*category:\s*(?:streaming|micropayments?)\s*\]/ },
+    { label: "streaming-payment protocol", tier: "strong", pattern: /\bsablier\b|\bsuperfluid\b|\bllamapay\b/ },
+    { label: "session key with an expiry", tier: "weak", pattern: /\bexpir\w*\s+session\b|\bsession\s+keys?\s+with\s+(?:an?\s+)?expiry\b/ },
+  ],
+
+  /**
+   * TREASURY is recurring outgoing payments on a schedule: payroll,
+   * subscriptions, vesting. The near-miss to guard against is a DAO treasury
+   * ANALYTICS agent, which reports on a treasury and never pays anyone. Reporting
+   * verbs are deliberately absent from this table.
+   */
+  TREASURY: [
+    { label: "payroll", tier: "decisive", pattern: /\bpayroll\b|\bpays?\s+salaries\b|\bcontributor\s+payments?\b/ },
+    { label: "recurring / scheduled payments", tier: "decisive", pattern: /\brecurring\s+payments?\b|\bscheduled\s+(?:payments?|transfers?|disbursements?)\b|\bstanding\s+orders?\b/ },
+    { label: "runs subscriptions on a schedule", tier: "decisive", pattern: /\bsubscriptions?\s+(?:on\s+a\s+schedule|billing\s+cycle)\b|\brenews?\s+subscriptions?\b/ },
+    { label: "[category:treasury] marker", tier: "decisive", pattern: /\[\s*category:\s*(?:treasury|payroll)\s*\]/ },
+    { label: "vesting / disbursement schedule", tier: "strong", pattern: /\bvesting\s+schedules?\b|\bdisburse\w*\s+on\s+a\s+schedule\b/ },
+    { label: "treasury operations", tier: "strong", pattern: /\btreasury\s+(?:operations?|management|execution)\b/ },
+    { label: "multiple scopes on one wallet", tier: "weak", pattern: /\bmultiple\s+agents?\s+(?:on|share)\s+(?:one|a\s+single)\s+wallet\b|\bdifferent\s+scopes?\b/ },
+  ],
 };
 
 /**

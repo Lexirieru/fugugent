@@ -100,7 +100,9 @@ describe("GET /api/agents", () => {
     expect(service.listCalls[0].opts).toMatchObject({ limit: 7, offset: 14 });
   });
 
-  it("with no category, it merges all four categories", async () => {
+  // Sized from CATEGORIES, so widening the catalogue moves this test rather than
+  // breaking it. One item per category in, one item per category out.
+  it("with no category, it merges every category", async () => {
     const service = fakeService({
       list: async (category) =>
         makePage({
@@ -111,7 +113,7 @@ describe("GET /api/agents", () => {
     const body = await json(await get(app, "/api/agents"));
 
     expect(service.listCalls.map((c) => c.category).sort()).toEqual([...CATEGORIES].sort());
-    expect(body.items).toHaveLength(4);
+    expect(body.items).toHaveLength(CATEGORIES.length);
     expect(body.category).toBeNull();
   });
 
@@ -122,7 +124,7 @@ describe("GET /api/agents", () => {
    * pagination from that number and then receives an empty `healthy: true` page.
    * Fails if `total` is turned back into a sum.
    */
-  it("the merged total is the reachable unique items, not the sum of the four totals", async () => {
+  it("the merged total is the reachable unique items, not the sum of every category's total", async () => {
     const app = createApp({
       service: fakeService({
         list: async (category) =>
@@ -137,8 +139,10 @@ describe("GET /api/agents", () => {
     });
     const body = await json(await get(app, "/api/agents?limit=100"));
 
-    expect(body.items).toHaveLength(8);
-    expect(body.total).toBe(8);
+    // Two per category. The point is that `total` is what a client can actually
+    // page to, not the 1000 each category claims.
+    expect(body.items).toHaveLength(CATEGORIES.length * 2);
+    expect(body.total).toBe(CATEGORIES.length * 2);
   });
 
   it("an item appearing in two categories is counted only once", async () => {
@@ -458,12 +462,13 @@ describe("onchainExecution — three states, and the third is not false", () => 
         i.onchainExecution,
       ]),
     );
-    expect(states).toEqual({
-      REBALANCING: false,
-      GRID: false,
-      YIELD: null,
-      HEALTH_FACTOR: true,
-    });
+    // Built from CATEGORIES for the same reason as above. The three states are what
+    // this test is about: false, true, and the null that must not collapse to false.
+    expect(states).toEqual(
+      Object.fromEntries(
+        CATEGORIES.map((c) => [c, c === "YIELD" ? null : c === "HEALTH_FACTOR"]),
+      ),
+    );
     // Every item states it, none leaves it to be inferred.
     for (const item of body.items) expect("onchainExecution" in item).toBe(true);
     for (const item of body.items) expect("listingMetadata" in item).toBe(true);
@@ -768,13 +773,13 @@ describe("GET /api/agents/:id", () => {
 });
 
 describe("GET /api/categories", () => {
-  it("reports counts for all four categories", async () => {
-    const counts: Record<string, number> = {
-      REBALANCING: 3,
-      GRID: 5,
-      YIELD: 0,
-      HEALTH_FACTOR: 2,
-    };
+  it("reports a count for every category, in the catalogue's own order", async () => {
+    // A distinct count per category so a row that silently borrows another row's
+    // number would show up. Zero is included on purpose: an empty category must
+    // still appear, or the marketplace loses a shelf whenever it happens to be empty.
+    const counts: Record<string, number> = Object.fromEntries(
+      CATEGORIES.map((c, i) => [c, i === 2 ? 0 : i + 1]),
+    );
     const app = createApp({
       service: fakeService({
         list: async (category) => makePage({ items: [], total: counts[category] }),
@@ -784,13 +789,10 @@ describe("GET /api/categories", () => {
 
     expect(res.status).toBe(200);
     const body = await json(res);
-    expect(body.categories).toEqual([
-      expect.objectContaining({ category: "REBALANCING", count: 3 }),
-      expect.objectContaining({ category: "GRID", count: 5 }),
-      expect.objectContaining({ category: "YIELD", count: 0 }),
-      expect.objectContaining({ category: "HEALTH_FACTOR", count: 2 }),
-    ]);
-    expect(body.total).toBe(10);
+    expect(body.categories).toEqual(
+      CATEGORIES.map((c) => expect.objectContaining({ category: c, count: counts[c] })),
+    );
+    expect(body.total).toBe(Object.values(counts).reduce((a, b) => a + b, 0));
   });
 
   it("each row carries its own source and ageSeconds", async () => {
@@ -806,7 +808,7 @@ describe("GET /api/categories", () => {
     expect(body.degraded).toBe(true);
   });
 
-  it("one failing category does not erase the other three", async () => {
+  it("one failing category does not erase the others", async () => {
     const app = createApp({
       service: fakeService({
         list: async (category) => {
@@ -819,12 +821,14 @@ describe("GET /api/categories", () => {
 
     expect(res.status).toBe(200);
     const body = await json(res);
-    expect(body.categories).toHaveLength(4);
+    expect(body.categories).toHaveLength(CATEGORIES.length);
     expect(body.categories.find((c: { category: string }) => c.category === "YIELD")).toMatchObject(
       { count: 0, healthy: false },
     );
     expect(body.healthy).toBe(false);
-    expect(body.total).toBe(3);
+    // Every category answers 1 except the one that threw, which contributes nothing
+    // rather than being guessed at.
+    expect(body.total).toBe(CATEGORIES.length - 1);
   });
 });
 

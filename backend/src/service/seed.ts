@@ -84,8 +84,16 @@ interface SeedSpec {
 }
 
 /**
- * The four Fugugent agents. Their category, protocols, and wallet are copied
- * from `ai/CLAUDE.md` and `ai/<agent>/app/agent/studio.toml` — not invented.
+ * The nine HelloFugu agents, one per category. Their category, protocols, and
+ * wallet are copied from `ai/CLAUDE.md`, `ai/<agent>/app/agent/studio.toml` and
+ * `docs/setup/ENVIRONMENT.md` §G3 — not invented.
+ *
+ * The last five have no runtime yet. Their descriptions say so in the first
+ * sentence, because this list is the fallback shown when nothing upstream
+ * answers, and a fallback that quietly promises five agents that cannot run
+ * would be the exact failure this project exists to avoid. Their wallets are
+ * real and already fixed on chain: `agentWallet` cannot be changed after
+ * `list()`, so these addresses are the ones the listings will always point at.
  */
 const SEED_SPECS: readonly SeedSpec[] = [
   {
@@ -132,6 +140,61 @@ const SEED_SPECS: readonly SeedSpec[] = [
       "the liquidation threshold. Executes through a bounded Altana session key with an explicit call allowlist.",
     tags: ["health-factor", "liquidation-protection", "venus", "aave"],
     agentWallet: "0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0",
+  },
+  {
+    slug: "fugubroker",
+    name: "FuguBroker",
+    category: "HIRING",
+    description:
+      "Not built yet. The plan is an agent that hires other agents and pays them: it reads the listing " +
+      "catalogue, picks one by deterministic rules, and holds the fee until the work is delivered. " +
+      "The listing and the wallet exist on chain; the runtime does not.",
+    tags: ["agent-hiring", "erc-8183", "escrow"],
+    agentWallet: "0x1E77279cf18Da89EEF1477F010D2e6B1E2A1E2c3",
+  },
+  {
+    slug: "fugutrader",
+    name: "FuguTrader",
+    category: "COMMERCE",
+    description:
+      "Not built yet. The plan is an agent that buys inference or data one call at a time and settles " +
+      "each call on chain, so neither side ever holds the other's keys. " +
+      "The listing and the wallet exist on chain; the runtime does not.",
+    tags: ["agent-to-agent-commerce", "x402", "pay-per-call"],
+    agentWallet: "0x1B82F72346a8553a968fafD6AC07A21d4A88589f",
+  },
+  {
+    slug: "fugupilot",
+    name: "FuguPilot",
+    category: "AUTONOMOUS",
+    description:
+      "Not built yet. The plan is an agent that trades, lends and stakes on its own inside a spending " +
+      "limit the chain enforces, so it cannot exceed the cap even if its own code is wrong. " +
+      "The listing and the wallet exist on chain; the runtime does not.",
+    tags: ["autonomous-defi", "spending-cap", "copy-trading"],
+    agentWallet: "0x79AFD7B81a1D7CA57270d53Cf9FC315Cd5698c8D",
+  },
+  {
+    slug: "fugumeter",
+    name: "FuguMeter",
+    category: "STREAMING",
+    description:
+      "Not built yet. The plan is an agent that pays by the call, by the second or by the unit, with no " +
+      "person approving each payment, through a permission that expires on its own. " +
+      "The listing and the wallet exist on chain; the runtime does not.",
+    tags: ["micropayments", "metered-billing", "expiring-permission"],
+    agentWallet: "0x95c3c77e3B7d3873BcF6b9F4b12f47775e7312c8",
+  },
+  {
+    slug: "fugusteward",
+    name: "FuguSteward",
+    category: "TREASURY",
+    description:
+      "Not built yet. The plan is an agent that runs payroll, recurring transfers and subscription " +
+      "renewals on a schedule, with several agents sharing one wallet under different scopes. " +
+      "The listing and the wallet exist on chain; the runtime does not.",
+    tags: ["payroll", "recurring-payments", "scoped-permissions"],
+    agentWallet: "0xB92Dd50E84560E719627AcE28b32060dbF0E7083",
   },
 ] as const;
 

@@ -6,14 +6,14 @@
 # Each job checks that the number of PASSING tests is at least the recorded
 # baseline:
 #
-#     contracts       150   forge test
-#     backend         484   vitest (plus 1 deliberately skipped)
+#     contracts       200   forge test
+#     backend         659   vitest (plus 1 deliberately skipped)
 #     fuguguardian    285   vitest
 #     fugurebalancer  130   vitest
 #     fugugrid        144   vitest
 #     fuguyield       141   vitest
 #                   -----
-#                    1334
+#                    1559
 #
 # A green suite is not by itself evidence that the suite ran. A `describe` block
 # accidentally renamed to `describe.skip`, a glob that stops matching after a file
@@ -67,7 +67,7 @@ env:
 
 jobs:
   contracts:
-    name: contracts (forge test, baseline 150)
+    name: contracts (forge test, baseline 200)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -104,7 +104,7 @@ jobs:
         working-directory: contracts
         run: |
           set -euo pipefail
-          baseline=150
+          baseline=200
           # "Ran 10 test suites ...: 150 tests passed, 0 failed, 0 skipped (150 total tests)"
           actual=$(grep -oE '[0-9]+ tests passed' forge-test.log | tail -1 | grep -oE '[0-9]+')
           echo "forge: $actual passed, baseline $baseline"
@@ -114,7 +114,7 @@ jobs:
           fi
 
   backend:
-    name: backend (vitest, baseline 484)
+    name: backend (vitest, baseline 659)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -161,7 +161,7 @@ jobs:
         working-directory: backend
         run: |
           set -uo pipefail
-          baseline=484
+          baseline=659
           # "Tests  484 passed | 1 skipped (485)" — the PASSED figure is the one
           # that matters; a test converted to `.skip` must show up as a loss.
           #
@@ -307,7 +307,7 @@ jobs:
               exit 1
             fi
           done
-          echo "all 1334 tests green"
+          echo "all 1559 tests green"
 
   # ── images ────────────────────────────────────────────────────────────────
   #

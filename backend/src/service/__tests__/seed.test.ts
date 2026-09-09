@@ -19,9 +19,13 @@ import {
 const NOW = new Date("2026-09-10T00:00:00.000Z");
 
 describe("the curated seed", () => {
-  it("holds our own four Fugugent agents, one per category", () => {
+  // Counted from CATEGORIES rather than written as a number, so widening the
+  // catalogue moves this test to the new size instead of breaking it. What is
+  // asserted is the invariant that matters: exactly one seed agent per category,
+  // no category missing and none served twice.
+  it("holds one of our own agents per category, and exactly one", () => {
     const items = seedAgents(NOW);
-    expect(items).toHaveLength(4);
+    expect(items).toHaveLength(CATEGORIES.length);
 
     const byCategory = new Map<Category, string>();
     for (const agent of items) {
@@ -29,20 +33,57 @@ describe("the curated seed", () => {
       expect(category).not.toBeNull();
       byCategory.set(category as Category, agent.name);
     }
+    expect(byCategory.size).toBe(items.length);
     expect([...byCategory.keys()].sort()).toEqual([...CATEGORIES].sort());
     expect([...byCategory.values()].sort()).toEqual(
-      ["FuguGrid", "FuguGuardian", "FuguRebalancer", "FuguYield"].sort(),
+      [
+        "FuguBroker",
+        "FuguGrid",
+        "FuguGuardian",
+        "FuguMeter",
+        "FuguPilot",
+        "FuguRebalancer",
+        "FuguSteward",
+        "FuguTrader",
+        "FuguYield",
+      ].sort(),
     );
+  });
+
+  // The five newest agents have no runtime. This list is what the marketplace
+  // falls back to when nothing upstream answers, so a fallback that presented
+  // them as working would be the failure the whole project is about.
+  it("says so, first, on every agent that has no runtime yet", () => {
+    const items = seedAgents(NOW);
+    const notBuilt = ["FuguBroker", "FuguTrader", "FuguPilot", "FuguMeter", "FuguSteward"];
+
+    for (const name of notBuilt) {
+      const agent = items.find((a) => a.name === name);
+      expect(agent, `${name} is missing from the seed`).toBeDefined();
+      expect(agent?.description.startsWith("Not built yet.")).toBe(true);
+    }
+    for (const agent of items.filter((a) => !notBuilt.includes(a.name))) {
+      expect(agent.description.startsWith("Not built yet.")).toBe(false);
+    }
   });
 
   it("uses the real Altana wallet from each agent's studio.toml", () => {
     const wallets = seedAgents(NOW).map((a) => a.agentWallet);
     expect(wallets.sort()).toEqual(
       [
+        // The four built agents, from each one's studio.toml.
         "0x15dE73F47Ca58a11A6Ef9dB24dfDc6F096b0a866",
         "0x2AA59d5cf540c8f1b1CE4C667C2e745475d4EAd9",
         "0xb8f155D1278f0437b9De7c63911f2C0EDa485941",
         "0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0",
+        // The five newest, from docs/setup/ENVIRONMENT.md §G3. Generated before
+        // their agents because `agentWallet` cannot be changed after `list()`,
+        // so a mismatch here would be permanent.
+        "0x1B82F72346a8553a968fafD6AC07A21d4A88589f",
+        "0x1E77279cf18Da89EEF1477F010D2e6B1E2A1E2c3",
+        "0x79AFD7B81a1D7CA57270d53Cf9FC315Cd5698c8D",
+        "0x95c3c77e3B7d3873BcF6b9F4b12f47775e7312c8",
+        "0xB92Dd50E84560E719627AcE28b32060dbF0E7083",
       ].sort(),
     );
   });

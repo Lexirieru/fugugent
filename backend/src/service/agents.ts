@@ -400,6 +400,16 @@ export const CATEGORY_SEMANTIC_QUERIES: Readonly<Record<Category, string>> = {
     "yield farming optimizer that routes capital to the best APY and auto-compounds rewards",
   HEALTH_FACTOR:
     "health factor monitor that protects lending positions from liquidation by repaying debt",
+  HIRING:
+    "agent that hires and pays other autonomous agents for work, holding the fee until the job is delivered",
+  COMMERCE:
+    "agent that buys inference or data from another agent one call at a time and settles each call on chain",
+  AUTONOMOUS:
+    "autonomous agent that trades, lends and stakes on its own inside a spending limit it cannot exceed",
+  STREAMING:
+    "agent that pays continuously by the second or by the unit, in micropayments, with no human approving each one",
+  TREASURY:
+    "agent that runs payroll, recurring transfers and subscription renewals on a fixed schedule",
 };
 
 /**

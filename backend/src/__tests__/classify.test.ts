@@ -1,5 +1,5 @@
 /**
- * Tests for the four-category classifier (Task 4).
+ * Tests for the classifier (Task 4).
  *
  * ## Where the examples come from
  *
@@ -20,6 +20,28 @@
  * | YIELD | an agricultural harvest agent | "yield" = a harvest, not a return |
  * | REBALANCING | `smart-money-yield-agent` | it says "Rebalances daily", but it is a YIELD agent |
  * | HEALTH_FACTOR | `yieldflow` | it mentions "liquidity", not "liquidation" |
+ *
+ * ## The five newest categories are different, and it matters
+ *
+ * HIRING, COMMERCE, AUTONOMOUS, STREAMING and TREASURY were added after that
+ * survey, and **their examples are not from production**. Nothing in the live
+ * corpus described an agent that hires another agent or streams a payment, so
+ * there was nothing to copy. Their examples are written here, which is a weaker
+ * kind of evidence than the four above and is said out loud rather than left to
+ * be assumed: passing them proves the rules do what they were written to do, not
+ * that they survive contact with real registrants.
+ *
+ * What is still worth something is the negatives. Every one of these five words
+ * has a loud homonym outside our domain, and each negative below is the homonym
+ * the rules were shaped to survive:
+ *
+ * | Category | Its negative | Why it is treacherous |
+ * |---|---|---|
+ * | HIRING | a recruiting agent | "hiring" that means employing people |
+ * | COMMERCE | a shopping assistant | "commerce" that means buying goods |
+ * | AUTONOMOUS | a yield optimiser | it also lends and stakes, but has no cap |
+ * | STREAMING | a video agent | "streaming" that means media |
+ * | TREASURY | a DAO treasury dashboard | it reports on a treasury, never pays |
  */
 
 import { describe, expect, it } from "vitest";
@@ -699,5 +721,189 @@ describe("classify — purity and the output contract", () => {
     const broken = { name: undefined, description: undefined, tags: undefined } as unknown as AgentRecord;
     expect(() => classify(broken)).not.toThrow();
     expect(classify(broken).category).toBeNull();
+  });
+});
+
+
+/**
+ * The five newest categories. See the note at the top of this file: these
+ * examples are written, not surveyed, and the negatives carry most of the value.
+ */
+describe("classify — HIRING", () => {
+  it("recognizes an agent that hires and pays other agents", () => {
+    const result = classify(
+      agent({
+        name: "Broker",
+        description:
+          "Hires other agents to do work and holds the fee until the job is delivered. Reads the " +
+          "listing catalogue, picks one by deterministic rules, and settles on chain.",
+      }),
+    );
+    expect(result.category).toBe("HIRING");
+    expect(result.confidence).toBeGreaterThanOrEqual(0.55);
+  });
+
+  it("recognizes the ERC-8183 buyer side by name", () => {
+    const result = classify(
+      agent({
+        name: "hireErc8183Agent runner",
+        description: "Buyer side of ERC-8183: commissions an agent and releases the fee on delivery.",
+      }),
+    );
+    expect(result.category).toBe("HIRING");
+  });
+
+  it("NEGATIVE: a recruiting agent that hires PEOPLE is not HIRING", () => {
+    const result = classify(
+      agent({
+        name: "TalentScout",
+        description:
+          "Screens candidates, schedules interviews and speeds up hiring for engineering teams. " +
+          "Ranks applicants against the job description and writes the offer letter.",
+      }),
+    );
+    expect(result.category).not.toBe("HIRING");
+  });
+});
+
+describe("classify — COMMERCE", () => {
+  it("recognizes per-call purchase of inference", () => {
+    const result = classify(
+      agent({
+        name: "InferenceBuyer",
+        description:
+          "Buys inference from other agents and pays per call over x402, so neither side holds the " +
+          "other's keys.",
+      }),
+    );
+    expect(result.category).toBe("COMMERCE");
+    expect(result.confidence).toBeGreaterThanOrEqual(0.55);
+  });
+
+  it("NEGATIVE: a shopping assistant that buys goods is not COMMERCE", () => {
+    const result = classify(
+      agent({
+        name: "ShopMate",
+        description:
+          "Your e-commerce companion. Finds the best price across online stores, applies coupons and " +
+          "checks out for you. Tracks parcels and handles returns.",
+      }),
+    );
+    expect(result.category).not.toBe("COMMERCE");
+  });
+});
+
+describe("classify — AUTONOMOUS", () => {
+  it("recognizes acting alone inside a cap", () => {
+    const result = classify(
+      agent({
+        name: "Pilot",
+        description:
+          "Trades, lends and stakes on its own inside a spending cap the chain enforces. Nobody " +
+          "approves each move; the limit is what stops it.",
+      }),
+    );
+    expect(result.category).toBe("AUTONOMOUS");
+    expect(result.confidence).toBeGreaterThanOrEqual(0.55);
+  });
+
+  it("recognizes copy trading", () => {
+    const result = classify(
+      agent({
+        name: "MirrorDesk",
+        description: "Copy trading agent: mirrors a chosen wallet's trades on BNB Chain.",
+      }),
+    );
+    expect(result.category).toBe("AUTONOMOUS");
+  });
+
+  /**
+   * The boundary that actually matters, and it is not where it first looks.
+   *
+   * AUTONOMOUS was written as "acts inside a cap", so the obvious guess is that
+   * naming a cap moves an agent into it. It does not, and the pair below pins
+   * down what really happens: an agent that names a SPECIALISED strategy keeps
+   * that strategy's shelf even when it also names a cap, because the strategy
+   * has more decisive cues behind it. AUTONOMOUS is reached by breadth, an agent
+   * whose pitch is "several things, under one limit", not by the word "cap".
+   *
+   * That is the right way round for a marketplace: a shopper looking for yield
+   * farming should find a yield farmer, not lose it to a shelf named after how
+   * it is supervised. Nearly every agent here runs under a cap, so a cap that
+   * outranked the strategy would empty the other shelves.
+   *
+   * Both halves are asserted because the second is the surprising one, and a
+   * future reader who "fixes" it will break the first.
+   */
+  const YIELD_WORK =
+    "Routes capital to the best APY across Venus and Aave, lends and stakes, and auto-compounds rewards.";
+
+  it("a specialised yield agent stays YIELD", () => {
+    const result = classify(agent({ name: "YieldRouter", description: YIELD_WORK }));
+    expect(result.category).toBe("YIELD");
+  });
+
+  it("and it stays YIELD even once a cap it cannot exceed is named", () => {
+    const result = classify(
+      agent({
+        name: "YieldRouter",
+        description: `${YIELD_WORK} Everything happens inside a spending cap it cannot exceed, with no human approval.`,
+      }),
+    );
+    expect(result.category).toBe("YIELD");
+  });
+});
+
+describe("classify — STREAMING", () => {
+  it("recognizes payment by the second", () => {
+    const result = classify(
+      agent({
+        name: "Meter",
+        description:
+          "Streams payments by the second and by the unit. Metered billing with no person approving " +
+          "each micropayment.",
+      }),
+    );
+    expect(result.category).toBe("STREAMING");
+    expect(result.confidence).toBeGreaterThanOrEqual(0.55);
+  });
+
+  it("NEGATIVE: a video streaming agent is not STREAMING", () => {
+    const result = classify(
+      agent({
+        name: "ClipCurator",
+        description:
+          "Finds what to watch across streaming services, builds a watchlist and streams a trailer " +
+          "before you commit to the film.",
+      }),
+    );
+    expect(result.category).not.toBe("STREAMING");
+  });
+});
+
+describe("classify — TREASURY", () => {
+  it("recognizes scheduled payroll", () => {
+    const result = classify(
+      agent({
+        name: "Steward",
+        description:
+          "Runs payroll and recurring payments on a schedule, and renews subscriptions when they " +
+          "come due.",
+      }),
+    );
+    expect(result.category).toBe("TREASURY");
+    expect(result.confidence).toBeGreaterThanOrEqual(0.55);
+  });
+
+  it("NEGATIVE: a treasury dashboard that reports but never pays is not TREASURY", () => {
+    const result = classify(
+      agent({
+        name: "TreasuryLens",
+        description:
+          "Analytics for DAO treasuries. Charts the runway, breaks holdings down by token and posts " +
+          "a weekly report to Discord.",
+      }),
+    );
+    expect(result.category).not.toBe("TREASURY");
   });
 });
