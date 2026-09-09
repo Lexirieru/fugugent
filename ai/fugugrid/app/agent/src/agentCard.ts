@@ -21,6 +21,49 @@
 
 import type { AgentCard, AgentSkill, SecurityScheme } from "@a2a-js/sdk";
 import { loadStudioToml } from "@bnbagent/studio-runtime/config";
+import { GRID_ADVISORY_SKILL, GRID_FEASIBILITY_SKILL } from "./advisory.js";
+
+/**
+ * The value skill. Advertised UNCONDITIONALLY — unlike the two commerce skills it needs no
+ * payment rail, no wallet and no network, because it is a pure function of its input.
+ *
+ * The description says what this agent does NOT do, in the card itself, where a buyer reads
+ * it BEFORE paying: it recommends and explains, it never executes. The on-chain listing
+ * metadata says the same thing (`onchainExecution: false`), and the two must never drift.
+ */
+const GRID_ADVISORY: AgentSkill = {
+  id: GRID_ADVISORY_SKILL,
+  name: "Grid advice (analysis only — no execution)",
+  description:
+    'Send a data part {"skill": "' + GRID_ADVISORY_SKILL + '", "config": {"lowerBase": ' +
+    '"50000000000", "upperBase": "70000000000", "levels": 11, "capitalBase": "100000000000"}, ' +
+    '"state": {"bandIndex": 5, "lotsHeld": 5, "consecutiveOutside": 0, "outsideSide": null}, ' +
+    '"observation": {"priceBase": "58000000000"}} — prices and money on the 8-decimal basis. ' +
+    "The deterministic engine replies with IDLE / BUY / SELL / WATCH_BREAKOUT / EXIT_ABOVE / " +
+    "EXIT_BELOW, the lot count, the notional and the reasoning. The `state` is REQUIRED: the " +
+    "grid's memory belongs to whoever runs it, and this agent stores none. " +
+    "THIS SKILL DOES NOT TRADE. This agent has no execution path: it signs no swap, places no " +
+    "order, and moves no funds. `nextStateIfActedOn` is the state that WOULD follow if you " +
+    "carried the trade out yourself. A grid that cannot turn a profit is rejected with the " +
+    "reason, never answered with a guess.",
+  tags: ["defi", "grid-trading", "advisory", "no-execution", "bnb-chain"],
+  inputModes: ["application/json"],
+  outputModes: ["application/json"],
+};
+
+const GRID_FEASIBILITY: AgentSkill = {
+  id: GRID_FEASIBILITY_SKILL,
+  name: "Can this grid make money, and the thresholds that decide it",
+  description:
+    'Send {"skill": "' + GRID_FEASIBILITY_SKILL + '", "config": {...}} to get the grid lines, ' +
+    "the lot value, the narrowest line-to-line spacing, the cost of one buy-then-sell round trip, " +
+    "and whether the spacing clears the required multiple of that cost — plus, when it does not, " +
+    "the number that stops it. Omit the config to read the thresholds alone. Analysis only; " +
+    "nothing is executed.",
+  tags: ["defi", "grid-trading", "advisory", "no-execution"],
+  inputModes: ["application/json"],
+  outputModes: ["application/json"],
+};
 
 const NEGOTIATE: AgentSkill = {
   id: "negotiate",
@@ -107,7 +150,11 @@ export function buildAgentCard(
   }
   return {
     name,
-    description: `ERC-8183 seller agent (${name}) — negotiate + notify_funded over A2A.`,
+    description:
+      `ERC-8183 seller agent (${name}) — grid trading ADVICE over A2A: it reads a grid, its ` +
+      "state and a price, decides with deterministic code, and explains itself. It has no " +
+      "execution path and sends no transactions (onchainExecution: false). Commerce: negotiate " +
+      "+ notify_funded.",
     // main.ts overwrites this with $AGENTCORE_RUNTIME_URL at boot.
     // Local-dev fallback: a client-routable localhost URL (not the 0.0.0.0
     // bind address). Host via AGENT_HOST (default localhost); port via the
@@ -128,8 +175,13 @@ export function buildAgentCard(
     capabilities: { streaming: false },
     defaultInputModes: ["application/json"],
     defaultOutputModes: ["application/json"],
-    skills:
-      opts.commerceSkills === false ? [] : [NEGOTIATE, NOTIFY_FUNDED],
+    // The advisory skills stand first and are never gated: they are what the agent is FOR,
+    // and they work with or without a payment rail configured.
+    skills: [
+      GRID_ADVISORY,
+      GRID_FEASIBILITY,
+      ...(opts.commerceSkills === false ? [] : [NEGOTIATE, NOTIFY_FUNDED]),
+    ],
     ...extra,
   };
 }

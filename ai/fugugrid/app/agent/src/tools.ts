@@ -30,6 +30,12 @@ import * as cr from "@bnbagent/studio-runtime/tools";
 import { loadStudioToml } from "@bnbagent/studio-runtime/config";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
+import {
+  adviseGrid,
+  gridAdvisoryInputSchema,
+  gridFeasibilityInputSchema,
+  gridFeasibilitySkill,
+} from "./advisory.js";
 
 /**
  * The project-wide default network (`[network].default`) — tool calls that
@@ -51,7 +57,50 @@ const networkArg = z
   .optional()
   .describe("studio network name (defaults to the project's [network].default)");
 
+/**
+ * The strategy tools — the reason this agent is worth renting.
+ *
+ * They read a grid, its state and a price, run the DETERMINISTIC decision engine in
+ * `src/strategy/`, and return the decision together with the reasoning behind it. The LLM
+ * may call them and read the result out loud; it may not pick the action, shift a
+ * threshold, or recompute an amount. Every number came from `decide()`, which is pure,
+ * replayable and backtested.
+ *
+ * They are ANALYSIS tools. This agent has no execution path at all — the descriptions say
+ * so, because an LLM that thinks a tool trades will tell a user it traded.
+ */
+export const STRATEGY_TOOLS: ToolSet = {
+  grid_advisory: tool({
+    description:
+      "ANALYSIS ONLY — recommends what a grid should do at the current price, and explains why. " +
+      "Takes the grid config, the grid's state from the previous observation, and the current " +
+      "price; returns IDLE / BUY / SELL / WATCH_BREAKOUT / EXIT_ABOVE / EXIT_BELOW with the lot " +
+      "count, the notional, and the numbers behind it. The state is REQUIRED and is never guessed: " +
+      "the grid's memory belongs to whoever runs it. The `nextStateIfActedOn` in the reply is only " +
+      "true for a caller who actually carries the trade out. " +
+      "THIS TOOL DOES NOT TRADE. It signs nothing, places no order, and holds no inventory; this " +
+      "agent has no execution path (onchainExecution: false). Report its numbers exactly as " +
+      "returned and never invent, adjust, or extrapolate them.",
+    inputSchema: gridAdvisoryInputSchema,
+    execute: async (input) => adviseGrid(input).payload,
+  }),
+  grid_feasibility: tool({
+    description:
+      "Whether a grid configuration can make money at all, and the thresholds that decide it. " +
+      "Give it a config and it returns the grid lines, the lot value, the narrowest line-to-line " +
+      "spacing, the cost of one buy-then-sell round trip, and whether the spacing clears the " +
+      "required multiple of that cost — plus, when it does not, exactly which number stops it. " +
+      "Omit the config to read the thresholds alone. Read this instead of guessing why a grid was " +
+      "accepted or refused. Analysis only; nothing is executed.",
+    inputSchema: gridFeasibilityInputSchema,
+    execute: async (input) => gridFeasibilitySkill(input),
+  }),
+};
+
 export const LLM_READ_TOOLS: ToolSet = {
+  // --- Strategy (the deliverable; pure code, never the LLM's judgement) ---
+  ...STRATEGY_TOOLS,
+
   // --- Wallet & chain basics ---
   wallet_info: tool({
     description:

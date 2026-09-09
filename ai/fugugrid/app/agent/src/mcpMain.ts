@@ -74,6 +74,14 @@ import {
   B402Seller,
 } from "@bnbagent/studio-runtime/b402";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import {
+  GRID_ADVISORY_SKILL,
+  GRID_FEASIBILITY_SKILL,
+  gridAdvisoryToolShape,
+  gridAdvisorySkill,
+  gridFeasibilityToolShape,
+  gridFeasibilitySkill,
+} from "./advisory.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { generateText, stepCountIs } from "ai";
@@ -210,6 +218,14 @@ async function runLlm(prompt: string): Promise<string> {
       const result = await generateText({
         model,
         system:
+          "FINANCIAL DECISIONS ARE NOT YOURS TO MAKE. Every number, threshold and " +
+          "recommended action must come from the `grid_advisory` / `grid_feasibility` " +
+          "tools, which run deterministic, backtested code. Quote what they return; " +
+          "never invent, adjust, average or extrapolate a figure, and never state an " +
+          "action they did not return. " +
+          "This agent CANNOT execute: it has no swap path, places no order and sends no " +
+          "transaction. Describe its output as a recommendation, never as something " +
+          "done, in progress, or about to happen. " +
           "You are a seller agent. The runtime has already authorized this task " +
           "through its configured commerce rail. Complete the user's task now; " +
           "do not ask for a job ID or additional payment. " +
@@ -450,6 +466,49 @@ export function buildMcpServer(
     },
     );
   }
+
+  // ── Strategy tools (the deliverable) ───────────────────────────────────────
+  // Registered UNCONDITIONALLY, unlike the commerce tools: the advisory needs no payment
+  // rail, no wallet and no network — it is a pure function of its argument.
+  //
+  // `readOnlyHint: true` and `openWorldHint: false` are both literally true here: the
+  // handler touches no chain and no outside service, it only runs `src/strategy/`. Do not
+  // relax either flag; an MCP client shows those hints to its user as a promise.
+  const advisoryAnnotations = { readOnlyHint: true, openWorldHint: false };
+
+  server.registerTool(
+    GRID_ADVISORY_SKILL,
+    {
+      description:
+        "ANALYSIS ONLY — recommend what a grid should do at the current price, and explain why. " +
+        "Send the grid config, the state this agent returned at the previous observation, and the " +
+        "current price (8-decimal basis); the deterministic engine returns IDLE / BUY / SELL / " +
+        "WATCH_BREAKOUT / EXIT_ABOVE / EXIT_BELOW with the lot count, the notional and the reasoning. " +
+        "The state is REQUIRED and never guessed — the grid's memory belongs to whoever runs it — and " +
+        "`nextStateIfActedOn` only becomes true for a caller who actually carries the trade out. " +
+        "THIS TOOL DOES NOT TRADE: this agent has no execution path (onchainExecution: false). It " +
+        "signs nothing, places no order and moves no funds. A grid that cannot turn a profit is " +
+        "rejected with the two numbers that disagree, never answered with a guess.",
+      inputSchema: gridAdvisoryToolShape,
+      annotations: advisoryAnnotations,
+    },
+    async (args) => toolResult(gridAdvisorySkill(args)),
+  );
+
+  server.registerTool(
+    GRID_FEASIBILITY_SKILL,
+    {
+      description:
+        "Whether a grid configuration can make money at all, and the thresholds that decide it — the " +
+        "grid lines, the lot value, the narrowest line-to-line spacing, the cost of one buy-then-sell " +
+        "round trip, and whether the spacing clears the required multiple of that cost. When it does " +
+        "not, the answer names the number that stops it instead of throwing. Omit the config to read " +
+        "the thresholds alone. Analysis only; nothing is executed.",
+      inputSchema: gridFeasibilityToolShape,
+      annotations: advisoryAnnotations,
+    },
+    async (args) => toolResult(gridFeasibilitySkill(args)),
+  );
 
   // ── Read-only chain tools ──────────────────────────────────────────────────
   const network = z.string().optional().describe("studio network name");
