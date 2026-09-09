@@ -1,11 +1,19 @@
+import { useEffect } from "react";
+import { PLANE_VIDEO_URL } from "./content";
+import { startEntrance } from "./entrance";
+import Features from "./Features";
+import SiteFooter from "./Footer";
 import RailMarquee from "./RailMarquee";
+import { startReveal } from "./reveal";
 import {
   AgentsSection,
   HonestSection,
   NextSection,
   ProofSection,
-  SiteFooter,
+  RecordSection,
 } from "./Sections";
+import Showcase from "./Showcase";
+import Triptych from "./Triptych";
 
 function LogoMark() {
   return (
@@ -44,6 +52,33 @@ function LaunchButton() {
 }
 
 export default function App() {
+  /*
+   * Two controllers, and both of them are written to end in the page you would
+   * get if they had never run.
+   *
+   * `startEntrance` plays the hero once and then removes every class it added,
+   * so the finished hero is the stylesheet's hero and nothing else. That is not
+   * a nicety: the composition below was calibrated against the aircraft video by
+   * hand, `--video-offset-y` is a lever the repo owner set himself, and an
+   * entrance that left a transform behind would move it by a hair.
+   *
+   * `startReveal` is the one that can silently destroy the page, so it is the
+   * one with three separate ways to fail open. The long note in reveal.ts has
+   * the argument.
+   *
+   * `useEffect` rather than `useLayoutEffect`: the hidden state comes from the
+   * inline script in index.html, which has already run, so there is nothing to
+   * flash. React's own render is not on the critical path for it.
+   */
+  useEffect(() => {
+    const stopEntrance = startEntrance();
+    const stopReveal = startReveal();
+    return () => {
+      stopEntrance();
+      stopReveal();
+    };
+  }, []);
+
   return (
     <div className="site" id="top">
       <main className="site-main">
@@ -60,10 +95,7 @@ export default function App() {
             playsInline
             preload="metadata"
           >
-            <source
-              src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260801_022931_e13cbef4-690a-42d2-b5ee-5b3b1f483c83.mp4"
-              type="video/mp4"
-            />
+            <source src={PLANE_VIDEO_URL} type="video/mp4" />
           </video>
 
           <header className="site-header">
@@ -94,9 +126,25 @@ export default function App() {
         </div>
 
         <RailMarquee />
+
+        {/*
+         * The scaled part of the page. Everything inside measures itself against
+         * this element with container query units rather than against the
+         * viewport, because container units exclude the scrollbar and `vw` does
+         * not: on Windows that difference is seventeen pixels of horizontal
+         * overflow at every width. The `vw` form is still there as the fallback
+         * for browsers without container queries.
+         */}
+        <div className="scale-root">
+          <Features />
+          <Showcase />
+        </div>
+
+        <Triptych />
         <AgentsSection />
-        <NextSection />
+        <RecordSection />
         <ProofSection />
+        <NextSection />
         <HonestSection />
       </main>
 

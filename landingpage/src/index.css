@@ -985,3 +985,2094 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ════════════════════════════════════════════════════════════════════
+ * PART TWO — the hero entrance, and everything below the hero that is
+ * drawn as a composition rather than laid out as a document.
+ * ════════════════════════════════════════════════════════════════════ */
+
+/* ── The hero entrance ──────────────────────────────────────────────
+ *
+ * Plays once. What matters is not the animation, it is the state it leaves
+ * behind: when `entrance-playing` is removed, every rule below stops applying
+ * and each element falls back to the stylesheet it always had. No transform, no
+ * opacity, no compositing layer, no inline style. The finished hero has to be
+ * pixel-identical to the hero that shipped before this existed, because that
+ * composition was calibrated by hand against the aircraft video.
+ *
+ * The hidden state lives under `html.entrance-pending`, and that class is added
+ * by the inline script in index.html, never by this file. JavaScript off means
+ * no class, which means no hidden state, which means the hero just appears.
+ *
+ * Transforms are deliberately small. This is a settle, not an arrival, and a
+ * large travel would read as a layout shift on a page whose first screen is the
+ * thing being judged.
+ */
+
+html.entrance-pending .logo,
+html.entrance-pending .hero-eyebrow,
+html.entrance-pending .site-header .download-btn,
+html.entrance-pending .hero-title,
+html.entrance-pending .hero-left .download-btn,
+html.entrance-pending .hero-desc {
+  opacity: 0;
+}
+
+html.entrance-pending .logo,
+html.entrance-pending .site-header .download-btn {
+  transform: translateY(-8px);
+}
+
+html.entrance-pending .hero-eyebrow,
+html.entrance-pending .hero-title,
+html.entrance-pending .hero-left .download-btn,
+html.entrance-pending .hero-desc {
+  transform: translateY(14px);
+}
+
+html.entrance-playing .logo,
+html.entrance-playing .hero-eyebrow,
+html.entrance-playing .site-header .download-btn,
+html.entrance-playing .hero-title,
+html.entrance-playing .hero-left .download-btn,
+html.entrance-playing .hero-desc {
+  opacity: 1;
+  transform: none;
+}
+
+html.entrance-playing .logo {
+  transition:
+    opacity 560ms var(--ease-panel) 80ms,
+    transform 680ms var(--ease-panel) 80ms;
+}
+
+html.entrance-playing .hero-eyebrow {
+  transition:
+    opacity 460ms var(--ease-panel) 130ms,
+    transform 580ms var(--ease-panel) 130ms;
+}
+
+html.entrance-playing .hero-title {
+  transition:
+    opacity 680ms var(--ease-panel) 180ms,
+    transform 900ms var(--ease-panel) 180ms;
+}
+
+html.entrance-playing .site-header .download-btn {
+  transition:
+    opacity 480ms var(--ease-panel) 280ms,
+    transform 600ms var(--ease-panel) 280ms;
+}
+
+html.entrance-playing .hero-left .download-btn {
+  transition:
+    opacity 520ms var(--ease-panel) 710ms,
+    transform 700ms var(--ease-panel) 710ms;
+}
+
+html.entrance-playing .hero-desc {
+  transition:
+    opacity 560ms var(--ease-panel) 720ms,
+    transform 720ms var(--ease-panel) 720ms;
+}
+
+/* A reader who asked for less motion never gets the pending state at all: the
+   controller completes immediately and strips both classes before first paint.
+   This is the belt to that brace. */
+@media (prefers-reduced-motion: reduce) {
+  html.entrance-pending .logo,
+  html.entrance-pending .hero-eyebrow,
+  html.entrance-pending .site-header .download-btn,
+  html.entrance-pending .hero-title,
+  html.entrance-pending .hero-left .download-btn,
+  html.entrance-pending .hero-desc {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── The scale system ───────────────────────────────────────────────
+ *
+ * READ THIS BEFORE CHANGING `--k`.
+ *
+ * The features and showcase sections are drawings, not documents. A chip points
+ * at a mini-card; a connector has to land on an edge; artwork is cropped on
+ * purpose. Reflowing that with ordinary responsive rules pulls the pieces away
+ * from each other. So the whole composition scales as one: `--k` is the ratio
+ * between the width the page actually has and the 1685px canvas it was drawn
+ * on, and every desktop length is a drawing number multiplied by it. At exactly
+ * 1685px `--k` is 1px and the render matches the drawing to the pixel.
+ *
+ * `--k` MUST BE A LENGTH. In CSS, number x length is a length, but number x
+ * number is a number, and a bare number is invalid for `height` and `width`, so
+ * EVERY declaration written `calc(<n> * var(--k))` is thrown away. The failure
+ * is silent and it is the worst kind: the hero above still looks perfect and
+ * everything here is blank.
+ *
+ *   RIGHT   --design-w: 1685;                                 (no unit)
+ *           --page-scale: calc((100vw - 2*var(--gutter)) / var(--design-w));
+ *
+ *   WRONG   --page-scale: calc((100vw - 40px) / 1685px);      (length / length)
+ *           --page-scale: calc(100vw / 1685);   ...is fine, but dividing by a
+ *                                                LENGTH is what kills it.
+ *
+ * The same holds inside `clamp()` and `min()`: every branch must carry a unit,
+ * because one unitless branch poisons the whole function. Firefox is strictest.
+ *
+ * To check: in devtools the computed `--k` on `.features` must read like
+ * "0.83px". If it reads "0.83", stop and fix the token before anything else.
+ */
+
+.features,
+.showcase {
+  --gutter: 20px;
+  --design-w: 1685; /* UNITLESS. See the note above. */
+  --tablet-inset: 24px;
+
+  --page-scale: calc((100vw - 2 * var(--gutter)) / var(--design-w));
+  --k: var(--page-scale);
+
+  /* Structural radii and tracking, in drawing units. */
+  --radius-media: 30;
+  --radius-panel: 18;
+  --radius-button: 14;
+  --radius-chip: 12;
+  --radius-kcard: 38.34;
+  --track-tight: -0.02em;
+  --track-display: -0.05em;
+}
+
+:root {
+  --ease-panel: cubic-bezier(0.42, 0.02, 0.05, 0.97);
+}
+
+/*
+ * Container units exclude the scrollbar and `vw` does not. On a platform with a
+ * classic scrollbar that difference is about seventeen pixels of horizontal
+ * overflow at every single width, which is the other way this page can quietly
+ * break. The `vw` form above stays as the fallback.
+ */
+@supports (width: 1cqw) {
+  .scale-root {
+    container-type: inline-size;
+  }
+
+  .features,
+  .showcase {
+    --page-scale: calc((100cqw - 2 * var(--gutter)) / var(--design-w));
+    --k: var(--page-scale);
+  }
+}
+
+/* ── Scroll reveal ──────────────────────────────────────────────────
+ *
+ * Every hidden state below is prefixed with `html.scroll-reveal-ready`, and
+ * that class is added by reveal.ts ONLY, and only after an IntersectionObserver
+ * has been built and every target observed. There is deliberately no bare
+ * `[data-reveal] { opacity: 0 }` anywhere in this file: such a rule would
+ * survive JavaScript being off, and the two sections below the hero would be
+ * blank forever while the hero kept looking perfect.
+ *
+ * If you add a new revealed element, add it under this prefix or not at all.
+ */
+html.scroll-reveal-ready [data-reveal]:not(.is-revealed) {
+  opacity: 0;
+  transform: translateY(22px);
+}
+
+html.scroll-reveal-ready [data-reveal] {
+  transition:
+    opacity 760ms var(--ease-panel),
+    transform 900ms var(--ease-panel);
+}
+
+/* The interior pieces trail the card they sit in, so the artwork assembles. */
+html.scroll-reveal-ready .feature:not(.is-revealed) .feature__stage > * {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+html.scroll-reveal-ready .feature .feature__stage > * {
+  transition:
+    opacity 620ms var(--ease-panel) var(--inside-delay, 0ms),
+    transform 720ms var(--ease-panel) var(--inside-delay, 0ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.scroll-reveal-ready [data-reveal]:not(.is-revealed),
+  html.scroll-reveal-ready .feature:not(.is-revealed) .feature__stage > * {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── Features ───────────────────────────────────────────────────────
+ *
+ * Two rows, two cards. The grid runs wider than `.section-inner` on purpose:
+ * these are pictures, and they want the full canvas, while the heading above
+ * them keeps the page's normal measure so every left edge still lines up.
+ */
+
+.features__grid {
+  width: min(calc(100% - 2 * var(--gutter)), calc(1665 * var(--k)));
+  margin-inline: auto;
+  margin-top: clamp(40px, 3.4vw, 66px);
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: clamp(18px, 1.7vw, 34px);
+}
+
+.feature {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius-kcard) * var(--k));
+  padding: clamp(16px, 1.3vw, 26px);
+  overflow: hidden;
+}
+
+/*
+ * BELT AND BRACES, AND EVERY STRAND IS LOAD-BEARING.
+ *
+ * Everything inside `.feature__media` is absolutely positioned, so this box has
+ * no intrinsic height of its own. If the one declaration that gives it a height
+ * ever becomes invalid — one bad `calc`, one unitless `--k` — it collapses to
+ * 0px and every chip, connector, mini-card and finder inside it vanishes with
+ * no error anywhere. So it carries THREE independent sources of height, and a
+ * zero is only possible if all three fail at once.
+ *
+ * Never let this end up `height: auto` with no `aspect-ratio`.
+ */
+.feature__media {
+  position: relative;
+  height: calc(577.97 * var(--k));
+  aspect-ratio: 1060.28 / 577.97;
+  min-height: 320px;
+  overflow: hidden;
+  border-radius: calc(var(--radius-media) * var(--k));
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  /*
+   * A SIZE container, not an inline-size one, so the drawing inside can read
+   * the height as well as the width. It is safe here because the box has three
+   * independent sources of height above and its children are all absolute, so
+   * it can never depend on its own contents.
+   */
+  container-type: size;
+}
+
+/*
+ * The drawing itself, in its own 1060.28 x 577.97 coordinate space. `--u` is
+ * one drawing unit, taken from the width the media box actually got, so the
+ * interior keeps the drawing's proportions no matter how tall its box is. It is
+ * centred vertically, so a media box taller than the drawing reads as padding
+ * rather than as a misalignment.
+ */
+.feature__stage {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  /* Fallback: half the grid measure, minus half the gap, over the design width. */
+  --u: calc((min(calc(100% - 2 * var(--gutter)), calc(1665 * var(--k))) - 34px) / 2 / 1060.28);
+  height: calc(577.97 * var(--u));
+  color: var(--fg);
+}
+
+@supports (width: 1cqw) {
+  .feature__stage {
+    /*
+     * One drawing unit, taken from whichever of the two axes runs out first.
+     *
+     * The height branch lets the drawing use the room the media box actually
+     * has instead of leaving a third of it empty. The width branch is what
+     * caps the damage: it divides by 1020 rather than by the drawing's full
+     * 1060.28, so the stage runs about 4% wider than its box and is cropped by
+     * it. Every piece of content sits between x=56 and x=1010, so the only
+     * thing that goes under the edge is empty canvas. Divide by a smaller
+     * number and you start cutting the right-hand column off, which is exactly
+     * what 975 did.
+     */
+    --u: min(calc(100cqh / 577.97), calc(100cqw / 1020));
+  }
+}
+
+.feature__stage > * {
+  position: absolute;
+  left: calc(var(--x) * var(--u));
+  top: calc(var(--y) * var(--u));
+}
+
+.feature__stage > [style*="--w"] {
+  width: calc(var(--w) * var(--u));
+}
+
+.feature__stage > [style*="--h"] {
+  height: calc(var(--h) * var(--u));
+}
+
+.feature__copy {
+  padding: calc(26 * var(--u, 1px)) 0 0;
+  padding-top: clamp(16px, 1.4vw, 28px);
+}
+
+.feature__eyebrow {
+  font-family: var(--font-hand);
+  font-size: clamp(13px, 0.82vw, 17px);
+  color: var(--accent);
+  letter-spacing: var(--tracking-eyebrow);
+  margin: 0 0 8px;
+}
+
+.feature__title {
+  font-family: var(--font-display);
+  font-size: clamp(18px, 1.28vw, 27px);
+  font-weight: 600;
+  letter-spacing: var(--track-display);
+  line-height: 1.14;
+  margin: 0 0 10px;
+  color: var(--fg);
+}
+
+.feature__body {
+  font-family: var(--font-body);
+  font-size: clamp(13px, 0.84vw, 17px);
+  color: var(--fg-muted);
+  line-height: 1.5;
+  margin: 0;
+  max-width: 46ch;
+}
+
+/* ── Interior pieces, all sized in drawing units ───────────────── */
+
+.chip-key,
+.chip-record,
+.chip-count,
+.chip-plain,
+.chip-live-sm {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(10 * var(--u));
+  height: calc(46 * var(--u));
+  padding-inline: calc(20 * var(--u));
+  border-radius: calc(var(--radius-chip) * var(--u) * 2);
+  font-family: var(--font-display);
+  font-size: calc(20 * var(--u));
+  font-weight: 600;
+  letter-spacing: var(--track-tight);
+  white-space: nowrap;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  color: var(--fg);
+}
+
+.chip-key,
+.chip-record {
+  background: var(--accent);
+  border-color: transparent;
+  color: #fff;
+}
+
+.chip-live-sm {
+  background: var(--accent);
+  border-color: transparent;
+  color: #fff;
+  height: calc(40 * var(--u));
+  font-size: calc(18 * var(--u));
+}
+
+.chip-plain {
+  background: transparent;
+  border-style: dashed;
+  color: var(--fg-muted);
+}
+
+.chip-dot {
+  width: calc(12 * var(--u));
+  height: calc(12 * var(--u));
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+
+.stage-note {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: calc(19 * var(--u));
+  line-height: 1.45;
+  color: var(--fg-muted);
+}
+
+.connector {
+  color: var(--border-strong);
+  opacity: 0.55;
+}
+
+.mini-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: calc(22 * var(--u));
+  padding: calc(22 * var(--u));
+  box-shadow: 0 calc(6 * var(--u)) calc(18 * var(--u)) rgb(44 35 29 / 8%);
+}
+
+.mini-card__art {
+  width: calc(78 * var(--u));
+  height: auto;
+  border-radius: calc(14 * var(--u));
+  margin-bottom: auto;
+}
+
+.mini-card__name {
+  font-family: var(--font-display);
+  font-size: calc(24 * var(--u));
+  font-weight: 600;
+  letter-spacing: var(--track-tight);
+  margin: calc(14 * var(--u)) 0 calc(4 * var(--u));
+}
+
+.mini-card__category {
+  font-family: var(--font-body);
+  font-size: calc(18 * var(--u));
+  color: var(--accent);
+  margin: 0 0 calc(10 * var(--u));
+}
+
+.mini-card__price {
+  font-family: var(--font-body);
+  font-size: calc(18 * var(--u));
+  color: var(--fg-muted);
+  margin: 0;
+}
+
+.mini-card__price strong {
+  font-family: var(--font-display);
+  color: var(--fg);
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: calc(18 * var(--u));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: calc(20 * var(--u));
+  padding-inline: calc(26 * var(--u));
+  font-family: var(--font-body);
+  font-size: calc(23 * var(--u));
+  color: var(--fg);
+}
+
+.check-row__text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.check-row__go {
+  font-family: var(--font-display);
+  font-size: calc(19 * var(--u));
+  color: var(--fg-muted);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius-button) * var(--u));
+  padding: calc(8 * var(--u)) calc(16 * var(--u));
+  flex: none;
+}
+
+.check-badge {
+  width: calc(30 * var(--u));
+  height: calc(30 * var(--u));
+  flex: none;
+  color: var(--risk-1);
+}
+
+.cross-badge {
+  width: calc(30 * var(--u));
+  height: calc(30 * var(--u));
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: calc(1.4 * var(--u)) solid var(--risk-5);
+  color: var(--risk-5);
+  font-size: calc(22 * var(--u));
+  line-height: 1;
+}
+
+.benefit-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: calc(28 * var(--u));
+  padding: calc(30 * var(--u));
+  box-shadow: 0 calc(8 * var(--u)) calc(24 * var(--u)) rgb(44 35 29 / 9%);
+}
+
+.benefit-card__art {
+  width: calc(104 * var(--u));
+  height: auto;
+  border-radius: calc(18 * var(--u));
+}
+
+.benefit-card__name {
+  font-family: var(--font-display);
+  font-size: calc(30 * var(--u));
+  font-weight: 600;
+  letter-spacing: var(--track-display);
+  margin: calc(18 * var(--u)) 0 calc(4 * var(--u));
+}
+
+.benefit-card__category {
+  font-family: var(--font-body);
+  font-size: calc(20 * var(--u));
+  color: var(--accent);
+  margin: 0 0 calc(12 * var(--u));
+}
+
+.benefit-card__body {
+  font-family: var(--font-body);
+  font-size: calc(20 * var(--u));
+  line-height: 1.45;
+  color: var(--fg-muted);
+  margin: 0 0 auto;
+}
+
+.benefit-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(16 * var(--u));
+  margin-top: calc(20 * var(--u));
+}
+
+.mini-finder {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: calc(26 * var(--u));
+  padding: calc(28 * var(--u));
+  box-shadow: 0 calc(8 * var(--u)) calc(24 * var(--u)) rgb(44 35 29 / 9%);
+}
+
+.mini-finder__field {
+  display: flex;
+  align-items: center;
+  gap: calc(14 * var(--u));
+  height: calc(66 * var(--u));
+  padding-inline: calc(22 * var(--u));
+  border: 1px solid var(--border);
+  border-radius: calc(18 * var(--u));
+  background: var(--bg-elev);
+  font-family: var(--font-body);
+  font-size: calc(23 * var(--u));
+}
+
+.finder-glyph {
+  width: calc(28 * var(--u));
+  height: calc(28 * var(--u));
+  flex: none;
+  color: var(--fg-muted);
+}
+
+.mini-finder__query {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--fg);
+}
+
+/* The caret does not blink. A blinking caret in a still picture reads as an
+   input someone can type into, and this one is a drawing. */
+.mini-finder__caret {
+  width: calc(2 * var(--u));
+  height: calc(26 * var(--u));
+  background: var(--accent);
+  flex: none;
+}
+
+.mini-finder__scope {
+  margin-left: auto;
+  font-size: calc(19 * var(--u));
+  color: var(--fg-muted);
+  border-left: 1px solid var(--border);
+  padding-left: calc(18 * var(--u));
+}
+
+.mini-finder__results {
+  list-style: none;
+  margin: calc(22 * var(--u)) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(14 * var(--u));
+}
+
+.mini-finder__row {
+  display: flex;
+  align-items: center;
+  gap: calc(16 * var(--u));
+  padding: calc(16 * var(--u)) calc(20 * var(--u));
+  border-radius: calc(16 * var(--u));
+  background: var(--bg-elev);
+  font-size: calc(19 * var(--u));
+}
+
+.mini-finder__row code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: calc(19 * var(--u));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.mini-finder__tag {
+  flex: none;
+  font-family: var(--font-display);
+  font-size: calc(17 * var(--u));
+  color: var(--fg-muted);
+}
+
+.mini-finder__row.is-allowed .mini-finder__tag {
+  color: var(--risk-1);
+}
+
+.mini-finder__row.is-refused .mini-finder__tag {
+  color: var(--risk-5);
+}
+
+.mini-finder__foot {
+  margin: auto 0 0;
+  padding-top: calc(20 * var(--u));
+  font-family: var(--font-body);
+  font-size: calc(19 * var(--u));
+  color: var(--fg-muted);
+}
+
+/* ── Showcase ───────────────────────────────────────────────────────
+ *
+ * Same belt-and-braces rule as `.feature__media`, minus the height: the figure
+ * takes its height from the aspect ratio against whatever width the grid gives
+ * it, with a floor underneath. Two independent sources, so zero is impossible.
+ */
+
+.showcase__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(28px, 3vw, 56px);
+  margin-top: clamp(40px, 3.4vw, 66px);
+}
+
+.showcase__heading {
+  font-family: var(--font-display);
+  font-size: clamp(18px, 1.2vw, 26px);
+  font-weight: 600;
+  letter-spacing: var(--track-display);
+  line-height: 1.16;
+  margin: 0 0 clamp(14px, 1.2vw, 22px);
+}
+
+.showcase__figure {
+  aspect-ratio: 1060.85 / 675.47;
+  min-height: 260px;
+  display: grid;
+  place-items: center;
+  padding: clamp(14px, 1.6vw, 32px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius-media) * var(--k));
+  container-type: inline-size;
+  overflow: hidden;
+}
+
+.showcase__body {
+  font-family: var(--font-body);
+  font-size: clamp(13px, 0.84vw, 17px);
+  color: var(--fg-muted);
+  line-height: 1.5;
+  margin: clamp(14px, 1.2vw, 22px) 0 0;
+  max-width: 52ch;
+}
+
+/* Sized in container units so the row always fits its figure, at any width. */
+.showcase__figure .puff-row {
+  width: 100%;
+  margin: 0;
+  gap: 2cqw;
+}
+
+.showcase__figure .puff-art {
+  border-radius: 2cqw;
+}
+
+.showcase__figure .puff-name {
+  font-size: 3.4cqw;
+  margin-top: 2cqw;
+}
+
+.showcase__figure .puff-index {
+  font-size: 2.9cqw;
+}
+
+.listing-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2.4cqw;
+}
+
+/*
+ * A three by three grid inside a figure whose height is fixed by its aspect
+ * ratio, so each tile has about 84 container-pixels to live in. Stacked, with
+ * the art above the name, a tile needs about 126 and the bottom row is silently
+ * clipped away. Beside the name it needs about 65.
+ */
+.listing-tile {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  align-content: center;
+  column-gap: 1.4cqw;
+  row-gap: 0.2cqw;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 2.6cqw;
+  padding: 1.8cqw;
+  min-width: 0;
+}
+
+/* The one that has actually done something is the only one with the accent. */
+.listing-tile.is-live {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.listing-tile__art {
+  grid-row: span 2;
+  width: 6.4cqw;
+  height: auto;
+  border-radius: 1.4cqw;
+}
+
+.listing-tile__name,
+.listing-tile__category {
+  grid-column: 2;
+  min-width: 0;
+}
+
+.listing-tile__state {
+  grid-column: 1 / -1;
+  margin-top: 0.6cqw;
+}
+
+.listing-tile__name {
+  font-family: var(--font-display);
+  font-size: 3cqw;
+  font-weight: 600;
+  letter-spacing: var(--track-tight);
+}
+
+.listing-tile__category {
+  font-family: var(--font-body);
+  font-size: 2.4cqw;
+  color: var(--accent);
+}
+
+.listing-tile__state {
+  font-family: var(--font-body);
+  font-size: 2.4cqw;
+  color: var(--fg-muted);
+}
+
+/* ── Triptych ───────────────────────────────────────────────────────
+ *
+ * Three cards, sized in container units against the scene so they keep their
+ * proportions to each other. The scene has an `aspect-ratio` rather than a
+ * height, which is what makes `cqh` definite; the ratio is picked so that
+ * `--cards-scale` lands on 1 at desktop and only shrinks when the scene really
+ * is too short for the cards.
+ */
+
+.triptych__scene {
+  width: min(75vw, calc(100% - 48px));
+  /*
+   * Almost no margin of its own. The scene already carries about 40% of its
+   * height as empty space, because `--cards-scale` is built to leave the cards
+   * occupying 60cqh, and adding a section margin on top of that reads as a hole
+   * in the page rather than as air around a composition.
+   */
+  margin: clamp(4px, 0.6vw, 12px) auto 0;
+  aspect-ratio: 1685 / 950;
+  container-type: size;
+  position: relative;
+}
+
+.triptych .cards {
+  --surface-card: #fff;
+  --panel: #fffaf6;
+  --orange-soft: rgba(234, 88, 12, 0.18);
+  --green: var(--risk-1);
+  --card-title-size: 1.86cqw;
+  --card-title-tracking: -0.125cqw;
+  --cards-height: 33.81cqw;
+  --cards-scale: min(1, calc(60cqh / var(--cards-height)));
+
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  width: 81.71cqw;
+  height: var(--cards-height);
+  display: grid;
+  grid-template-columns: 32.33% 32.33% 31.7%;
+  justify-content: space-between;
+  align-items: start;
+  scale: var(--cards-scale);
+}
+
+.triptych .card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: 72.2% 27.8%;
+  border: 0.075cqw solid var(--border);
+  border-radius: 1.59cqw;
+  background: var(--surface-card);
+  box-shadow:
+    0.32cqw 1.18cqh 1.42cqw rgb(44 35 29 / 11%),
+    0 0.18cqh 0.42cqw rgb(44 35 29 / 3.5%);
+}
+
+.triptych .card:last-child {
+  height: 98.5%;
+  margin-top: 0.76%;
+}
+
+.triptych .panel {
+  position: relative;
+  margin-inline: 2.55%;
+  margin-top: 2.55%;
+  overflow: hidden;
+  border-radius: 1.28cqw 1.28cqw 1.08cqw 1.08cqw;
+  background:
+    radial-gradient(120% 90% at 12% 0%, rgba(255, 255, 255, 0.9), transparent 60%),
+    linear-gradient(180deg, var(--panel) 0%, #fdf1e9 100%);
+  border: 0.06cqw solid var(--border);
+}
+
+.triptych .card-copy {
+  padding: 7.1% 8.4% 6.5%;
+  position: relative;
+}
+
+.triptych .card-copy h2 {
+  font-family: var(--font-display);
+  font-size: var(--card-title-size);
+  letter-spacing: var(--card-title-tracking);
+  font-weight: 600;
+  line-height: 1.04;
+  white-space: nowrap;
+  translate: 0 -0.36cqh;
+  margin: 0 0 0.6cqw;
+  color: var(--fg);
+}
+
+.triptych .card-copy p {
+  font-family: var(--font-body);
+  font-size: 1.39cqw;
+  line-height: 1.28;
+  margin: 0;
+  color: var(--fg-muted);
+  transform: scaleX(0.94);
+  transform-origin: left top;
+}
+
+.triptych .corner-icon {
+  position: absolute;
+  right: 8.4%;
+  bottom: 22.5%;
+  width: 8.2%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--orange-soft);
+  color: var(--accent);
+  display: grid;
+  place-items: center;
+}
+
+.triptych .corner-icon svg {
+  width: 55%;
+  height: 55%;
+}
+
+/* Card 1: the health factor over time */
+
+.triptych .timeline {
+  position: absolute;
+  inset: 8% 7% 7%;
+  display: flex;
+  flex-direction: column;
+}
+
+.triptych .value-chip {
+  align-self: flex-start;
+  font-family: var(--font-display);
+  font-size: 1.35cqw;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 0.9cqw;
+  padding: 0.45cqw 0.9cqw;
+  margin-bottom: auto;
+}
+
+.triptych .bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.28cqw;
+  height: 62%;
+}
+
+.triptych .bar {
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: 0.2cqw 0.2cqw 0 0;
+  background: rgba(234, 88, 12, 0.28);
+}
+
+.triptych .bar.active {
+  background: var(--accent);
+}
+
+.triptych .axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.7cqw;
+  font-family: var(--font-display);
+  font-size: 0.82cqw;
+  letter-spacing: 0.08em;
+  color: var(--fg-faint);
+}
+
+/* Card 2: the allowlist */
+
+.triptych .panel--assistant {
+  padding: 7% 7.5%;
+  display: flex;
+  flex-direction: column;
+}
+
+.triptych .assistant-head {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1.1cqw;
+}
+
+.triptych .assistant-badge {
+  font-family: var(--font-display);
+  font-size: 1cqw;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 0.7cqw;
+  padding: 0.35cqw 0.8cqw;
+}
+
+.triptych .question {
+  font-family: var(--font-body);
+  font-size: 1.12cqw;
+  line-height: 1.3;
+  color: var(--fg);
+  margin: 0 0 1cqw;
+}
+
+.triptych .prompt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5cqw;
+  background: #fff;
+  border: 0.06cqw solid var(--border);
+  border-radius: 0.9cqw;
+  padding: 0.8cqw;
+  margin-bottom: auto;
+}
+
+.triptych .prompt code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.95cqw;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  border-radius: 0.4cqw;
+  padding: 0.2cqw 0.5cqw;
+}
+
+.triptych .prompt-note {
+  flex-basis: 100%;
+  font-family: var(--font-body);
+  font-size: 0.86cqw;
+  line-height: 1.35;
+  color: var(--fg-muted);
+}
+
+/* Not a real control: it is part of a picture, so it is out of the tab order
+   and hidden from assistive technology rather than pretending to be a button. */
+.triptych .automate {
+  position: relative;
+  align-self: flex-start;
+  font-family: var(--font-display);
+  font-size: 1.05cqw;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border: none;
+  border-radius: 0.8cqw;
+  padding: 0.6cqw 1.6cqw 0.6cqw 1.1cqw;
+  cursor: default;
+}
+
+.triptych .magic {
+  position: absolute;
+  right: -0.5cqw;
+  top: -0.9cqw;
+  width: 2.4cqw;
+  height: 2.4cqw;
+  pointer-events: none;
+}
+
+.triptych .cursor {
+  position: absolute;
+  right: 22%;
+  bottom: 14%;
+  width: 1.5cqw;
+  height: 1.5cqw;
+  background: #0e1014;
+  clip-path: polygon(0 0, 0 78%, 26% 60%, 44% 100%, 62% 90%, 44% 52%, 78% 46%);
+}
+
+/* Card 3: the catalogue */
+
+.triptych .panel--flow {
+  padding: 7% 7.5%;
+  display: flex;
+  flex-direction: column;
+}
+
+.triptych .metric {
+  display: flex;
+  flex-direction: column;
+  z-index: 1;
+}
+
+.triptych .metric strong {
+  font-family: var(--font-display);
+  font-size: 5.2cqw;
+  font-weight: 600;
+  letter-spacing: -0.16cqw;
+  line-height: 1;
+  color: var(--fg);
+}
+
+.triptych .metric-label {
+  font-family: var(--font-body);
+  font-size: 1cqw;
+  color: var(--fg-muted);
+  margin-top: 0.35cqw;
+}
+
+.triptych .metric-green {
+  font-family: var(--font-display);
+  font-size: 1cqw;
+  font-weight: 600;
+  color: var(--green);
+  margin-top: 0.2cqw;
+}
+
+.triptych .decision-flow {
+  position: absolute;
+  inset: 34% 0 22% 0;
+  width: 100%;
+  pointer-events: none;
+}
+
+.triptych .tags {
+  margin-top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4cqw;
+  z-index: 1;
+}
+
+.triptych .tag {
+  font-family: var(--font-body);
+  font-size: 0.8cqw;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.82);
+  border: 0.06cqw solid var(--border);
+  border-radius: 0.5cqw;
+  padding: 0.24cqw 0.6cqw;
+}
+
+/* ── The record ─────────────────────────────────────────────────────
+ * Where a page like this would put testimonials. There are none.
+ */
+
+.record-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(14px, 1.3vw, 26px);
+  margin-top: clamp(40px, 3.4vw, 66px);
+}
+
+.record-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: clamp(20px, 1.6vw, 34px);
+}
+
+.record-quote {
+  width: clamp(24px, 1.8vw, 32px);
+  height: clamp(24px, 1.8vw, 32px);
+  color: var(--accent);
+  opacity: 0.5;
+  margin-bottom: clamp(14px, 1.2vw, 24px);
+}
+
+.record-fact {
+  font-family: var(--font-body);
+  font-size: clamp(14px, 0.9vw, 18px);
+  line-height: 1.5;
+  color: var(--fg);
+  margin: 0 0 14px;
+  overflow-wrap: anywhere;
+}
+
+.record-link,
+.record-nolink {
+  font-family: var(--font-body);
+  font-size: clamp(12px, 0.78vw, 16px);
+  margin: 0 0 auto;
+  padding-bottom: 20px;
+}
+
+/* No link, and it says why. This is the row that makes the other four
+   believable, so it is styled as a statement rather than as a missing link. */
+.record-nolink {
+  color: var(--fg-muted);
+  border-left: 2px solid var(--border-strong);
+  padding-left: 12px;
+  line-height: 1.45;
+}
+
+.record-author {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.record-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--bg-elev);
+  flex: none;
+}
+
+.record-who {
+  display: block;
+  font-family: var(--font-display);
+  font-size: clamp(13px, 0.82vw, 16px);
+  font-weight: 600;
+}
+
+.record-kind {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-body);
+  font-size: clamp(12px, 0.78vw, 15px);
+  color: var(--fg-muted);
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────
+ *
+ * Two cards, a badge that overhangs the right one, and a giant faded wordmark
+ * underneath. Everything moves on hover and nothing moves on its own: there is
+ * not one keyframe in this block.
+ */
+
+.site-footer {
+  border-top: none;
+  padding-block: clamp(48px, 4.5vw, 96px) clamp(20px, 2vw, 40px);
+  overflow: hidden;
+}
+
+.footer-wrapper {
+  max-width: 1150px;
+  margin-inline: auto;
+  padding-inline: 24px;
+  display: grid;
+  grid-template-columns: 350px 1fr;
+  gap: 16px;
+  align-items: stretch;
+}
+
+/* Left card: the aircraft again */
+
+.footer-left {
+  position: relative;
+  min-height: 340px;
+  border-radius: 28px;
+  padding: 32px;
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(44, 35, 29, 0.18);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/*
+ * THE ONE DELIBERATE DEVIATION FROM THE BRIEF, AND WHY.
+ *
+ * The composition this card comes from says: no overlay, no tint, no noise.
+ * That instruction assumes a dark video. Ours is the aircraft, which is a cream
+ * sky with black line art, and white text on it measures about 1.1:1. The whole
+ * card was unreadable: the wordmark, the tagline and the label all vanished.
+ *
+ * The two honest ways out were dark text or a scrim. Dark text loses against
+ * the black cabin windows the tagline sits over, so it is a scrim, and it is
+ * the smallest one that works rather than a flat wash. Measured against white:
+ * about 5.1:1 behind the wordmark at the top, about 8.5:1 behind the tagline,
+ * about 8.9:1 behind the label. The aircraft is still visible through the
+ * middle, which is where the scrim is lightest.
+ *
+ * If the video is ever replaced with a dark one, delete this rule rather than
+ * keeping it out of habit.
+ */
+.footer-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(10, 8, 6, 0.58) 0%,
+    rgba(10, 8, 6, 0.44) 38%,
+    rgba(10, 8, 6, 0.84) 100%
+  );
+}
+
+.footer-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.footer-logo {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.footer-logo-mark {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  display: grid;
+  place-items: center;
+}
+
+.footer-logo-mark img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.footer-logo-name {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.02em;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.35);
+}
+
+.footer-tagline-container {
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+  margin-bottom: 28px;
+}
+
+.footer-tagline {
+  font-family: var(--font-body);
+  font-size: 19px;
+  font-weight: 400;
+  color: #fff;
+  line-height: 1.45;
+  margin: 0;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.4);
+}
+
+.footer-tagline span {
+  display: block;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.footer-social-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.footer-social-label {
+  font-family: "Caveat", var(--font-hand);
+  font-size: 17px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: 0.3px;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.4);
+}
+
+.footer-social-icons {
+  display: flex;
+  gap: 7px;
+}
+
+.footer-social-icons a {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: #0e1014;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, 0.35),
+    0 2px 6px rgba(0, 0, 0, 0.2);
+  transition:
+    background 0.2s,
+    transform 0.15s,
+    box-shadow 0.2s;
+}
+
+.footer-social-icons svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
+.footer-social-icons a:hover {
+  background: #000;
+  transform: translateY(-2px);
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.45),
+    0 3px 10px rgba(0, 0, 0, 0.28);
+}
+
+.footer-social-icons a:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+/* Right card */
+
+.footer-right {
+  position: relative;
+  background: var(--surface);
+  border-radius: 28px;
+  padding: 40px;
+  overflow: visible;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.footer-lucky-graphic {
+  position: absolute;
+  top: -36px;
+  right: 40px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+/* The original is cobalt. Ours is the accent orange, because a second brand
+   colour showing up once, in the footer, would read as a mistake. */
+.lucky-cube {
+  width: 96px;
+  height: 96px;
+  border-radius: 22px;
+  rotate: -10deg;
+  background: linear-gradient(135deg, #f9a03c 0%, #ea580c 55%, #a8420a 100%);
+  box-shadow:
+    inset 3px 3px 8px rgba(255, 255, 255, 0.35),
+    inset -3px -3px 12px rgba(0, 0, 0, 0.18),
+    8px 14px 28px rgba(168, 66, 10, 0.28);
+  display: grid;
+  place-items: center;
+}
+
+/*
+ * No `invert()` here. The logo asset is a dark rounded tile with the fish cut
+ * out of it, so inverting it turns the tile white and the fish disappears with
+ * it. Left alone, the dark tile reads perfectly well against the orange.
+ */
+.lucky-cube img {
+  rotate: 10deg;
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
+  border-radius: 10px;
+}
+
+.lucky-text-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  rotate: -4deg;
+  margin-top: 4px;
+}
+
+.lucky-arrow {
+  width: 22px;
+  height: 22px;
+  color: #9ca3af;
+  flex: none;
+}
+
+.lucky-text {
+  font-family: "Caveat", var(--font-hand);
+  font-size: 20px;
+  font-weight: 600;
+  color: #9ca3af;
+  white-space: nowrap;
+}
+
+.footer-nav-cols {
+  display: flex;
+  gap: 72px;
+  padding-top: 8px;
+}
+
+.footer-nav-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.footer-nav-col h3 {
+  font-family: "Caveat", var(--font-hand);
+  font-size: 24px;
+  font-weight: 600;
+  font-style: italic;
+  color: #9ca3af;
+  margin: 0 0 18px;
+}
+
+.footer-nav-col a {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+  text-decoration: none;
+  margin-bottom: 14px;
+  transition: color 0.2s;
+}
+
+.footer-nav-col a:hover {
+  color: var(--accent);
+}
+
+.footer-nav-col a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.footer-bottom {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 48px;
+}
+
+.footer-copyright {
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--fg-muted);
+  line-height: 1.5;
+  margin: 0;
+  max-width: 34ch;
+}
+
+.footer-cta-mini {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.footer-cta-mini h4 {
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--fg-muted);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.footer-cta-mini strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--fg);
+}
+
+/*
+ * This is where a subscribe field would go, and it is a link instead.
+ *
+ * There is no subscription endpoint and there is no plan to build one, so a
+ * field here would take somebody's address and drop it. That is exactly the
+ * small dishonesty the rest of this page argues against, and the argument does
+ * not survive one exception in the footer.
+ */
+.footer-subscribe-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 310px;
+  max-width: 100%;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 5px 5px 5px 14px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+  text-decoration: none;
+}
+
+.footer-subscribe-text {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+
+.footer-subscribe-button {
+  flex: none;
+  padding: 11px 22px;
+  background: #111214;
+  color: #fff;
+  border-radius: 8px;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.28),
+    0 2px 8px rgba(0, 0, 0, 0.15);
+  transition:
+    background 0.2s,
+    transform 0.15s;
+}
+
+.footer-subscribe-row:hover .footer-subscribe-button {
+  background: #000;
+  transform: translateY(-1px);
+}
+
+.footer-subscribe-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* The wordmark. Its viewBox is set from the rendered glyph box by Footer.tsx,
+   so the letters meet the container edges instead of floating inside a guessed
+   box that changes the moment the webfont arrives. */
+.footer-watermark {
+  max-width: 1150px;
+  margin: -60px auto 0;
+  padding-inline: 24px;
+  pointer-events: none;
+  user-select: none;
+  position: relative;
+  z-index: 0;
+  line-height: 0;
+}
+
+.footer-watermark svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.footer-watermark text {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  fill: rgba(0, 0, 0, 0.04);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+ * RESPONSIVE — the three tiers, and the one rule that governs all of them:
+ * every redefinition of `--k` stays a LENGTH. A single unitless branch inside
+ * a clamp() poisons the whole function and the sections above go blank.
+ * ════════════════════════════════════════════════════════════════════ */
+
+/* Desktop: two feature cards per row, two showcase items per row. */
+@media (min-width: 1024px) {
+  .showcase__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Tablet, 700 to 1080. One card per row so the interiors keep their size. */
+@media (max-width: 1080px) {
+  .features,
+  .showcase {
+    /* Every branch carries px. `clamp(0.72, ..., 1)` would kill the section. */
+    --k: clamp(0.72px, calc((100vw - 2 * var(--tablet-inset)) / 1080), 1px);
+  }
+
+  .features__grid {
+    grid-template-columns: 1fr;
+    width: min(75vw, calc(100% - 48px));
+  }
+
+  .record-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@supports (width: 1cqw) {
+  @media (max-width: 1080px) {
+    .features,
+    .showcase {
+      --k: clamp(0.72px, calc((100cqw - 2 * var(--tablet-inset)) / 1080), 1px);
+    }
+  }
+}
+
+/* Narrow tablet. */
+@media (max-width: 860px) {
+  .footer-wrapper {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+
+  .footer-left {
+    min-height: 320px;
+    aspect-ratio: auto;
+  }
+
+  .footer-watermark {
+    margin-top: -30px;
+  }
+}
+
+/* Mobile, 699 and below.
+ *
+ * `--k` is 1px here (note the unit) and the drawings stop being drawings: the
+ * interior pieces come out of absolute positioning and stack. Scaling them
+ * instead would leave a mini-card's title at seven pixels, which is a picture
+ * of a card rather than a card.
+ *
+ * `.feature__media` gives up its aspect-ratio here because its children now
+ * have intrinsic height, but it keeps a `min-height` so the guarantee that
+ * matters (never zero) survives the change.
+ */
+@media (max-width: 699px) {
+  .features,
+  .showcase {
+    --k: 1px;
+  }
+
+  .features__grid {
+    width: calc(100% - 32px);
+    grid-template-columns: 1fr;
+  }
+
+  .feature__media {
+    height: auto;
+    aspect-ratio: auto;
+    min-height: 220px;
+    container-type: normal;
+    overflow: visible;
+    padding: 18px;
+    border-radius: 20px;
+  }
+
+  .feature__stage {
+    position: static;
+    transform: none;
+    height: auto;
+    --u: 1px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  /*
+   * All three selectors, not just the star.
+   *
+   * `.feature__stage > [style*="--w"]` is an attribute selector and outranks
+   * `.feature__stage > *`, so a lone `* { width: auto }` here loses and every
+   * interior piece keeps the pixel width it was given for the desktop drawing.
+   * The card then clips it and half the text on this page disappears on a
+   * phone while the desktop stays perfect. Match the specificity or the
+   * override does nothing.
+   */
+  .feature__stage > *,
+  .feature__stage > [style*="--w"],
+  .feature__stage > [style*="--h"] {
+    position: static;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+  }
+
+  /* The connector only means anything when the three cards it points at are in
+     a row. Stacked, it points at nothing. */
+  .connector {
+    display: none;
+  }
+
+  .mini-card,
+  .benefit-card,
+  .mini-finder,
+  .check-row {
+    width: 100%;
+  }
+
+  .mini-card__art {
+    width: 56px;
+    margin-bottom: 10px;
+  }
+
+  .benefit-card__art {
+    width: 72px;
+  }
+
+  .check-row {
+    padding-block: 14px;
+    align-items: flex-start;
+  }
+
+  .check-row__go {
+    display: none;
+  }
+
+  .mini-finder__scope {
+    display: none;
+  }
+
+  .mini-finder__row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 4px 10px;
+  }
+
+  .mini-finder__row code {
+    grid-column: 2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .mini-finder__tag {
+    grid-column: 2;
+  }
+
+  .chip-key,
+  .chip-record,
+  .chip-count,
+  .chip-plain,
+  .chip-live-sm {
+    align-self: flex-start;
+    height: 32px;
+    font-size: 13px;
+    padding-inline: 14px;
+    gap: 8px;
+  }
+
+  .chip-dot {
+    width: 8px;
+    height: 8px;
+  }
+
+  .stage-note,
+  .mini-card__name,
+  .mini-card__category,
+  .mini-card__price,
+  .benefit-card__name,
+  .benefit-card__category,
+  .benefit-card__body,
+  .check-row,
+  .mini-finder__field,
+  .mini-finder__row,
+  .mini-finder__row code,
+  .mini-finder__tag,
+  .mini-finder__foot {
+    font-size: 14px;
+  }
+
+  .mini-card__name,
+  .benefit-card__name {
+    font-size: 16px;
+  }
+
+  .check-badge,
+  .cross-badge,
+  .finder-glyph {
+    width: 18px;
+    height: 18px;
+    font-size: 14px;
+  }
+
+  .mini-finder__caret {
+    width: 1px;
+    height: 15px;
+  }
+
+  .showcase__figure {
+    aspect-ratio: auto;
+    min-height: 240px;
+    padding: 16px;
+  }
+
+  .showcase__figure .puff-row {
+    gap: 6px;
+  }
+
+  .showcase__figure .puff-name {
+    font-size: 11px;
+  }
+
+  .showcase__figure .puff-index {
+    font-size: 10px;
+  }
+
+  .listing-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .listing-tile {
+    border-radius: 12px;
+    padding: 10px;
+    gap: 2px;
+  }
+
+  .listing-tile__art {
+    width: 26px;
+    border-radius: 6px;
+    margin-bottom: 4px;
+  }
+
+  .listing-tile__name {
+    font-size: 13px;
+  }
+
+  .listing-tile__category,
+  .listing-tile__state {
+    font-size: 11px;
+  }
+
+  .record-row {
+    grid-template-columns: 1fr;
+  }
+
+  .triptych__scene {
+    width: calc(100% - 32px);
+  }
+}
+
+/* The triptych's own two tiers, from the composition it came from. */
+@media (max-width: 56rem) and (max-aspect-ratio: 5 / 4) {
+  .triptych__scene {
+    aspect-ratio: auto;
+    height: auto;
+    container-type: inline-size;
+  }
+
+  .triptych .cards {
+    position: static;
+    translate: none;
+    scale: 1;
+    width: min(88cqw, 45rem);
+    max-width: 100%;
+    height: auto;
+    margin-inline: auto;
+    grid-template-columns: repeat(2, 1fr);
+    gap: clamp(0.75rem, 2cqw, 1.2rem);
+  }
+
+  .triptych .card {
+    height: auto;
+    aspect-ratio: 0.781;
+  }
+
+  .triptych .card:last-child {
+    grid-column: 1 / -1;
+    width: calc((100% - clamp(0.75rem, 2cqw, 1.2rem)) / 2);
+    margin-inline: auto;
+    margin-top: 0;
+  }
+
+  .triptych .card-copy h2 {
+    font-size: clamp(15px, 3.4cqw, 22px);
+    white-space: normal;
+  }
+
+  .triptych .card-copy p {
+    font-size: clamp(12px, 2.6cqw, 16px);
+  }
+}
+
+@media (max-width: 32rem),
+  ((max-height: 28rem) and (max-width: 64rem) and (pointer: coarse)) {
+  .triptych__scene {
+    aspect-ratio: auto;
+    height: auto;
+    container-type: inline-size;
+  }
+
+  .triptych .cards {
+    position: static;
+    translate: none;
+    scale: 1;
+    width: min(90cqw, 26rem);
+    max-width: 100%;
+    margin-inline: auto;
+    height: auto;
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .triptych .card,
+  .triptych .card:last-child {
+    height: auto;
+    width: 100%;
+    aspect-ratio: 0.86;
+    grid-column: auto;
+    margin: 0;
+  }
+
+  .triptych .card-copy h2 {
+    font-size: clamp(17px, 6cqw, 24px);
+    white-space: normal;
+  }
+
+  .triptych .card-copy p {
+    font-size: clamp(13px, 4.2cqw, 17px);
+  }
+
+  .triptych .value-chip,
+  .triptych .assistant-badge,
+  .triptych .question,
+  .triptych .prompt code,
+  .triptych .prompt-note,
+  .triptych .automate,
+  .triptych .metric-label,
+  .triptych .metric-green,
+  .triptych .tag,
+  .triptych .axis {
+    font-size: clamp(10px, 3cqw, 14px);
+  }
+
+  .triptych .metric strong {
+    font-size: clamp(38px, 16cqw, 68px);
+  }
+}
+
+@media (max-width: 560px) {
+  .footer-right {
+    padding: 64px 24px 24px;
+  }
+
+  .footer-lucky-graphic {
+    align-items: flex-end;
+  }
+
+  .lucky-text {
+    font-size: 16px;
+  }
+
+  .footer-nav-cols {
+    gap: 40px;
+  }
+
+  .footer-bottom {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 24px;
+  }
+
+  .footer-subscribe-row {
+    width: 100%;
+  }
+
+  .footer-lucky-graphic {
+    right: 12px;
+    top: -28px;
+  }
+
+  .lucky-cube {
+    width: 72px;
+    height: 72px;
+  }
+
+  .lucky-cube img {
+    width: 34px;
+    height: 34px;
+  }
+
+  .footer-watermark {
+    margin-top: -14px;
+  }
+}
+
+/* Extra narrow, 360 and below. */
+@media (max-width: 360px) {
+  .features__grid,
+  .triptych__scene {
+    width: calc(100% - 24px);
+  }
+
+  .listing-grid {
+    grid-template-columns: 1fr;
+  }
+}
