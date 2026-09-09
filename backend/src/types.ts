@@ -26,14 +26,40 @@
  *    claims checkable rather than merely asserted.
  */
 
-/** The four Fugugent product categories. The order is THE SAME as the `Category` enum in Solidity. */
-export const CATEGORIES = ["REBALANCING", "GRID", "YIELD", "HEALTH_FACTOR"] as const;
+/**
+ * The nine Fugugent product categories, in THE SAME order as the `Category` enum in
+ * Solidity (`contracts/src/types/FuguTypes.sol`).
+ *
+ * **This array is append-only. Never reorder it, never insert into the middle, never
+ * delete from it.** Position in this array IS the on-chain enum index, and that index is
+ * what is stored inside every listing in the `FuguRegistry` proxy on BSC testnet
+ * (`0xb2f36070E6eae3353E8e755172B477DF213ae248`). Moving an entry does not fail loudly:
+ * it silently relabels listings that already exist, so a health-factor agent starts
+ * showing up as something else.
+ *
+ * The first four were live before 2026-09-09 and their indices are frozen. The last five
+ * were appended when the catalog was widened; the contract upgrade that added them is
+ * proved not to have moved the old four by `contracts/test/CategoryUpgradeSafety.t.sol`.
+ */
+export const CATEGORIES = [
+  "REBALANCING",
+  "GRID",
+  "YIELD",
+  "HEALTH_FACTOR",
+  // --- appended 2026-09-09 ---
+  "HIRING",
+  "COMMERCE",
+  "AUTONOMOUS",
+  "STREAMING",
+  "TREASURY",
+] as const;
 
 export type Category = (typeof CATEGORIES)[number];
 
 /**
  * Maps the on-chain enum index -> category.
- * `contracts/src/types/FuguTypes.sol`: `REBALANCING=0, GRID=1, YIELD=2, HEALTH_FACTOR=3`.
+ * `contracts/src/types/FuguTypes.sol`: `REBALANCING=0, GRID=1, YIELD=2, HEALTH_FACTOR=3,
+ * HIRING=4, COMMERCE=5, AUTONOMOUS=6, STREAMING=7, TREASURY=8`.
  * Never reorder `CATEGORIES` without changing the contract.
  */
 export function categoryFromOnchainIndex(index: number): Category | null {
