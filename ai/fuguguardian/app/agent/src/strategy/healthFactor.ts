@@ -48,8 +48,8 @@ export function healthFactorAfterPriceDrop(pos: Position, dropBps: bigint): bigi
 /** The amount that must be repaid for HF to reach `targetHf`; 0n when it is already safe. */
 export function repayToReachTarget(pos: Position, targetHf: bigint): bigint {
   if (pos.debtBase === 0n || targetHf === 0n) return 0n;
-  const hutangTarget =
+  const targetDebt =
     (pos.collateralBase * pos.liquidationThresholdBps * HF_ONE) / (BPS * targetHf);
-  if (hutangTarget >= pos.debtBase) return 0n;
-  return pos.debtBase - hutangTarget;
+  if (targetDebt >= pos.debtBase) return 0n;
+  return pos.debtBase - targetDebt;
 }
