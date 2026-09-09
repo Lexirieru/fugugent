@@ -73,7 +73,7 @@ It is granted through `app/agent/scripts/grant-session-guardian.ts`, not
 loaded through `ensureAltanaSessionLoaded()`/`getWallet()`: the studio runtime rejects a
 session whose `permissions.calls` is not an exact copy of `defaultAgentPermissions()`. Load
 it through `deserializeSession` + `AltanaWalletProvider` (see
-`app/agent/scripts/altana.ts`).
+`app/agent/src/altana.ts`).
 
 **The Porto trap that has already cost one route:** a spend-capped session key runs through
 a guarded executor that **returns the ERC-20 allowance to zero at the end of the same
