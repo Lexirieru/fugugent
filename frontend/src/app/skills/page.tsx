@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Pagination, pageFromParam } from "@/components/pagination";
 import { ProofList } from "@/components/proof";
 import { SkillCard } from "@/components/skills/skill-card";
 import { SkillProvenanceRow } from "@/components/skills/skill-provenance";
@@ -40,11 +41,11 @@ export default async function SkillsPage({ searchParams }: PageProps<"/skills">)
     : null;
   const kind: SkillKind | null = isSkillKind(first("kind")) ? (first("kind") as SkillKind) : null;
   const q = first("q");
-  const offsetRaw = Number(first("offset") ?? "0");
-  const offset = Number.isFinite(offsetRaw) && offsetRaw > 0 ? Math.floor(offsetRaw) : 0;
+  const pageNumber = pageFromParam(first("page"));
+  const offset = (pageNumber - 1) * LIMIT;
 
   const src = skillSource();
-  const page = await src.listSkills({ limit: LIMIT, offset, kind, status, q });
+  const result = await src.listSkills({ limit: LIMIT, offset, kind, status, q });
 
   /**
    * The census behind the status filter is asked for separately and without a status,
@@ -60,7 +61,7 @@ export default async function SkillsPage({ searchParams }: PageProps<"/skills">)
    */
   const censusPage =
     status === null && offset === 0
-      ? page
+      ? result
       : await src.listSkills({
           limit: CENSUS_LIMIT,
           offset: 0,
@@ -79,7 +80,7 @@ export default async function SkillsPage({ searchParams }: PageProps<"/skills">)
       status,
       kind,
       q,
-      offset: offset > 0 ? String(offset) : null,
+      page: pageNumber > 1 ? String(pageNumber) : null,
     };
     for (const [key, value] of Object.entries({ ...base, ...patch })) {
       if (value !== null && value !== "") params.set(key, value);
@@ -89,7 +90,13 @@ export default async function SkillsPage({ searchParams }: PageProps<"/skills">)
   };
 
   const filtered = status !== null || kind !== null || (q !== null && q.trim() !== "");
-  const hasMore = offset + page.items.length < page.total;
+  /**
+   * The skill registry is a single source with an exact count, unlike the agent
+   * catalogue, so here the total can be printed and the next page can be derived
+   * from it without promising anything.
+   */
+  const hasNext = result.provenance.healthy && offset + result.items.length < result.total;
+  const hrefForPage = (n: number) => hrefWith({ page: n > 1 ? String(n) : null });
 
   return (
     <Page>
@@ -106,7 +113,7 @@ export default async function SkillsPage({ searchParams }: PageProps<"/skills">)
         </p>
 
         <div className="mt-8">
-          <SkillProvenanceRow provenance={page.provenance} origin={src.origin} />
+          <SkillProvenanceRow provenance={result.provenance} origin={src.origin} />
         </div>
       </Section>
 
@@ -163,43 +170,39 @@ export default async function SkillsPage({ searchParams }: PageProps<"/skills">)
         </div>
 
         <div className="mt-8">
-          {page.items.length > 0 ? (
+          {result.items.length > 0 ? (
             <>
-              <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {page.items.map((skill) => (
+              <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {result.items.map((skill) => (
                   <li key={skill.id} className="flex">
                     <SkillCard skill={skill} />
                   </li>
                 ))}
               </ul>
-              {offset > 0 || hasMore ? (
-                <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-                  {offset > 0 ? (
-                    <ButtonLink
-                      href={hrefWith({
-                        offset: offset - LIMIT > 0 ? String(offset - LIMIT) : null,
-                      })}
-                      variant="ghost"
-                    >
-                      ← Previous
-                    </ButtonLink>
-                  ) : (
-                    <span />
-                  )}
-                  <span className="tnum text-xs text-faint">
-                    {offset + 1}–{offset + page.items.length} of {page.total}
-                  </span>
-                  {hasMore ? (
-                    <ButtonLink href={hrefWith({ offset: String(offset + LIMIT) })} variant="ghost">
-                      Next →
-                    </ButtonLink>
-                  ) : (
-                    <span />
-                  )}
-                </div>
-              ) : null}
+              <Pagination
+                page={pageNumber}
+                offset={offset}
+                shown={result.items.length}
+                hasNext={hasNext}
+                total={result.total}
+                hrefForPage={hrefForPage}
+                unit="skill"
+              />
             </>
-          ) : page.provenance.healthy ? (
+          ) : pageNumber > 1 ? (
+            <EmptyState
+              title="There is nothing on this page"
+              body="The registry answered and this page of it is empty. The list is shorter than the page number in the address, so the first page is where the skills are."
+              actions={
+                <>
+                  <ButtonLink href={hrefForPage(1)}>Back to the first page</ButtonLink>
+                  <ButtonLink href={hrefForPage(pageNumber - 1)} variant="ghost">
+                    ← The page before this one
+                  </ButtonLink>
+                </>
+              }
+            />
+          ) : result.provenance.healthy ? (
             <EmptyState
               title={filtered ? "Nothing matches those filters" : "No skill has been listed yet"}
               body={
