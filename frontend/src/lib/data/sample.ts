@@ -71,6 +71,9 @@ function baseRecord(
     },
     classification: null,
     fuguListing: null,
+    // The bundled sample carries its evidence in `outcomes` directly rather than
+    // through a listing document, so there is nothing to decode here.
+    listingMetadata: null,
     source: "seed",
     fetchedAt: SEED_FETCHED_AT,
     createdAt: null,

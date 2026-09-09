@@ -73,6 +73,21 @@ export interface AgentClassification {
   reason: string;
 }
 
+/** The recognised fields of a listing's on-chain metadata document. All optional. */
+export interface ListingMetadata {
+  name: string | null;
+  description: string | null;
+  onchainExecution: boolean | null;
+  /** What the owner says the agent has already done, with hashes if they gave any. */
+  proof: string | null;
+  /** What the owner says it cannot do yet. */
+  limits: string | null;
+  /** A command or link the owner offers so a reader can check for themselves. */
+  verify: string | null;
+  declaredAgentWallet: Address | null;
+  agentWalletMatchesListing: boolean | null;
+}
+
 export interface AgentRecord {
   id: string;
   chainId: number;
@@ -103,6 +118,14 @@ export interface AgentRecord {
 
   classification: AgentClassification | null;
   fuguListing: FuguListing | null;
+  /**
+   * What the listing owner published on chain about their own agent.
+   *
+   * Every field here is a claim, not a measurement. We decode it from the listing's
+   * `metadataURI` and show it as the owner's words. Treating it as verified is the
+   * mistake this whole product exists to avoid.
+   */
+  listingMetadata: ListingMetadata | null;
 
   source: AgentSource;
   fetchedAt: string;

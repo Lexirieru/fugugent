@@ -479,6 +479,7 @@ describe("onchainExecution — three states, and the third is not false", () => 
       name: "Fugu Guardian",
       description: "repays debt before liquidation",
       onchainExecution: true,
+      proof: "raised a health factor from 1.14 to 1.50, tx 0x619cfbe3",
       limits: "testnet only",
       verify: "cast call ...",
       declaredAgentWallet: null,

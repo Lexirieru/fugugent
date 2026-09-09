@@ -92,19 +92,28 @@ function failedProvenance(reason: string, now: string): Provenance {
 }
 
 /**
- * A record from the backend does not carry risk, session permissions, or proof yet,
- * the `AgentRecord` shape genuinely does not hold them. Those fields are left empty,
- * which makes the fugu draw hollow: no fresh reading, so no guessed level. Once the
- * backend serves them, this function is the only thing that changes.
+ * A record from the backend carries no live risk reading and no session permissions,
+ * so those stay null and the fugu draws hollow: no fresh reading, so no guessed level.
+ *
+ * What it does carry is whatever the listing owner published on chain. `proof` and
+ * `limits` were being dropped here, and that was not a gap in the shape but a defect
+ * with a visible symptom: the registration script writes an evidence paragraph with
+ * transaction hashes into every listing, and this page answered "Nothing to show,
+ * because it has not run" for an agent whose proof had been on chain the whole time.
+ *
+ * Both are presented as claims by the listing owner, because that is exactly what they
+ * are. We did not verify them; we read them off the listing. The wording on screen has
+ * to keep saying so.
  */
 function toView(record: ReturnType<typeof parseAgentRecord>): AgentView {
+  const meta = record.listingMetadata;
   return {
     record,
     risk: null,
     session: null,
     proofs: [],
-    notShipped: null,
-    outcomes: [],
+    notShipped: meta?.limits ?? null,
+    outcomes: meta?.proof ? [meta.proof] : [],
   };
 }
 

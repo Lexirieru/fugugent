@@ -68,6 +68,20 @@ export interface ListingMetadata {
    * whole layer exists to avoid, so a `false` here is load-bearing, not trivia.
    */
   onchainExecution: boolean | null;
+  /**
+   * What the lister says the agent has already done, in its own words.
+   *
+   * Dropping this was a real defect rather than an omission: the registration
+   * script writes an evidence paragraph with transaction hashes and block
+   * numbers into the listing, and because this parser did not recognise the key,
+   * the marketplace answered "No transactions yet" for an agent whose proof was
+   * sitting on chain the whole time. The claim was published and then discarded
+   * one layer later.
+   *
+   * It is treated as a claim, not as proof. Nothing here is verified by us; it is
+   * whatever the listing owner wrote, and the UI has to present it that way.
+   */
+  proof: string | null;
   /** Free-text limitations declared by the lister. */
   limits: string | null;
   /** How a reader can verify the claims themselves. */
@@ -185,6 +199,7 @@ export function parseListingMetadata(metadataURI: unknown): ListingMetadata | nu
     text(parsed.description, MAX_DESCRIPTION_LENGTH) ??
     text(parsed.summary, MAX_DESCRIPTION_LENGTH);
   const onchainExecution = bool(parsed.onchainExecution);
+  const proof = text(parsed.proof, MAX_NOTE_LENGTH);
   const limits = text(parsed.limits, MAX_NOTE_LENGTH);
   const verify = text(parsed.verify, MAX_NOTE_LENGTH);
   const declaredAgentWallet = address(parsed.agentWallet);
@@ -196,6 +211,7 @@ export function parseListingMetadata(metadataURI: unknown): ListingMetadata | nu
     name === null &&
     description === null &&
     onchainExecution === null &&
+    proof === null &&
     limits === null &&
     verify === null &&
     declaredAgentWallet === null
@@ -207,6 +223,7 @@ export function parseListingMetadata(metadataURI: unknown): ListingMetadata | nu
     name,
     description,
     onchainExecution,
+    proof,
     limits,
     verify,
     declaredAgentWallet,

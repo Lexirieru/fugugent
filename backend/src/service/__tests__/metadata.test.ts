@@ -295,3 +295,34 @@ describe("parseListingMetadata — guards that only bite on a crafted payload", 
     expect(parseListingMetadata(smuggled)).toBeNull();
   });
 });
+
+/**
+ * The regression this file exists for.
+ *
+ * `proof` was written into every listing by the registration script and dropped
+ * here, so the marketplace showed "No transactions yet" for an agent whose
+ * evidence was on chain. A parser that silently discards a field it does not
+ * recognise is how a published claim disappears one layer later.
+ */
+describe("proof survives the parse", () => {
+  it("keeps the evidence paragraph the listing published", () => {
+    const proof = "Raised a health factor from 1.14 to 1.50 by repaying $4.03, tx 0x619cfbe3.";
+    const uri = dataUri({ name: "Fugu Guardian", summary: "watches a loan", proof });
+
+    expect(parseListingMetadata(uri)?.proof).toBe(proof);
+  });
+
+  it("is null, not an empty string, when the listing published none", () => {
+    const uri = dataUri({ name: "Fugu Guardian", summary: "watches a loan" });
+
+    expect(parseListingMetadata(uri)?.proof).toBeNull();
+  });
+
+  it("alone is enough to make a document usable", () => {
+    // A listing that declares nothing but its evidence still says something worth
+    // showing, so it must not be discarded as unreadable metadata.
+    const uri = dataUri({ proof: "tx 0x619cfbe3" });
+
+    expect(parseListingMetadata(uri)?.proof).toBe("tx 0x619cfbe3");
+  });
+});

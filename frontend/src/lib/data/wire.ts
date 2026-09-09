@@ -95,6 +95,7 @@ export function parseAgentRecord(v: unknown, at = "agent"): AgentRecord {
 
   const rep = asRecord(o.reputation ?? {}, `${at}.reputation`);
   const cls = o.classification == null ? null : asRecord(o.classification, `${at}.classification`);
+  const lm = o.listingMetadata == null ? null : asRecord(o.listingMetadata, `${at}.listingMetadata`);
 
   return {
     id: o.id,
@@ -129,6 +130,20 @@ export function parseAgentRecord(v: unknown, at = "agent"): AgentRecord {
       averageScore: nullableNumber(rep.averageScore),
       starCount: nullableNumber(rep.starCount) ?? 0,
     },
+
+    listingMetadata: lm
+      ? {
+          name: nullableString(lm.name),
+          description: nullableString(lm.description),
+          onchainExecution: typeof lm.onchainExecution === "boolean" ? lm.onchainExecution : null,
+          proof: nullableString(lm.proof),
+          limits: nullableString(lm.limits),
+          verify: nullableString(lm.verify),
+          declaredAgentWallet: (nullableString(lm.declaredAgentWallet) as Address | null) ?? null,
+          agentWalletMatchesListing:
+            typeof lm.agentWalletMatchesListing === "boolean" ? lm.agentWalletMatchesListing : null,
+        }
+      : null,
 
     classification: cls
       ? {
