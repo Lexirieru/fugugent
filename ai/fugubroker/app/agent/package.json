@@ -1,0 +1,38 @@
+{
+  "name": "fugubroker-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Fugu Broker Agent (sole signer, value layer): rents other agents from the FuguRegistry catalog and pays them.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx src/dualMain.ts",
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p tsconfig.scripts.json",
+    "session:grant": "tsx scripts/grant-session-broker.ts"
+  },
+  "dependencies": {
+    "@a2a-js/sdk": ">=0.3.14 <1.0",
+    "@ai-sdk/openai": "^4.0.60",
+    "@altananetwork/sdk": "0.7.1",
+    "@aws-sdk/client-secrets-manager": "^3.600.0",
+    "@bnbagent/sdk": "0.5.5",
+    "@bnbagent/studio-runtime": "0.0.13",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "ai": "^7.0.29",
+    "express": "^5.1.0",
+    "viem": "^2.56.3",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0",
+    "vitest": "^5.0.0"
+  }
+}
