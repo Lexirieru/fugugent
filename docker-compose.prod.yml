@@ -397,6 +397,11 @@ services:
     container_name: fugugent-prod-fuguguardian
     environment:
       <<: *agent-env
+    # The public URL this agent's own A2A card advertises. An A2A client reads
+    # the card and calls whatever is in that field, so left unset the card says
+    # `http://localhost:9000/`, which is correct on this machine and useless from
+    # anywhere else. nginx maps each path prefix to the port below.
+      AGENTCORE_RUNTIME_URL: ${AGENTS_BASE_URL:-https://agents.hellofugu.xyz}/guardian/
       # The monitoring loop is opt-in in code so `bag dev` keeps working
       # untouched. On the VPS it is the entire reason this container exists.
       FUGU_GUARDIAN_ENABLED: "1"
@@ -464,6 +469,13 @@ services:
       context: ./ai/fugurebalancer
       dockerfile: app/agent/Dockerfile
     container_name: fugugent-prod-fugurebalancer
+    environment:
+      <<: *agent-env
+    # The public URL this agent's own A2A card advertises. An A2A client reads
+    # the card and calls whatever is in that field, so left unset the card says
+    # `http://localhost:9000/`, which is correct on this machine and useless from
+    # anywhere else. nginx maps each path prefix to the port below.
+      AGENTCORE_RUNTIME_URL: ${AGENTS_BASE_URL:-https://agents.hellofugu.xyz}/rebalancer/
     volumes:
       - ./ai/fugurebalancer/.studio/wallets:/srv/agent/.studio/wallets:ro
     ports:
@@ -479,6 +491,13 @@ services:
       context: ./ai/fugugrid
       dockerfile: app/agent/Dockerfile
     container_name: fugugent-prod-fugugrid
+    environment:
+      <<: *agent-env
+    # The public URL this agent's own A2A card advertises. An A2A client reads
+    # the card and calls whatever is in that field, so left unset the card says
+    # `http://localhost:9000/`, which is correct on this machine and useless from
+    # anywhere else. nginx maps each path prefix to the port below.
+      AGENTCORE_RUNTIME_URL: ${AGENTS_BASE_URL:-https://agents.hellofugu.xyz}/grid/
     volumes:
       - ./ai/fugugrid/.studio/wallets:/srv/agent/.studio/wallets:ro
     ports:
@@ -494,6 +513,13 @@ services:
       context: ./ai/fuguyield
       dockerfile: app/agent/Dockerfile
     container_name: fugugent-prod-fuguyield
+    environment:
+      <<: *agent-env
+    # The public URL this agent's own A2A card advertises. An A2A client reads
+    # the card and calls whatever is in that field, so left unset the card says
+    # `http://localhost:9000/`, which is correct on this machine and useless from
+    # anywhere else. nginx maps each path prefix to the port below.
+      AGENTCORE_RUNTIME_URL: ${AGENTS_BASE_URL:-https://agents.hellofugu.xyz}/yield/
     volumes:
       - ./ai/fuguyield/.studio/wallets:/srv/agent/.studio/wallets:ro
     ports:

@@ -1,4 +1,4 @@
-# Secrets — jangan pernah di-commit
+# Secrets. Never commit these.
 .env
 .env.*
 !.env.example
@@ -23,3 +23,8 @@ broadcast/
 
 # OS
 .DS_Store
+
+# Reference material read while building, not part of what ships. Cloned from
+# other people's repositories, so committing it here would republish their code
+# under this repository's history.
+references/
