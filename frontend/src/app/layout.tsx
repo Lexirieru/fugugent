@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
-import { SiteNav } from "@/components/site-nav";
+import { PillNav } from "@/components/pill-nav";
 import { ConnectControl } from "@/components/wallet/connect-button";
 import { WalletProvider } from "@/components/wallet/provider";
 import { CHAIN, CONTRACT_LIST, addressUrl, shorten } from "@/lib/chain";
@@ -56,24 +56,22 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
  * The header carries the whole product in one line: which page you are on, which
  * network you are on, and whether a wallet is connected.
  *
- * At 390px the four nav links take a full-width row of their own below the wallet
- * control, and everything folds back into one line at `sm`. Nothing is hidden behind a
- * menu button at any width.
+ * `PillNav` sits in normal flow here rather than at the `position: absolute; top: 1em`
+ * its stylesheet ships with, which would have covered the wallet control. The header
+ * keeps its sticky behaviour and nothing ends up underneath anything.
+ *
+ * At 390px the nav takes a full-width row of its own below the wallet control and its
+ * pills wrap inside their own track. Nothing is hidden behind a menu button at any
+ * width, and the logo is the way back to the start page rather than a second link
+ * with a second name for it.
  */
 function SiteHeader() {
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 sm:px-8">
-        <Link
-          href="/"
-          className="text-sm font-semibold tracking-tight text-fg"
-          aria-label="HelloFugu, start page"
-        >
-          HelloFugu
-        </Link>
-        <SiteNav className="order-last w-full border-t border-line pt-2 sm:order-none sm:w-auto sm:border-t-0 sm:pt-0" />
+      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-4 gap-y-3 px-5 py-3 sm:px-8">
+        <PillNav className="order-last w-full sm:order-none sm:w-auto" />
         <span className="ml-auto flex items-center gap-2">
-          <span className="hidden items-center gap-1.5 rounded-full border border-accent/40 bg-accent-soft px-2.5 py-0.5 text-[11px] font-medium text-accent-strong sm:inline-flex">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent-soft px-2.5 py-0.5 text-[11px] font-medium text-accent-strong">
             {CHAIN.name}
           </span>
           <ConnectControl />

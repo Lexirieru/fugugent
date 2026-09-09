@@ -170,3 +170,219 @@ body {
   outline-offset: 3px;
   border-radius: 4px;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * PillNav — the primary navigation. Ported from React Bits' PillNav; the
+ * component and the four things that had to change are in
+ * `components/pill-nav.tsx`.
+ *
+ * ## Colour
+ *
+ * The original takes `#fff` and `#120F17` as props. Nothing here is a hex: every
+ * value below is a token from theme/tokens.css, because a colour written at a
+ * call site is a colour nobody can recompute. The structure is the original's,
+ * inverted for a light page: the track is the ink, the pills are the page.
+ *
+ * Measured (WCAG 2.1 relative luminance), against the ground each one is
+ * actually painted on:
+ *
+ *   pill --bg on track --fg                  17.15:1   the pill, and its label
+ *   track --fg on page --bg                  17.15:1   the track against the page
+ *   active pill --accent on track --fg        5.90:1   the current destination
+ *   active label --accent-ink on --accent     5.29:1   its text
+ *   marker bar --accent-ink on --accent        5.29:1   the bar under the label of
+ *                                                      the current destination
+ *
+ * The two pairs that do NOT clear 3:1 are --accent against --bg (2.91:1), and
+ * that is exactly why the current destination is never marked by colour alone:
+ * it carries a dot no other pill has, heavier text, and `aria-current="page"`.
+ * Take the colour away and the dot still says which one you are on.
+ *
+ * ## Placement
+ *
+ * The original sets `position: absolute; top: 1em`, which would sit on top of
+ * this app's sticky header and cover the wallet control. It is placed in normal
+ * flow inside that header instead, so the header keeps its sticky behaviour, the
+ * network badge and the Connect button, and nothing is ever underneath anything.
+ *
+ * ## 390px
+ *
+ * The original hides every destination behind a hamburger below 768px. There is
+ * no hamburger here at any width: the pills wrap inside their own track.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.pill-nav {
+  --pn-h: 42px;
+  --pn-gap: 3px;
+  --pn-pad-x: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* The logo file is a black rounded square with white letters on an opaque white
+   ground, so dropping it into a dark disc as-is paints a white square inside a
+   black circle. The image is scaled past the disc instead and the disc clips it,
+   which crops the white margin away and leaves the mark itself filling the
+   circle. 1.42 is 1 / 0.705, the fraction of the file the black square occupies. */
+.pill-logo {
+  width: var(--pn-h);
+  height: var(--pn-h);
+  flex: none;
+  border-radius: 50%;
+  background: var(--fg);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.pill-logo-inner {
+  display: block;
+  width: 100%;
+  height: 100%;
+  will-change: transform;
+}
+
+.pill-logo-inner img {
+  transform: scale(1.42);
+}
+
+.pill-nav-items {
+  min-width: 0;
+  background: var(--fg);
+  border-radius: 9999px;
+}
+
+.pill-list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--pn-gap);
+  margin: 0;
+  /* 5px, not the original's 3px: the pills wrap here, and 3px of breathing room
+     was measured on a track that could only ever hold one row. */
+  padding: 5px;
+}
+
+.pill-list > li {
+  display: flex;
+}
+
+.pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 6px var(--pn-pad-x);
+  background: var(--bg);
+  color: var(--fg);
+  text-decoration: none;
+  border-radius: 9999px;
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 1;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.pill .hover-circle {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  border-radius: 50%;
+  background: var(--fg);
+  z-index: 1;
+  display: block;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.pill .label-stack {
+  position: relative;
+  display: inline-block;
+  line-height: 1;
+  z-index: 2;
+}
+
+.pill .pill-label {
+  position: relative;
+  z-index: 2;
+  display: inline-block;
+  line-height: 1;
+  will-change: transform;
+}
+
+.pill .pill-label-hover {
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--bg);
+  z-index: 3;
+  display: inline-block;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+/* The current destination. Three channels, and colour is the third: it carries a
+   bar under its label that no other pill has, its text is heavier, and the link
+   carries aria-current="page". The original marks this with a dot hanging below
+   the pill; the bar is inside the pill instead, so its ground is the pill's own
+   fill and its contrast is a number that stays true wherever the pill wraps to. */
+.pill.is-active {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+.pill.is-active .hover-circle {
+  background: var(--accent-ink);
+}
+
+.pill.is-active .pill-label-hover {
+  color: var(--accent);
+}
+
+.pill.is-active::after {
+  content: "";
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 3px;
+  background: var(--accent-ink);
+  border-radius: 9999px;
+  z-index: 4;
+}
+
+/* No motion means no measured geometry either: the hover circle is never scaled
+   up, so it must not be able to cover a label. The whole message survives,
+   because it never lived in the animation. */
+@media (prefers-reduced-motion: reduce) {
+  .pill .hover-circle {
+    display: none;
+  }
+
+  .pill .pill-label-hover {
+    display: none;
+  }
+
+  .pill:hover,
+  .pill:focus-visible {
+    background: var(--fg);
+    color: var(--bg);
+  }
+
+  .pill.is-active:hover,
+  .pill.is-active:focus-visible {
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+}
