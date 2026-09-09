@@ -54,7 +54,7 @@ export const SKILL_SEED_AT = "2026-09-09T00:00:00.000Z";
 
 /** Attached to every response containing a seeded record. Never omitted. */
 export const SKILL_SEED_NOTICE =
-  "These records are curated EXAMPLES shipped with the backend to exercise every audit " +
+  "These records are curated examples shipped with the backend to exercise every audit " +
   "status. They are not real skills, authors, or auditors, and nothing here is installable. " +
   "Every example carries example: true and an id prefixed with 'example-'.";
 
@@ -264,7 +264,7 @@ function toSkill(spec: SkillSpec): SkillRecord {
     declaredDescription: spec.declaredDescription,
     declaredCapabilities: [...spec.declaredCapabilities],
     authorAddress: EXAMPLE_AUTHOR,
-    authorName: "Fugugent example author",
+    authorName: "HelloFugu example author",
     tags: [...spec.tags],
     priceUsd8PerVersion: spec.priceUsd8PerVersion,
     // Run through the very same scanner a submission goes through — so the

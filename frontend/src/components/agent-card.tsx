@@ -52,7 +52,16 @@ export function AgentCard({ view }: { view: AgentView }) {
           />
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="text-base font-semibold leading-tight text-fg">
+          {/*
+            Two lines are reserved whether or not the name needs them.
+            Agent names come from a public registry and run from "Ranger" to
+            "AgentCensus Rebalance Planner", so within one row some wrap and some do
+            not. Without a reservation the category, the badges and the description
+            below start at a different height in every card, and a tidy grid reads as
+            a broken one. `line-clamp-2` caps the other direction: a third line would
+            push the same rhythm out again.
+          */}
+          <h3 className="line-clamp-2 min-h-[2.5rem] text-base font-semibold leading-tight text-fg">
             <Link
               href={`/agent/${encodeURIComponent(record.id)}`}
               className="after:absolute after:inset-0 after:rounded-[var(--radius-card)]"

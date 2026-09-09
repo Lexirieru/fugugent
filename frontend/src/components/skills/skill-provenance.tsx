@@ -59,11 +59,21 @@ export function SkillProvenanceRow({
     return (
       <div className={`rounded-xl border border-line bg-surface px-4 py-3 ${className}`}>
         <p className="text-sm font-medium text-fg">{exampleHeadline(provenance)}</p>
+        {/*
+          The backend's own notice already says these are examples, that none is
+          installable, and that every id is prefixed `example-`. Restating it here put
+          the same two claims on screen twice in different words, which reads as
+          padding and makes a short honest warning look evasive. The sentence is kept
+          only for the case where the backend sent no notice at all.
+        */}
         <p className="mt-1 text-sm leading-relaxed text-muted">
-          {provenance.notice ?? SKILL_SOURCE_MEANING.seed} Every record below carries an{" "}
-          <span className="font-mono text-xs">example</span> tag and an id beginning{" "}
-          <span className="font-mono text-xs">example-</span>. Nothing here is installable, and no
-          author or auditor named below is a real one.
+          {provenance.notice ?? (
+            <>
+              {SKILL_SOURCE_MEANING.seed} Every record below carries an{" "}
+              <span className="font-mono text-xs">example</span> tag and an id beginning{" "}
+              <span className="font-mono text-xs">example-</span>.
+            </>
+          )}
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           {action ?? (

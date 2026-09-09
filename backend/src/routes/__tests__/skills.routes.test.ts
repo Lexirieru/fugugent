@@ -103,7 +103,10 @@ describe("GET /api/skills", () => {
 
   it("a response containing examples carries the notice, and every such item is flagged", async () => {
     const body = await json(await get(app(), "/api/skills?limit=100"));
-    expect(body.notice).toContain("EXAMPLES");
+    // The claim, not its typography. Asserting on the shouted spelling made the
+    // notice's wording a public contract and broke when it stopped shouting.
+    expect(body.notice?.toLowerCase()).toContain("curated examples");
+    expect(body.notice?.toLowerCase()).toContain("not real skills");
     for (const item of body.items) expect(item.example).toBe(true);
   });
 

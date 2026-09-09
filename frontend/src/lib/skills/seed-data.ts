@@ -18,7 +18,7 @@
  */
 
 export const SEED_NOTICE =
-  "These records are curated EXAMPLES shipped with the backend to exercise every audit status. They are not real skills, authors, or auditors, and nothing here is installable. Every example carries example: true and an id prefixed with 'example-'.";
+  "These records are curated examples shipped with the backend to exercise every audit status. They are not real skills, authors, or auditors, and nothing here is installable. Every example carries example: true and an id prefixed with 'example-'.";
 
 /** The moment the backend stamped these records. Reported, never refreshed. */
 export const SEED_FETCHED_AT = "2026-09-09T00:00:00.000Z";
