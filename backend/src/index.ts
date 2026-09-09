@@ -35,6 +35,10 @@ import { createAgentService, createDbAgentCache, redact } from "./service/agents
 import { createOnchainSource } from "./sources/onchain.js";
 import { createScan8004Source } from "./sources/scan8004.js";
 import { createApp } from "./routes/app.js";
+import { createDbSkillStore } from "./skills/repo.js";
+import { createMemorySkillStore } from "./skills/store.js";
+import { createReputationSource } from "./skills/reputation.js";
+import { createSkillService } from "./skills/service.js";
 
 export { createApp } from "./routes/app.js";
 export type { ApiDeps } from "./routes/app.js";
@@ -96,9 +100,26 @@ export function buildServer(env: NodeJS.ProcessEnv = process.env): BuiltServer {
     cache: dbHandle === null ? undefined : createDbAgentCache(dbHandle.db),
   });
 
+  // The audited-skill marketplace. With Postgres it uses the durable registry;
+  // without it, an in-process store — which still answers and still registers,
+  // and says `durable: false` rather than pretending otherwise.
+  const skills = createSkillService({
+    store:
+      dbHandle === null
+        ? createMemorySkillStore()
+        : createDbSkillStore(dbHandle.db, { chainId: config.chainId }),
+    // Auditor reputation comes from the FuguReputation contract that is already
+    // live on BSC testnet, rather than from a second scoreboard invented here.
+    reputation: createReputationSource(
+      createPublicClient({ chain: bscTestnet, transport: viemHttp(config.rpcUrl) }),
+      config.contracts.reputation,
+    ),
+    chainId: config.chainId,
+  });
+
   const handle = dbHandle;
   return {
-    app: createApp({ service }),
+    app: createApp({ service, skills }),
     config,
     hasCache: handle !== null,
     close: async (): Promise<void> => {
@@ -135,8 +156,19 @@ export function toRequest(req: IncomingMessage): { request: Request } | { badReq
     if (Array.isArray(value)) for (const item of value) headers.append(key, item);
     else headers.set(key, value);
   }
-  // This backend only reads; no route has a request body.
-  return { request: new Request(url, { method: req.method ?? "GET", headers }) };
+  const method = (req.method ?? "GET").toUpperCase();
+  // `GET`/`HEAD` must not carry a body — `new Request` throws if one is given —
+  // while `POST /api/skills` needs one. `duplex: "half"` is required by undici
+  // whenever a stream is used as a body; without it the request is rejected
+  // before it ever reaches a route.
+  const body = method === "GET" || method === "HEAD" ? undefined : (req as unknown as ReadableStream);
+  return {
+    request: new Request(url, {
+      method,
+      headers,
+      ...(body === undefined ? {} : { body, duplex: "half" }),
+    } as RequestInit),
+  };
 }
 
 export async function writeResponse(res: ServerResponse, response: Response): Promise<void> {

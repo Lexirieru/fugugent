@@ -9,11 +9,21 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { redact, type AgentService } from "../service/agents.js";
+import type { SkillService } from "../skills/service.js";
 import { createAgentRoutes } from "./agents.js";
 import { createHealthRoutes } from "./health.js";
+import { createSkillRoutes } from "./skills.js";
 
 export interface ApiDeps {
   service: AgentService;
+  /**
+   * The audited-skill marketplace. **Optional**: an instance without it serves
+   * the agent routes exactly as before, and `/api/skills` answers 404 like any
+   * other unknown path. Mounting it conditionally rather than always keeps the
+   * two features independent — a defect in one cannot take the other's routes
+   * with it.
+   */
+  skills?: SkillService;
   /** Injected so failure-envelope timestamps are deterministic in tests. */
   now?: () => Date;
 }
@@ -22,11 +32,15 @@ export function createApp(deps: ApiDeps): Hono {
   const app = new Hono();
 
   // The marketplace is served from another domain (`app.hellofugu.xyz` → `api.hellofugu.xyz`).
-  // GET only: this backend has not a single state-changing endpoint.
-  app.use("/api/*", cors({ origin: "*", allowMethods: ["GET", "OPTIONS"] }));
+  // `POST` is allowed for exactly one route — `POST /api/skills`, which registers
+  // a skill for audit. Every other endpoint is still read-only.
+  app.use("/api/*", cors({ origin: "*", allowMethods: ["GET", "POST", "OPTIONS"] }));
 
   app.route("/api", createAgentRoutes(deps));
   app.route("/api", createHealthRoutes(deps));
+  if (deps.skills !== undefined) {
+    app.route("/api", createSkillRoutes({ service: deps.skills, now: deps.now }));
+  }
 
   // JSON on every path, including the wrong ones: this client can only read
   // JSON, and an HTML "Not Found" page would reach it as a confusing parse
