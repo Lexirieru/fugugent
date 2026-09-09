@@ -61,13 +61,11 @@ export function createApp(deps: ApiDeps): Hono {
       credentials: false,
     }),
   );
-  app.use("/api/*", async (c, next) => {
-    await next();
-    // The response body is identical for every origin, but the
-    // `Access-Control-Allow-Origin` header is not. Anything caching by URL alone
-    // would serve one origin's header to another.
-    c.header("Vary", "Origin", { append: true });
-  });
+  // No `Vary: Origin` middleware here: Hono's cors() already sets it whenever the
+  // allowed origin depends on the request, which is exactly this case. Appending a
+  // second one produced a literal `Vary: Origin, Origin` in production. The test
+  // below still asserts the header is present, so removing it from Hono would be
+  // caught rather than assumed.
 
   app.route("/api", createAgentRoutes(deps));
   app.route("/api", createHealthRoutes(deps));
