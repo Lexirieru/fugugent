@@ -267,7 +267,7 @@ const AGENTS = [
     action: "Recompute the range, check it still pays after gas, slippage and IL, then move it",
     metric: "Puffs on: time spent out of range",
     state: "scaffold" as const,
-    stateLabel: "Scaffold + bounded key",
+    stateLabel: "Advises, cannot act yet",
     caveat: null,
   },
   {
@@ -280,7 +280,7 @@ const AGENTS = [
     action: "Execute the swap at that level and record the fill",
     metric: "Puffs on: drawdown",
     state: "scaffold" as const,
-    stateLabel: "Scaffold + bounded key",
+    stateLabel: "Advises, cannot act yet",
     caveat:
       "Structurally mean-reverting: it loses money in trending markets. That sentence belongs on the product page, not in a footnote.",
   },
@@ -294,7 +294,7 @@ const AGENTS = [
     action: "Move into the best risk-weighted pool",
     metric: "Puff metric not defined yet",
     state: "scaffold" as const,
-    stateLabel: "Scaffold + bounded key",
+    stateLabel: "Advises, cannot act yet",
     caveat: null,
   },
 ];
@@ -411,7 +411,7 @@ function Proof() {
         <ProofList proofs={MARKETPLACE_CYCLE} />
       </div>
       <p className="mt-3 text-xs leading-relaxed text-faint">
-        Whole cycle cost 0.0015 tBNB. 104 contract tests including a 256-run fuzz; 223 tests on the
+        Whole cycle cost 0.0015 tBNB. 147 contract tests including a 256-run fuzz; 285 tests on the
         Guardian strategy layer.
       </p>
 
@@ -437,8 +437,9 @@ function Proof() {
         ))}
       </ul>
       <p className="mt-3 text-xs leading-relaxed text-faint">
-        Upgradeable (UUPS) and deployed, but the source is not verified on BscScan yet — we do not
-        have an API key. You can still read the bytecode and every transaction above.
+        Upgradeable (UUPS), deployed, and source-verified on BscScan. Each proxy resolves to its
+        implementation, so the Read/Write as Proxy tab works — you can call these contracts from a
+        browser with no tooling at all.
       </p>
     </Section>
   );
@@ -593,20 +594,20 @@ function WhyLinks() {
 const LIVE = [
   "Four UUPS contracts deployed on BSC testnet, with the full list → hire → withdraw → review cycle run on the real network.",
   "Four agents, each with its own wallet and a bounded session key registered on-chain. Anyone can check validity with one eth_call.",
-  "Guardian’s strategy layer: pure health-factor maths rounded toward safety, a deterministic decision engine, spend cap, cooldown, and a kill switch whose state survives a restart. 223 tests.",
+  "Guardian’s strategy layer, running inside the agent runtime we serve: pure health-factor maths rounded toward safety, a deterministic decision engine, spend cap, cooldown, and a kill switch whose state survives a restart. 285 tests.",
   "A repay executed by a bounded session key, and the same key refused the moment it stepped outside its allowlist.",
   "BNB Agent Studio running: bag doctor 14 PASS / 0 FAIL, serving A2A + MCP, answering negotiate with a wallet-signed quote.",
 ];
 
 const NOT_LIVE = [
   "The marketplace app. There is no app.hellofugu.xyz to open yet — this page is the only thing that is live.",
-  "The backend: indexer, classifier and scheduler are not written.",
-  "The strategy is not wired into the agent runtime we serve. What ran the proven cycle is an E2E script; the served agent still returns text.",
-  "Three of the four agents have no strategy — Rebalancer, Grid and Yield are scaffolds with a session key.",
+  "A public deployment. The backend runs on Docker Compose with a four-level fallback proven live, but nothing is hosted anywhere yet.",
+  "A repay sent through the runtime. The runtime now runs the strategy and serves it over A2A and MCP, but the one proven repay still came from the E2E script.",
+  "On-chain execution for three of the four agents. Rebalancer, Grid and Yield have decision engines, backtests and live A2A/MCP tools — they can advise, they cannot act.",
   "The backtest has measured nothing. There is a harness and a synthetic price series, and not one historical price in the repo.",
   "Reads run on mainnet while execution runs on testnet, because Venus and Aave only exist on mainnet. That is a limitation, not a design.",
-  "The kill switch has no lever a user can pull. It is a function call inside the process — not a button, not a CLI command, not an endpoint — because nothing serves the strategy yet.",
-  "Contract sources are not verified on BscScan — the API key is not available yet.",
+  "A kill switch button. The lever exists and an external MCP client can pull it; what it stops has only been proven in unit tests, and there is no UI for it.",
+  "A signed hire. The Reown connect flow and the full signing path exist, but no wallet with tBNB has ever signed one here.",
 ];
 
 function StatusHonest() {
