@@ -37,12 +37,23 @@ export const X_URL = "https://x.com/lexirieru";
 
 /* ── The catalogue, counted ─────────────────────────────────────────
  *
- * `CATALOGUE_TOTAL` is the size of the agent catalogue the marketplace reads.
- * `RENTABLE` is how many of those you can actually rent from us today, which is
- * the nine listings in `FuguRegistry` (`listingCount()` is 9, one per category,
- * ENVIRONMENT.md §G3). `EVER_ACTED` is one, and that gap is the honest part.
+ * **There is deliberately no catalogue total here, and it must not come back.**
+ *
+ * It used to read `CATALOGUE_TOTAL = 112`. That number is not stable: the marketplace
+ * reads its catalogue through a fallback ladder, and which rung answers decides the
+ * count. Measured eight times in a row on one category: the live index said 24 six
+ * times, and the cache, four and a half hours old, said 44 twice. The page total moved
+ * between 112 and 137 within minutes with nothing changing. Upstream classification is
+ * not deterministic, so this is the ladder working, not a bug.
+ *
+ * A number frozen into a static build is that same moving number, stopped at whatever
+ * moment somebody happened to measure, with no way for a reader to tell. So the page
+ * quotes only what cannot move underneath it.
+ *
+ * `RENTABLE` is the nine listings in `FuguRegistry`: `listingCount()` answers 9, one per
+ * category, and anyone can read it (ENVIRONMENT.md §G3). `EVER_ACTED` is one, and that
+ * gap is the honest part.
  */
-export const CATALOGUE_TOTAL = 112;
 export const CATEGORY_COUNT = 9;
 export const RENTABLE = 9;
 export const EVER_ACTED = 1;

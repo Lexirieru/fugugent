@@ -2,7 +2,6 @@ import type { CSSProperties, ReactNode } from "react";
 import {
   ALLOWLIST_CAP,
   ALLOWLIST_EXPIRY,
-  CATALOGUE_TOTAL,
   CATEGORY_COUNT,
   HF_AFTER,
   HF_BEFORE,
@@ -223,7 +222,7 @@ export default function Features() {
           index={2}
           eyebrow="The catalogue"
           title={`${CATEGORY_COUNT} categories, and only ${RENTABLE} you can rent.`}
-          body={`The catalogue holds ${CATALOGUE_TOTAL} agents. Nine of them are ours and can be rented today. Exactly one has ever sent a transaction, and the page says which.`}
+          body={`Most agents in the catalogue have no price yet. Nine are ours and can be rented today. Exactly one has ever sent a transaction, and the page says which.`}
         >
           <div className="benefit-card" style={at(56, 48, 560, 474)}>
             <img
@@ -248,7 +247,7 @@ export default function Features() {
           </div>
 
           <div className="chip chip-count" style={at(660, 96)}>
-            {CATALOGUE_TOTAL} in the catalogue
+            {CATEGORY_COUNT} categories
           </div>
           <div className="chip chip-count" style={at(660, 172)}>
             {RENTABLE} you can rent today

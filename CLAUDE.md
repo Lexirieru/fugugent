@@ -56,8 +56,17 @@ cd contracts && forge test          # contract tests
 cd contracts && forge build         # build
 bun --cwd frontend dev              # marketplace
 bun --cwd landingpage dev           # landing page
+bun run --cwd frontend build        # note the word order, see below
+bun run --cwd frontend lint
+bun run --cwd landingpage build
 bag --help                          # BNB Agent Studio CLI
 ```
+
+> **`bun --cwd <dir> run <script>` does not run anything.** On bun 1.3.9 it prints the
+> `bun run` usage text and **exits 0**, which reads exactly like a build that passed. A
+> green build reported from that command is not evidence of anything. The working forms
+> are `bun run --cwd <dir> <script>` (with `run` before `--cwd`) and `bun --cwd <dir>
+> <script>` (with no `run` at all); the broken one is only the two combined.
 
 ## Style
 

@@ -4,8 +4,8 @@
 
 ```bash
 bun --cwd frontend dev
-bun --cwd frontend run build
-bun --cwd frontend run lint
+bun run --cwd frontend build
+bun run --cwd frontend lint
 ```
 
 ## The data layer — how to swap it for a real backend

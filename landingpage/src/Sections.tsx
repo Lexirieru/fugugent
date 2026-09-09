@@ -5,7 +5,6 @@ import {
   AGENT_WALLET_URL,
   ALLOWLIST,
   ALLOWLIST_CAP,
-  CATALOGUE_TOTAL,
   CONTRACTS,
   HF_AFTER,
   HF_BEFORE,
@@ -242,9 +241,8 @@ export function ProofSection() {
           <h3 className="proof-name">One per category, and no more</h3>
           <p className="proof-body">
             The registry answers <code>listingCount() = {RENTABLE}</code>: exactly one
-            listing in each of the nine categories, out of {CATALOGUE_TOTAL} agents in
-            the catalogue. Widening it from four to nine left every existing listing
-            byte for byte identical.{" "}
+            listing in each of the nine categories. Widening it from four to nine left
+            every existing listing byte for byte identical.{" "}
             <Out href={UPGRADE_TX_URL}>See the upgrade</Out>.
           </p>
         </StaggerItem>

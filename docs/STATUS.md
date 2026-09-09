@@ -22,7 +22,7 @@ evidence was insufficient. That list is kept on purpose.
 | Backend | **484** tests (1 skipped) | `cd backend && corepack pnpm test` |
 | **Total** | **not recomputable on 2026-09-09 (evening)** | see the note below |
 | History | **136** commits on top of the initial commit, clean working tree | `git log --oneline \| wc -l` → 137 (including `87508a2` "Initial commit"); `git status --porcelain` → empty |
-| Landing + marketplace | build and lint green | `bun --cwd landingpage run build`; `bun --cwd frontend run build && … run lint` |
+| Landing + marketplace | build and lint green | `bun run --cwd landingpage build`; `bun run --cwd frontend build` and `… lint`. **Not** `bun --cwd frontend run build`, which prints help and exits 0 |
 
 Every number in that table was recounted on 2026-09-09 by running the command beside it, not
 carried over from a previous edit. The previous values (131 / 249 / 88 / 99 / 93 / 374 =

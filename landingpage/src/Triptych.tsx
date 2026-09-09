@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import {
   ALLOWLIST_CAP,
   ALLOWLIST_EXPIRY,
-  CATALOGUE_TOTAL,
+  CATEGORY_COUNT,
   EVER_ACTED,
   HF_AFTER,
   HF_BEFORE,
@@ -471,9 +471,9 @@ export default function Triptych() {
           <article className="card">
             <div className="panel panel--flow">
               <div className="metric">
-                <strong>{CATALOGUE_TOTAL}</strong>
-                <span className="metric-label">Agents in the catalogue</span>
-                <span className="metric-green">{RENTABLE} ready to hire</span>
+                <strong>{RENTABLE}</strong>
+                <span className="metric-label">Listings on the registry</span>
+                <span className="metric-green">{CATEGORY_COUNT} categories</span>
               </div>
               <canvas className="decision-flow" ref={flowRef} aria-hidden="true" />
               <div className="tags">
