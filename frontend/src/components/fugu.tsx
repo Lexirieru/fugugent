@@ -1,6 +1,6 @@
 /**
  * The fugu as a React component. Its geometry comes from `lib/fugu.ts`, which is a
- * direct port of the brand generator — so the fish here and the fish in
+ * direct port of the brand generator, so the fish here and the fish in
  * `landingpage/public/brand/` really are the same fish.
  *
  * This component is pure and safe on the server: no state, no effects.
@@ -39,7 +39,9 @@ export function Fugu({
       aria-hidden={label ? undefined : true}
       focusable="false"
       className={[className, motion].filter(Boolean).join(" ")}
-      dangerouslySetInnerHTML={{ __html: fuguInner({ kind, level, seed, uid }) }}
+      dangerouslySetInnerHTML={{
+        __html: fuguInner({ kind, level, seed, uid }),
+      }}
     />
   );
 }

@@ -9,7 +9,7 @@ import type { TrustStatus } from "@/lib/skills/types";
  *
  * These are links with URLs rather than client state, for the same reason the agent
  * category tabs are: `?status=STALE_AUDIT` can be shared, bookmarked and rendered on the
- * server. Counts are shown exactly as they are, zero included — hiding an empty status
+ * server. Counts are shown exactly as they are, zero included, hiding an empty status
  * would misrepresent how much of this registry has actually been checked, which is the
  * one number this page exists to be honest about.
  */
@@ -81,21 +81,16 @@ const KNOWN_BANDS: TrustBand[] = ["verified", "dangerous"];
 export function TrustLegend() {
   return (
     <div className="rounded-[var(--radius-card)] border border-line bg-surface p-5 sm:p-6">
-      <h2 className="text-lg font-semibold tracking-tight text-fg">
-        Seven statuses, and only one of them means safe
-      </h2>
-      <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted">
-        The status is derived by the backend from the audits it actually holds — there is
-        no column anywhere that a publisher, an auditor or this page could write. Colour is
-        never the only difference between two of them: each has its own wording, its own
-        glyph and its own border texture, so the seven stay seven in grayscale as well.
+      <p className="max-w-3xl text-pretty text-sm leading-relaxed text-muted">
+        The status is worked out from the audits actually held. There is no column anywhere that a
+        publisher, an auditor or this page could write by hand.
       </p>
 
       {/* Two columns rather than three: one status means safe and one means dangerous,
           against five ways of not knowing. A 2 : 5 split shows that proportion; three
           equal columns would imply the three bands are the same size. */}
-      <div className="mt-5 grid gap-5 sm:grid-cols-2">
-        <div className="space-y-5">
+      <div className="mt-6 grid gap-6 sm:grid-cols-2">
+        <div className="space-y-6">
           {KNOWN_BANDS.map((band) => (
             <BandBlock key={band} band={band} />
           ))}
@@ -112,9 +107,7 @@ function BandBlock({ band }: { band: TrustBand }) {
     <div>
       <h3 className="text-xs font-medium uppercase tracking-[0.16em] text-faint">
         {BAND_HEADING[band]}
-        <span className="ml-2 font-mono normal-case tracking-normal">
-          {rows.length} of 7
-        </span>
+        <span className="ml-2 font-mono normal-case tracking-normal">{rows.length} of 7</span>
       </h3>
       <ul className="mt-3 space-y-3">
         {rows.map((status) => (

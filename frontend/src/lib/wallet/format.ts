@@ -13,7 +13,7 @@ export function formatTbnb(wei: bigint, decimals = 6): string {
   const full = formatUnits(wei, 18);
   const [whole, frac = ""] = full.split(".");
   const cut = frac.slice(0, decimals).replace(/0+$/, "");
-  // A non-zero value that rounds to "0" is the easiest lie to tell here — show the
+  // A non-zero value that rounds to "0" is the easiest lie to tell here, show the
   // full precision instead of a zero.
   if (!cut && wei > 0n) return full;
   return cut ? `${whole}.${cut}` : whole;
@@ -42,7 +42,7 @@ export function explainWriteError(err: unknown): string {
     return "The transaction sat unsigned past its 10-minute deadline and the contract rejected it. Nothing was charged. Try again to get a fresh quote.";
   }
   if (text.includes("wrongnativeamount")) {
-    return "The oracle price changed between the quote and the block, and this contract requires the exact amount. Nothing was charged. Try again — the quote refreshes every 15 seconds.";
+    return "The oracle price changed between the quote and the block, and this contract requires the exact amount. Nothing was charged. Try again, the quote refreshes every 15 seconds.";
   }
   if (text.includes("listinginactive")) {
     return "The owner deactivated this listing while you were deciding. It cannot be hired right now.";

@@ -2,7 +2,7 @@
  * One proof row.
  *
  * When there is a tx hash, the whole row becomes a link to BscScan. When there is not,
- * the reason is stated openly — never hidden. This answers a real market failure:
+ * the reason is stated openly, never hidden. This answers a real market failure:
  * Giza/ARMA shut down in February 2026 after its dashboard showed large numbers that
  * nobody could check.
  */
@@ -29,7 +29,7 @@ export function ProofRow({ proof, index }: { proof: Proof; index?: number }) {
           </span>
         ) : (
           <span className="mt-2 block text-xs leading-relaxed text-faint">
-            No link — {proof.noLinkReason}
+            No link: {proof.noLinkReason}
           </span>
         )}
       </span>
@@ -38,7 +38,9 @@ export function ProofRow({ proof, index }: { proof: Proof; index?: number }) {
 
   if (!proof.hash) {
     return (
-      <li className="flex gap-4 border-t border-line px-4 py-5 first:border-t-0 sm:px-5">{inner}</li>
+      <li className="flex gap-4 border-t border-line px-4 py-5 first:border-t-0 sm:px-5">
+        {inner}
+      </li>
     );
   }
 

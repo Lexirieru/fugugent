@@ -4,7 +4,7 @@
  * Three things in this file must not change:
  *
  * 1. **One network only: BSC testnet (97).** This marketplace never touches
- *    mainnet, so offering other chains in the modal buys nothing — a user who can
+ *    mainnet, so offering other chains in the modal buys nothing, a user who can
  *    pick Ethereum only ends up in the wrong-network state we built ourselves.
  * 2. **The RPC is overridden explicitly.** The SDK default points at the
  *    `binance.org` domain, which is blocked from Indonesia (`../../CLAUDE.md`
@@ -14,7 +14,7 @@
  *    connects nothing, and the hire panel falls back to `cast` commands that still
  *    produce a real transaction. Better to leave the control out than ship it broken.
  *
- * A Reown project id is designed to be public and does ship in the browser bundle —
+ * A Reown project id is designed to be public and does ship in the browser bundle,
  * that is normal. The value still lives only in the gitignored `.env.local`;
  * committed files name the variable and never its value.
  */
@@ -41,7 +41,7 @@ export const metadata = {
 
 /**
  * `null` when there is no project id. Building the adapter without one blows up
- * inside WalletConnect, so that failure is stated here — in one place — instead of
+ * inside WalletConnect, so that failure is stated here, in one place, instead of
  * being allowed to surface as a blank screen.
  */
 export const wagmiAdapter = walletEnabled

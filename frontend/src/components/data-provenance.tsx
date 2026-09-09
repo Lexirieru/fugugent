@@ -14,7 +14,7 @@ import {
  * The backend walks a fallback ladder 8004scan -> cache -> on-chain -> seed, and every
  * answer carries the ladder it actually walked. Showing it is not decoration: when
  * 8004scan is down and we serve from the cache, a page that looks normal lets the user
- * misunderstand — and an uncheckable dashboard is what closed Giza/ARMA.
+ * misunderstand, and an uncheckable dashboard is what closed Giza/ARMA.
  *
  * The weight adapts to the situation, because a warning that always shouts stops being
  * heard: healthy and fresh = one dim line; not confirmed fresh or degraded = a visible
@@ -43,9 +43,9 @@ export function DataProvenance({
         <p className="text-sm font-medium text-fg">The catalogue did not answer.</p>
         <p className="mt-1 text-sm leading-relaxed text-muted">
           {origin} replied:{" "}
-          <span className="font-mono text-xs">{provenance.reason ?? "no reason given"}</span>. Nothing
-          below is stale data pretending to be live — the list is empty because we have nothing we
-          can stand behind.
+          <span className="font-mono text-xs">{provenance.reason ?? "no reason given"}</span>.
+          Nothing below is stale data pretending to be live. The list is empty because we have
+          nothing we can stand behind.
         </p>
         <Trail provenance={provenance} />
       </div>
@@ -55,9 +55,7 @@ export function DataProvenance({
   if (provenance.source === "seed") {
     return (
       <div className={`rounded-xl border border-line bg-surface px-4 py-3 ${className}`}>
-        <p className="text-sm font-medium text-fg">
-          The live catalogue is not connected yet.
-        </p>
+        <p className="text-sm font-medium text-fg">The live catalogue is not connected yet.</p>
         <p className="mt-1 text-sm leading-relaxed text-muted">
           {SOURCE_MEANING.seed} Each card says what that agent can actually do today, and every
           transaction link opens on BscScan.
@@ -94,15 +92,14 @@ export function DataProvenance({
   }
 
   // `div`, not `p`: `Trail` renders a `<details>`, and `<details>` inside `<p>` is
-  // invalid HTML — the browser hoists it out during parsing, so hydration fails and
+  // invalid HTML, the browser hoists it out during parsing, so hydration fails and
   // React throws this whole tree away and redraws it.
   return (
-    <div className={`flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs text-faint ${className}`}>
+    <div
+      className={`flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs text-faint ${className}`}
+    >
       <span className="inline-flex items-center gap-1.5">
-        <span
-          aria-hidden
-          className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--risk-1)]"
-        />
+        <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--risk-1)]" />
         Live from {label}
       </span>
       {age ? <span className="tnum">· {age}</span> : null}
@@ -112,7 +109,7 @@ export function DataProvenance({
 }
 
 /**
- * The ladder that was walked, one click away. It is present at all three weights — an
+ * The ladder that was walked, one click away. It is present at all three weights, an
  * uncheckable resilience claim is no better than an uncheckable AUM claim.
  */
 function Trail({ provenance, inline = false }: { provenance: Provenance; inline?: boolean }) {
@@ -129,7 +126,7 @@ function Trail({ provenance, inline = false }: { provenance: Provenance; inline?
             <span className="tnum shrink-0 text-faint">{i + 1}</span>
             <span className="min-w-0">
               <span className="font-mono text-fg">{SOURCE_LABEL[step.source]}</span>
-              <span className="text-faint"> — {outcomeLabel(step.outcome)}</span>
+              <span className="text-faint">, {outcomeLabel(step.outcome)}</span>
               {typeof step.items === "number" ? (
                 <span className="tnum text-faint">
                   , {step.items} {step.items === 1 ? "item" : "items"}

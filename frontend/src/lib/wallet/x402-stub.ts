@@ -2,13 +2,13 @@
  * A shim for `@x402/*`.
  *
  * `@wagmi/connectors` bundles the Base Account connector, which through
- * `@coinbase/cdp-sdk` imports several `@x402/*` modules — the x402 payment paths on
+ * `@coinbase/cdp-sdk` imports several `@x402/*` modules, the x402 payment paths on
  * Base and Solana. Those packages are **optional peer dependencies** that are not
  * installed, and Turbopack fails the build because it cannot resolve them, even
  * though not one line of Fugugent calls them.
  *
- * Fugugent pays through `FuguSubscription.subscribe` on BSC testnet — the only
- * contract that holds funds — so those modules are aliased to this file in
+ * Fugugent pays through `FuguSubscription.subscribe` on BSC testnet, the only
+ * contract that holds funds, so those modules are aliased to this file in
  * `next.config.ts`.
  *
  * Every export here **throws if it is ever actually called**. Shimming a money path

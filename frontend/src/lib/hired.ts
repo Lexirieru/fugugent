@@ -10,7 +10,7 @@
  *
  * The middle path: the user records the **real tx hash** after paying, and the badge
  * becomes a link to that transaction. The badge is then checkable by anyone, it still
- * stops a second payment, and the user can delete it themselves — every action in
+ * stops a second payment, and the user can delete it themselves, every action in
  * Fugugent must be reversible.
  *
  * Read through `useSyncExternalStore`, not `useEffect`: `localStorage` is an external
@@ -25,7 +25,7 @@ const EVENT = "fugugent:hires";
 
 export interface HireRecord {
   agentId: string;
-  /** The tx hash the user entered. Always present — without it there is nothing to check. */
+  /** The tx hash the user entered. Always present, without it there is nothing to check. */
   txHash: string;
   periods: number;
   recordedAt: string;

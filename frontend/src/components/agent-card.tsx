@@ -13,7 +13,7 @@ import { riskAriaLabel } from "@/lib/risk";
  * Four things must be readable before somebody decides to open the detail page: who the
  * agent is (silhouette + name + category), how heavy its risk is right now (the fugu +
  * the chip), what it has actually done (an outcome sentence with numbers in it), and what
- * it costs. What is **not** on this card is a metric we have not measured — an empty
+ * it costs. What is **not** on this card is a metric we have not measured, an empty
  * field is more honest than a zero that looks like a result.
  */
 export function AgentCard({ view }: { view: AgentView }) {
@@ -79,7 +79,7 @@ export function AgentCard({ view }: { view: AgentView }) {
             {formatPricePerPeriod(listing.priceUsd8PerPeriod, listing.periodSeconds)}
           </span>
         ) : (
-          <span className="text-sm text-faint">Not listed — nothing to pay yet</span>
+          <span className="text-sm text-faint">Not listed. Nothing to pay yet</span>
         )}
         <span className="text-xs text-faint transition group-hover:text-accent-strong">
           Open the agent →

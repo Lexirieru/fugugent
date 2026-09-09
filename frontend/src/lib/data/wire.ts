@@ -2,7 +2,7 @@
  * The wire (JSON) shape of `AgentRecord`, and its translator.
  *
  * `AgentRecord` carries `bigint` and is therefore **not** JSON-serializable as it
- * stands — `backend/src/types.ts` states this rule at the top of the file: the layer
+ * stands, `backend/src/types.ts` states this rule at the top of the file: the layer
  * that writes to HTTP must turn every bigint into a decimal string explicitly. This
  * file is the frontend half of that agreement.
  *
@@ -11,13 +11,7 @@
  * not through a `NaN` that quietly renders as a price.
  */
 
-import type {
-  AgentRecord,
-  Address,
-  Category,
-  FuguListing,
-  PublisherTier,
-} from "@/lib/agent-types";
+import type { AgentRecord, Address, Category, FuguListing, PublisherTier } from "@/lib/agent-types";
 import { CATEGORIES } from "@/lib/agent-types";
 
 export interface WireFuguListing {
@@ -154,7 +148,7 @@ export function parseAgentRecord(v: unknown, at = "agent"): AgentRecord {
   };
 }
 
-/** The other direction — used when the frontend has to pass a record along unchanged. */
+/** The other direction, used when the frontend has to pass a record along unchanged. */
 export function toWire(record: AgentRecord): WireAgentRecord {
   const { fuguListing, ...rest } = record;
   return {

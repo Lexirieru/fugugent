@@ -2,7 +2,7 @@
  * The `MarketplaceSource` implementation on top of the bundled sample data.
  *
  * It never fails, and it always admits what it is: `source: "seed"` with
- * `degraded: true`, because the seed really is the bottom rung of the fallback ladder —
+ * `degraded: true`, because the seed really is the bottom rung of the fallback ladder,
  * the last floor before an empty page, not a healthy primary source.
  *
  * `ageSeconds: null` is not an oversight. This data goes into the bundle at build time,
@@ -49,7 +49,10 @@ export const seedSource: MarketplaceSource = {
       total: matching.length,
       limit,
       offset,
-      provenance: { ...SEED_PROVENANCE, trail: [{ ...SEED_PROVENANCE.trail[0], items: matching.length }] },
+      provenance: {
+        ...SEED_PROVENANCE,
+        trail: [{ ...SEED_PROVENANCE.trail[0], items: matching.length }],
+      },
     };
   },
 
@@ -57,7 +60,10 @@ export const seedSource: MarketplaceSource = {
     const agent = SEED_AGENTS.find((a) => a.record.id === id) ?? null;
     return {
       agent,
-      provenance: { ...SEED_PROVENANCE, trail: [{ ...SEED_PROVENANCE.trail[0], items: agent ? 1 : 0 }] },
+      provenance: {
+        ...SEED_PROVENANCE,
+        trail: [{ ...SEED_PROVENANCE.trail[0], items: agent ? 1 : 0 }],
+      },
     };
   },
 
@@ -72,6 +78,11 @@ export const seedSource: MarketplaceSource = {
   },
 
   async health(): Promise<SourceHealth> {
-    return { source: "seed", healthy: true, reason: null, checkedAt: SEED_FETCHED_AT };
+    return {
+      source: "seed",
+      healthy: true,
+      reason: null,
+      checkedAt: SEED_FETCHED_AT,
+    };
   },
 };

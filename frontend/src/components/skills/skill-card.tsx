@@ -9,7 +9,7 @@ import type { SkillRecord } from "@/lib/skills/types";
  * One skill in the list.
  *
  * The order of the card is the order of the decision. What we know about it comes
- * first — the rail across the top, then the badge, then a sentence — and only after
+ * first, the rail across the top, then the badge, then a sentence, and only after
  * that does the card say what the skill claims to do. The author's own description sits
  * below the verdict on purpose: it is the text an attacker controls, and on a poisoned
  * skill it is the payload.

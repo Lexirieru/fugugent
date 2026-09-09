@@ -1,6 +1,14 @@
 import type { Metadata } from "next";
 import { SkillProvenanceRow } from "@/components/skills/skill-provenance";
-import { ButtonLink, Card, EmptyState, Eyebrow, Section } from "@/components/ui";
+import {
+  ButtonLink,
+  Card,
+  EmptyState,
+  Page,
+  PageHeader,
+  Section,
+  SectionHeader,
+} from "@/components/ui";
 import { CONTRACTS, addressUrl, shorten } from "@/lib/chain";
 import { formatUsd8 } from "@/lib/money";
 import { formatUtc } from "@/lib/provenance";
@@ -18,29 +26,28 @@ export default async function AuditorsPage() {
   const list = await src.listAuditors();
 
   return (
-    <>
-      <Section className="pt-10 sm:pt-14">
-        <Eyebrow>Auditors</Eyebrow>
-        <h1 className="mt-3 text-balance text-3xl font-semibold leading-[1.15] tracking-tight sm:text-4xl">
-          The people who lose money when a verdict is wrong.
-        </h1>
-        <p className="mt-4 max-w-2xl text-pretty text-base leading-relaxed text-muted">
-          Anyone can call a skill safe. What separates an audit from an opinion is the bond: an
-          auditor posts one before starting, is paid when the verdict stands, and is slashed when
-          it is overturned. The two numbers that matter on each row below are therefore the bond
-          and the slash count — not the number of audits shipped.
-        </p>
+    <Page>
+      <Section>
+        <PageHeader
+          eyebrow="Auditors"
+          title="The people who lose money when a verdict is wrong."
+          lede="Anyone can call a skill safe. What separates an audit from an opinion is the money at stake: an auditor puts it down before starting, is paid when the verdict stands, and loses it when the verdict is overturned. The two numbers that matter on each row below are therefore the money at stake and the number of times it was taken away, not the number of audits shipped."
+        />
 
         <div className="mt-8">
           <SkillProvenanceRow
             provenance={list.provenance}
             origin={src.origin}
-            action={<ButtonLink href="/skills" variant="ghost">What they are auditing</ButtonLink>}
+            action={
+              <ButtonLink href="/skills" variant="ghost">
+                What they are auditing
+              </ButtonLink>
+            }
           />
         </div>
 
         {Object.keys(list.reputationSources).length > 0 ? (
-          <p className="mt-4 text-sm leading-relaxed text-muted">
+          <p className="mt-4 text-pretty text-sm leading-relaxed text-muted">
             Reputation reads on this page:{" "}
             {Object.entries(list.reputationSources)
               .map(([source, count]) => `${count} ${source}`)
@@ -48,10 +55,13 @@ export default async function AuditorsPage() {
             . A row we could not read says so; it never shows a zero we invented.
           </p>
         ) : null}
+      </Section>
 
-        <div className="mt-8">
+      <Section labelledBy="roster">
+        <SectionHeader id="roster" title="The roster" />
+        <div>
           {list.items.length > 0 ? (
-            <ul className="grid gap-4 lg:grid-cols-2">
+            <ul className="grid gap-6 lg:grid-cols-2">
               {list.items.map((auditor) => (
                 <li key={auditor.id} className="flex">
                   <AuditorCard auditor={auditor} />
@@ -61,11 +71,11 @@ export default async function AuditorsPage() {
           ) : list.provenance.healthy ? (
             <EmptyState
               title="No auditor has registered yet"
-              body="The registry answered and holds nobody. Until an auditor posts a bond there is no one to run an audit, which is why every skill in the list is currently in one of the five states of not knowing."
+              body="The registry answered and holds nobody. Until an auditor puts money down there is no one to run an audit, which is why every skill in the list is currently in one of the five states of not knowing."
               actions={
                 <>
                   <ButtonLink href="/skills">See what is waiting to be audited</ButtonLink>
-                  <ButtonLink href="/" variant="ghost">
+                  <ButtonLink href="/agents" variant="ghost">
                     Browse agents
                   </ButtonLink>
                 </>
@@ -74,7 +84,7 @@ export default async function AuditorsPage() {
           ) : (
             <EmptyState
               title="We could not read the auditor roster"
-              body="The registry did not answer. Rather than show a stale roster that might name an auditor who has since been slashed, this page shows nothing and says why."
+              body="The registry did not answer. Rather than show a stale roster that might name an auditor who has since lost their money, this page shows nothing and says why."
               actions={
                 <>
                   <ButtonLink href="/auditors">Try again</ButtonLink>
@@ -88,12 +98,10 @@ export default async function AuditorsPage() {
         </div>
       </Section>
 
-      <Section className="pt-12">
+      <Section labelledBy="reputation">
+        <SectionHeader id="reputation" title="Where the reputation number comes from" />
         <Card>
-          <h2 className="text-lg font-semibold tracking-tight text-fg">
-            Where the reputation number comes from
-          </h2>
-          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted">
+          <p className="max-w-3xl text-pretty text-sm leading-relaxed text-muted">
             The score is read from{" "}
             <a
               href={addressUrl(CONTRACTS.reputation)}
@@ -102,23 +110,21 @@ export default async function AuditorsPage() {
               className="font-mono text-xs text-accent-strong underline decoration-dotted underline-offset-4"
             >
               FuguReputation {shorten(CONTRACTS.reputation)} ↗
-            </a>{" "}
-            — the same contract the agent marketplace uses, where a review can only be written by
-            a wallet that provably paid. There is no second scoreboard for auditors, because a
-            score kept in our own database would be a number only we can check.
+            </a>
+            , the same contract the agent marketplace uses, where a review can only be written by a
+            wallet that provably paid. There is no second scoreboard for auditors, because a score
+            kept in our own database would be a number only we can check.
           </p>
         </Card>
       </Section>
-    </>
+    </Page>
   );
 }
 
 function AuditorCard({ auditor }: { auditor: AuditorRecord }) {
   const { reputation } = auditor;
   const score =
-    reputation.averageScoreX100 === null
-      ? null
-      : (reputation.averageScoreX100 / 100).toFixed(2);
+    reputation.averageScoreX100 === null ? null : (reputation.averageScoreX100 / 100).toFixed(2);
   const reviews = reputation.reviewCount ?? 0;
 
   return (
@@ -160,14 +166,16 @@ function AuditorCard({ auditor }: { auditor: AuditorRecord }) {
 
       <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
         <div>
-          <dt className="text-xs uppercase tracking-[0.14em] text-faint">Bond at stake</dt>
+          <dt className="text-xs uppercase tracking-[0.14em] text-faint">Money at stake</dt>
           <dd className="tnum mt-1 font-mono text-lg text-fg">{formatUsd8(auditor.bondUsd8)}</dd>
         </div>
         <div>
-          <dt className="text-xs uppercase tracking-[0.14em] text-faint">Slashed</dt>
+          <dt className="text-xs uppercase tracking-[0.14em] text-faint">Taken away</dt>
           <dd
             className="tnum mt-1 font-mono text-lg"
-            style={{ color: auditor.slashes > 0 ? "var(--risk-5)" : "var(--fg)" }}
+            style={{
+              color: auditor.slashes > 0 ? "var(--risk-5)" : "var(--fg)",
+            }}
           >
             {auditor.slashes}
             {auditor.slashes > 0 ? (
@@ -192,9 +200,11 @@ function AuditorCard({ auditor }: { auditor: AuditorRecord }) {
       <div className="grow" />
 
       <div className="mt-5 border-t border-line pt-4">
-        <p className="text-xs uppercase tracking-[0.14em] text-faint">On-chain reputation</p>
+        <p className="text-xs uppercase tracking-[0.14em] text-faint">
+          Reputation, read from the blockchain
+        </p>
         {/* Three states, never collapsed into two. "Read it, and there are no reviews"
-            is not "0.00 out of 5" — an average of nothing is not zero, and printing it
+            is not "0.00 out of 5", an average of nothing is not zero, and printing it
             as one would defame an auditor nobody has rated. */}
         {score === null ? (
           <p className="mt-1 text-sm leading-relaxed text-muted">
@@ -203,8 +213,8 @@ function AuditorCard({ auditor }: { auditor: AuditorRecord }) {
           </p>
         ) : reviews === 0 ? (
           <p className="mt-1 text-sm leading-relaxed text-muted">
-            Read from chain, and there is nothing to average: no review has been written about
-            this auditor yet.{" "}
+            Read from chain, and there is nothing to average: no review has been written about this
+            auditor yet.{" "}
             {reputation.fetchedAt ? (
               <span className="text-faint">Read {formatUtc(reputation.fetchedAt)}.</span>
             ) : null}

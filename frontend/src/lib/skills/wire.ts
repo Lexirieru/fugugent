@@ -8,11 +8,7 @@
  */
 
 import { parseUsd8 } from "@/lib/money";
-import {
-  isSkillSource,
-  type SkillProvenance,
-  type SkillTrailStep,
-} from "@/lib/skills/provenance";
+import { isSkillSource, type SkillProvenance, type SkillTrailStep } from "@/lib/skills/provenance";
 import {
   AUDIT_VERDICTS,
   RISK_LEVELS,
@@ -100,8 +96,8 @@ function evidence(v: unknown): Evidence {
  *
  * Three deliberate asymmetries, all of them one-way:
  *
- * 1. An unrecognised `status` is read as `INCONCLUSIVE` — "the audit could not
- *    conclude" — because a status we do not understand is a thing we do not know.
+ * 1. An unrecognised `status` is read as `INCONCLUSIVE`, "the audit could not
+ *    conclude", because a status we do not understand is a thing we do not know.
  * 2. `verified` is accepted only when the status is `PASSED` as well. A payload that
  *    claims verification for any other status is contradicting itself, and the reading
  *    that costs nobody a wallet is the untrusting one.

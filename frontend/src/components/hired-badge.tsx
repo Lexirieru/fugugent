@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * The `Hired` badge — it exists to stop someone paying twice for the same thing.
+ * The `Hired` badge, it exists to stop someone paying twice for the same thing.
  *
  * Its source of truth is the **contract**: with a wallet connected to BSC testnet,
- * this badge comes from `FuguSubscription.getSub` — a subscription belonging to
+ * this badge comes from `FuguSubscription.getSub`, a subscription belonging to
  * that address on this listing, not cancelled and not yet ended according to the
  * block timestamp. The `localStorage` note is only a second layer, for a payment
  * made from a terminal or another device, and both forms of the badge always link
- * to something anyone can check — the transaction, or the contract. A badge without
+ * to something anyone can check, the transaction, or the contract. A badge without
  * proof is never rendered.
  */
 
@@ -23,7 +23,7 @@ export function HiredBadge({
   listingId = null,
 }: {
   agentId: string;
-  /** `null` when the agent has no listing — there is nothing to read from chain. */
+  /** `null` when the agent has no listing, there is nothing to read from chain. */
   listingId?: string | null;
 }) {
   if (walletEnabled && listingId !== null) {
@@ -50,7 +50,7 @@ function ChainBadge({ agentId, listingId }: { agentId: string; listingId: string
   }
 
   // No active subscription on chain. The device note may still speak, because it
-  // points at a real transaction — an expired subscription, for instance.
+  // points at a real transaction, an expired subscription, for instance.
   return <DeviceBadge agentId={agentId} />;
 }
 

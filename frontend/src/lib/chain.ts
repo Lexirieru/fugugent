@@ -5,14 +5,14 @@
  *
  * The binding rule: **every number shown in the UI must be clickable through to its
  * proof**. If a number has no tx hash and no verification command, it is marked openly
- * as unproven — never hidden.
+ * as unproven, never hidden.
  */
 
 export const CHAIN = {
   id: 97,
   name: "BNB Smart Chain Testnet",
   explorer: "https://testnet.bscscan.com",
-  /** `binance.org` is blocked from Indonesia — always override the RPC. */
+  /** `binance.org` is blocked from Indonesia, always override the RPC. */
   rpc: "https://data-seed-prebsc-1-s1.bnbchain.org:8545",
 } as const;
 
@@ -37,7 +37,7 @@ export const CONTRACTS = {
   priceOracle: "0xB5f72a0ab0bA971c8C4F69D4A075cB7fd7859e65",
   /**
    * The audit escrow. A verdict only costs something to get wrong if the bond is real
-   * money sitting somewhere anybody can look at — this is where it sits.
+   * money sitting somewhere anybody can look at, this is where it sits.
    * `contracts/deployments/bsc-testnet.json` → `auditEscrow.proxy`.
    */
   auditEscrow: "0x0354d2a4be40f118e4d1301915ee2ff54eec8a52",
@@ -52,12 +52,12 @@ export const CONTRACT_LIST = [
   {
     name: "FuguSubscription",
     address: CONTRACTS.subscription,
-    role: "Escrowed hire, streamed payout, refund",
+    role: "Holds the payment, pays the agent by the second, refunds the rest",
   },
   {
     name: "FuguPriceOracle",
     address: CONTRACTS.priceOracle,
-    role: "Chainlink pricing, buyer picks the token",
+    role: "Chainlink pricing, the buyer picks what to pay in",
   },
   {
     name: "FuguReputation",
@@ -67,7 +67,7 @@ export const CONTRACT_LIST = [
   {
     name: "FuguAuditEscrow",
     address: CONTRACTS.auditEscrow,
-    role: "Auditor fee and bond, released or slashed",
+    role: "Auditor fee and money at stake, released or taken away",
   },
 ] as const;
 
@@ -89,32 +89,32 @@ export type Proof = {
  *
  * This is the mechanism the whole skill marketplace rests on: an auditor who posts a
  * bond, is paid when the verdict stands, and loses the bond when it does not. These
- * four hashes are that cycle actually happening — job 1, 5 mUSD fee, 2 mUSD bond,
+ * four hashes are that cycle actually happening, job 1, 5 mUSD fee, 2 mUSD bond,
  * settled. `contracts/deployments/bsc-testnet.json` → `auditEscrow.e2e`.
  */
 export const AUDIT_ESCROW_CYCLE: Proof[] = [
   {
-    label: "An audit job was created — developer and auditor named, skill hash bound in",
+    label: "An audit job was created, with the developer, the auditor and the exact build named",
     detail:
-      "createJob(auditor, fee, bond, skillHash). The contract refuses a job whose developer and auditor are the same address, so nobody audits their own skill.",
+      "The contract refuses a job whose developer and auditor are the same wallet, so nobody audits their own skill.",
     hash: "0xa522fcb04d269a5ecc7b114bb5556faff371462e67bee4dd02f0ec2657267c22",
   },
   {
-    label: "The developer funded the fee — 5 mUSD into escrow",
+    label: "The developer funded the fee: 5 mUSD paid in and held",
     detail:
-      "fundFee takes no amount from its caller: the figure booked is the escrow's own balance delta, so a fee-on-transfer token cannot pay one job out of another job's money.",
+      "The amount booked is the contract's own change in balance, not a figure its caller supplies, so a token that skims on transfer cannot pay one job out of another job's money.",
     hash: "0x11488b8bbde7836bd80760ad2b5c130a101799aef6dd794e86b342ebb762534b",
   },
   {
-    label: "The auditor posted a 2 mUSD bond — the thing it loses if the verdict is wrong",
+    label: "The auditor put 2 mUSD at stake, the money it loses if the verdict is wrong",
     detail:
-      "postBond. Without a bond an auditor risks nothing by waving a skill through, and a green badge costs nothing to hand out.",
+      "Without money at stake an auditor risks nothing by waving a skill through, and a green badge costs nothing to hand out.",
     hash: "0x2a867edeff55920fda798f8e0dfff4f50dc19574854d8117fdef297467108862",
   },
   {
-    label: "The verdict stood, so fee and bond were released — 7 mUSD to the auditor",
+    label: "The verdict stood, so the fee and the stake were released: 7 mUSD to the auditor",
     detail:
-      "release is not permissionless: only the developer or the arbiter may call it, and only the arbiter may slash. getJob(1) now reads status 3 (SETTLED) with the escrow balance at zero.",
+      "Releasing is not open to everyone: only the developer or the arbiter may do it, and only the arbiter may take the stake away. The job now reads as settled, with the held balance at zero.",
     hash: "0x338030ed89923a5bc995a1170a9aa884e63e07193a8846d1ee58a5daee520c53",
   },
 ];

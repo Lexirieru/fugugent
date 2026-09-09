@@ -4,14 +4,14 @@
  * Two properties copied from the agent source and kept for the same reasons:
  *
  * 1. **It never throws to the caller.** A dead network, unfamiliar JSON, an unknown
- *    shape — all become `healthy: false` with a readable reason. A page that failed
+ *    shape, all become `healthy: false` with a readable reason. A page that failed
  *    still has a shape, and the reader is told what happened instead of seeing an empty
  *    list that looks like "no skills yet".
  * 2. **Every answer knows where it came from and how old it is**, so the "these are
  *    examples" banner cannot be forgotten by a human.
  *
  * `notFound` is a third promise particular to this endpoint. The backend answers 404
- * **only when it truly knows** a skill does not exist — every level answered "not
+ * **only when it truly knows** a skill does not exist, every level answered "not
  * there" and none of them threw. A registry that is merely sick produces a 200 with
  * `healthy: false`, never a 404 that erases a real skill. That distinction survives the
  * trip through here as a separate flag; it is not flattened into "no result".

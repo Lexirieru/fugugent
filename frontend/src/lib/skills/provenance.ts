@@ -2,15 +2,15 @@
  * Where a skill answer came from, in the skill ladder's own vocabulary.
  *
  * The agent ladder has four rungs (8004scan → cache → on-chain → seed); the skill
- * ladder has two, because there is no third-party discovery API for audited skills —
+ * ladder has two, because there is no third-party discovery API for audited skills,
  * the registry *is* the source of truth:
  *
- *   1. `registry` — Postgres, first-party, authoritative
- *   2. `seed`     — curated examples, so the marketplace is never blank
+ *   1. `registry`. Postgres, first-party, authoritative
+ *   2. `seed`, curated examples, so the marketplace is never blank
  *
  * Two rungs, not four, is why this file exists rather than reusing
  * `lib/provenance.ts` wholesale: pushing `registry` through an `AgentSource` union
- * would mean labelling it as something it is not. The *functions* are shared —
+ * would mean labelling it as something it is not. The *functions* are shared,
  * `formatAge`, `formatUtc` and `outcomeLabel` are imported from there, not copied.
  */
 
@@ -35,7 +35,7 @@ export interface SkillProvenance {
   reason: string | null;
   fetchedAt: string;
   ageSeconds: number | null;
-  /** "Cannot be confirmed fresh" — the backend's decision, not our arithmetic. */
+  /** "Cannot be confirmed fresh", the backend's decision, not our arithmetic. */
   stale: boolean;
   /** The answer came from below the registry. */
   degraded: boolean;
@@ -51,9 +51,8 @@ export const SKILL_SOURCE_LABEL: Record<SkillSource, string> = {
 };
 
 export const SKILL_SOURCE_MEANING: Record<SkillSource, string> = {
-  registry: "Our first-party registry — the authoritative record of what has been listed.",
-  seed:
-    "Curated examples shipped with the build so that this page is never blank. They are marked as examples on every card, and none of them is installable.",
+  registry: "Our first-party registry, the authoritative record of what has been listed.",
+  seed: "Curated examples shipped with the build so that this page is never blank. They are marked as examples on every card, and none of them is installable.",
 };
 
 /** How loudly the provenance row has to speak. Same three weights as the agent one. */

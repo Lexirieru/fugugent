@@ -1,14 +1,14 @@
 /**
- * The badge that says what we know about a skill — the single most load-bearing
+ * The badge that says what we know about a skill, the single most load-bearing
  * component in this part of the app.
  *
  * Somebody who misreads it installs a skill that empties their agent's wallet, so it
  * never leans on colour. Each of the seven statuses differs in **four** ways at once:
  *
- *   1. a unique phrase   — only one of the seven contains the word "passed";
- *   2. a unique glyph    — tick, cross, ≠, ?, half-disc, hourglass, slashed circle;
- *   3. a border texture  — solid, filled, double, dotted, dashed, hairline;
- *   4. a full sentence   — `TrustStatement`, which says what installing would mean.
+ *   1. a unique phrase, only one of the seven contains the word "passed";
+ *   2. a unique glyph, tick, cross, ≠, ?, half-disc, hourglass, slashed circle;
+ *   3. a border texture, solid, filled, double, dotted, dashed, hairline;
+ *   4. a full sentence. `TrustStatement`, which says what installing would mean.
  *
  * Points 1, 2 and 3 all survive `filter: grayscale(1)`. Point 4 survives a screen
  * reader. Colour is fifth, and never alone.
@@ -93,13 +93,7 @@ function Glyph({ glyph }: { glyph: TrustGlyph }) {
   }
 }
 
-export function TrustBadge({
-  status,
-  size = "md",
-}: {
-  status: TrustStatus;
-  size?: "sm" | "md";
-}) {
+export function TrustBadge({ status, size = "md" }: { status: TrustStatus; size?: "sm" | "md" }) {
   const spec = TRUST_PRESENTATION[status];
   const pad = size === "sm" ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-1 text-xs";
 

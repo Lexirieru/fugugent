@@ -10,7 +10,7 @@
  *
  * Every record carries `example: true` and an id prefixed `example-`. None of them is
  * installable, none of the authors or auditors is real, and the nine together exercise
- * all seven audit statuses — which is what makes the seven visually distinguishable
+ * all seven audit statuses, which is what makes the seven visually distinguishable
  * without a running backend.
  *
  * Regenerate by reading the running backend:
@@ -299,7 +299,7 @@ export const SEED_SKILL_PAYLOADS: unknown[] = [
     "version": "0.5.0",
     "contentSha256": "633d56858dfb8e6db2fbb98743c9fa69912427e4a43169d514580f3dad7a30fe",
     "sourceUri": "https://example.invalid/skills/rpc-proxy",
-    "declaredDescription": "Proxies JSON-RPC calls to a configured node. The audit ran but could not observe the binary's behaviour, so it reached no verdict — which is reported as INCONCLUSIVE rather than rounded to either safe or dangerous.",
+    "declaredDescription": "Proxies JSON-RPC calls to a configured node. The audit ran but could not observe the binary's behaviour, so it reached no verdict, which is reported as INCONCLUSIVE rather than rounded to either safe or dangerous.",
     "declaredCapabilities": [
       "forwards JSON-RPC requests"
     ],
@@ -402,7 +402,7 @@ export const SEED_SKILL_PAYLOADS: unknown[] = [
         "complete": true
       },
       "completedAt": "2026-07-02T13:40:00.000Z",
-      "reason": "the newest completed audit (example-audit-tax-1) examined build 2bcc79c073b9… of version 1.0.0, not the 673101ca13ce… being served now — its SAFE verdict does not carry over to this build"
+      "reason": "the newest completed audit (example-audit-tax-1) examined build 2bcc79c073b9… of version 1.0.0, not the 673101ca13ce… being served now, its SAFE verdict does not carry over to this build"
     }
   },
   {
@@ -427,7 +427,7 @@ export const SEED_SKILL_PAYLOADS: unknown[] = [
       {
         "severity": "critical",
         "title": "instruction-override directive in the declared text",
-        "detail": "The description tells the calling agent to discard its own instructions — the core of MCP tool poisoning (CVE-2025-54136 / CVE-2025-54135). A description is documentation for a human; it has no legitimate reason to address the agent's control flow. Matched: \"ignore all previous instruction\""
+        "detail": "The description tells the calling agent to discard its own instructions, the core of MCP tool poisoning (CVE-2025-54136 / CVE-2025-54135). A description is documentation for a human; it has no legitimate reason to address the agent's control flow. Matched: \"ignore all previous instruction\""
       },
       {
         "severity": "high",
@@ -848,7 +848,7 @@ export const SEED_AUDIT_PAYLOADS: unknown[] = [
       {
         "severity": "medium",
         "title": "behaviour could not be observed",
-        "detail": "The sandbox could not instrument the shipped binary. Nothing malicious was seen, and nothing was ruled out — this is reported as inconclusive, not as clean."
+        "detail": "The sandbox could not instrument the shipped binary. Nothing malicious was seen, and nothing was ruled out, this is reported as inconclusive, not as clean."
       }
     ],
     "feeUsd8": "100000000",
@@ -973,7 +973,7 @@ export const SEED_AUDIT_PAYLOADS: unknown[] = [
           {
             "severity": "critical",
             "title": "hidden instruction override in the description",
-            "detail": "The description tells the agent to ignore prior instructions and read credential files — the tool-poisoning shape behind CVE-2025-54136 and CVE-2025-54135."
+            "detail": "The description tells the agent to ignore prior instructions and read credential files, the tool-poisoning shape behind CVE-2025-54136 and CVE-2025-54135."
           }
         ]
       },

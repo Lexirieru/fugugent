@@ -14,7 +14,7 @@
  * Why not `hasSubscribed`: that gate only flips to `true` once the agent has
  * **actually drawn** payment (>= 50% of one period's price), so it answers "may
  * this wallet write a review?", not "is it hiring right now?". Using it for the
- * `Hired` badge would leave a user who just paid still marked as not hired — which
+ * `Hired` badge would leave a user who just paid still marked as not hired, which
  * is exactly the nudge towards paying twice.
  *
  * "Now" comes from the block timestamp, not the browser clock: a skewed clock must
@@ -56,7 +56,7 @@ export interface SubscriptionState {
   status: SubscriptionStatus;
   /** The subscription still running according to the block timestamp. */
   active: OnchainSub | null;
-  /** The most recent expired subscription — proof of a past hire, not a reason to skip paying. */
+  /** The most recent expired subscription, proof of a past hire, not a reason to skip paying. */
   expired: OnchainSub | null;
   /** This wallet has a subscription on this listing, within the swept range. */
   everSubscribed: boolean;

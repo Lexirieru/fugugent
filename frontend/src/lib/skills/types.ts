@@ -2,7 +2,7 @@
  * The audited-skill marketplace, as the frontend sees it.
  *
  * An agent gains abilities by installing a skill or an MCP server, and it installs them
- * from open sources nobody vets. That is a named, CVE'd attack surface — tool poisoning
+ * from open sources nobody vets. That is a named, CVE'd attack surface, tool poisoning
  * (`CVE-2025-54136`, `CVE-2025-54135`), capability mismatch, supply-chain RCE
  * (`CVE-2025-6514`), and the rug-pull update: a clean v1 followed by a malicious v2. One
  * poisoned skill drains the agent's wallet, and the agent does it to itself.
@@ -21,7 +21,7 @@
  * ## Money
  *
  * Every monetary value arrives as a decimal string in USD8 base (`"1500000000"` = $15.00)
- * and becomes a `bigint` here. It never passes through `number` — `12345678` is $0.12,
+ * and becomes a `bigint` here. It never passes through `number`, `12345678` is $0.12,
  * and a single `Number()` on that path would show "12,345,678" to somebody deciding
  * whether to install.
  */
@@ -39,7 +39,7 @@ export function isSkillKind(v: unknown): v is SkillKind {
  * towards knowing something. The difference between them is the whole product.
  *
  * Exactly one of them (`PASSED`) means "safe". Five mean "we do not know". `FAILED`
- * means we *do* know, and it is bad — which is not the same as not knowing, and must
+ * means we *do* know, and it is bad, which is not the same as not knowing, and must
  * never be drawn as if it were.
  */
 export const TRUST_STATUSES = [
@@ -93,7 +93,7 @@ export interface Trust {
   auditedSha256: string | null;
   /** The digest being served right now. */
   currentSha256: string | null;
-  /** `true` when those two differ — the rug-pull signal. */
+  /** `true` when those two differ, the rug-pull signal. */
   buildChanged: boolean;
   evidence: Evidence;
   completedAt: string | null;
@@ -114,7 +114,7 @@ export interface SkillRecord {
   version: string;
   contentSha256: string;
   sourceUri: string;
-  /** The author's own text. Untrusted — it is the injection surface itself. */
+  /** The author's own text. Untrusted, it is the injection surface itself. */
   declaredDescription: string;
   declaredCapabilities: string[];
   authorAddress: string | null;
@@ -184,7 +184,7 @@ export interface AuditRecord {
 
 /** On-chain reputation, or an honest account of why we could not read it. */
 export interface AuditorReputation {
-  /** Score × 100. `null` when it could not be read — never rendered as zero. */
+  /** Score × 100. `null` when it could not be read, never rendered as zero. */
   averageScoreX100: number | null;
   reviewCount: number | null;
   source: "onchain" | "unavailable" | "unhealthy" | string;

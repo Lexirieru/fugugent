@@ -1,20 +1,26 @@
 /**
- * The numeric risk chip — the sixth channel from `docs/brand/puff-levels.md` §0, and the
+ * The numeric risk chip, the sixth channel from `docs/brand/puff-levels.md` §0, and the
  * only unambiguous one. That is why it is required on both the card and the detail page,
  * and must never be dropped at any size that shows levels 4–5.
  *
  * Level 5 is always a filled block + white text + uppercase, in light mode and dark
- * alike: `#A4210E` as text on a dark background is only 2.53:1 — which would make the
+ * alike: `#A4210E` as text on a dark background is only 2.53:1, which would make the
  * gravest state the hardest one to read. The filled block gives 7.49:1.
  *
  * This chip belongs to the **risk-state** scale: fully rounded, prose name, always beside a
- * fugu. The action band never uses this shape — see `components/action-token.tsx`.
+ * fugu. The action band never uses this shape, see `components/action-token.tsx`.
  */
 
 import { BLOAT, type RiskReading } from "@/lib/risk";
 import { txUrl } from "@/lib/chain";
 
-export function RiskChip({ reading, size = "md" }: { reading: RiskReading | null; size?: "sm" | "md" }) {
+export function RiskChip({
+  reading,
+  size = "md",
+}: {
+  reading: RiskReading | null;
+  size?: "sm" | "md";
+}) {
   const pad = size === "sm" ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-1 text-xs";
 
   if (!reading) {

@@ -10,13 +10,13 @@
  *   - an action is an UPPERCASE_SNAKE_CASE code token in monospace, in a square-cornered
  *     box, never beside a fugu.
  *
- * The difference is carried by wording, typeface, letter case and box shape — four
+ * The difference is carried by wording, typeface, letter case and box shape, four
  * channels, none of them colour. In grayscale, at 48 px, with colour vision that does not
  * separate red from green, `PARTIAL_REPAY` still cannot be read as "Strained".
  *
  * `EMERGENCY` gets a filled block with white text, the same rule the risk chip uses for
  * level 5: `#A4210E` as text on a dark background is only 2.53:1, which would make the
- * gravest state the hardest to read. The filled block gives 7.49:1 — and the all-caps
+ * gravest state the hardest to read. The filled block gives 7.49:1, and the all-caps
  * token inside it is still legible with the fill stripped away entirely.
  */
 

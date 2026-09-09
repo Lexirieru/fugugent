@@ -62,7 +62,12 @@ function provenance(now: Date): SkillProvenance {
         reason: "no marketplace API is configured (NEXT_PUBLIC_API_BASE_URL is unset)",
         items: 0,
       },
-      { source: "seed", outcome: "ok", reason: SEED_NOTICE, items: SKILLS.length },
+      {
+        source: "seed",
+        outcome: "ok",
+        reason: SEED_NOTICE,
+        items: SKILLS.length,
+      },
     ],
   };
 }
@@ -112,7 +117,10 @@ export const seedSkillSource: SkillSourcePort = {
       offset,
       trustCensus,
       statuses: [...TRUST_STATUSES],
-      provenance: { ...provenance(now), notice: items.length > 0 ? NOTICE : null },
+      provenance: {
+        ...provenance(now),
+        notice: items.length > 0 ? NOTICE : null,
+      },
     };
   },
 
@@ -127,7 +135,10 @@ export const seedSkillSource: SkillSourcePort = {
       audits,
       // Every level answered, and one of them said "not there". That is knowledge.
       notFound: skill === null,
-      provenance: { ...provenance(now), notice: skill === null ? null : NOTICE },
+      provenance: {
+        ...provenance(now),
+        notice: skill === null ? null : NOTICE,
+      },
     };
   },
 

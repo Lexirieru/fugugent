@@ -1,7 +1,7 @@
 /**
  * The only door to the skill data. Pages call `skillSource()`, never `fetch`.
  *
- * Connecting a real backend is one environment variable — `NEXT_PUBLIC_API_BASE_URL`,
+ * Connecting a real backend is one environment variable. `NEXT_PUBLIC_API_BASE_URL`,
  * the same one the agent marketplace already uses. No component changes, because no
  * component knows where its data came from: they read `source` and `healthy` off the
  * envelope and show them exactly as they are.

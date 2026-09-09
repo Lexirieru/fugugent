@@ -1,7 +1,7 @@
 /**
  * How each of the seven statuses is *said* and *drawn*.
  *
- * This file holds no logic that decides a status — only the vocabulary for one that has
+ * This file holds no logic that decides a status, only the vocabulary for one that has
  * already been decided by the backend. Nothing here reads an audit, a finding, or a
  * digest in order to reach a conclusion.
  *
@@ -10,14 +10,14 @@
  * Somebody who misreads this installs a skill that empties their wallet. So the
  * distinction is never left to colour:
  *
- * 1. **`label`** — a unique phrase per status. All seven differ, and only one of them
+ * 1. **`label`**, a unique phrase per status. All seven differ, and only one of them
  *    contains the word "passed". This channel alone separates all seven, in grayscale,
  *    in a screen reader, and in a black-and-white printout.
- * 2. **`glyph`** — a unique silhouette per status (tick, cross, ≠, ?, half-disc,
+ * 2. **`glyph`**, a unique silhouette per status (tick, cross, ≠, ?, half-disc,
  *    hourglass, slashed circle). Shape, not hue.
- * 3. **`pattern`** — the border and the card's top rail: solid, hazard stripes, double,
+ * 3. **`pattern`**, the border and the card's top rail: solid, hazard stripes, double,
  *    dotted, dashed, hairline. A texture survives `grayscale(1)`.
- * 4. **`verdictLine`** — a full sentence about installing. The five "we do not know"
+ * 4. **`verdictLine`**, a full sentence about installing. The five "we do not know"
  *    statuses all say so in words; `FAILED` says the opposite of "unknown", not a
  *    louder version of it.
  *
@@ -28,22 +28,10 @@
 import type { TrustStatus } from "@/lib/skills/types";
 
 export type TrustGlyph =
-  | "tick"
-  | "cross"
-  | "not-equal"
-  | "question"
-  | "half"
-  | "hourglass"
-  | "empty";
+  "tick" | "cross" | "not-equal" | "question" | "half" | "hourglass" | "empty";
 
 export type TrustPattern =
-  | "solid"
-  | "hazard"
-  | "double"
-  | "dotted"
-  | "dashed"
-  | "ticks"
-  | "hairline";
+  "solid" | "hazard" | "double" | "dotted" | "dashed" | "ticks" | "hairline";
 
 /**
  * The three bands. `verified` holds exactly one status; `dangerous` holds exactly one;
@@ -91,7 +79,7 @@ export const TRUST_PRESENTATION: Record<TrustStatus, TrustPresentation> = {
     filled: true,
     verdictLine: "An auditor examined this exact build and found it dangerous. Do not install it.",
     meaning:
-      "Knowledge, not ignorance. This build was examined and found harmful — a different thing from never having been looked at.",
+      "Knowledge, not ignorance. This build was examined and found harmful, a different thing from never having been looked at.",
   },
   STALE_AUDIT: {
     label: "Audit is for an older build",
@@ -139,8 +127,7 @@ export const TRUST_PRESENTATION: Record<TrustStatus, TrustPresentation> = {
     color: "var(--fg-muted)",
     filled: false,
     verdictLine: "An audit has been funded, and no auditor has produced a verdict yet.",
-    meaning:
-      "Money in escrow is a promise about the future, not a statement about the code.",
+    meaning: "Money put at stake is a promise about the future, not a statement about the code.",
   },
   UNAUDITED: {
     label: "Never audited",
@@ -174,12 +161,12 @@ export const BAND_HEADING: Record<TrustBand, string> = {
 };
 
 /**
- * The CSS `border-style` for a pattern. `hazard` has no border at all — it is a filled
- * block — and `hairline` is the thinnest honest line we can draw.
+ * The CSS `border-style` for a pattern. `hazard` has no border at all, it is a filled
+ * block, and `hairline` is the thinnest honest line we can draw.
  */
 /**
  * Border style and width per pattern. Together with the colour these give every one of
- * the seven badges a triple nothing else shares — so two of them never differ by hue
+ * the seven badges a triple nothing else shares, so two of them never differ by hue
  * alone, which is what a colour-blind reader would be left with.
  */
 export const PATTERN_BORDER: Record<TrustPattern, string> = {
@@ -206,7 +193,7 @@ export const PATTERN_WIDTH: Record<TrustPattern, string> = {
  * The rail across the top of a card, as a `background` value.
  *
  * Every one of these is a texture rather than a tint, so the seven remain seven under
- * `filter: grayscale(1)` — the check a colour-blind reader performs for us.
+ * `filter: grayscale(1)`, the check a colour-blind reader performs for us.
  */
 export function railBackground(pattern: TrustPattern, color: string): string {
   switch (pattern) {

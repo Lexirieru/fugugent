@@ -5,7 +5,7 @@
  *
  * Three states, and no silent fourth: not connected, wrong network (with the
  * switch button, not merely a warning), and connected. If this build has no Reown
- * project id, this component renders nothing — a Connect button that connects
+ * project id, this component renders nothing, a Connect button that connects
  * nothing is worse than no button at all.
  */
 
@@ -52,7 +52,7 @@ function Control() {
             <span className="sm:hidden">Wrong network</span>
             {/* Wide screens name the destination; narrow ones still fit without
                 forcing a horizontal scroll in the header. */}
-            <span className="hidden sm:inline">Wrong network — switch to {CHAIN.name}</span>
+            <span className="hidden sm:inline">Wrong network, switch to {CHAIN.name}</span>
           </>
         )}
       </button>

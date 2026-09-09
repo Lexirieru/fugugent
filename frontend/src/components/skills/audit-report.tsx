@@ -4,7 +4,7 @@ import { SEVERITY_COLOR, formatDate, linkability, shortDigest } from "@/lib/skil
 import type { AuditRecord, AuditStage, Finding } from "@/lib/skills/types";
 
 /**
- * One audit, in full — every stage, every finding, the money, and the evidence.
+ * One audit, in full, every stage, every finding, the money, and the evidence.
  *
  * The whole history is shown, in whatever state each audit is in, because an audit that
  * was abandoned or that reached no verdict is part of what is known about a skill. Only
@@ -45,9 +45,7 @@ export function AuditReport({ audit }: { audit: AuditRecord }) {
               {audit.auditorId}
             </a>
           ) : (
-            <span className="text-muted">
-              none selected yet — the job is funded and unassigned
-            </span>
+            <span className="text-muted">none selected yet: the job is funded and unassigned</span>
           )}
         </Row>
         <Row label="Build examined">
@@ -56,7 +54,9 @@ export function AuditReport({ audit }: { audit: AuditRecord }) {
         <Row label="Dates">
           <span className="tnum text-muted">
             requested {formatDate(audit.requestedAt) ?? "unknown"}
-            {audit.completedAt ? ` · completed ${formatDate(audit.completedAt)}` : " · not finished"}
+            {audit.completedAt
+              ? ` · completed ${formatDate(audit.completedAt)}`
+              : " · not finished"}
           </span>
         </Row>
         <Row label="Fee">
@@ -67,7 +67,7 @@ export function AuditReport({ audit }: { audit: AuditRecord }) {
           <span className="tnum font-mono text-fg">{formatUsd8(audit.bondUsd8)}</span>
           <span className="text-muted">
             {audit.bondUsd8 === 0n
-              ? " — no bond has been posted on this job yet"
+              ? ". No bond has been posted on this job yet"
               : " lost by the auditor if the verdict is overturned"}
           </span>
         </Row>
@@ -143,7 +143,7 @@ export function AuditReport({ audit }: { audit: AuditRecord }) {
           </p>
         ) : (
           <p className="mt-2 text-sm leading-relaxed text-muted">
-            The report is not openable from here — {evidence.reason}.
+            The report is not openable from here: {evidence.reason}.
             {audit.evidence.sha256 ? (
               <span className="mt-1 block font-mono text-xs text-faint">
                 its digest is on record: sha256 {shortDigest(audit.evidence.sha256, 24)}
@@ -199,7 +199,7 @@ function StageRow({ stage }: { stage: AuditStage }) {
       </span>
       <span className="min-w-0 flex-1">
         <span className="text-sm font-medium text-fg">
-          {stage.stage} — {mark.word}
+          {stage.stage} · {mark.word}
         </span>
         {stage.summary ? (
           <span className="block text-sm leading-relaxed text-muted">{stage.summary}</span>
@@ -244,7 +244,7 @@ export function FindingList({ findings }: { findings: Finding[] }) {
  *
  * When the backend is not pointed at an escrow it says `NOT_WIRED`, and this says so
  * plainly rather than drawing an empty progress bar. The contract itself is deployed and
- * verified, and the link goes there — a reader can see the code, and can see that this
+ * verified, and the link goes there, a reader can see the code, and can see that this
  * particular job is not in it.
  */
 function EscrowBlock({ audit }: { audit: AuditRecord }) {
@@ -263,7 +263,7 @@ function EscrowBlock({ audit }: { audit: AuditRecord }) {
         <p className="mt-2 text-sm leading-relaxed text-muted">
           This job is not on chain: the backend reports{" "}
           <span className="font-mono text-xs text-fg">{escrow.status}</span>, with no job id and no
-          transactions. The escrow contract itself is deployed and verified —{" "}
+          transactions. The escrow contract itself is deployed and verified,{" "}
           <a
             href={addressUrl(CONTRACTS.auditEscrow)}
             target="_blank"
@@ -271,15 +271,15 @@ function EscrowBlock({ audit }: { audit: AuditRecord }) {
             className="font-mono text-xs text-accent-strong underline decoration-dotted underline-offset-4"
           >
             {shorten(CONTRACTS.auditEscrow)} ↗
-          </a>{" "}
-          — and its fee/bond/release cycle has been run end to end; those transactions are at
-          the foot of this page. What has not happened is this audit being settled through it.
+          </a>
+          , and its fee, money at stake and release cycle has been run end to end. Those
+          transactions are at the foot of this page. What has not happened is this audit being
+          settled through it.
         </p>
       ) : (
         <ul className="mt-2 space-y-1.5">
           <li className="text-sm text-muted">
-            job{" "}
-            <span className="font-mono text-xs text-fg">{escrow.jobId ?? "unnumbered"}</span> ·{" "}
+            job <span className="font-mono text-xs text-fg">{escrow.jobId ?? "unnumbered"}</span> ·{" "}
             <a
               href={addressUrl(escrow.contract)}
               target="_blank"

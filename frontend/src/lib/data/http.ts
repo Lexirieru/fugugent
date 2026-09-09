@@ -7,8 +7,8 @@
  *   GET /api/categories
  *   GET /api/health
  *
- * **It never throws.** Every failure — a dead network, unfamiliar JSON, a shape we do
- * not recognise — becomes `healthy: false` with a readable reason. A page that failed
+ * **It never throws.** Every failure, a dead network, unfamiliar JSON, a shape we do
+ * not recognise, becomes `healthy: false` with a readable reason. A page that failed
  * still has a shape, and the user is told what happened instead of seeing an empty list
  * masquerading as "no agents yet".
  *
@@ -92,13 +92,20 @@ function failedProvenance(reason: string, now: string): Provenance {
 }
 
 /**
- * A record from the backend does not carry risk, session permissions, or proof yet —
+ * A record from the backend does not carry risk, session permissions, or proof yet,
  * the `AgentRecord` shape genuinely does not hold them. Those fields are left empty,
  * which makes the fugu draw hollow: no fresh reading, so no guessed level. Once the
  * backend serves them, this function is the only thing that changes.
  */
 function toView(record: ReturnType<typeof parseAgentRecord>): AgentView {
-  return { record, risk: null, session: null, proofs: [], notShipped: null, outcomes: [] };
+  return {
+    record,
+    risk: null,
+    session: null,
+    proofs: [],
+    notShipped: null,
+    outcomes: [],
+  };
 }
 
 async function getJson(url: string): Promise<unknown> {
@@ -122,7 +129,10 @@ export function createHttpSource(baseUrl: string): MarketplaceSource {
       const limit = query.limit ?? 24;
       const offset = query.offset ?? 0;
       const now = new Date().toISOString();
-      const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+      const params = new URLSearchParams({
+        limit: String(limit),
+        offset: String(offset),
+      });
       if (query.category) params.set("category", query.category);
 
       try {
@@ -158,7 +168,10 @@ export function createHttpSource(baseUrl: string): MarketplaceSource {
           provenance: parseProvenance(o, now),
         };
       } catch (err) {
-        return { agent: null, provenance: failedProvenance(reasonOf(err), now) };
+        return {
+          agent: null,
+          provenance: failedProvenance(reasonOf(err), now),
+        };
       }
     },
 
@@ -180,7 +193,10 @@ export function createHttpSource(baseUrl: string): MarketplaceSource {
         }
         return { categories, provenance: parseProvenance(o, now) };
       } catch (err) {
-        return { categories: [], provenance: failedProvenance(reasonOf(err), now) };
+        return {
+          categories: [],
+          provenance: failedProvenance(reasonOf(err), now),
+        };
       }
     },
 
@@ -195,7 +211,12 @@ export function createHttpSource(baseUrl: string): MarketplaceSource {
           checkedAt,
         };
       } catch (err) {
-        return { source: "cache", healthy: false, reason: reasonOf(err), checkedAt };
+        return {
+          source: "cache",
+          healthy: false,
+          reason: reasonOf(err),
+          checkedAt,
+        };
       }
     },
   };

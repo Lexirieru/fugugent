@@ -4,7 +4,7 @@ import { ProofList } from "@/components/proof";
 import { SkillCard } from "@/components/skills/skill-card";
 import { SkillProvenanceRow } from "@/components/skills/skill-provenance";
 import { TrustFilter, TrustLegend } from "@/components/skills/trust-filter";
-import { ButtonLink, EmptyState, Eyebrow, Section } from "@/components/ui";
+import { ButtonLink, EmptyState, Page, PageHeader, Section, SectionHeader } from "@/components/ui";
 import { AUDIT_ESCROW_CYCLE, CONTRACTS, addressUrl, shorten } from "@/lib/chain";
 import { skillSource } from "@/lib/skills";
 import { KIND_LABEL } from "@/lib/skills/format";
@@ -35,7 +35,9 @@ export default async function SkillsPage({ searchParams }: PageProps<"/skills">)
     return null;
   };
 
-  const status: TrustStatus | null = isTrustStatus(first("status")) ? (first("status") as TrustStatus) : null;
+  const status: TrustStatus | null = isTrustStatus(first("status"))
+    ? (first("status") as TrustStatus)
+    : null;
   const kind: SkillKind | null = isSkillKind(first("kind")) ? (first("kind") as SkillKind) : null;
   const q = first("q");
   const offsetRaw = Number(first("offset") ?? "0");
@@ -47,7 +49,7 @@ export default async function SkillsPage({ searchParams }: PageProps<"/skills">)
   /**
    * The census behind the status filter is asked for separately and without a status,
    * because the census that comes back with a filtered page only counts the status that
-   * was filtered for — every other chip would read zero, which is a lie about how much of
+   * was filtered for, every other chip would read zero, which is a lie about how much of
    * the registry has been checked.
    *
    * It is also only shown when it is complete. The backend counts the statuses of the
@@ -59,7 +61,13 @@ export default async function SkillsPage({ searchParams }: PageProps<"/skills">)
   const censusPage =
     status === null && offset === 0
       ? page
-      : await src.listSkills({ limit: CENSUS_LIMIT, offset: 0, kind, status: null, q });
+      : await src.listSkills({
+          limit: CENSUS_LIMIT,
+          offset: 0,
+          kind,
+          status: null,
+          q,
+        });
   const censusComplete =
     censusPage.provenance.healthy && censusPage.total <= censusPage.items.length;
   const census = censusComplete ? censusPage.trustCensus : null;
@@ -67,7 +75,12 @@ export default async function SkillsPage({ searchParams }: PageProps<"/skills">)
   /** A URL builder that keeps every other filter intact. Filters compose; they do not reset each other. */
   const hrefWith = (patch: Record<string, string | null>): string => {
     const params = new URLSearchParams();
-    const base: Record<string, string | null> = { status, kind, q, offset: offset > 0 ? String(offset) : null };
+    const base: Record<string, string | null> = {
+      status,
+      kind,
+      q,
+      offset: offset > 0 ? String(offset) : null,
+    };
     for (const [key, value] of Object.entries({ ...base, ...patch })) {
       if (value !== null && value !== "") params.set(key, value);
     }
@@ -79,30 +92,27 @@ export default async function SkillsPage({ searchParams }: PageProps<"/skills">)
   const hasMore = offset + page.items.length < page.total;
 
   return (
-    <>
-      <Section className="pt-10 sm:pt-14">
-        <Eyebrow>Audited skill marketplace</Eyebrow>
-        <h1 className="mt-3 text-balance text-3xl font-semibold leading-[1.15] tracking-tight sm:text-4xl">
-          Your agent installs code. Somebody should have read it first.
-        </h1>
+    <Page>
+      <Section>
+        <PageHeader
+          eyebrow="Skills"
+          title="Your agent installs code. Somebody should have read it first."
+          lede="An agent gains its abilities by installing add-ons from open sources nobody checks. That is a live attack surface: instructions hidden inside a tool description that hijack the agent, a price checker that quietly reads your keys, a clean first version followed by a poisoned second one. One bad add-on empties the wallet, and the agent does it to itself."
+        />
         <p className="mt-4 max-w-2xl text-pretty text-base leading-relaxed text-muted">
-          An agent gains its abilities by installing skills and MCP servers, and it installs them
-          from open sources nobody vets. That is a live attack surface with CVEs against it:
-          instructions hidden inside a tool description that hijack the agent, a &ldquo;price
-          checker&rdquo; that quietly reads keys, a clean v1 followed by a malicious v2. One
-          poisoned skill drains the wallet, and the agent does it to itself.
-        </p>
-        <p className="mt-3 max-w-2xl text-pretty text-base leading-relaxed text-muted">
-          So an auditor posts a bond, audits a build, is paid when the verdict stands, and loses
-          the bond when it does not. Below, every skill carries what is actually known about it —
+          So an auditor puts money down, reads a build, is paid when the verdict stands, and loses
+          the money when it does not. Below, every add-on carries what is actually known about it,
           and five of the seven states are ways of not knowing.
         </p>
 
         <div className="mt-8">
           <SkillProvenanceRow provenance={page.provenance} origin={src.origin} />
         </div>
+      </Section>
 
-        <div className="mt-8 space-y-4">
+      <Section labelledBy="catalogue">
+        <SectionHeader id="catalogue" title="Every skill on record" />
+        <div className="space-y-4">
           <TrustFilter
             census={census}
             active={status}
@@ -112,7 +122,11 @@ export default async function SkillsPage({ searchParams }: PageProps<"/skills">)
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
             <nav aria-label="Filter by kind" className="flex flex-wrap gap-2">
-              <KindTab href={hrefWith({ kind: null, offset: null })} label="Every kind" active={kind === null} />
+              <KindTab
+                href={hrefWith({ kind: null, offset: null })}
+                label="Every kind"
+                active={kind === null}
+              />
               {SKILL_KINDS.map((k) => (
                 <KindTab
                   key={k}
@@ -162,7 +176,9 @@ export default async function SkillsPage({ searchParams }: PageProps<"/skills">)
                 <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
                   {offset > 0 ? (
                     <ButtonLink
-                      href={hrefWith({ offset: offset - LIMIT > 0 ? String(offset - LIMIT) : null })}
+                      href={hrefWith({
+                        offset: offset - LIMIT > 0 ? String(offset - LIMIT) : null,
+                      })}
                       variant="ghost"
                     >
                       ← Previous
@@ -188,7 +204,7 @@ export default async function SkillsPage({ searchParams }: PageProps<"/skills">)
               title={filtered ? "Nothing matches those filters" : "No skill has been listed yet"}
               body={
                 filtered
-                  ? "The registry answered, and nothing in it fits. Clearing the filters shows everything it does hold — including the skills nobody has audited, which are the ones worth looking at hardest."
+                  ? "The registry answered, and nothing in it fits. Clearing the filters shows everything it does hold, including the skills nobody has audited, which are the ones worth looking at hardest."
                   : "The registry answered and it is empty. That is a real answer, not a failed request: nothing has been listed, so there is nothing to audit yet."
               }
               actions={
@@ -207,7 +223,7 @@ export default async function SkillsPage({ searchParams }: PageProps<"/skills">)
               actions={
                 <>
                   <ButtonLink href={hrefWith({})}>Try again</ButtonLink>
-                  <ButtonLink href="/" variant="ghost">
+                  <ButtonLink href="/agents" variant="ghost">
                     Browse agents instead
                   </ButtonLink>
                 </>
@@ -217,17 +233,22 @@ export default async function SkillsPage({ searchParams }: PageProps<"/skills">)
         </div>
       </Section>
 
-      <Section className="pt-12">
+      <Section labelledBy="legend">
+        <SectionHeader
+          id="legend"
+          title="Seven statuses, and only one of them means safe"
+          lede="Colour is never the only difference between two of them: each has its own wording, its own glyph and its own border texture, so the seven stay seven in grayscale as well."
+        />
         <TrustLegend />
       </Section>
 
-      <Section className="pt-12">
-        <h2 className="text-lg font-semibold tracking-tight text-fg">
+      <Section labelledBy="verdict-cost">
+        <h2 id="verdict-cost" className="text-balance text-lg font-semibold tracking-tight text-fg">
           What makes a verdict cost something
         </h2>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
-          A badge is worth exactly as much as the auditor loses by handing it out wrongly. The
-          fee and the bond sit in{" "}
+        <p className="mt-2 mb-6 max-w-2xl text-pretty text-sm leading-relaxed text-muted">
+          A badge is worth exactly as much as the auditor loses by handing it out wrongly. The fee
+          and the money at stake sit in{" "}
           <a
             href={addressUrl(CONTRACTS.auditEscrow)}
             target="_blank"
@@ -239,16 +260,14 @@ export default async function SkillsPage({ searchParams }: PageProps<"/skills">)
           , deployed and verified on BNB Chain testnet, and the whole cycle has been run on it.
           These are those four transactions.
         </p>
-        <div className="mt-5">
-          <ProofList proofs={AUDIT_ESCROW_CYCLE} />
-        </div>
-        <div className="mt-5">
+        <ProofList proofs={AUDIT_ESCROW_CYCLE} />
+        <div className="mt-6">
           <ButtonLink href="/auditors" variant="ghost">
-            Who is putting up the bond →
+            Who is putting up the money →
           </ButtonLink>
         </div>
       </Section>
-    </>
+    </Page>
   );
 }
 

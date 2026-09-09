@@ -5,7 +5,7 @@
  *   GET /api/skills/:id
  *   GET /api/auditors
  *
- * The envelope — `source`, `ageSeconds`, `stale`, `degraded`, `notice`, `trail` — is
+ * The envelope, `source`, `ageSeconds`, `stale`, `degraded`, `notice`, `trail`, is
  * passed through unchanged and never recomputed. The backend is the one that knows
  * which rung it walked, and it is the only party allowed to declare an answer
  * impossible to confirm fresh.
@@ -25,12 +25,7 @@ import type {
   SkillQuery,
   SkillSourcePort,
 } from "@/lib/skills/source";
-import {
-  parseAudit,
-  parseAuditor,
-  parseSkill,
-  parseSkillProvenance,
-} from "@/lib/skills/wire";
+import { parseAudit, parseAuditor, parseSkill, parseSkillProvenance } from "@/lib/skills/wire";
 
 const TIMEOUT_MS = 8_000;
 
@@ -53,8 +48,9 @@ async function getJson(url: string): Promise<Fetched> {
 
 function statuses(v: unknown): TrustStatus[] {
   if (!Array.isArray(v)) return [...TRUST_STATUSES];
-  const found = v.filter((s): s is TrustStatus =>
-    typeof s === "string" && (TRUST_STATUSES as readonly string[]).includes(s),
+  const found = v.filter(
+    (s): s is TrustStatus =>
+      typeof s === "string" && (TRUST_STATUSES as readonly string[]).includes(s),
   );
   return found.length > 0 ? found : [...TRUST_STATUSES];
 }
@@ -81,7 +77,10 @@ export function createHttpSkillSource(baseUrl: string): SkillSourcePort {
       const limit = query.limit ?? 24;
       const offset = query.offset ?? 0;
       const now = new Date().toISOString();
-      const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+      const params = new URLSearchParams({
+        limit: String(limit),
+        offset: String(offset),
+      });
       if (query.kind) params.set("kind", query.kind);
       if (query.status) params.set("status", query.status);
       if (query.q && query.q.trim() !== "") params.set("q", query.q.trim());
@@ -115,9 +114,7 @@ export function createHttpSkillSource(baseUrl: string): SkillSourcePort {
     async getSkill(id: string): Promise<SkillDetail> {
       const now = new Date().toISOString();
       try {
-        const { status, body } = await getJson(
-          `${base}/api/skills/${encodeURIComponent(id)}`,
-        );
+        const { status, body } = await getJson(`${base}/api/skills/${encodeURIComponent(id)}`);
         const o = (body ?? {}) as Record<string, unknown>;
         const provenance = parseSkillProvenance(o, now);
         const raw = o.skill;

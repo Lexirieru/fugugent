@@ -57,8 +57,8 @@ export function SkillProvenanceRow({
         <p className="mt-1 text-sm leading-relaxed text-muted">
           {provenance.notice ?? SKILL_SOURCE_MEANING.seed} Every record below carries an{" "}
           <span className="font-mono text-xs">example</span> tag and an id beginning{" "}
-          <span className="font-mono text-xs">example-</span>. Nothing here is installable, and
-          no author or auditor named below is a real one.
+          <span className="font-mono text-xs">example-</span>. Nothing here is installable, and no
+          author or auditor named below is a real one.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           {action ?? (
@@ -97,7 +97,9 @@ export function SkillProvenanceRow({
   }
 
   return (
-    <div className={`flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs text-faint ${className}`}>
+    <div
+      className={`flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs text-faint ${className}`}
+    >
       <span className="inline-flex items-center gap-1.5">
         <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--risk-1)]" />
         Live from {label}
@@ -108,13 +110,7 @@ export function SkillProvenanceRow({
   );
 }
 
-function Trail({
-  provenance,
-  inline = false,
-}: {
-  provenance: SkillProvenance;
-  inline?: boolean;
-}) {
+function Trail({ provenance, inline = false }: { provenance: SkillProvenance; inline?: boolean }) {
   if (provenance.trail.length === 0) return null;
 
   return (
@@ -128,7 +124,7 @@ function Trail({
             <span className="tnum shrink-0 text-faint">{i + 1}</span>
             <span className="min-w-0">
               <span className="font-mono text-fg">{SKILL_SOURCE_LABEL[step.source]}</span>
-              <span className="text-faint"> — {outcomeLabel(step.outcome)}</span>
+              <span className="text-faint">, {outcomeLabel(step.outcome)}</span>
               {typeof step.items === "number" ? (
                 <span className="tnum text-faint">
                   , {step.items} {step.items === 1 ? "item" : "items"}
@@ -155,13 +151,13 @@ function exampleHeadline(provenance: SkillProvenance): string {
   const registry = provenance.trail.find((step) => step.source === "registry");
   switch (registry?.outcome) {
     case "unavailable":
-      return "Curated examples — no skill registry is connected.";
+      return "Curated examples. No skill registry is connected.";
     case "empty":
-      return "Curated examples — the registry answered, and it holds nothing that matches.";
+      return "Curated examples. The registry answered, and it holds nothing that matches.";
     case "unhealthy":
     case "threw":
-      return "Curated examples — the registry could not answer, so nothing below is a live listing.";
+      return "Curated examples. The registry could not answer, so nothing below is a live listing.";
     default:
-      return "Curated examples — nothing below is a live listing.";
+      return "Curated examples. Nothing below is a live listing.";
   }
 }

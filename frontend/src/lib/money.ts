@@ -7,7 +7,7 @@
  * here accepts a `number` as a money value.
  */
 
-/** 10^8 — one dollar in USD8 base. */
+/** 10^8, one dollar in USD8 base. */
 export const USD8 = 100_000_000n;
 
 /** Divide, rounding up. A cost is always rounded towards the side that costs us. */
@@ -24,7 +24,7 @@ function abs(v: bigint): bigint {
  * Format USD8 as dollar text.
  *
  * Two decimals for ordinary values. When a value is non-zero but rounds to `$0.00`,
- * the precision is increased until the figure becomes visible — showing "$0.00" for a
+ * the precision is increased until the figure becomes visible, showing "$0.00" for a
  * price that really exists is the easiest lie to tell here.
  */
 export function formatUsd8(value: bigint, opts: { minDecimals?: number } = {}): string {
@@ -71,7 +71,7 @@ export function formatPricePerPeriod(priceUsd8: bigint, periodSeconds: number): 
 
 export interface CostEstimate {
   periods: number;
-  /** The total in USD8. Bigint multiplication — never through `number`. */
+  /** The total in USD8. Bigint multiplication, never through `number`. */
   totalUsd8: bigint;
   /** How long the subscription lasts, in seconds. */
   durationSeconds: number;
@@ -80,7 +80,7 @@ export interface CostEstimate {
 }
 
 /**
- * A cost estimate BEFORE hiring — not merely a warning.
+ * A cost estimate BEFORE hiring, not merely a warning.
  * `periods` is an integer; everything else is bigint arithmetic.
  */
 export function estimateCost(
@@ -92,9 +92,7 @@ export function estimateCost(
   const totalUsd8 = priceUsd8PerPeriod * BigInt(n);
   const durationSeconds = periodSeconds * n;
   const perDayUsd8 =
-    periodSeconds > 0
-      ? divCeil(priceUsd8PerPeriod * 86_400n, BigInt(periodSeconds))
-      : 0n;
+    periodSeconds > 0 ? divCeil(priceUsd8PerPeriod * 86_400n, BigInt(periodSeconds)) : 0n;
   return { periods: n, totalUsd8, durationSeconds, perDayUsd8 };
 }
 
@@ -117,7 +115,7 @@ export function formatDuration(seconds: number): string {
  *
  * The backend sends money as a **decimal string** precisely so that it never travels
  * through a JSON `number`, whose 53 significant bits cannot hold a USD8 amount safely.
- * Anything that is not a plain integer string comes back `null` — the caller then has to
+ * Anything that is not a plain integer string comes back `null`, the caller then has to
  * say "we do not have this figure" rather than print a zero it invented. A missing
  * price and a price of zero are different facts.
  */

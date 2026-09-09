@@ -15,7 +15,7 @@ export function shortDigest(sha256: string | null, head = 12): string | null {
 /**
  * Whether a URI is worth rendering as a link.
  *
- * `.invalid` is reserved by RFC 2606 and never resolves — the curated examples use it
+ * `.invalid` is reserved by RFC 2606 and never resolves, the curated examples use it
  * on purpose, so that nothing in a demo can be mistaken for a real download. A link
  * that cannot be followed is a promise the page does not keep, so those are rendered as
  * text with the reason stated instead.
@@ -39,7 +39,7 @@ export function linkability(
     return {
       linkable: false,
       reason:
-        "the .invalid domain is reserved by RFC 2606 and never resolves — this is an example, and there is nothing behind it",
+        "the .invalid domain is reserved by RFC 2606 and never resolves, this is an example, and there is nothing behind it",
     };
   }
   return { linkable: true, href: uri };
@@ -76,9 +76,7 @@ export const SEVERITY_COLOR: Record<string, string> = {
   none: "var(--risk-1)",
 };
 
-export function highestSeverity(
-  findings: ReadonlyArray<{ severity: string }>,
-): string | null {
+export function highestSeverity(findings: ReadonlyArray<{ severity: string }>): string | null {
   for (const level of SEVERITY_ORDER) {
     if (findings.some((f) => f.severity === level)) return level;
   }

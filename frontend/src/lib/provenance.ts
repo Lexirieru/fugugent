@@ -7,7 +7,7 @@
  * built so the UI **can** be honest; this file is what gets that honesty onto the screen.
  *
  * The rule is the same as for the puff level: **the frontend does not recompute.**
- * `stale` means "cannot be confirmed fresh", not "older than X" — the cache is always
+ * `stale` means "cannot be confirmed fresh", not "older than X", the cache is always
  * stale because we only reach it after the upstream failed to answer. The backend
  * decides that; we display it.
  */
@@ -30,7 +30,7 @@ export interface Provenance {
   fetchedAt: string;
   /** The age of the oldest item, in seconds. `null` when it does not apply. */
   ageSeconds: number | null;
-  /** "Cannot be confirmed fresh" — the backend's decision, not our arithmetic. */
+  /** "Cannot be confirmed fresh", the backend's decision, not our arithmetic. */
   stale: boolean;
   /** The answer came from a rung below the primary source. */
   degraded: boolean;
@@ -66,7 +66,7 @@ export function outcomeLabel(outcome: string): string {
   return OUTCOME_LABEL[outcome] ?? outcome;
 }
 
-/** An age in words. `null` in, `null` out — an age that does not apply is not invented. */
+/** An age in words. `null` in, `null` out, an age that does not apply is not invented. */
 export function formatAge(seconds: number | null): string | null {
   if (seconds === null || !Number.isFinite(seconds) || seconds < 0) return null;
   if (seconds < 5) return "just now";
