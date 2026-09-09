@@ -10,6 +10,10 @@ import type { CategoryCount } from "@/lib/data/types";
  * bookmarked, and rendered on the server. It also shows the counts exactly as they are,
  * zero included. Hiding an empty kind would be lying about the depth of the catalogue.
  *
+ * The counts are of the catalogue, not of what can be hired. Those are two different
+ * numbers and this row never blurs them: "ready to hire" is its own filter beside this
+ * one, and it carries its own count.
+ *
  * The selected tab is marked by weight and by a filled dot as well as by colour, so it
  * is still the selected tab in grayscale.
  */
@@ -17,20 +21,26 @@ export function CategoryTabs({
   counts,
   active,
   total,
+  hrefFor,
 }: {
   counts: CategoryCount[];
   active: Category | null;
   total: number;
+  /**
+   * Built by the page, not here, so that switching kind keeps whatever else is in the
+   * address. Filters compose; picking a kind must not silently drop "ready to hire".
+   */
+  hrefFor: (category: Category | null) => string;
 }) {
   const countOf = (c: Category) => counts.find((x) => x.category === c)?.count ?? 0;
 
   return (
     <nav aria-label="Filter by kind of agent" className="flex flex-wrap gap-2">
-      <Tab href="/agents" label="All" count={total} active={active === null} />
+      <Tab href={hrefFor(null)} label="All" count={total} active={active === null} />
       {CATEGORY_ORDER.map((c) => (
         <Tab
           key={c}
-          href={`/agents?category=${c}`}
+          href={hrefFor(c)}
           label={CATEGORY_META[c].label}
           count={countOf(c)}
           active={active === c}
