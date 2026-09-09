@@ -101,16 +101,38 @@ export const CATEGORY_META: Record<Category, CategoryMeta> = {
 export const CATEGORY_ORDER: Category[] = [...CATEGORIES];
 
 /**
- * The ids of our first-party agents. Only these four may carry a distinguishing prop
- * (shield, visor, leaf, scale arms) per `docs/brand/characters.md` §7. A third-party
- * agent always gets a neutral silhouette in a deterministic colour, so that our own
- * agents read as a quality floor rather than as four out of 309 thousand.
+ * The ids of our own agents. Only these may carry a distinguishing prop (a shield, a
+ * visor, a leaf, scale arms, a case, a price tag, twin fins, a dial, a clock) per
+ * `docs/brand/characters.md` §7. Everything else gets a neutral silhouette in a
+ * deterministic colour, so that ours read as a quality floor rather than as nine out
+ * of three hundred thousand.
+ *
+ * **The key is the id, and that is the point.** Anybody may publish an agent called
+ * "Fugu Guardian"; nobody else can take our token id. Matching on the name would hand
+ * the shield to whoever asked for it.
+ *
+ * There are two sets of ids because there are two catalogues. The `97:1` to `97:4`
+ * keys belong to the sample bundled with this build. The `97:8004` to `97:8012` keys
+ * are the ERC-8004 token ids of the same agents as they are actually registered on
+ * the test network, all owned by 0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E. Both are
+ * listed rather than one, because the app has to be right whichever catalogue answers.
  */
 export const FIRST_PARTY: Record<string, FuguKind> = {
+  // The bundled sample.
   "97:1": "guardian",
   "97:2": "rebalancer",
   "97:3": "grid",
   "97:4": "yield",
+  // Registered on chain, ERC-8004 token ids.
+  "97:8004": "guardian",
+  "97:8005": "rebalancer",
+  "97:8006": "grid",
+  "97:8007": "yield",
+  "97:8008": "broker",
+  "97:8009": "trader",
+  "97:8010": "pilot",
+  "97:8011": "meter",
+  "97:8012": "steward",
 };
 
 export function fuguKindFor(record: AgentRecord): FuguKind {
