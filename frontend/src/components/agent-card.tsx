@@ -108,7 +108,7 @@ export function AgentCard({ view }: { view: AgentView }) {
       ) : null}
 
       {notShipped ? (
-        <p className="mt-3 text-xs leading-relaxed text-faint">Not shipped: {notShipped}</p>
+        <p className="mt-3 text-xs leading-relaxed break-words text-faint">Not shipped: {notShipped}</p>
       ) : null}
 
       {/* Spacer: the price row always sits at the foot of the card, so card heights match. */}

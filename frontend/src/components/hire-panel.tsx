@@ -136,7 +136,7 @@ export function HirePanel({
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--risk-3)]">
             Before you pay
           </p>
-          <p className="mt-2 text-pretty text-sm leading-relaxed text-fg">{notShipped}</p>
+          <p className="mt-2 text-pretty text-sm leading-relaxed break-words text-fg">{notShipped}</p>
         </div>
       ) : null}
 

@@ -164,7 +164,7 @@ function AgentDetail({
             <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-faint">
               What this agent does not do yet
             </h2>
-            <p className="mt-3 max-w-3xl text-pretty text-sm leading-relaxed text-fg">
+            <p className="mt-3 max-w-3xl text-pretty text-sm leading-relaxed break-words text-fg">
               {notShipped}
             </p>
           </div>
