@@ -106,8 +106,12 @@
   /* The focus ring. Deliberately --accent-strong and not --accent: WCAG 2.2
    * wants 3:1 against what surrounds it, and --accent only reaches 2.91:1 on
    * this page. The landing page still writes `var(--accent)` in its own
-   * :focus-visible rules — migrating it would change how that page renders,
-   * which the current task forbids. Flagged, not forgotten. */
+   * :focus-visible rules, including the ones added with its features, showcase
+   * and footer sections, so the gap widened rather than closed. Migrating them
+   * is a single find-and-replace in `landingpage/src/index.css` and it changes
+   * how focus renders on a page that has been signed off, so it wants its own
+   * change rather than a quiet ride along with something else. Flagged, still
+   * not forgotten. */
   --focus-ring: var(--accent-strong);
 
   /* ── Puff-level (risk) colours ─────────────────────────────────────────
@@ -238,22 +242,37 @@
    * tracking is shared too — it is a small, recognisable signature and it is
    * cheap to keep identical.
    *
-   * Kalam (the handwritten eyebrow) is deliberately NOT adopted by the
-   * marketplace. It earns its bytes on the landing page, where a handwritten
-   * eyebrow heads every section; in the marketplace there is exactly one
-   * eyebrow on one page, and a whole webfont for sixteen characters is a
-   * network cost with no return. The marketplace's eyebrow instead borrows the
-   * part that carries the brand — the accent colour and the tracking.
+   * Kalam is loaded by BOTH apps, and in both of them it is an ACCENT ONLY.
+   * It sets the handwritten eyebrow that heads every section of the landing
+   * page, and one emphasised word in a marketplace section heading (loaded
+   * there through `next/font/google` in `frontend/src/app/layout.tsx`). It
+   * never sets body copy, a control, a number, or anything a reader has to get
+   * through rather than glance at: it is a display face and it stops being
+   * charming at paragraph length.
+   *
+   * This used to say the marketplace deliberately did not load it, on the
+   * grounds that one eyebrow did not pay for a webfont. That is no longer
+   * true — the marketplace took it for a handwritten accent word — so the
+   * shared rule is now the ACCENT-ONLY rule above rather than a rule about
+   * which app may load it. What both apps still share, and what actually
+   * carries the brand in an eyebrow, is the accent colour and
+   * `--tracking-eyebrow`.
    *
    * The three role names below are declared by each app, not here, because the
-   * loading mechanisms genuinely differ: the landing page pulls Geist from
-   * Figma's CDN with @font-face, the marketplace uses next/font. A shared
-   * family LIST would name faces that only one of them has loaded. The roles
-   * are the contract; the binding is local.
+   * loading mechanisms genuinely differ: the landing page pulls Geist and Kalam
+   * from Figma's CDN with @font-face and Caveat from Google Fonts, the
+   * marketplace uses next/font. A shared family LIST would name faces that only
+   * one of them has loaded. The roles are the contract; the binding is local.
    *
    *   --font-display  headings and figures   (Geist 600)
    *   --font-body     everything else        (Geist 500)
-   *   --font-hand     eyebrows               (Kalam 700, landing page only)
+   *   --font-hand     handwritten accents    (Kalam 700, both apps)
+   *
+   * Caveat is a fourth face and is deliberately NOT given a role token. It
+   * appears in exactly one component, the landing page's footer, for the two
+   * italic column headings and the badge note, and it is bound there by name.
+   * A token here would invite a second app to reach for a font it has not
+   * loaded.
    */
   --weight-body: 500;
   --weight-display: 600;
