@@ -21,6 +21,49 @@
 
 import type { AgentCard, AgentSkill, SecurityScheme } from "@a2a-js/sdk";
 import { loadStudioToml } from "@bnbagent/studio-runtime/config";
+import { YIELD_ADVISORY_SKILL, YIELD_BREAKEVEN_SKILL } from "./advisory.js";
+
+/**
+ * The value skill. Advertised UNCONDITIONALLY — unlike the two commerce skills it needs no
+ * payment rail, no wallet and no network, because it is a pure function of its input.
+ *
+ * The description says what this agent does NOT do, in the card itself, where a buyer reads
+ * it BEFORE paying: it recommends and explains, it never executes. The on-chain listing
+ * metadata says the same thing (`onchainExecution: false`), and the two must never drift.
+ */
+const YIELD_ADVISORY: AgentSkill = {
+  id: YIELD_ADVISORY_SKILL,
+  name: "Yield migration advice (analysis only — no execution)",
+  description:
+    'Send a data part {"skill": "' + YIELD_ADVISORY_SKILL + '", "position": {"principalBase": ' +
+    '"1000000000000", "current": {"poolId": "...", "protocol": "...", "apyBps": "500", ' +
+    '"tvlBase": "...", "riskScore": 20, "isActive": true, "apyAgeSeconds": 60}}, ' +
+    '"candidates": [...], "consecutiveFavorable": 0} — money on the 8-decimal basis, APY in ' +
+    "bps. The deterministic engine replies with STAY / MIGRATE / EXIT, a reason code, the APY " +
+    "spread, the migration cost, the DERIVED threshold it was measured against, and why each " +
+    "rejected candidate was refused before its APY was compared. A higher APY that does not " +
+    "clear the threshold is a real answer: the threshold is inversely proportional to the " +
+    "principal and the horizon, so the highest APY is not the answer. " +
+    "THIS SKILL DOES NOT MOVE FUNDS. This agent has no execution path: it signs nothing, " +
+    "withdraws nothing and deposits nothing. `consecutiveFavorable` is yours to count — this " +
+    "agent keeps no memory and reads no clock.",
+  tags: ["defi", "yield", "advisory", "no-execution", "bnb-chain"],
+  inputModes: ["application/json"],
+  outputModes: ["application/json"],
+};
+
+const YIELD_BREAKEVEN: AgentSkill = {
+  id: YIELD_BREAKEVEN_SKILL,
+  name: "The spread a migration has to clear, and the thresholds that decide it",
+  description:
+    'Send {"skill": "' + YIELD_BREAKEVEN_SKILL + '", "principalBase": "1000000000000"} to get ' +
+    "the migration cost, the break-even APY spread over the horizon, and the required spread " +
+    "after the safety multiple — derived from the cost, the principal and the horizon, not " +
+    "chosen. Omit the principal to read the thresholds alone. Analysis only; nothing is executed.",
+  tags: ["defi", "yield", "advisory", "no-execution"],
+  inputModes: ["application/json"],
+  outputModes: ["application/json"],
+};
 
 const NEGOTIATE: AgentSkill = {
   id: "negotiate",
@@ -107,7 +150,11 @@ export function buildAgentCard(
   }
   return {
     name,
-    description: `ERC-8183 seller agent (${name}) — negotiate + notify_funded over A2A.`,
+    description:
+      `ERC-8183 seller agent (${name}) — yield migration ADVICE over A2A: it reads a position ` +
+      "and its alternatives, decides with deterministic code, and explains itself. It has no " +
+      "execution path and sends no transactions (onchainExecution: false). Commerce: negotiate " +
+      "+ notify_funded.",
     // main.ts overwrites this with $AGENTCORE_RUNTIME_URL at boot.
     // Local-dev fallback: a client-routable localhost URL (not the 0.0.0.0
     // bind address). Host via AGENT_HOST (default localhost); port via the
@@ -128,8 +175,13 @@ export function buildAgentCard(
     capabilities: { streaming: false },
     defaultInputModes: ["application/json"],
     defaultOutputModes: ["application/json"],
-    skills:
-      opts.commerceSkills === false ? [] : [NEGOTIATE, NOTIFY_FUNDED],
+    // The advisory skills stand first and are never gated: they are what the agent is FOR,
+    // and they work with or without a payment rail configured.
+    skills: [
+      YIELD_ADVISORY,
+      YIELD_BREAKEVEN,
+      ...(opts.commerceSkills === false ? [] : [NEGOTIATE, NOTIFY_FUNDED]),
+    ],
     ...extra,
   };
 }

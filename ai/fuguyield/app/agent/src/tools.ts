@@ -30,6 +30,12 @@ import * as cr from "@bnbagent/studio-runtime/tools";
 import { loadStudioToml } from "@bnbagent/studio-runtime/config";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
+import {
+  adviseYield,
+  yieldAdvisoryInputSchema,
+  yieldBreakevenInputSchema,
+  yieldBreakevenSkill,
+} from "./advisory.js";
 
 /**
  * The project-wide default network (`[network].default`) — tool calls that
@@ -51,7 +57,49 @@ const networkArg = z
   .optional()
   .describe("studio network name (defaults to the project's [network].default)");
 
+/**
+ * The strategy tools — the reason this agent is worth renting.
+ *
+ * They read a position and its alternatives, run the DETERMINISTIC decision engine in
+ * `src/strategy/`, and return the decision together with the reasoning behind it. The LLM
+ * may call them and read the result out loud; it may not pick the pool, shift a threshold,
+ * or recompute a spread. Every number came from `decide()`, which is pure, replayable and
+ * backtested.
+ *
+ * They are ANALYSIS tools. This agent has no execution path at all — the descriptions say
+ * so, because an LLM that thinks a tool moves money will tell a user it moved money.
+ */
+export const STRATEGY_TOOLS: ToolSet = {
+  yield_advisory: tool({
+    description:
+      "ANALYSIS ONLY — recommends whether a yield position should move, and explains why. " +
+      "Takes the current position and the candidate pools; returns STAY / MIGRATE / EXIT with a " +
+      "reason code, the APY spread, the migration cost, the DERIVED spread threshold, and why each " +
+      "rejected candidate was refused. A higher APY that does not clear the threshold is a real " +
+      "answer, not a failure: the highest APY is not the right answer, because the threshold is " +
+      "inversely proportional to the principal and the horizon. " +
+      "THIS TOOL DOES NOT MOVE FUNDS. It signs nothing, withdraws nothing and deposits nothing; " +
+      "this agent has no execution path (onchainExecution: false). Report its numbers exactly as " +
+      "returned and never invent, adjust, or extrapolate them.",
+    inputSchema: yieldAdvisoryInputSchema,
+    execute: async (input) => adviseYield(input).payload,
+  }),
+  yield_breakeven: tool({
+    description:
+      "The APY spread a migration must clear for a given principal, and the thresholds that decide " +
+      "it. Give it a principal and it returns the migration cost, the break-even spread over the " +
+      "horizon, and the required spread after the safety multiple — derived, not chosen. Omit the " +
+      "principal to read the thresholds alone. Read this instead of guessing why a higher APY was " +
+      "or was not worth moving to. Analysis only; nothing is executed.",
+    inputSchema: yieldBreakevenInputSchema,
+    execute: async (input) => yieldBreakevenSkill(input),
+  }),
+};
+
 export const LLM_READ_TOOLS: ToolSet = {
+  // --- Strategy (the deliverable; pure code, never the LLM's judgement) ---
+  ...STRATEGY_TOOLS,
+
   // --- Wallet & chain basics ---
   wallet_info: tool({
     description:

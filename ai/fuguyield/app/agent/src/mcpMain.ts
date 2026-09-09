@@ -74,6 +74,14 @@ import {
   B402Seller,
 } from "@bnbagent/studio-runtime/b402";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import {
+  YIELD_ADVISORY_SKILL,
+  YIELD_BREAKEVEN_SKILL,
+  yieldAdvisoryToolShape,
+  yieldAdvisorySkill,
+  yieldBreakevenToolShape,
+  yieldBreakevenSkill,
+} from "./advisory.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { generateText, stepCountIs } from "ai";
@@ -210,6 +218,14 @@ async function runLlm(prompt: string): Promise<string> {
       const result = await generateText({
         model,
         system:
+          "FINANCIAL DECISIONS ARE NOT YOURS TO MAKE. Every number, threshold and " +
+          "recommended action must come from the `yield_advisory` / `yield_breakeven` " +
+          "tools, which run deterministic, backtested code. Quote what they return; " +
+          "never invent, adjust, average or extrapolate a figure, and never state an " +
+          "action they did not return. " +
+          "This agent CANNOT execute: it has no protocol adapter, moves no principal and " +
+          "sends no transaction. Describe its output as a recommendation, never as " +
+          "something done, in progress, or about to happen. " +
           "You are a seller agent. The runtime has already authorized this task " +
           "through its configured commerce rail. Complete the user's task now; " +
           "do not ask for a job ID or additional payment. " +
@@ -450,6 +466,50 @@ export function buildMcpServer(
     },
     );
   }
+
+  // ── Strategy tools (the deliverable) ───────────────────────────────────────
+  // Registered UNCONDITIONALLY, unlike the commerce tools: the advisory needs no payment
+  // rail, no wallet and no network — it is a pure function of its argument.
+  //
+  // `readOnlyHint: true` and `openWorldHint: false` are both literally true here: the
+  // handler touches no chain and no outside service, it only runs `src/strategy/`. Do not
+  // relax either flag; an MCP client shows those hints to its user as a promise.
+  const advisoryAnnotations = { readOnlyHint: true, openWorldHint: false };
+
+  server.registerTool(
+    YIELD_ADVISORY_SKILL,
+    {
+      description:
+        "ANALYSIS ONLY — recommend whether a yield position should move, and explain why. Send the " +
+        "current position (principal on the 8-decimal basis, its pool with APY in bps, TVL, risk " +
+        "score, active flag and the AGE of the APY reading) plus the candidate pools and how many " +
+        "consecutive observations the spread has already qualified for. The deterministic engine " +
+        "returns STAY / MIGRATE / EXIT with a reason code, the spread, the migration cost, the " +
+        "DERIVED threshold it was measured against, and why each rejected candidate was refused " +
+        "before its APY was even compared. " +
+        "THIS TOOL DOES NOT MOVE FUNDS: this agent has no execution path (onchainExecution: false). " +
+        "It signs nothing, withdraws nothing and deposits nothing. A broken reading — a risk score " +
+        "outside 0..100, a duplicated pool id — is rejected with the reason, never answered with a guess.",
+      inputSchema: yieldAdvisoryToolShape,
+      annotations: advisoryAnnotations,
+    },
+    async (args) => toolResult(yieldAdvisorySkill(args)),
+  );
+
+  server.registerTool(
+    YIELD_BREAKEVEN_SKILL,
+    {
+      description:
+        "The APY spread a migration must clear for a given principal, and the thresholds that decide " +
+        "it — the migration cost, the break-even spread over the horizon, and the required spread " +
+        "after the safety multiple. All derived, not chosen: the cost is paid once and the spread is " +
+        "earned per day, so the threshold is inversely proportional to both the principal and the " +
+        "horizon. Omit the principal to read the thresholds alone. Analysis only; nothing is executed.",
+      inputSchema: yieldBreakevenToolShape,
+      annotations: advisoryAnnotations,
+    },
+    async (args) => toolResult(yieldBreakevenSkill(args)),
+  );
 
   // ── Read-only chain tools ──────────────────────────────────────────────────
   const network = z.string().optional().describe("studio network name");
