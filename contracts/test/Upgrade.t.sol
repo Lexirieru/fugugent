@@ -8,6 +8,8 @@ import {FuguPriceOracle} from "../src/FuguPriceOracle.sol";
 import {FuguSubscription} from "../src/FuguSubscription.sol";
 import {FuguRegistryV2} from "./mocks/FuguRegistryV2.sol";
 import {FuguSubscriptionV2} from "./mocks/FuguSubscriptionV2.sol";
+import {FuguAuditEscrow} from "../src/FuguAuditEscrow.sol";
+import {FuguAuditEscrowV2} from "./mocks/FuguAuditEscrowV2.sol";
 import {Category, Listing} from "../src/types/FuguTypes.sol";
 import {MockAggregator} from "./mocks/MockAggregator.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
@@ -270,5 +272,63 @@ contract UpgradeTest is Test {
         // It cannot be called twice.
         vm.expectRevert();
         subs.initializeV2();
+    }
+
+    /// @notice An audit job holding real money must read back identically after an upgrade:
+    ///         the escrow is the one contract here whose storage IS the custody record.
+    function test_escrowUpgradePreservesFundedJob() public {
+        MockERC20 musd = new MockERC20("Mock USD", "mUSD");
+        FuguAuditEscrow escrow = FuguAuditEscrow(
+            address(
+                new ERC1967Proxy(
+                    address(new FuguAuditEscrow()),
+                    abi.encodeCall(FuguAuditEscrow.initialize, (owner, address(musd), owner))
+                )
+            )
+        );
+
+        address developer = address(0xD3EF);
+        address auditorAddr = address(0xA0D17);
+        musd.mint(developer, 100e18);
+        musd.mint(auditorAddr, 100e18);
+        vm.prank(developer);
+        musd.approve(address(escrow), type(uint256).max);
+        vm.prank(auditorAddr);
+        musd.approve(address(escrow), type(uint256).max);
+
+        vm.prank(developer);
+        uint256 jobId = escrow.createJob(auditorAddr, 30e18, 12e18, keccak256("skill"));
+        vm.prank(developer);
+        escrow.fundFee(jobId);
+        vm.prank(auditorAddr);
+        escrow.postBond(jobId);
+
+        FuguAuditEscrowV2 v2impl = new FuguAuditEscrowV2();
+        vm.prank(owner);
+        escrow.upgradeToAndCall(address(v2impl), "");
+        FuguAuditEscrowV2 upgraded = FuguAuditEscrowV2(address(escrow));
+
+        assertEq(upgraded.version(), "v2");
+        FuguAuditEscrow.Job memory j = upgraded.getJob(jobId);
+        assertEq(j.developer, developer);
+        assertEq(j.auditor, auditorAddr);
+        assertEq(j.fee, 30e18);
+        assertEq(j.bond, 12e18);
+        assertEq(j.skillHash, keccak256("skill"));
+        assertEq(uint8(j.status), uint8(FuguAuditEscrow.JobStatus.Funded));
+        assertEq(upgraded.jobCount(), 1);
+        assertEq(address(upgraded.payToken()), address(musd));
+        assertEq(upgraded.arbiter(), owner);
+
+        // the appended V2 slot is fresh and does not overwrite the job book
+        assertEq(upgraded.extraField(), 0);
+        upgraded.setExtraField(7);
+        assertEq(upgraded.getJob(jobId).fee, 30e18);
+
+        // and the money is still payable after the upgrade
+        vm.prank(developer);
+        upgraded.release(jobId);
+        assertEq(musd.balanceOf(auditorAddr), 100e18 - 12e18 + 42e18);
+        assertEq(musd.balanceOf(address(upgraded)), 0);
     }
 }

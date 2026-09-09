@@ -17,7 +17,8 @@
     "FuguPriceOracle": "0x864f888330821b6025b2fe670f30e01ee8776449",
     "FuguRegistry": "0xd68968cf68e9930a689e0fc9d648a898050a548a",
     "FuguSubscription": "0x06bc0ba1dbc3b6fd22defe7a0cd9a6cd13c15e97",
-    "FuguReputation": "0x30c92ffadad24ca079227a92a33b78683d36fde6"
+    "FuguReputation": "0x30c92ffadad24ca079227a92a33b78683d36fde6",
+    "FuguAuditEscrow": "0xf7a0e340455af3c476564d7af283d9be4d2cfabb"
   },
   "listings": {
     "listedAt": "2026-09-09",
@@ -146,5 +147,48 @@
         "healthFactor": "1800000000000000000"
       }
     }
+  },
+  "FuguAuditEscrow": "0x0354d2a4be40f118e4d1301915ee2ff54eec8a52",
+  "auditEscrow": {
+    "deployedAt": "2026-09-09",
+    "script": "script/DeployAuditEscrow.s.sol:DeployAuditEscrow",
+    "proxy": "0x0354d2a4be40f118e4d1301915ee2ff54eec8a52",
+    "implementation": "0xf7a0e340455af3c476564d7af283d9be4d2cfabb",
+    "proxyTxHash": "0xabf9500a97fdbedcea1e2adc647ed2a7b0709c447e0e4826eb9d7dc9005e1442",
+    "implementationTxHash": "0xf68186d8bf7fc9b8c6b5f440ef12bd924be90ea09abb89c20623d4c1a6256616",
+    "block": 129993029,
+    "gasUsed": {
+      "implementation": 1669200,
+      "proxy": 224117
+    },
+    "owner": "0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E",
+    "arbiter": "0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E",
+    "payToken": "0x932E82632E80b06318ca969e33F99A54F1a04b10",
+    "payTokenNote": "mUSD (MockTokenUSD, 18 desimal, `mint` terbuka). Token pembayaran DIKUNCI saat initialize dan tidak punya setter: menukar token saat masih ada job berisi dana akan menyelesaikan job itu dengan token yang tidak pernah diterima escrow. Token lain = deployment escrow lain.",
+    "verified": {
+      "verifiedAt": "2026-09-09",
+      "status": "Implementasi DAN proxy keduanya terverifikasi di BscScan testnet (solc v0.8.30+commit.73712a01, optimizer 200 runs). BscScan mengenali proxy (Proxy=1) dan menunjuk ke implementasi yang benar, jadi tab Read/Write as Proxy bekerja.",
+      "verify": "curl -s \"https://api.etherscan.io/v2/api?chainid=97&module=contract&action=getsourcecode&address=<addr>&apikey=$BSCSCAN_API_KEY\"  # ContractName=FuguAuditEscrow / ERC1967Proxy (endpoint V1 api-testnet.bscscan.com sudah deprecated)"
+    },
+    "e2e": {
+      "script": "script/AuditEscrowE2E.s.sol:AuditEscrowE2E",
+      "jobId": 1,
+      "developer": "0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E",
+      "auditor": "0x26bE190729B79c3CCfAc47b520Da9799F56301a7",
+      "auditorNote": "Kunci uji deterministik keccak256(\"fugu-audit-escrow-auditor-testnet-seed\") — bukan rahasia, testnet saja. Dibutuhkan karena kontrak menolak job yang developer dan auditornya alamat yang sama (SelfAudit).",
+      "skillHash": "0x7afd6c0463f6abd3073d34849802b132ab9d7a081dd8f9b02dd091ff0a9557b3",
+      "fee": "5000000000000000000 (5 mUSD)",
+      "bond": "2000000000000000000 (2 mUSD)",
+      "txHashes": {
+        "createJob": "0xa522fcb04d269a5ecc7b114bb5556faff371462e67bee4dd02f0ec2657267c22",
+        "fundFee": "0x11488b8bbde7836bd80760ad2b5c130a101799aef6dd794e86b342ebb762534b",
+        "postBond": "0x2a867edeff55920fda798f8e0dfff4f50dc19574854d8117fdef297467108862",
+        "release": "0x338030ed89923a5bc995a1170a9aa884e63e07193a8846d1ee58a5daee520c53"
+      },
+      "result": "getJob(1) = (developer, auditor, 5e18, 2e18, feeFunded=true, bondPosted=true, status=3 SETTLED, skillHash). Saldo mUSD escrow 0, auditor 7e18 = fee + bond.",
+      "verify": "cast call --rpc-url \"$BSC_TESTNET_RPC_URL\" 0x0354d2a4be40f118e4d1301915ee2ff54eec8a52 'getJob(uint256)((address,address,uint256,uint256,bool,bool,uint8,bytes32))' 1"
+    },
+    "biaya": "Deploy 1.893.317 gas @ 0,1 gwei = 0,0001893317 tBNB; e2e 617.535 gas = 0,0000617535 tBNB; ditambah stipend gas 0,002 tBNB ke wallet auditor. Saldo deployer 0,095355113612945404 -> 0,093114489012945404 tBNB.",
+    "keamanan": "Port dari references/ethnyc/hardhat/contracts/MarsEscrow.sol dengan lima perbaikan keamanan: (1) release/slash tidak lagi permissionless — release hanya developer atau arbiter, slash hanya arbiter; (2) fundFee/postBond tidak lagi menerima parameter jumlah dari pemanggil mana pun (di aslinya siapa pun bisa menguras allowance developer); (3) SafeERC20 menggantikan transfer/transferFrom mentah; (4) jumlah yang dibukukan adalah selisih saldo nyata, bukan jumlah yang diminta, sehingga token fee-on-transfer tidak membuat satu job dibayar dari dana job lain; (5) `cancel` menambah jalan keluar untuk job yang hanya didanai satu pihak — di aslinya dana itu terkunci selamanya. Ditambah ReentrancyGuard, penolakan self-audit, dan penolakan auditor sebagai reporter saat slash."
   }
 }
