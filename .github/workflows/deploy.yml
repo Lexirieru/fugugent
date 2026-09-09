@@ -73,6 +73,10 @@ concurrency:
 
 permissions:
   contents: read
+  # So GITHUB_TOKEN can pull this repository's own container images. It is
+  # short-lived and scoped to this repository, which is why no long-lived
+  # personal access token has to exist for this to work.
+  packages: read
 
 jobs:
   deploy:
@@ -121,14 +125,19 @@ jobs:
       - name: log the VPS in to GHCR
         # Piped over stdin rather than passed as an argument, so the token never
         # appears in the remote host's process list.
+        #
+        # GITHUB_TOKEN by default. It is minted for this run, expires when the job
+        # ends, and `permissions: packages: read` above is all it needs to pull
+        # this repository's images, so keeping the packages private costs nothing
+        # and no long-lived token has to exist anywhere. GHCR_PULL_TOKEN stays
+        # supported for the case where the images move to an account this
+        # workflow's token cannot reach.
+        env:
+          GHCR_TOKEN: ${{ secrets.GHCR_PULL_TOKEN || github.token }}
         run: |
           set -euo pipefail
-          if [ -n "${{ secrets.GHCR_PULL_TOKEN }}" ]; then
-            printf '%s' '${{ secrets.GHCR_PULL_TOKEN }}' \
-              | ssh target "docker login ghcr.io -u '${{ steps.prefix.outputs.owner }}' --password-stdin"
-          else
-            echo "GHCR_PULL_TOKEN not set — assuming the packages are public."
-          fi
+          printf '%s' "$GHCR_TOKEN" \
+            | ssh target "docker login ghcr.io -u '${{ steps.prefix.outputs.owner }}' --password-stdin"
 
       - name: deploy
         id: deploy
@@ -274,6 +283,13 @@ jobs:
         # rollback instant.
         if: always()
         run: ssh target 'docker image prune -f >/dev/null 2>&1; docker builder prune -f --keep-storage 1GB >/dev/null 2>&1; df -h / | tail -1'
+
+      - name: log the VPS out of GHCR
+        # The credential this job wrote to ~/.docker/config.json on the VPS
+        # expires with the job, so leaving it there leaves a dead secret on a
+        # machine running someone else's production. Every deploy logs in again.
+        if: always()
+        run: ssh target 'docker logout ghcr.io >/dev/null 2>&1 || true'
 
       - name: report
         if: always()
