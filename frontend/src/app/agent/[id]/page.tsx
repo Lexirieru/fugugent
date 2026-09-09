@@ -9,8 +9,9 @@ import { HiredBadge } from "@/components/hired-badge";
 import { ProofList } from "@/components/proof";
 import { RiskChip } from "@/components/risk-chip";
 import { Badge, ButtonLink, Card, EmptyState, Page, Section, SectionHeader } from "@/components/ui";
+import { ListAgent } from "@/components/wallet/list-agent";
 import { PermissionCheck } from "@/components/wallet/permission-check";
-import { CATEGORY_META, categoryOf, fuguKindFor } from "@/lib/agents";
+import { CATEGORY_META, categoryOf, fuguKindFor, guardianHref } from "@/lib/agents";
 import { addressUrl, shorten, txUrl } from "@/lib/chain";
 import { source } from "@/lib/data";
 import type { AgentView } from "@/lib/data/types";
@@ -60,17 +61,27 @@ export default async function AgentPage({ params }: PageProps<"/agent/[id]">) {
 
   if (!result.agent) notFound();
 
-  return <AgentDetail view={result.agent} provenance={result.provenance} origin={src.origin} />;
+  return (
+    <AgentDetail
+      view={result.agent}
+      provenance={result.provenance}
+      origin={src.origin}
+      ourAgentHref={guardianHref(src.kind)}
+    />
+  );
 }
 
 function AgentDetail({
   view,
   provenance,
   origin,
+  ourAgentHref,
 }: {
   view: AgentView;
   provenance: Provenance;
   origin: string;
+  /** Fugu Guardian, addressed by the id of whichever catalogue answered. */
+  ourAgentHref: string;
 }) {
   const { record, risk, session, proofs, outcomes, notShipped } = view;
   const kind = fuguKindFor(record);
@@ -303,7 +314,7 @@ function AgentDetail({
             body="This agent has no completed runs, so there is no history to display. Fugu Guardian has run on the test network and its transactions are open to read."
             actions={
               <>
-                <ButtonLink href="/agent/97%3A1">Open Fugu Guardian</ButtonLink>
+                <ButtonLink href={ourAgentHref}>Open Fugu Guardian</ButtonLink>
                 <ButtonLink href="/agents" variant="ghost">
                   Back to all agents
                 </ButtonLink>
@@ -416,7 +427,7 @@ function AgentDetail({
             body="This agent has never touched the blockchain, so there is nothing to link to. An empty list is the honest answer here."
             actions={
               <>
-                <ButtonLink href="/agent/97%3A1">See an agent that has</ButtonLink>
+                <ButtonLink href={ourAgentHref}>See an agent that has</ButtonLink>
                 <ButtonLink href="/agents" variant="ghost">
                   Back to all agents
                 </ButtonLink>
@@ -434,7 +445,7 @@ function AgentDetail({
           lede={
             listing && listing.active
               ? `Listing number ${listing.listingId.toString()}. ${formatPricePerPeriod(listing.priceUsd8PerPeriod, listing.periodSeconds)}, and one period is ${formatPeriod(listing.periodSeconds)}.`
-              : undefined
+              : "Nobody has put a price on this agent, so there is nothing to pay yet. Its owner can change that from this page."
           }
         />
         {listing && listing.active ? (
@@ -447,17 +458,20 @@ function AgentDetail({
             notShipped={notShipped}
           />
         ) : (
-          <EmptyState
-            title="This agent cannot be hired"
-            body="It is not listed on FuguRegistry, so there is no price and nowhere for your payment to be held. We would rather leave the button out than ship one that takes your money and does nothing."
-            actions={
-              <>
-                <ButtonLink href="/agent/97%3A1">Hire Fugu Guardian instead</ButtonLink>
-                <ButtonLink href="/agents" variant="ghost">
-                  Compare the nine kinds
-                </ButtonLink>
-              </>
-            }
+          /* Not "this agent cannot be hired", which was a dead end for 103 of the 112
+             agents in the catalogue. It cannot be hired *yet*, the person who can change
+             that is named, and if that person is the one reading, the form is right here. */
+          <ListAgent
+            agentName={record.name}
+            agentDescription={record.description}
+            tokenId={record.tokenId}
+            ownerAddress={record.ownerAddress}
+            agentWallet={record.agentWallet}
+            classifiedCategory={category}
+            classifierConfidence={record.classification?.confidence ?? null}
+            classifierReason={record.classification?.reason ?? null}
+            endpointVerified={record.isEndpointVerified}
+            catalogueSource={record.source}
           />
         )}
       </Section>
@@ -488,7 +502,7 @@ function AgentDetail({
                 </>
               ) : (
                 <>
-                  <ButtonLink href="/agent/97%3A1">Open an agent you can hire</ButtonLink>
+                  <ButtonLink href={ourAgentHref}>Open an agent you can hire</ButtonLink>
                   <ButtonLink href="/agents" variant="ghost">
                     Back to all agents
                   </ButtonLink>

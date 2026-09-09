@@ -99,7 +99,10 @@ export const ORACLE_ABI = [
   },
 ] as const;
 
-/** `FuguRegistry.sol`, the listing catalogue. Read to get the price that actually applies. */
+/**
+ * `FuguRegistry.sol`, the listing catalogue. Read to get the price that actually
+ * applies, and written to when an agent's owner lists it themselves.
+ */
 export const REGISTRY_ABI = [
   {
     type: "function",
@@ -142,6 +145,43 @@ export const KEYSTORE_ABI = [
       { name: "keyHash", type: "bytes32" },
     ],
     outputs: [{ type: "bool" }],
+  },
+] as const;
+
+/**
+ * The write side of the registry, and the read that guards it.
+ *
+ * `list` is permissionless and sets `owner: msg.sender`. `FuguSubscription.claim`
+ * pays `listing.owner`, so whoever signs this is whoever gets paid. That is the whole
+ * reason this app never lists an agent on somebody else's behalf: doing it for them
+ * would route their renters' money to us.
+ *
+ * `listingByAgentId` is a public mapping, so it is a free read, and it is what lets
+ * the page find out that an agent id is already taken **before** anybody signs. The
+ * contract raises `AgentAlreadyListed` for that case, and learning it after a wallet
+ * has opened is a worse way to find out.
+ */
+export const REGISTRY_WRITE_ABI = [
+  {
+    type: "function",
+    name: "list",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "erc8004AgentId", type: "uint256" },
+      { name: "agentWallet", type: "address" },
+      { name: "category", type: "uint8" },
+      { name: "priceUsd8PerPeriod", type: "uint128" },
+      { name: "periodSeconds", type: "uint32" },
+      { name: "metadataURI", type: "string" },
+    ],
+    outputs: [{ name: "listingId", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "listingByAgentId",
+    stateMutability: "view",
+    inputs: [{ name: "erc8004AgentId", type: "uint256" }],
+    outputs: [{ type: "uint256" }],
   },
 ] as const;
 

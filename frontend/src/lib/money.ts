@@ -111,6 +111,29 @@ export function formatDuration(seconds: number): string {
 }
 
 /**
+ * A dollar amount typed by a person, into USD8 base, without a float anywhere.
+ *
+ * `Number("0.07")` is 0.07000000000000001, and multiplying that by 1e8 gives
+ * 7000000.000000001. This module exists so that never reaches a contract call, so the
+ * text is split on the decimal point and the two halves become integers directly.
+ *
+ * `null` means "this is not a dollar amount", and the caller has to say so rather than
+ * send something it invented. Zero parses fine and is a real answer; the contract is
+ * the thing that rejects a zero price, and it says so in its own words.
+ */
+export function parseUsdToUsd8(input: string): bigint | null {
+  const text = input.trim();
+  if (!/^\d{1,12}(\.\d{1,8})?$/.test(text)) return null;
+  const [whole, frac = ""] = text.split(".");
+  const padded = (frac + "00000000").slice(0, 8);
+  try {
+    return BigInt(whole) * USD8 + BigInt(padded);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * A USD8 value off the wire.
  *
  * The backend sends money as a **decimal string** precisely so that it never travels
