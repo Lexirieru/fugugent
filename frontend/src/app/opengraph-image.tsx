@@ -12,7 +12,7 @@ import { ACCENT, SURFACES, TEXT } from "@/lib/theme";
  * the literal projection of `theme/tokens.css` — never from hexes typed into this file.
  */
 
-export const alt = "Fugugent — a marketplace of DeFi agents that swell as their risk grows";
+export const alt = "HelloFugu — a marketplace of DeFi agents that swell as their risk grows";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 

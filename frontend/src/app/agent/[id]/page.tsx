@@ -28,7 +28,7 @@ export async function generateMetadata({
     title: agent.record.name,
     description: agent.record.description.slice(0, 200),
     openGraph: {
-      title: `${agent.record.name} — Fugugent`,
+      title: `${agent.record.name} — HelloFugu`,
       description: agent.record.description.slice(0, 200),
     },
   };

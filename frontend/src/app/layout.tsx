@@ -16,21 +16,21 @@ const description =
 export const metadata: Metadata = {
   metadataBase: new URL("https://app.hellofugu.xyz"),
   title: {
-    default: "Fugugent — hire a DeFi agent you can check",
-    template: "%s — Fugugent",
+    default: "HelloFugu — hire a DeFi agent you can check",
+    template: "%s — HelloFugu",
   },
   description,
-  applicationName: "Fugugent",
+  applicationName: "HelloFugu",
   openGraph: {
     type: "website",
     url: "https://app.hellofugu.xyz",
-    siteName: "Fugugent",
-    title: "Fugugent — hire a DeFi agent you can check",
+    siteName: "HelloFugu",
+    title: "HelloFugu — hire a DeFi agent you can check",
     description,
   },
   twitter: {
     card: "summary_large_image",
-    title: "Fugugent — hire a DeFi agent you can check",
+    title: "HelloFugu — hire a DeFi agent you can check",
     description,
   },
 };
@@ -62,7 +62,7 @@ function SiteHeader() {
     <header className="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur">
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3 sm:px-8">
         <Link href="/" className="text-sm font-semibold tracking-tight text-fg">
-          Fugugent
+          HelloFugu
         </Link>
         <SiteNav className="order-last w-full border-t border-line pt-2 sm:order-none sm:w-auto sm:border-t-0 sm:pt-0" />
         <span className="ml-auto flex items-center gap-2">

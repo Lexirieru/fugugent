@@ -33,7 +33,7 @@ export const walletEnabled = projectId.length > 0;
 export const networks: [AppKitNetwork, ...AppKitNetwork[]] = [bscTestnet];
 
 export const metadata = {
-  name: "Fugugent",
+  name: "HelloFugu",
   description: "Hire a DeFi agent on BNB Chain and check its work yourself.",
   url: "https://app.hellofugu.xyz",
   icons: ["https://app.hellofugu.xyz/icon.svg"],

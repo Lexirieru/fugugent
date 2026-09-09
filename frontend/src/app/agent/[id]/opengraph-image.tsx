@@ -20,7 +20,7 @@ import { ACCENT, SURFACES, TEXT } from "@/lib/theme";
  * colours come from `lib/theme.ts`, the literal projection of `theme/tokens.css`.
  */
 
-export const alt = "A Fugugent agent — the pufferfish swells as its risk grows";
+export const alt = "A HelloFugu agent — the pufferfish swells as its risk grows";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -28,7 +28,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   const { id } = await params;
   const { agent } = await source().getAgent(decodeURIComponent(id));
 
-  const name = agent?.record.name ?? "Fugugent";
+  const name = agent?.record.name ?? "HelloFugu";
   const kind = agent ? fuguKindFor(agent.record) : "fallback";
   const level = agent?.risk?.level ?? null;
   const category = agent ? categoryOf(agent.record) : null;

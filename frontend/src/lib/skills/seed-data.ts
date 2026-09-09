@@ -36,7 +36,7 @@ export const SEED_SKILL_PAYLOADS: unknown[] = [
       "read-only HTTPS to one forecast host"
     ],
     "authorAddress": "0x000000000000000000000000000000000000dEaD",
-    "authorName": "Fugugent example author",
+    "authorName": "HelloFugu example author",
     "tags": [
       "weather",
       "read-only"
@@ -90,7 +90,7 @@ export const SEED_SKILL_PAYLOADS: unknown[] = [
       "no secrets or wallet access"
     ],
     "authorAddress": "0x000000000000000000000000000000000000dEaD",
-    "authorName": "Fugugent example author",
+    "authorName": "HelloFugu example author",
     "tags": [
       "price",
       "defi"
@@ -144,7 +144,7 @@ export const SEED_SKILL_PAYLOADS: unknown[] = [
       "no signing"
     ],
     "authorAddress": "0x000000000000000000000000000000000000dEaD",
-    "authorName": "Fugugent example author",
+    "authorName": "HelloFugu example author",
     "tags": [
       "portfolio",
       "read-only"
@@ -198,7 +198,7 @@ export const SEED_SKILL_PAYLOADS: unknown[] = [
       "returns a fee estimate"
     ],
     "authorAddress": "0x000000000000000000000000000000000000dEaD",
-    "authorName": "Fugugent example author",
+    "authorName": "HelloFugu example author",
     "tags": [
       "gas",
       "read-only"
@@ -252,7 +252,7 @@ export const SEED_SKILL_PAYLOADS: unknown[] = [
       "one outbound HTTPS request"
     ],
     "authorAddress": "0x000000000000000000000000000000000000dEaD",
-    "authorName": "Fugugent example author",
+    "authorName": "HelloFugu example author",
     "tags": [
       "observability"
     ],
@@ -304,7 +304,7 @@ export const SEED_SKILL_PAYLOADS: unknown[] = [
       "forwards JSON-RPC requests"
     ],
     "authorAddress": "0x000000000000000000000000000000000000dEaD",
-    "authorName": "Fugugent example author",
+    "authorName": "HelloFugu example author",
     "tags": [
       "rpc",
       "infrastructure"
@@ -358,7 +358,7 @@ export const SEED_SKILL_PAYLOADS: unknown[] = [
       "writes a CSV report"
     ],
     "authorAddress": "0x000000000000000000000000000000000000dEaD",
-    "authorName": "Fugugent example author",
+    "authorName": "HelloFugu example author",
     "tags": [
       "tax",
       "reporting"
@@ -417,7 +417,7 @@ export const SEED_SKILL_PAYLOADS: unknown[] = [
       "extracts text from PDF files"
     ],
     "authorAddress": "0x000000000000000000000000000000000000dEaD",
-    "authorName": "Fugugent example author",
+    "authorName": "HelloFugu example author",
     "tags": [
       "pdf",
       "documents"
@@ -491,7 +491,7 @@ export const SEED_SKILL_PAYLOADS: unknown[] = [
       "quotes a swap route"
     ],
     "authorAddress": "0x000000000000000000000000000000000000dEaD",
-    "authorName": "Fugugent example author",
+    "authorName": "HelloFugu example author",
     "tags": [
       "defi",
       "mcp",

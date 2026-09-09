@@ -18,7 +18,7 @@
  */
 
 const REASON =
-  "@x402/* is not installed in this build: Fugugent pays through FuguSubscription on BSC testnet, never through x402.";
+  "@x402/* is not installed in this build: HelloFugu pays through FuguSubscription on BSC testnet, never through x402.";
 
 function unavailable(): never {
   throw new Error(REASON);
