@@ -5,7 +5,41 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#F4EBE3" />
     <link rel="icon" href="/logos/hellofugu-logo.webp" />
+    <!--
+      Caveat, for the handwritten labels in the footer only. Geist and Kalam
+      already come from Figma's CDN through @font-face in index.css; this one is
+      a <link> rather than a CSS @import so it does not sit in the stylesheet's
+      critical chain, and it is a single weight because only one is used.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&display=swap"
+    />
     <title>HelloFugu</title>
+    <!--
+      Blocking, and before the stylesheet, on purpose.
+
+      `entrance-pending` is what puts the hero's opening state on screen. If it
+      landed after the first paint the hero would flash in fully drawn and then
+      jump back to hidden, which is worse than no animation at all. And it is
+      added by SCRIPT rather than written into the stylesheet, so a reader with
+      JavaScript off never gets the hidden state in the first place: no class,
+      no rule, hero fully visible.
+
+      The timer is the belt to that pair of braces. If the controller in
+      `entrance.ts` never runs (it threw, the bundle 404'd, React never
+      mounted), this removes the classes anyway and the hero ends up exactly
+      where it would have been. `completeEntrance()` clears it, so on the normal
+      path it never fires.
+    -->
+    <script>
+      document.documentElement.classList.add("has-js", "entrance-pending");
+      window.__fuguEntranceFallback = setTimeout(function () {
+        document.documentElement.classList.remove("entrance-pending", "entrance-playing");
+      }, 3500);
+    </script>
   </head>
   <body>
     <div id="root"></div>
