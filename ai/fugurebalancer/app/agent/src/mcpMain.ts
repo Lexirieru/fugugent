@@ -74,6 +74,14 @@ import {
   B402Seller,
 } from "@bnbagent/studio-runtime/b402";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import {
+  REBALANCE_ADVISORY_SKILL,
+  REBALANCE_THRESHOLDS_SKILL,
+  rebalanceAdvisoryToolShape,
+  rebalanceAdvisorySkill,
+  rebalanceThresholdsSkill,
+  thresholdsRequestSchema,
+} from "./advisory.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { generateText, stepCountIs } from "ai";
@@ -210,6 +218,14 @@ async function runLlm(prompt: string): Promise<string> {
       const result = await generateText({
         model,
         system:
+          "FINANCIAL DECISIONS ARE NOT YOURS TO MAKE. Every number, threshold and " +
+          "recommended action must come from the `rebalance_advisory` / " +
+          "`rebalance_thresholds` tools, which run deterministic, backtested code. " +
+          "Quote what they return; never invent, adjust, average or extrapolate a " +
+          "figure, and never state an action they did not return. " +
+          "This agent CANNOT execute: it has no swap path, signs no trade and sends no " +
+          "transaction. Describe its output as a recommendation, never as something " +
+          "done, in progress, or about to happen. " +
           "You are a seller agent. The runtime has already authorized this task " +
           "through its configured commerce rail. Complete the user's task now; " +
           "do not ask for a job ID or additional payment. " +
@@ -450,6 +466,47 @@ export function buildMcpServer(
     },
     );
   }
+
+  // ── Strategy tools (the deliverable) ───────────────────────────────────────
+  // Registered UNCONDITIONALLY, unlike the commerce tools: the advisory needs no
+  // payment rail, no wallet and no network — it is a pure function of its argument.
+  //
+  // `readOnlyHint: true` and `openWorldHint: false` are both literally true here: the
+  // handler touches no chain and no outside service, it only runs `src/strategy/`. Do not
+  // relax either flag; an MCP client shows those hints to its user as a promise.
+  const advisoryAnnotations = { readOnlyHint: true, openWorldHint: false };
+
+  server.registerTool(
+    REBALANCE_ADVISORY_SKILL,
+    {
+      description:
+        "ANALYSIS ONLY — recommend whether a portfolio should be rebalanced, and explain why. " +
+        "Send the current asset values (USD, 8-decimal basis) and target weights (bps, summing to " +
+        "10000); the deterministic rebalancing engine returns NONE / WATCH / REBALANCE / " +
+        "BLOCKED_BY_COST with the reasoning and every number behind it. BLOCKED_BY_COST is a real " +
+        "answer, not an error: the portfolio IS off target, and moving it would cost more than the " +
+        "drift is worth. " +
+        "THIS TOOL DOES NOT TRADE: this agent has no execution path (onchainExecution: false). It " +
+        "signs nothing, broadcasts nothing, and moves no funds. A malformed portfolio is rejected " +
+        "with the reason, never answered with a guess.",
+      inputSchema: rebalanceAdvisoryToolShape,
+      annotations: advisoryAnnotations,
+    },
+    async (args) => toolResult(rebalanceAdvisorySkill(args)),
+  );
+
+  server.registerTool(
+    REBALANCE_THRESHOLDS_SKILL,
+    {
+      description:
+        "The Rebalancer's thresholds — watch band, rebalance band, cost budget, cost model — each " +
+        "with the reason it is the value it is, plus the smallest turnover that can clear the cost " +
+        "gate. Read this rather than guessing why the agent did or did not recommend a rebalance.",
+      inputSchema: thresholdsRequestSchema.shape,
+      annotations: advisoryAnnotations,
+    },
+    async (args) => toolResult(rebalanceThresholdsSkill(args)),
+  );
 
   // ── Read-only chain tools ──────────────────────────────────────────────────
   const network = z.string().optional().describe("studio network name");

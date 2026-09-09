@@ -21,6 +21,48 @@
 
 import type { AgentCard, AgentSkill, SecurityScheme } from "@a2a-js/sdk";
 import { loadStudioToml } from "@bnbagent/studio-runtime/config";
+import { REBALANCE_ADVISORY_SKILL, REBALANCE_THRESHOLDS_SKILL } from "./advisory.js";
+
+/**
+ * The value skill. Advertised UNCONDITIONALLY — unlike the two commerce skills it needs
+ * no payment rail, no wallet and no network, because it is a pure function of its input.
+ *
+ * The description says what this agent does NOT do, in the card itself, where a buyer
+ * reads it BEFORE paying: it recommends and explains, it never executes. The on-chain
+ * listing metadata says the same thing (`onchainExecution: false`), and the two must never
+ * drift apart.
+ */
+const REBALANCE_ADVISORY: AgentSkill = {
+  id: REBALANCE_ADVISORY_SKILL,
+  name: "Rebalancing advice (analysis only — no execution)",
+  description:
+    'Send a data part {"skill": "' + REBALANCE_ADVISORY_SKILL + '", "assets": ' +
+    '[{"symbol": "BNB", "valueBase": "600000000000", "targetWeightBps": "5000"}, ...]} — ' +
+    "asset values in USD on the 8-decimal basis, target weights in bps summing to exactly " +
+    "10000; `cost` and `thresholds` are optional overrides. The deterministic engine replies " +
+    "with NONE / WATCH / REBALANCE / BLOCKED_BY_COST, the suggested trades, and the reasoning " +
+    "behind it. BLOCKED_BY_COST is a real answer: the portfolio IS off target, and fixing it " +
+    "would cost more than the drift is worth. " +
+    "THIS SKILL DOES NOT TRADE. This agent has no execution path: it signs no swap, sends no " +
+    "transaction, and moves no funds. What you get is a decision and its reasoning, to act on " +
+    "yourself. A malformed portfolio comes back as a rejection with the reason, never as a guess.",
+  tags: ["defi", "rebalancing", "advisory", "no-execution", "bnb-chain"],
+  inputModes: ["application/json"],
+  outputModes: ["application/json"],
+};
+
+const REBALANCE_THRESHOLDS: AgentSkill = {
+  id: REBALANCE_THRESHOLDS_SKILL,
+  name: "The thresholds this agent decides with",
+  description:
+    'Send {"skill": "' + REBALANCE_THRESHOLDS_SKILL + '"} to read the watch band, the ' +
+    "rebalance band, the cost budget and the cost model, each with the reason it is the value " +
+    "it is, plus the smallest turnover that can clear the cost gate. Analysis only; nothing is " +
+    "executed.",
+  tags: ["defi", "rebalancing", "advisory", "no-execution"],
+  inputModes: ["application/json"],
+  outputModes: ["application/json"],
+};
 
 const NEGOTIATE: AgentSkill = {
   id: "negotiate",
@@ -107,7 +149,10 @@ export function buildAgentCard(
   }
   return {
     name,
-    description: `ERC-8183 seller agent (${name}) — negotiate + notify_funded over A2A.`,
+    description:
+      `ERC-8183 seller agent (${name}) — rebalancing ADVICE over A2A: it reads a portfolio, ` +
+      "decides with deterministic code, and explains itself. It has no execution path and sends " +
+      "no transactions (onchainExecution: false). Commerce: negotiate + notify_funded.",
     // main.ts overwrites this with $AGENTCORE_RUNTIME_URL at boot.
     // Local-dev fallback: a client-routable localhost URL (not the 0.0.0.0
     // bind address). Host via AGENT_HOST (default localhost); port via the
@@ -128,8 +173,13 @@ export function buildAgentCard(
     capabilities: { streaming: false },
     defaultInputModes: ["application/json"],
     defaultOutputModes: ["application/json"],
-    skills:
-      opts.commerceSkills === false ? [] : [NEGOTIATE, NOTIFY_FUNDED],
+    // The advisory skills stand first and are never gated: they are what the agent is FOR,
+    // and they work with or without a payment rail configured.
+    skills: [
+      REBALANCE_ADVISORY,
+      REBALANCE_THRESHOLDS,
+      ...(opts.commerceSkills === false ? [] : [NEGOTIATE, NOTIFY_FUNDED]),
+    ],
     ...extra,
   };
 }

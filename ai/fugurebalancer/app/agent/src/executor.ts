@@ -43,8 +43,37 @@ import {
   type ExecutionEventBus,
   type RequestContext,
 } from "@a2a-js/sdk/server";
+import {
+  ADVISORY_SKILL_IDS,
+  REBALANCE_ADVISORY_SKILL,
+  REBALANCE_THRESHOLDS_SKILL,
+  rebalanceAdvisorySkill,
+  rebalanceThresholdsSkill,
+} from "./advisory.js";
 import { isCommerceRateLimitError } from "./requestLimits.js";
 import { SellerCore } from "./sellerCore.js";
+
+/**
+ * The value skills, over A2A.
+ *
+ * They are handled BEFORE the commerce skills and outside their try/catch on purpose. The
+ * commerce path masks a fault as "seller operation failed; retry later" because a buyer
+ * must not learn anything from a signing error — but a REJECTED ADVISORY REQUEST is the
+ * caller's own malformed portfolio, and hiding the reason would leave them retrying the
+ * same broken payload forever. `rebalanceAdvisorySkill` therefore never throws: it returns
+ * either the advice or a rejection carrying the engine's own message.
+ *
+ * Neither skill touches the wallet, the chain, or the LLM. Both are pure functions of the
+ * data part.
+ */
+function advisoryDispatch(
+  skill: unknown,
+  data: Record<string, unknown>,
+): Record<string, unknown> | null {
+  if (skill === REBALANCE_ADVISORY_SKILL) return rebalanceAdvisorySkill(data);
+  if (skill === REBALANCE_THRESHOLDS_SKILL) return rebalanceThresholdsSkill(data);
+  return null;
+}
 
 const log = {
   error: (msg: string, e?: unknown) =>
@@ -66,6 +95,15 @@ const log = {
  */
 export class SellerAgentExecutor extends SellerCore implements AgentExecutor {
   /**
+   * The advisory skills are always served, so they always belong in the list a caller gets
+   * back after sending an unknown skill — a seller with no payment rail configured would
+   * otherwise answer "skills: []" while happily answering `rebalance_advisory`.
+   */
+  override skills(): string[] {
+    return [...ADVISORY_SKILL_IDS, ...super.skills()];
+  }
+
+  /**
    * Text-carrier entrypoint (Foundry invocations / responses SkillRouter).
    *
    * Same skill switch as {@link execute}, but NEVER throws: on a text
@@ -78,6 +116,8 @@ export class SellerAgentExecutor extends SellerCore implements AgentExecutor {
     data: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
     const skill = data.skill;
+    const advice = advisoryDispatch(skill, data);
+    if (advice !== null) return advice;
     try {
       if (skill === "negotiate") {
         return await this.negotiate(data);
@@ -109,6 +149,11 @@ export class SellerAgentExecutor extends SellerCore implements AgentExecutor {
   ): Promise<void> => {
     const data = inbound(context);
     const skill = data.skill;
+    const advice = advisoryDispatch(skill, data);
+    if (advice !== null) {
+      reply(eventBus, context, advice);
+      return;
+    }
     let result: Record<string, unknown>;
     try {
       if (skill === "negotiate") {

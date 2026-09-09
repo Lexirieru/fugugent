@@ -30,6 +30,12 @@ import * as cr from "@bnbagent/studio-runtime/tools";
 import { loadStudioToml } from "@bnbagent/studio-runtime/config";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
+import {
+  adviseRebalance,
+  rebalanceAdvisoryInputSchema,
+  thresholdsPayload,
+} from "./advisory.js";
+import { DEFAULT_COST_MODEL, DEFAULT_THRESHOLDS } from "./strategy/types.js";
 
 /**
  * The project-wide default network (`[network].default`) — tool calls that
@@ -51,7 +57,46 @@ const networkArg = z
   .optional()
   .describe("studio network name (defaults to the project's [network].default)");
 
+/**
+ * The strategy tools — the reason this agent is worth renting.
+ *
+ * They read a portfolio, run the DETERMINISTIC decision engine in `src/strategy/`, and
+ * return the decision together with the reasoning behind it. The LLM may call them and
+ * read the result out loud; it may not pick the action, shift a threshold, or recompute an
+ * amount. Every number in the result came from `decide()`, which is pure, replayable and
+ * backtested.
+ *
+ * They are ANALYSIS tools. This agent has no execution path at all — the descriptions say
+ * so, because an LLM that thinks a tool trades will tell a user it traded.
+ */
+export const STRATEGY_TOOLS: ToolSet = {
+  rebalance_advisory: tool({
+    description:
+      "ANALYSIS ONLY — recommends whether a portfolio should be rebalanced, and explains why. " +
+      "Takes the current asset values and target weights, runs the deterministic rebalancing " +
+      "engine, and returns one of NONE / WATCH / REBALANCE / BLOCKED_BY_COST with the numbers " +
+      "behind it. BLOCKED_BY_COST is a real answer, not a failure: it means the portfolio IS off " +
+      "target but moving it would cost more than the drift is worth. " +
+      "THIS TOOL DOES NOT TRADE. It signs nothing, sends no transaction, and moves no funds; " +
+      "this agent has no execution path (onchainExecution: false). Report its numbers exactly as " +
+      "returned and never invent, adjust, or extrapolate them.",
+    inputSchema: rebalanceAdvisoryInputSchema,
+    execute: async (input) => adviseRebalance(input).payload,
+  }),
+  rebalance_thresholds: tool({
+    description:
+      "The Rebalancer's thresholds (watch band, rebalance band, cost budget, cost model) with the " +
+      "reason each one is the value it is, and the smallest turnover that can clear the cost gate. " +
+      "Read this instead of guessing a threshold when asked why the agent did or did not act.",
+    inputSchema: z.object({}),
+    execute: async () => thresholdsPayload(DEFAULT_THRESHOLDS, DEFAULT_COST_MODEL),
+  }),
+};
+
 export const LLM_READ_TOOLS: ToolSet = {
+  // --- Strategy (the deliverable; pure code, never the LLM's judgement) ---
+  ...STRATEGY_TOOLS,
+
   // --- Wallet & chain basics ---
   wallet_info: tool({
     description:
