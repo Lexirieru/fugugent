@@ -14,19 +14,36 @@ evidence was insufficient. That list is kept on purpose.
 
 | What is measured | Number | How to check |
 |---|---|---|
-| Contracts (Foundry) | **147** tests | `cd contracts && forge test` |
+| Contracts (Foundry) | **200** tests | `cd contracts && forge test` |
 | Fugu Guardian | **285** tests | `cd ai/fuguguardian/app/agent && corepack pnpm test` |
 | Fugu Rebalancer | **130** tests | `cd ai/fugurebalancer/app/agent && corepack pnpm test` |
 | Fugu Grid | **144** tests | `cd ai/fugugrid/app/agent && corepack pnpm test` |
 | Fugu Yield | **141** tests | `cd ai/fuguyield/app/agent && corepack pnpm test` |
 | Backend | **484** tests (1 skipped) | `cd backend && corepack pnpm test` |
-| **Total** | **1,331** tests | |
+| **Total** | **not recomputable on 2026-09-09 (evening)** | see the note below |
 | History | **136** commits on top of the initial commit, clean working tree | `git log --oneline \| wc -l` → 137 (including `87508a2` "Initial commit"); `git status --porcelain` → empty |
 | Landing + marketplace | build and lint green | `bun --cwd landingpage run build`; `bun --cwd frontend run build && … run lint` |
 
 Every number in that table was recounted on 2026-09-09 by running the command beside it, not
 carried over from a previous edit. The previous values (131 / 249 / 88 / 99 / 93 / 374 =
 1,034) are wrong everywhere they still appear outside this document.
+
+**The total is deliberately blank, and two rows above it need care.**
+
+The contracts row is settled: **200**, counted by running `forge test` on the evening of
+2026-09-09. The old **147** was already stale before that run; the suite stood at **190** on
+the commit this work started from, and the category expansion added **10**: seven in
+`test/CategoryUpgradeSafety.t.sol` and three more in the rewritten `test/ListAgentsScript.t.sol`.
+So 147 → 200 is not "53 new tests", it is one stale number replaced by a counted one plus ten
+real additions.
+
+The backend row is **stale and currently red**. `npx vitest run` in `backend/` reports **646
+tests, of which 91 fail** (554 pass, 1 skipped), and `tsc --noEmit` reports two errors
+(`src/classify.ts:264`, `src/service/agents.ts:394`). The cause is known and named in B16:
+`CATEGORIES` in `backend/src/types.ts` went from four entries to nine to match the contract,
+and five of those nine have no classifier rules and no curated seed entry yet. Until that is
+finished, adding these rows up would produce a figure wrong in two directions at once, so no
+total is written.
 
 **The landing page is `landingpage/`.** This reverses what earlier versions of this document
 said, and the reversal is real rather than a correction of a mistake: there were two landing
@@ -44,7 +61,7 @@ through PGlite.
 
 ## A. What exists and is proven
 
-### A1. Four UUPS contracts, live on BSC testnet (chainId 97)
+### A1. Five UUPS contracts, live on BSC testnet (chainId 97)
 
 | Contract | Address |
 |---|---|
@@ -52,8 +69,9 @@ through PGlite.
 | FuguRegistry | `0xb2f36070E6eae3353E8e755172B477DF213ae248` |
 | FuguSubscription | `0xfdb083371f44Cf53181350389D3217e51B431776` |
 | FuguReputation | `0x279B31B00F64C0ce85BCe2Bd7e377CdcAE58d400` |
+| FuguAuditEscrow | `0x0354d2a4be40f118e4d1301915ee2ff54eec8a52` |
 
-147 tests including a 256-run fuzz. **The marketplace lifecycle was run on the real network**:
+200 tests including a 256-run fuzz. **The marketplace lifecycle was run on the real network**:
 list an agent → rent → agent withdraws payment → review → second review rejected. The whole
 cycle cost 0.0015 tBNB. The tx hash for each step is in `docs/e2e/2026-09-08-e2e-testnet.md`.
 
@@ -433,6 +451,62 @@ An agent that answers "no, this loses money" is the product working, not the pro
 The default cost models behind those numbers are still estimates and not measurements (C9); the
 payloads say so in their own `costModel.why` field rather than hiding it.
 
+### A11. The catalog holds nine categories, and the widening did not disturb the four that were already there
+
+`Category` in `contracts/src/types/FuguTypes.sol` grew from four values to nine on 2026-09-09.
+The five new ones were **appended** after `HEALTH_FACTOR`: `HIRING` 4, `COMMERCE` 5,
+`AUTONOMOUS` 6, `STREAMING` 7, `TREASURY` 8. Indices 0 to 3 did not move, and that is the whole
+risk of this change: a `Category` is stored inside every listing as its number, an upgrade
+replaces code and never rewrites storage, so reordering the enum would silently relabel every
+listing that already exists. Nothing would revert and nothing would warn.
+
+| | |
+|---|---|
+| Proxy | `0xb2f36070E6eae3353E8e755172B477DF213ae248` (unchanged) |
+| Implementation before | `0xd68968cf68e9930a689e0fc9d648a898050a548a` |
+| Implementation after | [`0x13836c1b…`](https://testnet.bscscan.com/address/0x13836c1bc0d32def6b6c0ec2acf120c2f342f3eb#code), source-verified |
+| Implementation deploy tx | [`0xfa3d5106…`](https://testnet.bscscan.com/tx/0xfa3d51060328db38a268de78705b01e9c876fa062651a55aaa4d92d514112176) |
+| Upgrade tx | [`0x24438b39…`](https://testnet.bscscan.com/tx/0x24438b39a85ceeb9411d1cb4197ea8369eb1d1a44c3213656a43cf32c4050c5f) (block 130002412, 37,649 gas) |
+| `INIT_DATA` | empty, deliberately. The widening adds no state variable, so there is no reinitializer to run |
+
+**Three pieces of evidence, none of which is an assumption.**
+
+1. *The upgrade was actually needed.* Before it, `countByCategory(4)` on the live proxy
+   reverted with empty data, because 4 is out of range for a four-value enum. After it, the
+   same call answers a number. That is also why `ListAgents.s.sol` probes for the highest
+   category before it spends anything.
+
+2. *No existing listing changed.* All four listings were read with `getListing` before the
+   upgrade and again after the upgrade **and** after five more registrations. The two outputs
+   are byte for byte identical, metadata string included, and `countByCategory(0..3)` is still
+   1 each. Repeat it:
+
+   ```bash
+   for i in 1 2 3 4; do
+     cast call --rpc-url "$BSC_TESTNET_RPC_URL" 0xb2f36070E6eae3353E8e755172B477DF213ae248 \
+       'getListing(uint256)((uint256,address,address,uint8,uint128,uint32,bool,bool,string))' $i
+   done
+   ```
+
+3. *A test that fails if anyone reorders the enum later.*
+   `contracts/test/CategoryUpgradeSafety.t.sol` does not compare the new code against itself,
+   which would prove nothing. It deploys a proxy over `test/legacy/FuguRegistryLegacy.sol`, a
+   **frozen copy of the pre-expansion source** with its own four-value enum, registers one
+   listing per old category through that old code, upgrades the proxy to today's implementation,
+   and reads everything back against hard-coded indices. Proved by mutation: moving `HIRING`
+   in front of `HEALTH_FACTOR` turns four of its seven tests red
+   (`test_oldListingsKeepTheirCategoryAfterUpgrade` fails with `3 != 4`), and moving it back
+   turns them green.
+
+The catalog now holds **nine listings, one per category**. `listingCount()` is 9 and
+`countByCategory` is 1 for every value 0 through 8. The five newest are Broker (5), Trader (6),
+Pilot (7), Meter (8), Steward (9), all registered in block 130003272 for 5,342,324 gas in total,
+at $0.05 per 120-second period. Addresses, wallets, and one tx hash per listing are in
+`docs/setup/ENVIRONMENT.md` §G3 and `contracts/deployments/bsc-testnet.json`.
+
+**What that does NOT mean:** five categories being full is not five agents working. Listings 5
+to 9 were registered before their code existed, and each one says so on chain. See B16 and B17.
+
 ---
 
 ## B. What does NOT exist yet — do not claim it
@@ -473,7 +547,7 @@ payloads say so in their own `costModel.why` field rather than hiding it.
    → The correct sentence is: *"they can be called and they give advice"*, not *"they manage a
    portfolio"* and not *"they trade"*.
    As of 2026-09-09 all three **are registered in `FuguRegistry`** and can be rented
-   (`listingCount() = 4`; every category holds exactly one listing). Their price is
+   (`listingCount()` was 4 then and is 9 now; every category holds exactly one listing). Their price is
    `5000000` = $0.05 per 120-second period, deliberately half of Guardian's, and their
    on-chain metadata carries `onchainExecution: false`. Registration transactions, all in
    block 129903555: Rebalancer
@@ -513,8 +587,10 @@ payloads say so in their own `costModel.why` field rather than hiding it.
    but Venus provides neither a health factor nor an aggregate liquidation threshold, so building
    a `Position` from it needs per-market data that is not being fetched.
 
-9. ~~**The contracts are not verified on BscScan.**~~ **Resolved 2026-09-09.** All four UUPS
-   implementations and every mock are source-verified. BscScan recognises each proxy as a proxy
+9. ~~**The contracts are not verified on BscScan.**~~ **Resolved 2026-09-09.** All five UUPS
+   implementations and every mock are source-verified, including the new `FuguRegistry`
+   implementation deployed for the category expansion
+   ([`0x13836c1b…`](https://testnet.bscscan.com/address/0x13836c1bc0d32def6b6c0ec2acf120c2f342f3eb#code)). BscScan recognises each proxy as a proxy
    and resolves its implementation, so the **Read/Write as Proxy** tab works — anyone can call
    the contracts from a browser with no tooling. Status confirmed through the BscScan
    `getsourcecode` API, not from a `forge` success message. See the "BscScan verification"
@@ -532,19 +608,45 @@ payloads say so in their own `costModel.why` field rather than hiding it.
     `minConsecutiveFavorable = 3` (Yield) are tied to a scheduler cadence that is **not yet
     decided** — three observations per minute is three minutes; per day is three days.
 
-12. **The hire flow has never actually been signed.** The claim that used to stand here —
-    *"there is no connect wallet button"* — is stale: `frontend/src/components/wallet/` now
-    holds a Reown AppKit connect control and a `hire-action.tsx` that reads the price from
-    `FuguRegistry`, refetches the quote, caps `maxAmount` at quote + 1%, sets a block-time
-    deadline and simulates before opening the wallet. The whole thing is gated on
-    `NEXT_PUBLIC_REOWN_PROJECT_ID`: without it `walletEnabled` is `false`, nothing is mounted,
-    and the panel falls back to the `cast` commands.
-    **What has never happened is a signature.** No wallet holding tBNB exists in this
-    development environment, so no hire has ever been signed from the browser — not once, in any
-    state. Everything about that path is code and simulation. The one real rent on chain (A1)
-    was sent with `cast` from the deployer key, not from the UI.
-    → The correct sentence is: *"the signing path is written and the wallet UI mounts when a
-    project id is present"*, not *"you can hire an agent from the marketplace"*.
+12. **A hire has now been signed, but not from the browser.** Two claims used to sit in this
+    item and only one of them has moved, so they are separated here on purpose.
+
+    **Closed:** *"no hire has ever been signed, because no wallet here holds tBNB"*. On
+    2026-09-09 a hire was signed and landed:
+    [`0x74fa4d9d…`](https://testnet.bscscan.com/tx/0x74fa4d9d67daea5c722f2dbc9fd1f43d7e5725d621c412e079085c7c856fe8ac),
+    block 130003006, 498,652 gas, status 1. Read back from chain rather than from the receipt:
+
+    ```bash
+    cast call --rpc-url "$BSC_TESTNET_RPC_URL" 0xfdb083371f44Cf53181350389D3217e51B431776 \
+      'getSub(uint256)((uint256,address,address,uint256,uint256,uint64,uint64,bool,uint16))' 2
+    # (1, 0x9F594C130cADB4a928C86f1AFe85C6888892494e, 0x0000…0000, 665249242281113, 0,
+    #  1788947875, 1788948475, false, 500)
+    ```
+
+    Subscription 2 is on listing 1 (Fugu Guardian, HEALTH_FACTOR), paid in **native tBNB**
+    (`payToken` is the zero address), 665,249,242,281,113 wei deposited. Listing 1 costs $0.10
+    per 120-second period, so that is five periods, $0.50, converted to tBNB by
+    `FuguPriceOracle` at the moment of the call. `feeBps` is 500: the 5% comes out of the
+    agent's payout when it claims, it is not added on top of the deposit. The escrow contract
+    holds the whole amount.
+
+    **Still open, and it is not a detail:** that signature came from `cast send` in a terminal,
+    **not from a button in the browser**. The wagmi/Reown path in `frontend/` has still never
+    signed a real hire. `frontend/src/components/wallet/` holds a Reown AppKit connect control
+    and a `hire-action.tsx` that reads the price from `FuguRegistry`, refetches the quote, caps
+    `maxAmount` at quote + 1%, sets a block-time deadline and simulates before opening the
+    wallet, all gated on `NEXT_PUBLIC_REOWN_PROJECT_ID`. None of it has been exercised against
+    a real signature. "A hire has been signed" and "a hire has been signed from the marketplace"
+    are two different claims and must not be merged into one.
+
+    Two more things that must not be smoothed over. The subscriber wallet
+    `0x9F594C130cADB4a928C86f1AFe85C6888892494e` was created with `cast wallet new` for this
+    purpose and funded with 0.02 tBNB from the deployer; it is not a real user's wallet. And
+    `claimed` is **0**: the money sits in escrow and no agent has withdrawn any of it, so nobody
+    may write that the agent has been paid.
+    → The correct sentence is: *"one hire has been signed from a terminal and the money is in
+    escrow"*, not *"you can hire an agent from the marketplace"* and not *"the agent has been
+    paid"*.
 
 13. **Listing 1's on-chain `agentWallet` is the deployer EOA, not Guardian's Altana wallet.**
     Check it with one call:
@@ -579,6 +681,47 @@ payloads say so in their own `costModel.why` field rather than hiding it.
     `frontend/src/app/layout.tsx`) all say `hellofugu.xyz`. Which one is actually registered is
     not verifiable here, and this document will not guess. Either way the answer to "is it
     live?" is no.
+
+16. **The backend does not know the five new categories yet, and its test suite is red because
+    of it.** `CATEGORIES` in `backend/src/types.ts` was widened to nine so it keeps matching the
+    contract enum, which is the only ordering that can be correct. Nothing else in the backend
+    was widened with it, and TypeScript caught exactly where:
+
+    - `src/classify.ts:264` — `RULES` is a `Record<Category, Rule[]>` and has no entry for
+      `HIRING`, `COMMERCE`, `AUTONOMOUS`, `STREAMING`, `TREASURY`. At runtime
+      `RULES[category]` is `undefined` and `classify()` throws.
+    - `src/service/agents.ts:394` — another exhaustive `Record<Category, string>`, same five
+      keys missing.
+    - `src/service/seed.ts` — the curated seed holds four agents, so the promise that the
+      marketplace is never empty is now only kept for four of nine categories.
+
+    Measured, not guessed: `cd backend && npx vitest run` gives **91 failed / 554 passed /
+    1 skipped**, in `classify.test.ts`, `agents.routes.test.ts`, `service/agents.test.ts` and
+    `service/seed.test.ts`; `npx tsc --noEmit` gives the two errors above. Until this is
+    finished the marketplace can serve the five new listings only through the on-chain read,
+    and `/api/categories` cannot answer for them at all.
+
+17. **The five new agents can be rented and can do nothing.** Broker, Trader, Pilot, Meter and
+    Steward are listed on chain (A11), and that is the entire extent of them. At the moment
+    they were registered there was no code in `ai/fugubroker`, `ai/fugutrader`, `ai/fugupilot`,
+    `ai/fugumeter` or `ai/fugusteward`; there is no test suite to quote, no decision engine, no
+    backtest, and not one of the five wallets has ever signed anything. Their on-chain metadata
+    says exactly that: `implemented: false`, `onchainExecution: false`, a `limits` string
+    beginning *"Not built yet"*, and a `verify` command that shows the absence rather than
+    quoting a test count. Renting one today holds the money and starts nothing.
+    → The correct sentence is: *"nine categories are listed"*, never *"nine agents work"*.
+
+18. **The five new agent wallets were created before their agents, and the chain cannot be
+    corrected if the agent teams generate different ones.** `agentWallet` is written once by
+    `list()`: `FuguRegistry` has no setter for it and `updateListing` does not reach it. The five
+    directories held no wallet at registration time, so five brand-new testnet EOAs were
+    generated with `cast wallet new`, written into the listings, and their keys kept in
+    `contracts/.env` (gitignored, unfunded, never used anywhere else). The addresses are in
+    `docs/setup/ENVIRONMENT.md` §G3. Whoever builds one of these agents has to **adopt** its
+    address (`bag wallet new --private-key -`) rather than generate a fresh one. If they
+    generate a fresh one, the listing points at a wallet the agent does not use, permanently,
+    exactly like listing 1 already does (B13). Only the metadata could then carry the real
+    address, because metadata is the one field still changeable.
 
 ---
 
@@ -713,6 +856,7 @@ written or planned**, then withdrawn once the evidence was examined.
 | "Rebalancer, Grid and Yield are wired up" (2026-09-09) | They are *callable*, not *capable*. B3 was rewritten rather than closed: six tools answer over A2A and MCP, and not one of them can send a transaction. |
 | "The marketplace runs against the live backend" | One manual browser session is reported, with no artifact left in the repo. A report of a run is not a run anyone else can check, so it stayed in §B (B4). |
 | "There is no connect wallet button" | Stale in the *other* direction: the button and the whole signing path now exist. The honest replacement is not "you can hire an agent" but "no hire has ever been signed, because no wallet here holds tBNB" (B12). |
+| "No hire has ever been signed" | Closed on 2026-09-09 by tx `0x74fa4d9d…`, read back as `getSub(2)`. What replaces it is narrower, not wider: the signature came from `cast send` in a terminal, the subscriber wallet was made for the occasion, and `claimed` is still 0. The browser path remains unproven (B12). |
 | "The landing page is `landingpage-fugugent/`" | True when written, and no longer: the HelloFugu redesign was built in `landingpage/`, that is what the Vercel project deploys, and `landingpage-fugugent/` was deleted on 2026-09-09. A directory that used to be right is the easiest kind of stale claim to miss. |
 | Guardian listing metadata: "no user-facing kill switch", "249 tests" | Still what the chain says. The repo moved and the on-chain string did not; recorded as B14 rather than quietly corrected here. |
 
@@ -724,8 +868,9 @@ written or planned**, then withdrawn once the evidence was examined.
    user can press (B1, B2).~~ **Done 2026-09-09 (A9).** What is left from it: force the
    EMERGENCY case on testnet so the kill switch is proven to stop a real send, and send one
    repay **through the runtime** so A4's evidence stops being the only on-chain repay.
-2. Sign one hire from the browser (B12) — which first needs a funded tBNB wallet in this
-   environment, and a Reown project id.
+2. Sign one hire **from the browser** (B12). A hire has now been signed on chain, but with
+   `cast send` from a terminal; the wagmi/Reown path still needs a Reown project id and a
+   funded wallet in a browser. After that, have the agent `claim` so `claimed` stops being 0.
 3. Connect the marketplace to a live backend and prove it with one **recorded** run (B4).
 4. The risk endpoint (`bloatLevel` + raw metrics) so the puffing fugu mechanic has data (B5).
 5. Scheduler + indexer, and set `breakoutConfirmObservations`/`minConsecutiveFavorable` together
@@ -737,3 +882,9 @@ written or planned**, then withdrawn once the evidence was examined.
    that decision has not been taken.
 9. Re-run `UpdateGuardianMetadata` so listing 1 stops advertising limits that no longer apply
    (B14), and decide whether a new listing is worth it to fix `agentWallet` (B13).
+10. Teach the backend the five new categories so its suite goes green again (B16): classifier
+    rules in `src/classify.ts`, the label map in `src/service/agents.ts`, and five curated seed
+    entries in `src/service/seed.ts`. This is the one item blocking a recomputable test total.
+11. Build the five agents that are listed but empty (B17), and have each one adopt the wallet
+    its listing already names (B18) instead of generating a new one. Then run `updateListing`
+    on listings 5 to 9 so their metadata stops saying "Not built yet".
