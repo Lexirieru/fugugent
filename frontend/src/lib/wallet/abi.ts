@@ -4,11 +4,11 @@
  * `contracts/src/*.sol` without scrolling.
  *
  * Every signature below has been **verified against the live contracts** on BSC
- * testnet with `eth_call` — the field order of `Sub` and `Listing` matches what
+ * testnet with `eth_call`, the field order of `Sub` and `Listing` matches what
  * the proxies actually return, rather than being guessed from the source.
  */
 
-/** `FuguSubscription.sol` — the only contract that holds funds. */
+/** `FuguSubscription.sol`, the only contract that holds funds. */
 export const SUBSCRIPTION_ABI = [
   {
     type: "function",
@@ -85,7 +85,7 @@ export const SUBSCRIPTION_ABI = [
   },
 ] as const;
 
-/** `FuguPriceOracle.sol` — USD in 8-decimal base to a token amount. */
+/** `FuguPriceOracle.sol`. USD in 8-decimal base to a token amount. */
 export const ORACLE_ABI = [
   {
     type: "function",
@@ -99,7 +99,7 @@ export const ORACLE_ABI = [
   },
 ] as const;
 
-/** `FuguRegistry.sol` — the listing catalogue. Read to get the price that actually applies. */
+/** `FuguRegistry.sol`, the listing catalogue. Read to get the price that actually applies. */
 export const REGISTRY_ABI = [
   {
     type: "function",
@@ -122,6 +122,26 @@ export const REGISTRY_ABI = [
         ],
       },
     ],
+  },
+] as const;
+
+/**
+ * The Altana Keystore. One view function, and it is the only thing the permissions
+ * panel needs: does this wallet still carry this limited permission, yes or no.
+ *
+ * Reading it takes no key and no account, which is the whole point. The panel used to
+ * print a command for the reader to run; now the page runs it and shows the answer.
+ */
+export const KEYSTORE_ABI = [
+  {
+    type: "function",
+    name: "isValidKey",
+    stateMutability: "view",
+    inputs: [
+      { name: "wallet", type: "address" },
+      { name: "keyHash", type: "bytes32" },
+    ],
+    outputs: [{ type: "bool" }],
   },
 ] as const;
 

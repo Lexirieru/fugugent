@@ -1,12 +1,12 @@
 /**
- * The `seed` source — sample data bundled with the app.
+ * The `seed` source, sample data bundled with the app.
  *
  * This is **not** a backend simulation pretending to be live. It is the four
  * agents that actually exist in this repository, each with its real status stated
  * plainly. All four are now listed on FuguRegistry and can be hired; what
  * separates them is what happens after you pay. Fugu Guardian has moved money on
  * chain and has the transactions to prove it. The other three ship a deterministic
- * decision engine and a backtest and have **never sent an on-chain transaction** —
+ * decision engine and a backtest and have **never sent an on-chain transaction**,
  * their on-chain listing metadata says `onchainExecution: false`, and so does
  * every card and page here.
  *
@@ -39,7 +39,9 @@ const ALTANA_KEYHASH =
 const MOCK_POOL = "0xb3e1F06Ac529aded2aA20aA38F4C0b4AD317e5F5" as const;
 const MOCK_USD = "0x932E82632E80b06318ca969e33F99A54F1a04b10" as const;
 
-function baseRecord(over: Partial<AgentRecord> & Pick<AgentRecord, "id" | "tokenId" | "name">): AgentRecord {
+function baseRecord(
+  over: Partial<AgentRecord> & Pick<AgentRecord, "id" | "tokenId" | "name">,
+): AgentRecord {
   return {
     chainId: CHAIN.id,
     registryAddress: CONTRACTS.registry,
@@ -78,22 +80,14 @@ function baseRecord(over: Partial<AgentRecord> & Pick<AgentRecord, "id" | "token
   };
 }
 
-/** The session key verification command. One `eth_call`, no API key. */
-const VERIFY_SESSION = `cast call --rpc-url ${CHAIN.rpc} \\
-  ${ALTANA_KEYSTORE} \\
-  'isValidKey(address,bytes32)(bool)' \\
-  ${ALTANA_WALLET} \\
-  ${ALTANA_KEYHASH}
-# true`;
-
 const GUARDIAN: AgentView = {
   record: baseRecord({
     id: "97:1",
     tokenId: "1",
     name: "Fugu Guardian",
     description:
-      "Watches a lending position and repays debt before it can be liquidated. It reads the health factor from chain, decides with deterministic code — never an LLM — and signs through an Altana session key that is allowed to call exactly two functions.",
-    tags: ["health factor", "lending", "liquidation", "session key"],
+      "Watches a loan and pays part of it back before the collateral behind it can be sold off. It reads the numbers straight from the blockchain, decides with plain code rather than a language model, and signs with a permission that lets it call exactly two functions and nothing else.",
+    tags: ["health factor", "lending", "limited permission"],
     skills: ["monitor-position", "partial-repay", "deleverage"],
     domains: ["defi", "lending"],
     agentWallet: ALTANA_WALLET,
@@ -115,7 +109,7 @@ const GUARDIAN: AgentView = {
     level: 1,
     metricLabel: "Health factor",
     metricValue: "4.99",
-    companion: "Collateral can fall 79.9% before liquidation.",
+    companion: "The collateral can fall 79.9% before the loan is closed by force.",
     observedAt: SEED_FETCHED_AT,
     blockNumber: null,
     // The last reading: the testnet price was restored to $750 after the proof run.
@@ -126,58 +120,66 @@ const GUARDIAN: AgentView = {
     wallet: ALTANA_WALLET,
     keyHash: ALTANA_KEYHASH,
     calls: [
-      { contract: "MockLendingPool", address: MOCK_POOL, signature: "repay(address,uint256)" },
-      { contract: "mUSD", address: MOCK_USD, signature: "approve(address,uint256)" },
+      {
+        contract: "MockLendingPool",
+        address: MOCK_POOL,
+        signature: "repay(address,uint256)",
+      },
+      {
+        contract: "mUSD",
+        address: MOCK_USD,
+        signature: "approve(address,uint256)",
+      },
     ],
     dailyCap: "0.02 tBNB + 100 mUSD per day",
     expiry: "8 October 2026",
     grantTxHash: "0x15e67a21e5ec25f8459ac2e83798033ca9afe5a14b41143aeb28fe2a47b64b52",
-    verifyCommand: VERIFY_SESSION,
   },
   proofs: [
     {
-      label: "Session key granted and registered in the Altana Keystore",
-      detail: "Two functions, 0.02 tBNB + 100 mUSD per day, expires 8 October 2026.",
+      label: "A limited permission was granted and recorded in the Altana keystore",
+      detail:
+        "Two functions and nothing else, at most 0.02 tBNB and 100 mUSD a day, and it runs out on 8 October 2026.",
       hash: "0x15e67a21e5ec25f8459ac2e83798033ca9afe5a14b41143aeb28fe2a47b64b52",
     },
     {
-      label: "Repaid $4.03 of debt — approve + repay in one atomic userOp",
+      label: "Paid back $4.03 of the loan, in one indivisible step",
       detail:
-        "Health factor 1.14 → 1.50, re-read from chain at block 129852222. Repay.user on the receipt is the Altana wallet, not the deployer.",
+        "Health factor 1.14 to 1.50, read back from the blockchain at block 129852222. The receipt names the agent's own wallet as the payer, not ours.",
       hash: "0x619cfbe351703913ebafd0e76db86af0f90953bbff33335d78d8dbf1e41e08cc",
     },
     {
-      label: "The same key tried mUSD.transfer(deployer, 1 wei) and was refused",
+      label: "The same permission tried to move money elsewhere and was refused",
       detail:
-        "UnauthorizedCall, raised by the Altana account contract — not by our code. Zero gas, no balance moved.",
+        "The refusal came from the account contract itself, not from anything we wrote. No fee was spent and no balance moved.",
       hash: null,
       noLinkReason:
-        "it was refused while the relay simulated the userOp, so it was never broadcast and there is no block to open. We would rather say that than quietly drop the row.",
+        "it was refused before it was ever sent, so there is no block to open. We would rather say that than quietly drop the row.",
     },
     {
       label: "Testnet collateral price restored to $750.00",
-      detail: "Health factor back to 4.99 — the state stays reusable for the next run.",
+      detail: "Health factor back to 4.99, so the setup can be run again.",
       hash: "0xb704b385cc5a298821cd7f2cad71542032a3b7b2e786de08df0f24bf82481b0a",
     },
   ],
   notShipped:
-    "The strategy is proven end to end by a script, not yet wired into the A2A/MCP runtime the agent serves. Hiring records payment on-chain; it does not start an autonomous loop today.",
+    "The strategy has been proven end to end by a script, and is not yet wired into the service the agent answers on. Hiring records your payment on the blockchain. It does not start the agent running on its own today.",
   outcomes: [
-    "Moved a position from health factor 1.14 to 1.50 by repaying $4.03 — the on-chain debt fell by exactly the amount claimed, to the last of 8 decimals.",
-    "Refused an off-allowlist transfer from its own session key: zero gas, nothing broadcast.",
-    "Ran against a lending pool we deployed and control ourselves — Aave v3 ABI, but never Aave, Venus, or anyone else's money.",
+    "Moved a loan from health factor 1.14 to 1.50 by paying back $4.03. The debt recorded on the blockchain fell by exactly the amount claimed, to the last of eight decimals.",
+    "Refused a transfer its own permission did not cover. No fee spent, nothing sent.",
+    "Ran against a lending pool we deployed and control ourselves. It speaks the same language as Aave v3, but it has never touched Aave, Venus, or anyone else's money.",
   ],
 };
 
 /**
  * The other three agents. All three are listed on FuguRegistry and hireable, at
- * $0.05 per 120-second period — half of Guardian's price, deliberately, because
+ * $0.05 per 120-second period, half of Guardian's price, deliberately, because
  * each one ships a decision engine and a backtest and nothing that executes.
  *
  * What they do **not** have is an on-chain executor. Their listing metadata carries
  * `onchainExecution: false`, they have never sent a transaction, and hiring one
  * puts money into escrow without starting an autonomous loop. That sentence lives
- * in `notShipped`, which the card, the detail page, and the hire panel all show —
+ * in `notShipped`, which the card, the detail page, and the hire panel all show,
  * the last one directly above the pay button, where it still changes a decision.
  */
 function strategyAgent(args: {
@@ -193,8 +195,8 @@ function strategyAgent(args: {
   agentWallet: `0x${string}`;
   /** Registration transaction, block 129903555. */
   listedTxHash: string;
-  /** How anyone can re-run this agent's own test suite. */
-  verifyCommand: string;
+  /** How many tests the decision code carries in this repository. */
+  testCount: number;
 }): AgentView {
   return {
     record: baseRecord({
@@ -217,7 +219,7 @@ function strategyAgent(args: {
         agentWallet: args.agentWallet,
         category: args.category,
         // USD, 8 decimals: 5_000_000 = $0.05. Half of Guardian, because half of the
-        // work is done — the decision, not the execution.
+        // work is done, the decision, not the execution.
         priceUsd8PerPeriod: 5_000_000n,
         periodSeconds: 120,
         active: true,
@@ -236,19 +238,19 @@ function strategyAgent(args: {
     proofs: [
       {
         label: "Listed on FuguRegistry",
-        detail: `Listing #${args.listingId} — $0.05 per 2 minutes, category ${args.category}.`,
+        detail: `Listing #${args.listingId}, $0.05 per 2 minutes, category ${args.category}.`,
         hash: args.listedTxHash,
       },
       {
         label: "Never executed on chain",
-        detail: `This agent's wallet ${args.agentWallet} has sent no strategy transaction. ${args.verifyCommand}`,
+        detail: `The wallet ${args.agentWallet} has sent no transaction of its own. Its decision code carries ${args.testCount} tests in this repository, and not one of them sends anything.`,
         hash: null,
         noLinkReason:
           "There is no transaction to open, which is the claim: the decision engine is tested, the executor is not built.",
       },
     ],
     notShipped:
-      "Hireable, but it cannot act yet. This agent ships a deterministic decision engine and a backtest — its listing metadata says onchainExecution: false — and it has never sent an on-chain transaction. Hiring it places your payment in escrow and does not start an autonomous loop.",
+      "You can hire it, but it cannot act yet. It ships decision code and a test run over past data, its own listing says so, and it has never sent a transaction. Hiring it holds your payment until the work is done, and does not start the agent running on its own.",
     outcomes: [],
   };
 }
@@ -259,13 +261,13 @@ const REBALANCER = strategyAgent({
   name: "Fugu Rebalancer",
   category: "REBALANCING",
   description:
-    "Keeps portfolio weights and PancakeSwap v3 LP ranges where you put them — and only moves when ΔFee − Gas − Slippage − ΔIL is positive, so tidying up never costs more than it saves.",
+    "Keeps the split of what you hold where you set it, and only moves when the fees earned beat the cost of moving, so tidying up never costs more than it saves.",
   tags: ["rebalancing", "pancakeswap v3", "liquidity"],
   listingId: 2n,
   erc8004AgentId: 8005n,
   agentWallet: "0xb8f155D1278f0437b9De7c63911f2C0EDa485941",
   listedTxHash: "0x858701b4238910259427eda6181d5488c1d29bc72b33f3c957d58108694b29c1",
-  verifyCommand: "cd ai/fugurebalancer/app/agent && corepack pnpm test  # 88 tests",
+  testCount: 88,
 });
 
 const GRID = strategyAgent({
@@ -274,13 +276,13 @@ const GRID = strategyAgent({
   name: "Fugu Grid",
   category: "GRID",
   description:
-    "Grid trading on PancakeSwap v3, watching slot0() itself because there is no on-chain order book. Structurally mean-reverting, which means it loses money in a trending market — that is written on its page, not buried.",
+    "Buys at fixed lower prices and sells at fixed higher ones on PancakeSwap v3, reading the price itself because there is no order book to read. It makes money when the price swings and loses it when the price only goes one way. That is written on its page, not buried.",
   tags: ["grid", "pancakeswap v3", "mean reversion"],
   listingId: 3n,
   erc8004AgentId: 8006n,
   agentWallet: "0x2AA59d5cf540c8f1b1CE4C667C2e745475d4EAd9",
   listedTxHash: "0x326c3c909d8e55a9b07d7886b5ef314fd652f62299d1854c687dd0f65143eafb",
-  verifyCommand: "cd ai/fugugrid/app/agent && corepack pnpm test  # 99 tests",
+  testCount: 99,
 });
 
 const YIELD = strategyAgent({
@@ -289,13 +291,13 @@ const YIELD = strategyAgent({
   name: "Fugu Yield",
   category: "YIELD",
   description:
-    "Moves funds into the highest risk-adjusted APR pool it can verify across Venus, Aave v3 and Lista — and only when the APR difference beats the cost of migrating.",
+    "Moves savings into the best paying place it can check for itself across Venus, Aave v3 and Lista, and only when the extra pay beats the cost of moving.",
   tags: ["yield", "venus", "aave", "lista"],
   listingId: 4n,
   erc8004AgentId: 8007n,
   agentWallet: "0x15dE73F47Ca58a11A6Ef9dB24dfDc6F096b0a866",
   listedTxHash: "0xf67c457f4a678dbbf0a62f101b6518ff8c2c42b83bbd2e7fe21d9b9d91683aa3",
-  verifyCommand: "cd ai/fuguyield/app/agent && corepack pnpm test  # 93 tests",
+  testCount: 93,
 });
 
 /** Four agents, one per category. No more, because there are no more. */
@@ -303,28 +305,29 @@ export const SEED_AGENTS: AgentView[] = [GUARDIAN, REBALANCER, GRID, YIELD];
 
 /**
  * The marketplace lifecycle, run on the real network. It belongs to no single
- * agent — it is the evidence that the contracts work, and the hire page uses it to
+ * agent, it is the evidence that the contracts work, and the hire page uses it to
  * explain what is about to happen to a buyer's money.
  */
 export const MARKETPLACE_CYCLE = [
   {
-    label: "An agent was listed — Health Factor category, $0.10 per 120 seconds",
+    label: "An agent was listed, in the Health factor kind, at $0.10 per 120 seconds",
     detail:
       "The first listing: listingCount went to 1, countByCategory(HEALTH_FACTOR) to 1. The registry now holds four, one per category.",
     hash: "0x590d2f13731bef32c6409d32c9f278af8b897766a0a82e0b504acf6799ffeab7",
   },
   {
-    label: "It was hired — tBNB into escrow, priced through Chainlink",
-    detail: "maxAmount + deadline enforced on the way in · subCount = 1",
+    label: "It was hired: tBNB paid in and held, priced through Chainlink",
+    detail:
+      "A ceiling on the price and a cut-off time were both enforced on the way in. Hire count 1.",
     hash: "0x15810ba2b62b87931e4464b8e39b7a021398934f8a0c805dc09c6d52d7f4f6c8",
   },
   {
     label: "The agent withdrew only the time it had actually served",
-    detail: "17668387054596 wei stayed in escrow, still refundable to the buyer",
+    detail: "17668387054596 wei stayed held and still refundable to the buyer",
     hash: "0xe0fd365d7bee36b524056c43aa6bf81351f88e6a4745f37b811e3e1fde5e4726",
   },
   {
-    label: "A review was written — and a second one from the same wallet reverted",
+    label: "A review was written, and a second one from the same wallet was refused",
     detail:
       "reviewCount = 1 · averageScoreX100 = 500 · the anti-sybil gate opens exactly when the agent gets paid",
     hash: "0xf7bd23695fd0da50d46b72bdb00d6b5caf7e8552f42ac7bb23b5a042e7f527a3",

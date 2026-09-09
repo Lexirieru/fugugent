@@ -2,7 +2,7 @@
  * The contract for the marketplace data layer.
  *
  * The backend does not exist yet. So that swapping it in later does not mean rewriting
- * the UI, every page talks only to `MarketplaceSource` — one interface, two
+ * the UI, every page talks only to `MarketplaceSource`, one interface, two
  * implementations (`seed` today, `http` as soon as `api.hellofugu.xyz` answers). Not one
  * component may call `fetch` itself.
  *
@@ -22,7 +22,7 @@ import type { RiskReading } from "@/lib/risk";
 
 /**
  * An agent's session key permissions, read from the on-chain Keystore.
- * Shown to a **prospective buyer before hiring** (spec §7.3, lesson 34) — not only to
+ * Shown to a **prospective buyer before hiring** (spec §7.3, lesson 34), not only to
  * the publisher.
  */
 export interface SessionPermission {
@@ -36,15 +36,13 @@ export interface SessionPermission {
   dailyCap: string;
   expiry: string;
   grantTxHash: string | null;
-  /** A command that can be copied verbatim. No API key. */
-  verifyCommand: string;
 }
 
 /**
  * What a page sees about one agent.
  *
  * `record` is `AgentRecord` exactly as the backend locked it. The rest are the pieces
- * that are **not** in that shape yet — risk, session permissions, proof — and they are
+ * that are **not** in that shape yet, risk, session permissions, proof, and they are
  * kept separate on purpose, so that adding them in the backend later changes not one
  * type that is already final.
  */

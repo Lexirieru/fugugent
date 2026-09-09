@@ -7,7 +7,7 @@
  *
  * 1. **The price is read from `FuguRegistry`, not from the catalogue.** The contract
  *    bills from the on-chain `Listing.priceUsd8PerPeriod`. If the backend says a
- *    different number, the backend is the one that is wrong — and the user must be
+ *    different number, the backend is the one that is wrong, and the user must be
  *    told before signing, not after.
  *
  * 2. **`maxAmount` and `deadline` are sent correctly.** Without them the listing
@@ -19,11 +19,11 @@
  *
  * 3. **The native path demands the exact amount.** `subscribe` rejects
  *    `msg.value != amount`, so the quote is refetched immediately before signing and
- *    simulated first — a revert is found before the wallet opens, not after the user
+ *    simulated first, a revert is found before the wallet opens, not after the user
  *    signed something that was always going to fail.
  *
  * 4. **No dead ends.** Not connected, wrong network, not enough balance, rejected,
- *    pending, already hired — every state names what happened and offers the next
+ *    pending, already hired, every state names what happened and offers the next
  *    step.
  */
 
@@ -86,7 +86,7 @@ export function HireAction({
 
   const onRightChain = chainId === CHAIN.id;
 
-  /** The price that actually applies, read from the registry — not the catalogue. */
+  /** The price that actually applies, read from the registry, not the catalogue. */
   const listing = useReadContract({
     address: CONTRACTS.registry,
     abi: REGISTRY_ABI,
@@ -123,11 +123,16 @@ export function HireAction({
   const confirmed = phase.kind === "sent" && receipt.data?.status === "success";
 
   // Once the transaction is in a block: record its hash once, then re-read the chain.
-  // That local note is not the source of truth — it only keeps the badge present when
+  // That local note is not the source of truth, it only keeps the badge present when
   // the wallet is disconnected, and it always links to the transaction that proves it.
   useEffect(() => {
     if (phase.kind !== "sent" || receipt.data?.status !== "success") return;
-    add({ agentId, txHash: phase.hash, periods, recordedAt: new Date().toISOString() });
+    add({
+      agentId,
+      txHash: phase.hash,
+      periods,
+      recordedAt: new Date().toISOString(),
+    });
     subscription.refetch();
     // `subscription.refetch` is a new function each render; putting it in the deps
     // would retrigger forever. The hash is what decides.
@@ -190,7 +195,7 @@ export function HireAction({
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="text-xs uppercase tracking-[0.14em] text-faint">Charged at signing</span>
         <span className="font-mono text-xl tabular-nums text-fg">
-          {amount === null ? "—" : `${formatTbnb(amount)} tBNB`}
+          {amount === null ? "not read yet" : `${formatTbnb(amount)} tBNB`}
         </span>
         {usdTotal8 !== null ? (
           <span className="text-sm text-muted">= {formatUsd8(usdTotal8)}</span>
@@ -201,20 +206,20 @@ export function HireAction({
         <p className="mt-2 text-sm leading-relaxed text-muted">
           {listing.isError || quote.isError
             ? "We could not read the price from the contracts, so there is no figure to sign against. The buttons stay out until we can quote it."
-            : "Reading the listing price and the oracle quote from chain…"}
+            : "Reading the listing price and the current rate from the blockchain…"}
         </p>
       ) : (
         <ul className="mt-3 space-y-1 text-xs leading-relaxed text-faint">
           <li>
-            Slippage cap sent with the call:{" "}
-            <span className="font-mono text-muted">{formatTbnb(capFor(amount))} tBNB</span> — the
-            quote plus 1%. Never <span className="font-mono">type(uint256).max</span>: that would
-            let the listing owner raise the price after you sign.
+            A ceiling goes with the payment:{" "}
+            <span className="font-mono text-muted">{formatTbnb(capFor(amount))} tBNB</span>, the
+            quoted price plus 1%. It is never left open, because an open ceiling would let the
+            listing owner raise the price after you have signed.
           </li>
           <li>
-            Deadline sent with the call: 10 minutes from the latest block, measured on chain time.
-            A stale transaction that sits in the mempool expires instead of executing at a price you
-            never saw.
+            A cut-off time goes with it too: 10 minutes, counted by the blockchain&apos;s own clock
+            rather than your computer&apos;s. A payment that sits in the queue past that expires
+            instead of going through at a price you never saw.
           </li>
         </ul>
       )}
@@ -245,19 +250,19 @@ export function HireAction({
           <p className="mt-1 text-xs leading-relaxed text-muted">
             It covers {agentName} until {formatChainTime(subscription.active.endsAt)}
             {subscription.chainNow !== null && subscription.active.endsAt > subscription.chainNow
-              ? ` — ${formatDuration(Number(subscription.active.endsAt - subscription.chainNow))} left`
+              ? `, ${formatDuration(Number(subscription.active.endsAt - subscription.chainNow))} left`
               : ""}
-            . {formatTbnb(subscription.active.deposited)} tBNB is in escrow and{" "}
+            . {formatTbnb(subscription.active.deposited)} tBNB is held and{" "}
             {formatTbnb(subscription.active.claimed)} tBNB has been drawn so far. Hiring again opens
-            a <em>second</em> subscription and charges you again — it does not extend this one.
+            a <em>second</em> subscription and charges you again. It does not extend this one.
           </p>
         </div>
       ) : null}
 
       {subscription.truncated ? (
         <p className="mt-3 text-xs leading-relaxed text-faint">
-          Note: this page checked only the most recent 300 subscriptions on the contract. If yours is
-          older than that, it will not be found here — the badge can be missing, never wrong.
+          Note: this page checked only the most recent 300 subscriptions on the contract. If yours
+          is older than that, it will not be found here. The badge can be missing, never wrong.
         </p>
       ) : null}
 
@@ -288,7 +293,7 @@ export function HireAction({
             </button>
             <p className="mt-2 text-xs leading-relaxed text-faint">
               The figures above are read straight from the contracts and need no wallet. Connecting
-              only lets you sign — one transaction, on {CHAIN.name}, chain id {CHAIN.id}.
+              only lets you sign: one transaction, on {CHAIN.name}, network {CHAIN.id}.
             </p>
           </>
         ) : !onRightChain ? (
@@ -302,8 +307,8 @@ export function HireAction({
               {switching ? "Switching…" : `Switch to ${CHAIN.name}`}
             </button>
             <p className="mt-2 text-xs leading-relaxed text-faint">
-              Your wallet is on chain id {chainId ?? "unknown"}. These contracts only exist on{" "}
-              {CHAIN.name} (chain id {CHAIN.id}), so nothing here can be signed until you switch.
+              Your wallet is on network {chainId ?? "unknown"}. These contracts only exist on{" "}
+              {CHAIN.name}, network {CHAIN.id}, so nothing here can be signed until you switch.
             </p>
           </>
         ) : confirmed && phase.kind === "sent" ? (
@@ -312,7 +317,7 @@ export function HireAction({
               Hired. The transaction is in a block.
             </p>
             <p className="mt-1 text-xs leading-relaxed text-muted">
-              The money is in escrow on FuguSubscription and is released to {agentName} only for time
+              The money is held by FuguSubscription and released to {agentName} only for the time
               it actually serves. Cancelling returns the rest to you.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -376,8 +381,8 @@ export function HireAction({
             </button>
             <p className="mt-2 text-xs leading-relaxed text-faint">
               This wallet holds {formatTbnb(balance.data?.value ?? 0n)} tBNB and the payment needs{" "}
-              {amount === null ? "—" : formatTbnb(amount)} tBNB, plus a little for gas — short by{" "}
-              {formatTbnb(shortfall)} tBNB.{" "}
+              {amount === null ? "not read yet" : formatTbnb(amount)} tBNB, plus a little for the
+              network fee. Short by {formatTbnb(shortfall)} tBNB.{" "}
               <a
                 href={FAUCET}
                 target="_blank"
@@ -400,7 +405,7 @@ export function HireAction({
               {phase.kind === "signing"
                 ? "Check your wallet…"
                 : subscription.active
-                  ? `Hire again anyway — ${usdTotal8 === null ? "" : formatUsd8(usdTotal8)}`
+                  ? `Hire again anyway for ${usdTotal8 === null ? "" : formatUsd8(usdTotal8)}`
                   : `Hire for ${usdTotal8 === null ? "" : formatUsd8(usdTotal8)}`}
             </button>
             <p className="mt-2 text-xs leading-relaxed text-faint">
