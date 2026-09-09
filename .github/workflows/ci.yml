@@ -12,8 +12,13 @@
 #     fugurebalancer  130   vitest
 #     fugugrid        144   vitest
 #     fuguyield       141   vitest
+#     fugubroker      156   vitest
+#     fugutrader      119   vitest
+#     fugupilot       147   vitest
+#     fugumeter       146   vitest
+#     fugusteward     169   vitest
 #                   -----
-#                    1559
+#                    2296
 #
 # A green suite is not by itself evidence that the suite ran. A `describe` block
 # accidentally renamed to `describe.skip`, a glob that stops matching after a file
@@ -197,6 +202,19 @@ jobs:
             baseline: 144
           - agent: fuguyield
             baseline: 141
+          # The five newest agents. Added to this matrix in the same commit that
+          # merged them, because a suite CI does not run is a suite nobody is
+          # checking: their 737 tests were green on one laptop and nowhere else.
+          - agent: fugubroker
+            baseline: 156
+          - agent: fugutrader
+            baseline: 119
+          - agent: fugupilot
+            baseline: 147
+          - agent: fugumeter
+            baseline: 146
+          - agent: fugusteward
+            baseline: 169
     steps:
       - uses: actions/checkout@v4
 
@@ -307,7 +325,7 @@ jobs:
               exit 1
             fi
           done
-          echo "all 1559 tests green"
+          echo "all 2296 tests green"
 
   # ── images ────────────────────────────────────────────────────────────────
   #
