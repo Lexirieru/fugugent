@@ -604,3 +604,32 @@ Then change `--no-frozen-lockfile` back to `--frozen-lockfile` in
 `.github/workflows/ci.yml` and in the four `ai/*/app/agent/Dockerfile` build
 stages, and drop the `COPY --from=build /srv/agent/pnpm-lock.yaml` line from each
 `prod-deps` stage.
+
+## Live deployments (2026-09-09)
+
+| Piece | URL / host | Notes |
+|---|---|---|
+| Landing page | https://landingpage-psi-umber.vercel.app | Vercel, public |
+| Marketplace | https://frontend-gules-gamma-37.vercel.app | Vercel, public |
+| Backend API | VPS `43.159.63.76:8787` | Not yet exposed through nginx |
+| Fugu Guardian | VPS, same compose stack | Monitoring loop live against BSC testnet |
+
+The backend runs on the VPS rather than Vercel on purpose. Its circuit breaker keeps
+state in the process; on serverless every invocation starts fresh, so the breaker would
+never open and the resilience the tests prove would quietly not exist in production.
+
+Measured on the host right after `up -d`, against the pre-Docker baseline:
+
+| | before Docker | stack running |
+|---|---|---|
+| RAM available | 806 MB | 679 MB |
+| Swap used | 2983 MB | 3133 MB |
+| 9router · claude-bot · nginx | active | active |
+| Next.js :20128 | 307 | 307 |
+| nginx :80 | 200 | 200 |
+
+Container usage against its ceiling: guardian 127/224 MiB, api 40/112, postgres 30/176,
+redis 5/24 — 202 MiB of the 536 MiB budget.
+
+Still to do: expose the API through nginx with TLS, point the purchased domain at it, and
+fill the six GitHub secrets listed above so the deploy workflow can run.
