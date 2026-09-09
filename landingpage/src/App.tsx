@@ -21,15 +21,25 @@ function LogoMark() {
   );
 }
 
+/**
+ * The marketplace lives on its own subdomain, so this is a link and not a button.
+ * It was a `<button>` with no handler, which looked right and did nothing at all.
+ *
+ * `target="_blank"` because the two are separate products and a reader who opens
+ * the app has not finished with this page. `rel="noopener"` goes with it: without
+ * it the opened tab can reach back through `window.opener` and navigate this one.
+ */
 function LaunchButton() {
   return (
-    <button
-      type="button"
+    <a
+      href="https://app.hellofugu.xyz"
       className="download-btn"
-      aria-label="Launch the HelloFugu app"
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Launch the HelloFugu app in a new tab"
     >
       <span className="download-btn-label">Launch app</span>
-    </button>
+    </a>
   );
 }
 

@@ -181,6 +181,9 @@ body {
   font-weight: 600;
   line-height: 1;
   cursor: pointer;
+  /* An <a> carries an underline and the visited colour by default; this is styled
+     as a button, so both are removed here rather than at the call site. */
+  text-decoration: none;
   background: radial-gradient(
     ellipse at center,
     #000 0%,
