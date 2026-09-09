@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ActionToken, SpendMarker } from "@/components/action-token";
 import { CopyButton } from "@/components/copy-button";
 import { DataProvenance } from "@/components/data-provenance";
 import { Fugu } from "@/components/fugu";
@@ -15,7 +16,7 @@ import { source } from "@/lib/data";
 import type { AgentView } from "@/lib/data/types";
 import { formatPeriod, formatPricePerPeriod } from "@/lib/money";
 import { SOURCE_LABEL, formatUtc, type Provenance } from "@/lib/provenance";
-import { BLOAT, riskAriaLabel } from "@/lib/risk";
+import { BLOAT, guardianActionFor, riskAriaLabel } from "@/lib/risk";
 
 export async function generateMetadata({
   params,
@@ -77,6 +78,9 @@ function AgentDetail({
   const meta = category ? CATEGORY_META[category] : null;
   const listing = record.fuguListing;
   const spec = risk ? BLOAT[risk.level] : null;
+  // The action band is Guardian's ladder. Showing it for another category would put a
+  // transaction name next to an agent that cannot send it — see `lib/risk.ts`.
+  const action = risk && category === "HEALTH_FACTOR" ? guardianActionFor(risk.level) : null;
   // A record's own provenance can differ from the envelope's: one page may be served
   // from the cache while its contents came from 8004scan, or the other way round.
   // The relative age is already in the banner (computed by the backend); this one names
@@ -152,21 +156,32 @@ function AgentDetail({
         </Section>
       ) : null}
 
-      {/* Risk */}
+      {/* Risk. Two questions, two separately headed cards — see `components/risk-legend.tsx`
+          for why they must never be read as one list. */}
       <Section className="pt-8">
         <h2 className="text-lg font-semibold tracking-tight text-fg">Risk right now</h2>
-        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          {/* Question 1: the state of the position. Prose name, pill, beside the fugu above. */}
           <Card>
+            <p className="text-xs uppercase tracking-[0.14em] text-faint">
+              Risk state — how puffed the fish is
+            </p>
             {risk && spec ? (
               <>
-                <p className="text-xs uppercase tracking-[0.14em] text-faint">
+                <p className="mt-3 text-[11px] uppercase tracking-[0.14em] text-faint">
                   {risk.metricLabel}
                 </p>
                 <p className="mt-1 font-mono text-4xl tabular-nums text-fg">{risk.metricValue}</p>
-                <p className="mt-3 text-sm font-medium text-fg">
-                  Level {risk.level} of 5 — {spec.name}
+                <p className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted">
+                  <span
+                    className="rounded-full border px-2.5 py-0.5 text-sm font-medium text-fg"
+                    style={{ borderColor: spec.color }}
+                  >
+                    {spec.name}
+                  </span>
+                  <span>level {risk.level} of 5</span>
                 </p>
-                <p className="mt-1 text-sm leading-relaxed text-muted">{spec.meaning}</p>
+                <p className="mt-3 text-sm leading-relaxed text-muted">{spec.state}</p>
                 {risk.companion ? (
                   <p className="mt-3 text-sm leading-relaxed text-fg">{risk.companion}</p>
                 ) : null}
@@ -187,7 +202,7 @@ function AgentDetail({
               </>
             ) : (
               <>
-                <p className="text-sm font-medium text-fg">No fresh reading.</p>
+                <p className="mt-3 text-sm font-medium text-fg">No fresh reading.</p>
                 <p className="mt-2 text-sm leading-relaxed text-muted">
                   The fish is drawn hollow rather than at a guessed level. Inferring a risk level
                   from stale numbers is the most expensive lie this product could tell, so we draw
@@ -197,6 +212,46 @@ function AgentDetail({
             )}
           </Card>
 
+          {/* Question 2: what the agent does. Code token, square box, no fugu. */}
+          <Card>
+            <p className="text-xs uppercase tracking-[0.14em] text-faint">
+              What the agent does about it
+            </p>
+            {action ? (
+              <>
+                <p className="mt-3 text-[11px] uppercase tracking-[0.14em] text-faint">
+                  Action at this level
+                </p>
+                <p className="mt-2">
+                  <ActionToken spec={action} />
+                </p>
+                <p className="mt-3 text-sm leading-relaxed text-muted">{action.does}</p>
+                <p className="mt-3">
+                  <SpendMarker spends={action.spendsMoney} />
+                </p>
+                <p className="mt-4 text-xs leading-relaxed text-faint">
+                  That label is the identifier the decision engine branches on, not a word chosen
+                  for this page — which is why it is written in code, in a square box, and never
+                  in the same style as the risk name beside it. The two are separate answers.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="mt-3 text-sm leading-relaxed text-fg">
+                  No action ladder is shipped for this category.
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-muted">
+                  The risk scale on the left is measured and real. What this agent would{" "}
+                  <em>do</em> at each level is not in the code yet, and we are not borrowing Fugu
+                  Guardian&apos;s repay ladder to fill the gap — naming an action an agent cannot
+                  take is exactly the kind of unverifiable claim this marketplace exists to stop.
+                </p>
+              </>
+            )}
+          </Card>
+        </div>
+
+        <div className="mt-4">
           <Card>
             <p className="text-xs uppercase tracking-[0.14em] text-faint">
               How this category is measured

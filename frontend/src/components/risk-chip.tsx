@@ -6,6 +6,9 @@
  * Level 5 is always a filled block + white text + uppercase, in light mode and dark
  * alike: `#A4210E` as text on a dark background is only 2.53:1 — which would make the
  * gravest state the hardest one to read. The filled block gives 7.49:1.
+ *
+ * This chip belongs to the **risk-state** scale: fully rounded, prose name, always beside a
+ * fugu. The action band never uses this shape — see `components/action-token.tsx`.
  */
 
 import { BLOAT, type RiskReading } from "@/lib/risk";
@@ -35,7 +38,7 @@ export function RiskChip({ reading, size = "md" }: { reading: RiskReading | null
           {reading.metricLabel} {reading.metricValue}
         </span>
         <span aria-hidden>·</span>
-        <span>{spec.name}</span>
+        <span title="Risk state">{spec.name}</span>
       </span>
     ) : (
       <span
@@ -48,7 +51,7 @@ export function RiskChip({ reading, size = "md" }: { reading: RiskReading | null
         <span className="text-faint" aria-hidden>
           ·
         </span>
-        <span>{spec.name}</span>
+        <span title="Risk state">{spec.name}</span>
       </span>
     );
 

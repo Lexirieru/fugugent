@@ -30,7 +30,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   const category = agent ? categoryOf(agent.record) : null;
   const categoryLabel = category ? CATEGORY_META[category].label : "DeFi agent";
   const status = level
-    ? `Level ${level} of 5 · ${BLOAT[level].name}`
+    ? `Risk level ${level} of 5 · ${BLOAT[level].name}`
     : "No fresh risk reading";
 
   const fish = fuguDataUri({ kind, level, seed: id, size: 420 });
