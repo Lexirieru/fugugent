@@ -88,33 +88,18 @@ FROM base AS build
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY app/agent/package.json ./app/agent/
 #
-# ⚠️  `--no-frozen-lockfile`, and it is a KNOWN DEFECT rather than a preference.
+# `--frozen-lockfile`. The committed `pnpm-lock.yaml` matches
+# `app/agent/package.json`, so the build gets one exact resolution and cannot pick
+# up a new minor of anything.
 #
-# NEITHER committed lockfile matches `app/agent/package.json`:
-#
-#   ../../pnpm-lock.yaml     the workspace one, correct in shape (its `importers:`
-#                            block covers `app/agent`) but three specifiers short —
-#                            `viem`, `@ai-sdk/openai` and `vitest` were added to
-#                            package.json without a `pnpm install` being committed.
-#                            `--frozen-lockfile` fails here with
-#                            ERR_PNPM_OUTDATED_LOCKFILE.
-#   ./pnpm-lock.yaml         resolves exactly those three and nothing else — seven
-#                            of the ten runtime dependencies are missing. Unusable.
-#
-# So there is no frozen build available today. `--no-frozen-lockfile` keeps every
-# already-locked version pinned and resolves only the three additions, which is the
-# smallest possible deviation — but it does mean a build next month can pick up a
-# new minor of viem.
-#
-# THE FIX, for whoever owns this agent (it is outside the deployment change set —
-# `pnpm-lock.yaml` lives one directory above the files this Dockerfile shipped with):
-#
-#     cd ai/fugugrid && pnpm install --lockfile-only && git add pnpm-lock.yaml
-#
-# then change both `--no-frozen-lockfile` below back to `--frozen-lockfile` and
-# delete the `COPY --from=build` of the lockfile in the prod-deps stage.
+# It was `--no-frozen-lockfile` for a while, because three specifiers (`viem`,
+# `@ai-sdk/openai`, `vitest`) had been added to package.json without a
+# `pnpm install` being committed. That was not free: resolving fresh on every run
+# is how CI ended up failing on a missing `@rolldown/binding-wasm32-wasi`, a
+# platform-specific optional dependency that a stale lockfile does not record.
+# Regenerating the lockfile (`pnpm install --lockfile-only`) fixed both at once.
 RUN --mount=type=cache,id=pnpm-fugugrid,target=/pnpm/store \
-    pnpm install --no-frozen-lockfile
+    pnpm install --frozen-lockfile
 COPY app/agent/tsconfig.json ./app/agent/
 COPY app/agent/src ./app/agent/src
 WORKDIR /srv/agent/app/agent
@@ -131,12 +116,10 @@ RUN printf '%s' '{"extends":"./tsconfig.json","exclude":["src/__tests__"]}' \
 FROM base AS prod-deps
 COPY package.json pnpm-workspace.yaml ./
 COPY app/agent/package.json ./app/agent/
-# The lockfile the BUILD stage reconciled, not the stale committed one. This is
-# what keeps the defect above from becoming a correctness problem: the compile and
-# the runtime install share ONE resolution, and this install is frozen against it.
-# Two independent `--no-frozen-lockfile` runs could drift apart and put the agent
-# on different dependency versions than the code was compiled against.
-COPY --from=build /srv/agent/pnpm-lock.yaml ./
+# The same committed lockfile the build stage used, so the compile and the runtime
+# install share one resolution and the agent cannot end up running against
+# different dependency versions than it was compiled against.
+COPY pnpm-lock.yaml ./
 RUN --mount=type=cache,id=pnpm-fugugrid,target=/pnpm/store \
     pnpm install --frozen-lockfile --prod
 
