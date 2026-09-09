@@ -25,9 +25,7 @@
 import { bscTestnet } from "viem/chains";
 import { createPublicClient, http } from "viem";
 import { CHAIN, CONTRACTS, addressUrl, txUrl } from "@/lib/chain";
-import { source } from "@/lib/data";
 import type { FuguKind } from "@/lib/fugu";
-import { SOURCE_LABEL } from "@/lib/provenance";
 
 export interface ChainNote {
   /** A stable key, and the anchor a future deep link would use. */
@@ -108,39 +106,57 @@ export const CHAIN_NOTES: ChainNote[] = [
 ];
 
 /**
- * The two counts shown beside the heading, both read at request time.
+ * The count shown beside the heading. One number, and it comes from the chain.
  *
- * They were typed in first, as "9 of 112", and that lasted about an hour: the live
- * catalogue answered 132 the next time it was asked, and one of the nine categories
- * moved by twenty between two calls a second apart. A hardcoded pair on a page whose
- * entire argument is "every number here is checkable" is the exact failure this product
- * was built against, so both halves are read rather than remembered.
+ * ## Why there is only one
  *
- * `hireable` comes from `listingCount()` on FuguRegistry, which is the definitive
- * answer and costs one `eth_call`. `total` is the catalogue the backend indexes, summed
- * over its nine categories. Either can come back `null`, and the card then shows only
- * the half it actually knows. The link never disappears, because counting them yourself
- * on `/agents?available=yes` is the point and it works whether or not these reads did.
+ * It started as two, "9 of 112", copied from the design prompt. The 112 did not survive
+ * contact with the backend: it answered 132 an hour later, and one category moved by
+ * twenty between two calls a second apart. Making it live rather than hardcoded looked
+ * like the fix, and it was not. Eight consecutive calls to a single category were
+ * measured:
+ *
+ *   cache     items=44  stale=true   age=16017     <- 4.5 hours old
+ *   cache     items=44  stale=true   age=16021
+ *   scan8004  items=24  stale=false  age=7         <- the live index, answering now
+ *   scan8004  items=24  stale=false  age=12
+ *   ...five more, all 24
+ *
+ * The backend is not lying: every row names its source, its age and its staleness, and
+ * the envelope says `degraded`. The ladder is working exactly as designed. What moves is
+ * upstream classification, which is not deterministic, so the set of agents in a category
+ * genuinely differs between two calls.
+ *
+ * That makes the catalogue total unusable as a headline, and no label fixes it. "112 read
+ * a moment ago" is still wrong the moment it reads 137 on a reload with nothing changed,
+ * because the problem is not that the number is stale, it is that the number is not a
+ * fact about the world. It is the sum of nine measurements taken at nine different times
+ * by a process that does not repeat itself.
+ *
+ * `listingCount()` on FuguRegistry has none of those properties. It is one `eth_call`,
+ * it is the same for everyone who asks, and any reader can check it in one line:
+ *
+ *   cast call --rpc-url "$BSC_TESTNET_RPC_URL" \
+ *     0xb2f36070E6eae3353E8e755172B477DF213ae248 'listingCount()(uint256)'
+ *
+ * So the card quotes that and nothing else. On a page whose whole argument is that its
+ * numbers hold still when you check them, a second number that does not hold still costs
+ * more than it explains.
  */
-export interface CatalogueCount {
-  /** Listings on FuguRegistry. `null` when the chain could not be reached. */
+export interface HireableCount {
+  /** `listingCount()` on FuguRegistry. `null` when the chain could not be reached. */
   hireable: number | null;
-  /** Agents in the indexed catalogue. `null` when the catalogue could not be reached. */
-  total: number | null;
-  /** Where `total` came from, so a degraded answer is never presented as a live one. */
-  totalSource: string | null;
   href: string;
 }
 
 export const CATALOGUE_HREF = "/agents?available=yes";
 
 /**
- * Read both counts. Server only, and it never throws: a failure is a `null`, which the
- * card renders as an absent number rather than as a guess.
+ * Server only, and it never throws: a failure is a `null`, which the card renders as an
+ * absent number rather than as a guess. The link is not conditional on any of it.
  */
-export async function readCatalogueCount(): Promise<CatalogueCount> {
-  const [hireable, catalogue] = await Promise.all([readListingCount(), readCatalogueTotal()]);
-  return { hireable, total: catalogue.total, totalSource: catalogue.source, href: CATALOGUE_HREF };
+export async function readHireableCount(): Promise<HireableCount> {
+  return { hireable: await readListingCount(), href: CATALOGUE_HREF };
 }
 
 async function readListingCount(): Promise<number | null> {
@@ -161,17 +177,6 @@ async function readListingCount(): Promise<number | null> {
   } catch {
     return null;
   }
-}
-
-async function readCatalogueTotal(): Promise<{ total: number | null; source: string | null }> {
-  const result = await source().listCategories();
-  // The seed rung is four sample agents, not the catalogue, so it is not a total. Saying
-  // "4 in the catalogue" would be worse than saying nothing.
-  if (!result.provenance.healthy || result.provenance.source === "seed") {
-    return { total: null, source: null };
-  }
-  const total = result.categories.reduce((sum, c) => sum + c.count, 0);
-  return { total, source: SOURCE_LABEL[result.provenance.source] };
 }
 
 const LISTING_COUNT_ABI = [

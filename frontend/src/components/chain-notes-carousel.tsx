@@ -45,7 +45,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Fugu } from "@/components/fugu";
-import { CHAIN_NOTES, type CatalogueCount, type ChainNote } from "@/lib/chain-notes";
+import { CHAIN_NOTES, type ChainNote, type HireableCount } from "@/lib/chain-notes";
 
 /** Ported unchanged: threshold 0.1, and once it has fired it never unfires. */
 function useInViewAnimation<T extends Element>() {
@@ -82,7 +82,7 @@ const AUTO_ADVANCE_MS = 3000;
  */
 const LANE_INSET = 24;
 
-export function ChainNotesCarousel({ counts }: { counts: CatalogueCount }) {
+export function ChainNotesCarousel({ counts }: { counts: HireableCount }) {
   const { ref, isVisible } = useInViewAnimation<HTMLElement>();
 
   const [offset, setOffset] = useState(0);
@@ -242,45 +242,33 @@ export function ChainNotesCarousel({ counts }: { counts: CatalogueCount }) {
 }
 
 /**
- * The pair of counts beside the heading. It replaces a five-star rating badge from a
- * review site, which is the one thing that could not be ported: there is no rating, and
- * a product whose argument is "check the number yourself" cannot open by inventing one.
+ * The count beside the heading. It replaces a five-star rating badge from a review site,
+ * which is the one thing that could not be ported: there is no rating, and a product
+ * whose argument is "check the number yourself" cannot open by inventing one.
  *
- * Every shape below leaves the link in place, because the link is what makes the claim
- * checkable and it works whether or not either read succeeded. A number that could not
- * be read is absent and named as absent; it is never a dash standing in for a value.
+ * One number, from the chain, because a second number from the upstream catalogue index
+ * does not hold still between two reloads. `lib/chain-notes.ts` carries the measurement
+ * that settled it.
+ *
+ * Both shapes below keep the link, because the link is what makes the claim checkable
+ * and it works whether or not the read succeeded. A number that could not be read is
+ * absent and named as absent; it is never a dash standing in for a value.
  */
-function CatalogueCard({ counts }: { counts: CatalogueCount }) {
-  const { hireable, total, totalSource } = counts;
-
-  const headline =
-    hireable !== null && total !== null
-      ? `${hireable} of ${total}`
-      : hireable !== null
-        ? `${hireable}`
-        : total !== null
-          ? `${total}`
-          : null;
-
-  const caption =
-    hireable !== null && total !== null
-      ? `agents in the catalogue carry a price and can be hired today, read from ${totalSource} and from the registry contract just now.`
-      : hireable !== null
-        ? "agents carry a price and can be hired today, read from the registry contract just now. The size of the catalogue could not be read."
-        : total !== null
-          ? `agents are in the catalogue, read from ${totalSource} just now. How many of them carry a price could not be read from the chain.`
-          : "Neither count could be read just now, so neither is shown. The list below still works.";
-
+function CatalogueCard({ counts }: { counts: HireableCount }) {
   return (
     <Link
       href={counts.href}
       className="group block rounded-2xl border border-line bg-surface px-5 py-4 transition hover:border-line-strong hover:bg-surface-strong md:text-right"
     >
-      {headline ? (
-        <span className="block font-mono text-2xl tabular-nums text-fg">{headline}</span>
+      {counts.hireable !== null ? (
+        <span className="block font-mono text-3xl leading-none tabular-nums text-fg">
+          {counts.hireable}
+        </span>
       ) : null}
-      <span className="mt-1 block max-w-[17rem] text-xs leading-relaxed text-faint md:ml-auto">
-        {caption}
+      <span className="mt-2 block max-w-[16rem] text-xs leading-relaxed text-faint md:ml-auto">
+        {counts.hireable !== null
+          ? "agents carry a price and can be hired today. Read from listingCount() on the registry contract just now, so it is the same number for you as for anyone else."
+          : "The registry contract did not answer just now, so no count is shown rather than a remembered one. The list still works."}
       </span>
       <span className="mt-2 block text-xs text-accent-strong">
         Open the list and count them →

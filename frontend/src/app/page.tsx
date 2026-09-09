@@ -4,14 +4,26 @@ import { Fugu } from "@/components/fugu";
 import { ProofList } from "@/components/proof";
 import { ButtonLink, Page, PageHeader, Section, SectionHeader } from "@/components/ui";
 import { CATEGORY_META, CATEGORY_ORDER } from "@/lib/agents";
-import { readCatalogueCount } from "@/lib/chain-notes";
+import { readHireableCount } from "@/lib/chain-notes";
 import { MARKETPLACE_CYCLE } from "@/lib/data/sample";
 
+/**
+ * Rendered per request, and the reason is one number.
+ *
+ * The card beside "What the chain says" quotes `listingCount()` from the registry and
+ * tells the reader it was read just now. Statically prerendered, "just now" would mean
+ * "whenever this was last deployed", and a count frozen at build time is the same stale
+ * number this section was rebuilt to get rid of, only harder to notice. The read is one
+ * `eth_call` behind a 4 second ceiling that degrades to no number at all, so the cost of
+ * saying it honestly is small and bounded.
+ */
+export const dynamic = "force-dynamic";
+
 export default async function StartPage() {
-  // Both counts beside "What the chain says" are read here, at request time: one
-  // `eth_call` for the registry's listing count and one call to the catalogue. Neither
-  // can throw, and either may come back unknown, which the card then states.
-  const catalogueCount = await readCatalogueCount();
+  // The count beside "What the chain says" is read here, at request time: one `eth_call`
+  // for the registry's listing count. It cannot throw, and it may come back unknown,
+  // which the card then states rather than filling in from memory.
+  const hireableCount = await readHireableCount();
 
   return (
     <Page>
@@ -43,7 +55,7 @@ export default async function StartPage() {
         right-hung column it was designed with, so it reads as a break in the page rather
         than as another card grid.
       */}
-      <ChainNotesCarousel counts={catalogueCount} />
+      <ChainNotesCarousel counts={hireableCount} />
 
       <Section labelledBy="where-to-go">
         <SectionHeader
