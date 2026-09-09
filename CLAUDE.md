@@ -21,9 +21,9 @@ Domains: `hellofugu.xyz` (landing, already purchased) · `app.hellofugu.xyz` (ma
 
 | Folder | Contents | Status |
 |---|---|---|
-| `contracts/` | 4 UUPS contracts (Foundry) | live on testnet, 131 tests |
-| `ai/` | 4 Fugu agents (BNB Agent Studio, Altana wallets) | Guardian proven on-chain through a session key (249 tests); Rebalancer/Grid/Yield have a decision engine + backtest (88/99/93), execution not yet wired |
-| `backend/` | Hono + Postgres + Redis: BFF, classifier, tiered fallback | running on Docker Compose, 374 tests; the 4-level fallback proven live |
+| `contracts/` | 4 UUPS contracts (Foundry) | live on testnet, 147 tests |
+| `ai/` | 4 Fugu agents (BNB Agent Studio, Altana wallets) | Guardian proven on-chain through a session key (249 tests); Rebalancer/Grid/Yield have a decision engine + backtest (88/99/93) and are listed on FuguRegistry, but on-chain execution is not yet wired |
+| `backend/` | Hono + Postgres + Redis: BFF, classifier, tiered fallback | running on Docker Compose, 484 tests; the 4-level fallback proven live |
 | `frontend/` | Next.js 16 marketplace | list + URL-addressable detail + rental flow, build green |
 | `landingpage/` | Next.js 16 landing | finished, build green |
 
