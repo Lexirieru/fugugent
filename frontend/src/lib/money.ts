@@ -111,3 +111,24 @@ export function formatDuration(seconds: number): string {
   if (!parts.length) parts.push(`${seconds} seconds`);
   return parts.join(" ");
 }
+
+/**
+ * A USD8 value off the wire.
+ *
+ * The backend sends money as a **decimal string** precisely so that it never travels
+ * through a JSON `number`, whose 53 significant bits cannot hold a USD8 amount safely.
+ * Anything that is not a plain integer string comes back `null` — the caller then has to
+ * say "we do not have this figure" rather than print a zero it invented. A missing
+ * price and a price of zero are different facts.
+ */
+export function parseUsd8(value: unknown): bigint | null {
+  if (typeof value === "bigint") return value;
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  if (!/^-?\d+$/.test(text)) return null;
+  try {
+    return BigInt(text);
+  } catch {
+    return null;
+  }
+}

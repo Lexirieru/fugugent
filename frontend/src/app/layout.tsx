@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
+import { SiteNav } from "@/components/site-nav";
 import { ConnectControl } from "@/components/wallet/connect-button";
 import { WalletProvider } from "@/components/wallet/provider";
 import { CHAIN, CONTRACT_LIST, addressUrl, shorten } from "@/lib/chain";
@@ -48,27 +49,28 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   );
 }
 
+/**
+ * The header carries the whole product in one line: which of the two marketplaces you
+ * are in, which chain you are on, and whether a wallet is connected.
+ *
+ * At 390px the three nav links take a full-width row of their own below the wallet
+ * control — `order-last w-full` until `sm`, where everything folds back into one line.
+ * Nothing is hidden behind a menu button at any width.
+ */
 function SiteHeader() {
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-6xl items-center gap-4 px-5 py-3 sm:px-8">
+      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3 sm:px-8">
         <Link href="/" className="text-sm font-semibold tracking-tight text-fg">
           Fugugent
         </Link>
-        <span className="hidden text-xs text-faint sm:inline">Marketplace</span>
-        <span className="grow" />
-        <span className="hidden items-center gap-1.5 rounded-full border border-accent/40 bg-accent-soft px-2.5 py-0.5 text-[11px] font-medium text-accent-strong sm:inline-flex">
-          {CHAIN.name}
+        <SiteNav className="order-last w-full border-t border-line pt-2 sm:order-none sm:w-auto sm:border-t-0 sm:pt-0" />
+        <span className="ml-auto flex items-center gap-2">
+          <span className="hidden items-center gap-1.5 rounded-full border border-accent/40 bg-accent-soft px-2.5 py-0.5 text-[11px] font-medium text-accent-strong sm:inline-flex">
+            {CHAIN.name}
+          </span>
+          <ConnectControl />
         </span>
-        <ConnectControl />
-        <a
-          href="https://hellofugu.xyz"
-          className="hidden text-xs text-muted transition hover:text-fg sm:inline"
-          target="_blank"
-          rel="noreferrer noopener"
-        >
-          About ↗
-        </a>
       </div>
     </header>
   );
@@ -103,6 +105,26 @@ function SiteFooter() {
             </li>
           ))}
         </ul>
+        <nav aria-label="Elsewhere" className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+          <Link href="/" className="text-muted transition hover:text-fg">
+            Agent marketplace
+          </Link>
+          <Link href="/skills" className="text-muted transition hover:text-fg">
+            Audited skills
+          </Link>
+          <Link href="/auditors" className="text-muted transition hover:text-fg">
+            Auditors
+          </Link>
+          <a
+            href="https://hellofugu.xyz"
+            className="text-muted transition hover:text-fg"
+            target="_blank"
+            rel="noreferrer noopener"
+          >
+            About ↗
+          </a>
+        </nav>
+
         <p className="mt-6 max-w-3xl text-xs leading-relaxed text-faint">
           Testnet only. All four implementations are deployed, exercised end to end, and verified
           on BscScan, so the explorer shows Solidity rather than bytecode — the links above go
