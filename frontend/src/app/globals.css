@@ -1,49 +1,35 @@
 @import "tailwindcss";
+/*
+  The palette, the shape scale and the typography constants live in `theme/tokens.css`
+  at the repository root — one file, shared verbatim with `landingpage/`. This app
+  defines no colour of its own; it only maps the shared semantic names onto Tailwind
+  utilities below. Every value, and the reasoning and the measured contrast behind it,
+  is in that file.
+
+  The two apps ship side by side (hellofugu.xyz and app.hellofugu.xyz) and used to look
+  like two different products, because they had two copies of the palette. Please do not
+  add a colour here. Add it there.
+*/
+@import "../../../theme/tokens.css";
 
 /*
-  Fugugent — marketplace (app.fugugent.xyz).
-
-  The theme and the base tokens are deliberately identical to
-  `landingpage/src/app/globals.css`, so the landing page and the app feel like one
-  product. What is added here are the risk tokens and the agent identity tokens from
-  `docs/brand/palette.md`, because the app is the only one that shows a real puff level.
+  Fugugent — marketplace (app.hellofugu.xyz).
 */
 
 :root {
-  color-scheme: dark;
-
-  --bg: #05080f;
-  --bg-elev: #0a1120;
-  --surface: rgba(255, 255, 255, 0.035);
-  --surface-strong: rgba(255, 255, 255, 0.06);
-  --border: rgba(148, 176, 214, 0.16);
-  --border-strong: rgba(148, 176, 214, 0.3);
-
-  --fg: #e9eef7;
-  --fg-muted: #96a7bf;
-  --fg-faint: #6b7e97;
-
-  /* BNB Chain yellow — actions and emphasis only, never inside a risk component. */
-  --accent: #f0b90b;
-  --accent-soft: rgba(240, 185, 11, 0.14);
-
-  /* docs/brand/palette.md §5 — may only appear inside a risk component. */
-  --risk-1: #009e73;
-  --risk-2: #f0e442;
-  --risk-3: #e69f00;
-  --risk-4: #d55e00;
-  --risk-5: #a4210e;
-
-  /* docs/brand/palette.md §4 — agent identity, never changed by risk. */
-  --agent-guardian: #0072b2;
-  --agent-rebalancer: #cc79a7;
-  --agent-grid: #56b4e9;
-  --agent-yield: #e69f00;
-
-  --foam-100: #f4f8f9;
-  --abyss-900: #05121a;
+  color-scheme: light;
 }
 
+/*
+  The Tailwind bridge. `@theme inline` is what turns a semantic custom property into
+  `bg-*`, `text-*`, `border-*` utilities, and it is the reason the vocabulary in the
+  markup reads as roles (`text-muted`, `bg-surface`) rather than as colours.
+
+  Note the two names that intentionally differ from their variable: `--color-line` maps
+  `--border`, and `--color-muted`/`--color-faint` map `--fg-muted`/`--fg-faint`. Tailwind
+  would otherwise generate `border-border` and `text-fg-muted`, which read badly at the
+  call site.
+*/
 @theme inline {
   --color-bg: var(--bg);
   --color-bg-elev: var(--bg-elev);
@@ -54,7 +40,14 @@
   --color-fg: var(--fg);
   --color-muted: var(--fg-muted);
   --color-faint: var(--fg-faint);
+
+  /* Three accents, because one orange cannot be a fill, a label and a focus ring on a
+     cream page. `accent` fills, `accent-strong` writes, `accent-ink` is what you write
+     on top of a fill. See the accent block in theme/tokens.css. */
   --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-ink: var(--accent-ink);
   --color-accent-soft: var(--accent-soft);
 
   --color-risk-1: var(--risk-1);
@@ -63,8 +56,28 @@
   --color-risk-4: var(--risk-4);
   --color-risk-5: var(--risk-5);
 
-  --font-sans: var(--font-geist-sans);
+  /* No `--radius-*` entry here: Tailwind's radius namespace uses the same
+     `--radius-card` name the shared file already defines, and mapping one onto the
+     other makes a self-referential custom property. Cards reach the shared value
+     directly, as `rounded-[var(--radius-card)]`. */
+
+  --font-sans: var(--font-body);
   --font-mono: var(--font-geist-mono);
+}
+
+/*
+  The font roles named in theme/tokens.css, bound to what this app actually loads.
+  Geist arrives through `next/font` in `app/layout.tsx` (the landing page pulls the same
+  family from Figma's CDN — same typeface, two loaders, because the frameworks differ).
+
+  There is no `--font-hand` here on purpose. Kalam gives the landing page its handwritten
+  eyebrow, but this app has one eyebrow on one page; a whole webfont for sixteen
+  characters is network cost with no return. The marketplace eyebrow instead borrows the
+  parts of that signature that are free — the accent colour and the tracking.
+*/
+:root {
+  --font-display: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
 html {
@@ -75,7 +88,12 @@ html {
 body {
   background-color: var(--bg);
   color: var(--fg);
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-body);
+  /* Matches the landing page's body weight. Geist at 400 next to Geist at 500 was one of
+     the things that made the two sites read as different products. */
+  font-weight: var(--weight-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   /* The body never scrolls horizontally. */
   overflow-x: hidden;
 }
@@ -135,11 +153,16 @@ body {
 }
 
 ::selection {
-  background: rgba(240, 185, 11, 0.28);
+  background: rgba(234, 88, 12, 0.24);
 }
 
+/*
+  --focus-ring, not --accent. WCAG 2.2 wants a focus indicator at 3:1 against what
+  surrounds it, and --accent only reaches 2.91:1 on this page; --accent-strong is
+  4.97:1 at the same hue.
+*/
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 3px;
   border-radius: 4px;
 }

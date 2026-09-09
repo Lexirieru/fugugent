@@ -54,7 +54,7 @@ export function HirePanel({
   );
 
   return (
-    <div className="rounded-2xl border border-line bg-surface p-5 sm:p-6">
+    <div className="rounded-[var(--radius-card)] border border-line bg-surface p-5 sm:p-6">
       <h3 className="text-lg font-semibold text-fg">Hire {agentName}</h3>
 
       <div className="mt-4">
@@ -80,7 +80,7 @@ export function HirePanel({
               onClick={() => setPeriods(p)}
               className={`rounded-full border px-3 py-1 text-xs transition ${
                 periods === p
-                  ? "border-accent/50 bg-accent-soft text-accent"
+                  ? "border-accent/50 bg-accent-soft text-accent-strong"
                   : "border-line text-muted hover:border-line-strong hover:text-fg"
               }`}
             >
@@ -197,7 +197,7 @@ export function HirePanel({
               href={txUrl(existing.txHash)}
               target="_blank"
               rel="noreferrer noopener"
-              className="font-mono text-xs text-accent underline decoration-accent/40 underline-offset-4"
+              className="font-mono text-xs text-accent-strong underline decoration-accent/40 underline-offset-4"
             >
               {existing.txHash.slice(0, 12)}… ↗
             </a>
@@ -244,7 +244,7 @@ export function HirePanel({
               <button
                 type="submit"
                 disabled={!isTxHash(hash)}
-                className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-[#06131a] transition hover:bg-[#ffce35] disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-ink transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Record
               </button>

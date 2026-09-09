@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 /**
@@ -13,6 +14,24 @@ const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
   turbopack: {
+    /**
+     * The repository root, not `frontend/`.
+     *
+     * `src/app/globals.css` imports `../../../theme/tokens.css` — the palette shared
+     * verbatim with `landingpage/`, so the two front ends cannot drift into looking
+     * like different products again. Turbopack treats its root as the filesystem
+     * root, and with the default (`frontend/`) that import fails outright:
+     *
+     *     FileSystemPath("").join("../theme/tokens.css") leaves the filesystem root
+     *
+     * Raising the root one level is what makes the single source of truth reachable.
+     *
+     * Deploy note: this app's Vercel project has Root Directory `frontend`, so
+     * "Include source files outside of the Root Directory in the Build Step" must
+     * stay enabled or `theme/` will not be in the build context. The same applies to
+     * the `landingpage` project.
+     */
+    root: path.join(import.meta.dirname, ".."),
     resolveAlias: {
       "@x402/core/client": X402_STUB,
       "@x402/evm": X402_STUB,

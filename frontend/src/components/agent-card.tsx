@@ -24,7 +24,7 @@ export function AgentCard({ view }: { view: AgentView }) {
   const listing = record.fuguListing;
 
   return (
-    <article className="group relative flex w-full flex-col rounded-2xl border border-line bg-surface p-5 transition hover:border-line-strong hover:bg-surface-strong">
+    <article className="group relative flex w-full flex-col rounded-[var(--radius-card)] border border-line bg-surface p-5 transition hover:border-line-strong hover:bg-surface-strong">
       <div className="flex items-start gap-4">
         <div className="shrink-0">
           <Fugu
@@ -39,7 +39,7 @@ export function AgentCard({ view }: { view: AgentView }) {
           <h3 className="text-base font-semibold leading-tight text-fg">
             <Link
               href={`/agent/${encodeURIComponent(record.id)}`}
-              className="after:absolute after:inset-0 after:rounded-2xl"
+              className="after:absolute after:inset-0 after:rounded-[var(--radius-card)]"
             >
               {record.name}
             </Link>
@@ -81,7 +81,7 @@ export function AgentCard({ view }: { view: AgentView }) {
         ) : (
           <span className="text-sm text-faint">Not listed — nothing to pay yet</span>
         )}
-        <span className="text-xs text-faint transition group-hover:text-accent">
+        <span className="text-xs text-faint transition group-hover:text-accent-strong">
           Open the agent →
         </span>
       </div>

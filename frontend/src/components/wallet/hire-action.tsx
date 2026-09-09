@@ -282,7 +282,7 @@ export function HireAction({
             <button
               type="button"
               onClick={() => open()}
-              className="w-full rounded-full bg-accent px-4 py-2.5 text-sm font-semibold text-[#06131a] transition hover:bg-[#ffce35] sm:w-auto"
+              className="w-full rounded-full bg-accent px-4 py-2.5 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover sm:w-auto"
             >
               Connect a wallet to hire
             </button>
@@ -320,7 +320,7 @@ export function HireAction({
                 href={txUrl(phase.hash)}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="rounded-full border border-line px-3 py-1.5 font-mono text-xs text-accent transition hover:border-line-strong"
+                className="rounded-full border border-line px-3 py-1.5 font-mono text-xs text-accent-strong transition hover:border-line-strong"
               >
                 {phase.hash.slice(0, 14)}… ↗
               </a>
@@ -350,7 +350,7 @@ export function HireAction({
                 href={txUrl(phase.hash)}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="rounded-full border border-line px-3 py-1.5 font-mono text-xs text-accent transition hover:border-line-strong"
+                className="rounded-full border border-line px-3 py-1.5 font-mono text-xs text-accent-strong transition hover:border-line-strong"
               >
                 {phase.hash.slice(0, 14)}… ↗
               </a>
@@ -370,7 +370,7 @@ export function HireAction({
             <button
               type="button"
               disabled
-              className="w-full cursor-not-allowed rounded-full bg-accent px-4 py-2.5 text-sm font-semibold text-[#06131a] opacity-40 sm:w-auto"
+              className="w-full cursor-not-allowed rounded-full bg-accent px-4 py-2.5 text-sm font-semibold text-accent-ink opacity-40 sm:w-auto"
             >
               Not enough tBNB
             </button>
@@ -382,7 +382,7 @@ export function HireAction({
                 href={FAUCET}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="text-accent underline decoration-accent/40 underline-offset-4"
+                className="text-accent-strong underline decoration-accent/40 underline-offset-4"
               >
                 Get testnet tBNB from the faucet ↗
               </a>{" "}
@@ -395,7 +395,7 @@ export function HireAction({
               type="button"
               onClick={hire}
               disabled={amount === null || phase.kind === "signing"}
-              className="w-full rounded-full bg-accent px-4 py-2.5 text-sm font-semibold text-[#06131a] transition hover:bg-[#ffce35] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+              className="w-full rounded-full bg-accent px-4 py-2.5 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
             >
               {phase.kind === "signing"
                 ? "Check your wallet…"

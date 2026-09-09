@@ -3,6 +3,7 @@ import { CATEGORY_META, categoryOf, fuguKindFor } from "@/lib/agents";
 import { source } from "@/lib/data";
 import { fuguDataUri } from "@/lib/fugu";
 import { BLOAT } from "@/lib/risk";
+import { ACCENT, SURFACES, TEXT } from "@/lib/theme";
 
 /**
  * The agent page OG image — its own fugu, not a generic card.
@@ -14,6 +15,9 @@ import { BLOAT } from "@/lib/risk";
  * Satori does not draw a nested `<svg>`, but it does accept a data URI in an `<img>` — so
  * the fugu here is built by exactly the same function the page uses. One geometry, two
  * renderers.
+ *
+ * It also has no document and no cascade, so `var(--bg)` resolves to nothing here. The
+ * colours come from `lib/theme.ts`, the literal projection of `theme/tokens.css`.
  */
 
 export const alt = "A Fugugent agent — the pufferfish swells as its risk grows";
@@ -43,13 +47,13 @@ export default async function Image({ params }: { params: Promise<{ id: string }
           height: "100%",
           display: "flex",
           alignItems: "center",
-          backgroundColor: "#05080f",
+          backgroundColor: SURFACES.bg,
           padding: "72px",
           fontFamily: "sans-serif",
         }}
       >
         <div style={{ display: "flex", flexDirection: "column", flex: 1, paddingRight: "48px" }}>
-          <div style={{ display: "flex", fontSize: 26, color: "#f0b90b", letterSpacing: 3 }}>
+          <div style={{ display: "flex", fontSize: 26, color: ACCENT.strong, letterSpacing: 3 }}>
             FUGUGENT
           </div>
           <div
@@ -57,17 +61,17 @@ export default async function Image({ params }: { params: Promise<{ id: string }
               display: "flex",
               fontSize: 72,
               fontWeight: 700,
-              color: "#e9eef7",
+              color: TEXT.fg,
               marginTop: 18,
               lineHeight: 1.05,
             }}
           >
             {name}
           </div>
-          <div style={{ display: "flex", fontSize: 30, color: "#96a7bf", marginTop: 20 }}>
+          <div style={{ display: "flex", fontSize: 30, color: TEXT.muted, marginTop: 20 }}>
             {categoryLabel} · BNB Chain testnet
           </div>
-          <div style={{ display: "flex", fontSize: 26, color: "#6b7e97", marginTop: 14 }}>
+          <div style={{ display: "flex", fontSize: 26, color: TEXT.faint, marginTop: 14 }}>
             {status}
           </div>
         </div>

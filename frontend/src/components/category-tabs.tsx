@@ -55,7 +55,7 @@ function Tab({
       aria-current={active ? "page" : undefined}
       className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm transition ${
         active
-          ? "border-accent/50 bg-accent-soft text-accent"
+          ? "border-accent/50 bg-accent-soft text-accent-strong"
           : "border-line text-muted hover:border-line-strong hover:text-fg"
       }`}
     >

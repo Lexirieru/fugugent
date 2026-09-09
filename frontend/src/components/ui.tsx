@@ -19,7 +19,9 @@ export function Section({
 
 export function Eyebrow({ children }: { children: ReactNode }) {
   return (
-    <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-accent">{children}</p>
+    <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-accent-strong">
+      {children}
+    </p>
   );
 }
 
@@ -39,7 +41,7 @@ export function Lede({ children }: { children: ReactNode }) {
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`rounded-2xl border border-line bg-surface p-5 sm:p-6 ${className}`}>
+    <div className={`rounded-[var(--radius-card)] border border-line bg-surface p-5 sm:p-6 ${className}`}>
       {children}
     </div>
   );
@@ -54,7 +56,7 @@ export function Badge({
 }) {
   const tones = {
     neutral: "border-line text-fg",
-    accent: "border-accent/40 bg-accent-soft text-accent",
+    accent: "border-accent/40 bg-accent-soft text-accent-strong",
     quiet: "border-line text-faint",
   } as const;
   return (
@@ -82,7 +84,7 @@ export function ButtonLink({
 }) {
   const styles =
     variant === "primary"
-      ? "bg-accent text-[#06131a] hover:bg-[#ffce35]"
+      ? "bg-accent text-accent-ink hover:bg-accent-hover"
       : "border border-line text-fg hover:border-line-strong hover:bg-surface-strong";
   const cls = `inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${styles} ${className}`;
 
@@ -114,7 +116,7 @@ export function EmptyState({
   actions: ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-dashed border-line-strong bg-surface px-6 py-12 text-center">
+    <div className="rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface px-6 py-12 text-center">
       <h3 className="text-lg font-semibold text-fg">{title}</h3>
       <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-muted">{body}</p>
       <div className="mt-6 flex flex-wrap items-center justify-center gap-3">{actions}</div>

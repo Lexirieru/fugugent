@@ -57,7 +57,7 @@ function SiteHeader() {
         </Link>
         <span className="hidden text-xs text-faint sm:inline">Marketplace</span>
         <span className="grow" />
-        <span className="hidden items-center gap-1.5 rounded-full border border-accent/40 bg-accent-soft px-2.5 py-0.5 text-[11px] font-medium text-accent sm:inline-flex">
+        <span className="hidden items-center gap-1.5 rounded-full border border-accent/40 bg-accent-soft px-2.5 py-0.5 text-[11px] font-medium text-accent-strong sm:inline-flex">
           {CHAIN.name}
         </span>
         <ConnectControl />
@@ -95,7 +95,7 @@ function SiteFooter() {
                 className="block rounded-xl border border-line px-3 py-2.5 transition hover:border-line-strong hover:bg-surface"
               >
                 <span className="block text-sm font-medium text-fg">{c.name}</span>
-                <span className="mt-0.5 block font-mono text-[11px] text-accent/80">
+                <span className="mt-0.5 block font-mono text-[11px] text-accent-strong">
                   {shorten(c.address)} ↗
                 </span>
                 <span className="mt-1 block text-[11px] leading-snug text-faint">{c.role}</span>

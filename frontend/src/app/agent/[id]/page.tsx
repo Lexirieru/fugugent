@@ -147,7 +147,7 @@ function AgentDetail({
       {/* The limits of the claim, stated before anything that flatters. */}
       {notShipped ? (
         <Section className="pt-8">
-          <div className="rounded-2xl border border-line bg-surface px-5 py-4">
+          <div className="rounded-[var(--radius-card)] border border-line bg-surface px-5 py-4">
             <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-faint">
               What this agent does not do yet
             </h2>
@@ -190,7 +190,7 @@ function AgentDetail({
                     href={txUrl(risk.proofTxHash)}
                     target="_blank"
                     rel="noreferrer noopener"
-                    className="mt-4 inline-block break-all font-mono text-xs text-accent underline decoration-accent/40 underline-offset-4"
+                    className="mt-4 inline-block break-all font-mono text-xs text-accent-strong underline decoration-accent/40 underline-offset-4"
                   >
                     {shorten(risk.proofTxHash, 14, 8)} ↗
                   </a>
@@ -331,7 +331,7 @@ function AgentDetail({
                         href={addressUrl(c.address)}
                         target="_blank"
                         rel="noreferrer noopener"
-                        className="ml-2 font-mono text-xs text-accent/85"
+                        className="ml-2 font-mono text-xs text-accent-strong"
                       >
                         {shorten(c.address, 8, 6)} ↗
                       </a>
@@ -355,7 +355,7 @@ function AgentDetail({
                       href={addressUrl(session.wallet)}
                       target="_blank"
                       rel="noreferrer noopener"
-                      className="font-mono text-xs text-accent/85"
+                      className="font-mono text-xs text-accent-strong"
                     >
                       {shorten(session.wallet)} ↗
                     </a>

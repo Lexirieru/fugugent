@@ -18,19 +18,27 @@
  */
 
 import type { BloatLevel } from "@/lib/risk";
+import { AGENT, ILLUSTRATION, RISK as RISK_COLOURS } from "@/lib/theme";
 
-const OUTLINE = "#05121A";
-const FOAM = "#F4F8F9";
-const FOAM2 = "#E3ECEF";
-const MUTED = "#6b7e97";
+/*
+ * Every colour below comes from `lib/theme.ts`, the server-side projection of the
+ * shared `theme/tokens.css`. This file used to carry its own hex literals, which is
+ * how the app's fish and the brand's fish were free to drift apart.
+ *
+ * The illustration colours (outline, foam, bellies, body colours) are byte-identical
+ * to `docs/brand/generate-svg.py`, so the fish here really is the fish on the landing
+ * page. The one part that is NOT identical is the risk ring: the static plates in
+ * `landingpage/public/brand/guardian-kembung-*.svg` paint their own #0B1E2B tile and
+ * therefore keep the original dark-ground Okabe–Ito rings, while the fish here is drawn
+ * inline on a cream card and uses the light-ground ring colours. Same hues, same order,
+ * different ground — see the puff-level block in theme/tokens.css.
+ */
+const OUTLINE = ILLUSTRATION.outline;
+const FOAM = ILLUSTRATION.foam;
+const FOAM2 = ILLUSTRATION.foam2;
+const MUTED = ILLUSTRATION.hollow;
 
-const RISK: Record<BloatLevel, string> = {
-  1: "#009E73",
-  2: "#F0E442",
-  3: "#E69F00",
-  4: "#D55E00",
-  5: "#A4210E",
-};
+const RISK: Record<BloatLevel, string> = RISK_COLOURS;
 
 const LEVEL_WH: Record<BloatLevel, [number, number]> = {
   1: [56, 52],
@@ -52,10 +60,10 @@ interface CharSpec {
 }
 
 const CHARS: Record<Exclude<FuguKind, "fallback">, CharSpec> = {
-  guardian: { body: "#0072B2", belly: "#58A9E0", ws: 1.06, hs: 0.95 },
-  rebalancer: { body: "#CC79A7", belly: "#E9A8CC", ws: 0.94, hs: 1.06 },
-  grid: { body: "#56B4E9", belly: "#8FD3F4", ws: 0.98, hs: 1.02 },
-  yield: { body: "#E69F00", belly: "#FFC24D", ws: 1.07, hs: 1.06 },
+  guardian: { ...AGENT.guardian, ws: 1.06, hs: 0.95 },
+  rebalancer: { ...AGENT.rebalancer, ws: 0.94, hs: 1.06 },
+  grid: { ...AGENT.grid, ws: 0.98, hs: 1.02 },
+  yield: { ...AGENT.yield, ws: 1.07, hs: 1.06 },
 };
 
 const CX = 50;
@@ -333,11 +341,24 @@ function hollowBody(kind: FuguKind, c: CharSpec): string {
   // Identity stays readable — the silhouette and the distinguishing prop do not
   // disappear with it. What disappears is exactly the risk channels: the body fill,
   // the spikes, and the ring.
-  return (
-    `<g fill="none" stroke="${color}" stroke-width="3" stroke-linejoin="round" stroke-dasharray="5 4" opacity="0.8">` +
+  //
+  // The halo underneath is what makes that survive a light page. Everywhere else an
+  // agent's colour is a FILL inside a 3px #05121A outline, and it is the outline that
+  // carries the shape; here the identity colour IS the stroke, with nothing under it.
+  // On cream that leaves #E69F00 (Yield) at 1.84:1 and #56B4E9 (Grid) at 1.88:1 — the
+  // fish all but evaporates. Drawing the same three paths first in the outline colour,
+  // one unit wider and at 0.3, gives the silhouette a dark edge on any ground without
+  // touching the identity colour itself, which the brand rule fixes.
+  const shape =
     `<path d="M${f(bx)},${f(by - 7)} L${f(bx - 17)},${f(by - 15)} L${f(bx - 12)},${f(by - 4)} L${f(bx - 19)},${f(by)} L${f(bx - 12)},${f(by + 4)} L${f(bx - 17)},${f(by + 15)} L${f(bx)},${f(by + 7)} Z"/>` +
     dorsal(kind, rx, ry, color, true) +
-    `<path d="${ell(CX, CY, rx, ry)}"/>` +
+    `<path d="${ell(CX, CY, rx, ry)}"/>`;
+  return (
+    `<g fill="none" stroke="${OUTLINE}" stroke-width="4.4" stroke-linejoin="round" stroke-dasharray="5 4" opacity="0.3">` +
+    shape +
+    `</g>` +
+    `<g fill="none" stroke="${color}" stroke-width="3" stroke-linejoin="round" stroke-dasharray="5 4" opacity="0.9">` +
+    shape +
     `</g>` +
     `<g fill="none" stroke="${MUTED}" stroke-width="2.4">` +
     `<circle cx="${f(farx)}" cy="${f(ny)}" r="${f(er * 0.92)}"/>` +

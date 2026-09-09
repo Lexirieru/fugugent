@@ -23,7 +23,7 @@ import { BLOAT, BLOAT_LEVELS, GUARDIAN_ACTIONS } from "@/lib/risk";
  */
 export function RiskLegend() {
   return (
-    <div className="rounded-2xl border border-line bg-surface p-5 sm:p-6">
+    <div className="rounded-[var(--radius-card)] border border-line bg-surface p-5 sm:p-6">
       <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-faint">
         Two questions, two different scales
       </h2>

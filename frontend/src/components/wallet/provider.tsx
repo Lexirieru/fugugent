@@ -31,6 +31,7 @@ import { createAppKit } from "@reown/appkit/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { WagmiProvider, type Config } from "wagmi";
+import { ACCENT } from "@/lib/theme";
 import { metadata, networks, projectId, wagmiAdapter, walletEnabled } from "@/lib/wallet/config";
 
 if (wagmiAdapter) {
@@ -46,6 +47,13 @@ if (wagmiAdapter) {
     // so nothing stays silent and nothing blocks the page.
     allowUnsupportedChain: true,
     enableNetworkSwitch: true,
+    // The modal is a third-party surface, so it is themed rather than restyled: without
+    // these two lines AppKit picks its own default and a light page hands the visitor a
+    // dark modal mid-purchase. `--w3m-accent` is a literal because the modal renders in
+    // its own shadow root, where this page's custom properties are not in scope; it comes
+    // from `lib/theme.ts`, the same projection the OG images use.
+    themeMode: "light",
+    themeVariables: { "--w3m-accent": ACCENT.base },
     features: {
       analytics: false,
       email: false,

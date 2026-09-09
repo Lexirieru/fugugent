@@ -1,10 +1,15 @@
 import { ImageResponse } from "next/og";
 import { fuguDataUri, type FuguKind } from "@/lib/fugu";
 import type { BloatLevel } from "@/lib/risk";
+import { ACCENT, SURFACES, TEXT } from "@/lib/theme";
 
 /**
  * The marketplace OG image. Four characters at four different puff levels — one picture
  * that explains the core mechanic of the product without a single sentence.
+ *
+ * Satori renders this on the server, with no document and no cascade, so a CSS custom
+ * property resolves to nothing here. The colours therefore come from `lib/theme.ts`,
+ * the literal projection of `theme/tokens.css` — never from hexes typed into this file.
  */
 
 export const alt = "Fugugent — a marketplace of DeFi agents that swell as their risk grows";
@@ -28,12 +33,12 @@ export default function Image() {
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
-          backgroundColor: "#05080f",
+          backgroundColor: SURFACES.bg,
           padding: "72px",
           fontFamily: "sans-serif",
         }}
       >
-        <div style={{ display: "flex", fontSize: 26, color: "#f0b90b", letterSpacing: 3 }}>
+        <div style={{ display: "flex", fontSize: 26, color: ACCENT.strong, letterSpacing: 3 }}>
           FUGUGENT
         </div>
         <div
@@ -41,14 +46,14 @@ export default function Image() {
             display: "flex",
             fontSize: 68,
             fontWeight: 700,
-            color: "#e9eef7",
+            color: TEXT.fg,
             marginTop: 16,
             lineHeight: 1.05,
           }}
         >
           Hire a DeFi agent you can check
         </div>
-        <div style={{ display: "flex", fontSize: 28, color: "#96a7bf", marginTop: 18 }}>
+        <div style={{ display: "flex", fontSize: 28, color: TEXT.muted, marginTop: 18 }}>
           The fish puffs up as the risk does. Every number opens a transaction.
         </div>
         <div style={{ display: "flex", marginTop: 44, gap: 28 }}>

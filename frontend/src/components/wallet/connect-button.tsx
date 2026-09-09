@@ -30,7 +30,7 @@ function Control() {
       <button
         type="button"
         onClick={() => open()}
-        className="rounded-full bg-accent px-3 py-1.5 text-xs font-semibold text-[#06131a] transition hover:bg-[#ffce35]"
+        className="rounded-full bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink transition hover:bg-accent-hover"
       >
         Connect wallet
       </button>

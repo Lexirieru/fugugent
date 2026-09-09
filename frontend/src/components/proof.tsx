@@ -24,7 +24,7 @@ export function ProofRow({ proof, index }: { proof: Proof; index?: number }) {
         <span className="block text-sm font-medium leading-snug text-fg">{proof.label}</span>
         <span className="mt-1 block text-sm leading-relaxed text-muted">{proof.detail}</span>
         {proof.hash ? (
-          <span className="mt-2 block break-all font-mono text-xs text-accent/85">
+          <span className="mt-2 block break-all font-mono text-xs text-accent-strong">
             {proof.hash} ↗
           </span>
         ) : (
@@ -58,7 +58,7 @@ export function ProofRow({ proof, index }: { proof: Proof; index?: number }) {
 
 export function ProofList({ proofs, numbered = true }: { proofs: Proof[]; numbered?: boolean }) {
   return (
-    <ul className="overflow-hidden rounded-2xl border border-line bg-surface">
+    <ul className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">
       {proofs.map((p, i) => (
         <ProofRow key={p.hash ?? p.label} proof={p} index={numbered ? i : undefined} />
       ))}
@@ -95,7 +95,7 @@ export function VerifiableNumber({
         className="block rounded-xl border border-line bg-surface px-4 py-3 transition hover:border-line-strong hover:bg-surface-strong"
       >
         {body}
-        <span className="mt-2 block font-mono text-[11px] text-accent/85">open the tx ↗</span>
+        <span className="mt-2 block font-mono text-[11px] text-accent-strong">open the tx ↗</span>
       </a>
     );
   }
