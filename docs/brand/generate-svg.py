@@ -15,14 +15,38 @@ RISK = {1: "#009E73", 2: "#F0E442", 3: "#E69F00", 4: "#D55E00", 5: "#A4210E"}
 LEVEL_WH = {1: (56, 52), 2: (64, 58), 3: (72, 66), 4: (80, 74), 5: (86, 82)}
 LEVEL_EXT = {1: 0.0, 2: 0.25, 3: 0.60, 4: 1.0, 5: 1.0}
 
+# The cream ground the marketplace actually paints. The five characters added in
+# the second round live only there, so their colours were measured against it.
+CREAM = "#F1E6E1"
+
+# The puff-level ring, recomputed for the cream ground. Same Okabe-Ito hues,
+# lowered in lightness until each clears 4.5:1 as text on cream. Copied from
+# theme/tokens.css, which carries the full argument and the measured numbers.
+RISK_LIGHT = {1: "#007656", 2: "#6B6300", 3: "#7B5500", 4: "#924000", 5: "#A4210E"}
+
 CHARS = {
     "guardian":   dict(body="#0072B2", belly="#58A9E0", ws=1.06, hs=0.95),
     "rebalancer": dict(body="#CC79A7", belly="#E9A8CC", ws=0.94, hs=1.06),
     "grid":       dict(body="#56B4E9", belly="#8FD3F4", ws=0.98, hs=1.02),
     "yield":      dict(body="#E69F00", belly="#FFC24D", ws=1.07, hs=1.06),
+    # --- the five capabilities added in the second round -------------------
+    # These are NOT the dark-ground Okabe-Ito values. Each was measured against
+    # the cream page #F1E6E1 and darkened at constant hue until it cleared the
+    # 3:1 a graphic needs. Three descend from the three Okabe-Ito hues no agent
+    # had yet; two are interpolated into the palette's one large empty arc, at
+    # 243.5 deg and 284.9 deg. Contrast numbers are computed, not estimated.
+    "broker":     dict(body="#00976E", belly="#26D7A7", ws=1.02, hs=0.98),   # 3.03:1 on cream
+    "trader":     dict(body="#91870B", belly="#CEC224", ws=0.96, hs=1.04),   # 3.02:1 on cream
+    "pilot":      dict(body="#D55E00", belly="#E29559", ws=1.05, hs=0.96),   # 3.16:1 on cream
+    "meter":      dict(body="#7F79E0", belly="#BAB7EE", ws=0.99, hs=1.03),   # 3.00:1 on cream
+    "steward":    dict(body="#BA5ED9", belly="#DDB1EC", ws=1.03, hs=1.00),   # 3.01:1 on cream
     "maskot":     dict(body="#0E7C86", belly="#9CE9EE", ws=1.02, hs=1.00),
     "fallback":   dict(body="#6E8C6E", belly="#94AE94", ws=1.00, hs=1.00),
 }
+
+# The five second-round characters are drawn on cream, so their ring uses the
+# cream-ground puff colours and their notch is cut in cream, not in navy.
+CREAM_KINDS = ("broker", "trader", "pilot", "meter", "steward")
 
 CX, CY = 50.0, 54.0
 
@@ -129,7 +153,7 @@ def mouth(rx, ry, level):
             f'ry="{w * 1.25:.2f}" fill="{OUTLINE}"/>')
 
 
-def rim(level):
+def rim(level, risk=None, bg=None):
     """Puff-level ring around each character. Each of the five levels (Calm,
     Watchful, Strained, Critical, Emergency) is encoded by a distinct STROKE
     PATTERN — an open arc, a solid circle, a dashed circle, a double ring, a
@@ -138,24 +162,29 @@ def rim(level):
     signal: the whole point is that the puff level must survive the 48px
     grayscale test and stay readable for colorblind users, where two similar
     hues collapse to the same gray. Do not "simplify" this into color-only
-    styling — that would silently break the accessibility guarantee."""
+    styling — that would silently break the accessibility guarantee.
+
+    `risk` and `bg` let a character be drawn on the cream marketplace ground
+    with the cream-ground ring colours instead of the dark-ground ones."""
+    risk = RISK if risk is None else risk
+    bg = BG if bg is None else bg
     if level == 1:  # Calm — open arc (partial ring, largest gap)
         r = 45.0
         a0, a1 = math.radians(198), math.radians(342)
         x0, y0 = 50 + r * math.cos(a0), 50 + r * math.sin(a0)
         x1, y1 = 50 + r * math.cos(a1), 50 + r * math.sin(a1)
         return (f'<path d="M{x0:.2f},{y0:.2f} A{r},{r} 0 0,1 {x1:.2f},{y1:.2f}" '
-                f'fill="none" stroke="{RISK[1]}" stroke-width="2" stroke-linecap="round"/>')
+                f'fill="none" stroke="{risk[1]}" stroke-width="2" stroke-linecap="round"/>')
     if level == 2:  # Watchful — solid closed circle with a small notch cut into it
-        return (f'<circle cx="50" cy="50" r="45" fill="none" stroke="{RISK[2]}" '
+        return (f'<circle cx="50" cy="50" r="45" fill="none" stroke="{risk[2]}" '
                 f'stroke-width="3"/>'
-                f'<rect x="46" y="2" width="8" height="7" fill="{BG}"/>')
+                f'<rect x="46" y="2" width="8" height="7" fill="{bg}"/>')
     if level == 3:  # Strained — dashed circle
-        return (f'<circle cx="50" cy="50" r="45" fill="none" stroke="{RISK[3]}" '
+        return (f'<circle cx="50" cy="50" r="45" fill="none" stroke="{risk[3]}" '
                 f'stroke-width="3" stroke-dasharray="6 4"/>')
     if level == 4:  # Critical — double concentric ring
-        return (f'<circle cx="50" cy="50" r="46" fill="none" stroke="{RISK[4]}" stroke-width="2"/>'
-                f'<circle cx="50" cy="50" r="42" fill="none" stroke="{RISK[4]}" stroke-width="2"/>')
+        return (f'<circle cx="50" cy="50" r="46" fill="none" stroke="{risk[4]}" stroke-width="2"/>'
+                f'<circle cx="50" cy="50" r="42" fill="none" stroke="{risk[4]}" stroke-width="2"/>')
     # Emergency — hazard-stripe ring, the busiest pattern, bracketed by two
     # thin plain rings so it still reads as a single ring at a glance
     return ('<circle cx="50" cy="50" r="45" fill="none" stroke="url(#hazard)" stroke-width="8"/>'
@@ -163,7 +192,12 @@ def rim(level):
             '<circle cx="50" cy="50" r="41" fill="none" stroke="' + OUTLINE + '" stroke-width="1"/>')
 
 
-def character(kind, level, with_rim=True, with_bg=True, bgcolor=BG):
+def character(kind, level, with_rim=True, with_bg=True, bgcolor=None, risk=None):
+    cream = kind in CREAM_KINDS
+    if bgcolor is None:
+        bgcolor = CREAM if cream else BG
+    if risk is None:
+        risk = RISK_LIGHT if cream else RISK
     c = CHARS[kind]
     w, h = LEVEL_WH[level]
     rx, ry = w * c["ws"] / 2, h * c["hs"] / 2
@@ -202,6 +236,40 @@ def character(kind, level, with_rim=True, with_bg=True, bgcolor=BG):
         g.append(f'<path fill="{c["body"]}" d="M{CX - 2:.2f},{CY - ry + 3:.2f} '
                  f'Q{CX + 14:.2f},{CY - ry - 20:.2f} {CX + 22:.2f},{CY - ry - 6:.2f} '
                  f'Q{CX + 16:.2f},{CY - ry + 3:.2f} {CX + 10:.2f},{CY - ry + 4:.2f} Z"/>')
+    if kind == "broker":     # a case with a handle: money held until the work is done
+        bw, bh = rx * 0.66, ry * 0.44
+        bxs, bys = CX - bw / 2, CY - ry - bh + 3
+        g.append(f'<path fill="none" d="M{bxs + bw * 0.33:.2f},{bys + 1:.2f} '
+                 f'q{bw * 0.17:.2f},-7 {bw * 0.34:.2f},0"/>')
+        g.append(f'<path fill="{FOAM2}" d="M{bxs + 4:.2f},{bys:.2f} L{bxs + bw - 4:.2f},{bys:.2f} '
+                 f'q4,0 4,4 L{bxs + bw:.2f},{bys + bh:.2f} L{bxs:.2f},{bys + bh:.2f} '
+                 f'L{bxs:.2f},{bys + 4:.2f} q0,-4 4,-4 Z"/>')
+    if kind == "trader":     # a price tag: one call, one price
+        t = ry * 0.54
+        tx, ty = CX + 1, CY - ry - t * 0.42
+        g.append(f'<path fill="{c["body"]}" d="M{tx - t * 0.92:.2f},{ty + t * 0.20:.2f} '
+                 f'L{tx + t * 0.10:.2f},{ty - t * 0.78:.2f} L{tx + t * 0.95:.2f},{ty + t * 0.05:.2f} '
+                 f'L{tx - t * 0.07:.2f},{ty + t * 0.83:.2f} Z"/>')
+        g.append(f'<circle cx="{tx + t * 0.28:.2f}" cy="{ty - t * 0.16:.2f}" r="{t * 0.17:.2f}" '
+                 f'fill="{FOAM}" stroke-width="2"/>')
+    if kind == "pilot":      # two swept fins, so it cannot be read as the grid triangle
+        for sgn in (-1, 1):
+            g.append(f'<path fill="{c["body"]}" d="M{CX + sgn * 2:.2f},{CY - ry + 3:.2f} '
+                     f'L{CX + sgn * 19:.2f},{CY - ry - 12:.2f} L{CX + sgn * 7:.2f},{CY - ry + 3:.2f} Z"/>')
+    if kind == "meter":      # a dial: it counts what is being spent while it is spent
+        mr = ry * 0.44
+        mcy = CY - ry + 2
+        g.append(f'<path fill="{FOAM}" d="M{CX - mr:.2f},{mcy:.2f} A{mr:.2f},{mr:.2f} 0 0,1 '
+                 f'{CX + mr:.2f},{mcy:.2f} Z"/>')
+        g.append(f'<path fill="none" stroke-width="2.4" d="M{CX:.2f},{mcy:.2f} '
+                 f'L{CX + mr * 0.58:.2f},{mcy - mr * 0.66:.2f}"/>')
+    if kind == "steward":    # a clock: the payments that repeat
+        sr = ry * 0.36
+        scy = CY - ry - sr + 3
+        g.append(f'<circle cx="{CX + 1:.2f}" cy="{scy:.2f}" r="{sr:.2f}" fill="{FOAM}"/>')
+        g.append(f'<path fill="none" stroke-width="2.4" d="M{CX + 1:.2f},{scy:.2f} '
+                 f'L{CX + 1:.2f},{scy - sr * 0.62:.2f} M{CX + 1:.2f},{scy:.2f} '
+                 f'L{CX + 1 + sr * 0.52:.2f},{scy + sr * 0.22:.2f}"/>')
     if kind == "rebalancer":  # horizontal scale arms, at exactly the same height
         ay = CY - ry * 0.15
         for sgn in (-1, 1):
@@ -247,7 +315,7 @@ def character(kind, level, with_rim=True, with_bg=True, bgcolor=BG):
                  f'fill="{FOAM}" stroke-width="2"/>')
         g.append(f'<rect x="{gx + 1.1:.2f}" y="{gy + gh * (1 - fill) + 1.1:.2f}" '
                  f'width="{gw - 2.2}" height="{max(gh * fill - 2.2, 0.8):.2f}" rx="0.8" '
-                 f'fill="{RISK[level]}" stroke="none"/>')
+                 f'fill="{risk[level]}" stroke="none"/>')
     if kind == "yield":      # three current bubbles behind the tail
         for (dx, dy, r_) in ((-2, -14, 3.2), (-7, -20, 2.3), (-11, -25, 1.6)):
             g.append(f'<circle cx="{bx + dx:.2f}" cy="{by + dy:.2f}" r="{r_}" '
@@ -258,7 +326,7 @@ def character(kind, level, with_rim=True, with_bg=True, bgcolor=BG):
     g.append('</g>')
     s.append("".join(g))
     if with_rim:
-        s.append(rim(level))
+        s.append(rim(level, risk, bgcolor))
     return "".join(s)
 
 
@@ -277,6 +345,12 @@ def write(name, content):
 os.makedirs(OUT, exist_ok=True)
 
 for k in ("guardian", "rebalancer", "grid", "yield"):
+    write(f"{k}.svg", svg100(character(k, 1), 512))
+
+# The five second-round characters, drawn on the cream ground they actually
+# appear on. Their colours were measured against that ground, so rendering them
+# on the navy tile would be showing a colour nobody ever sees.
+for k in CREAM_KINDS:
     write(f"{k}.svg", svg100(character(k, 1), 512))
 
 # NOTE: filenames keep the Indonesian word "kembung" ("puff" in English) —

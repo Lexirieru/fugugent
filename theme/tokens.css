@@ -189,6 +189,31 @@
   --agent-yield: #e69f00;
   --agent-yield-belly: #ffc24d;
 
+  /* The five capabilities added in the second round. Okabe-Ito has eight colours
+   * and four of them are already agent identities, so three of these five are the
+   * three unused Okabe-Ito hues and two are interpolated into the palette's single
+   * largest empty arc (201.6 deg to 326.7 deg, 125 deg wide and holding nothing).
+   * Hue order is preserved and the gaps stay wide: 26.5 Pilot, 41.5 Yield,
+   * 55.5 Trader, 163.7 Broker, 201.6 Guardian and Grid, 243.5 Meter, 284.9 Steward,
+   * 326.7 Rebalancer. The narrowest gap is 14.0 deg, which is what Okabe-Ito itself
+   * carries between its orange and its yellow.
+   *
+   * Contrast is measured against this page, --bg #F1E6E1, not against the dark
+   * ground the original Okabe-Ito values were chosen for. A body colour is a
+   * graphic and never text, so the bar is 3:1; each one clears it, and each was
+   * darkened at constant hue until it did. The numbers beside them are computed,
+   * and if you change a value here you recompute the number in the same edit. */
+  --agent-broker: #00976e; /* 3.03:1 on --bg - Okabe-Ito bluish green #009E73 darkened, hue 163.7 held */
+  --agent-broker-belly: #26d7a7; /* 2.01:1 against the body it sits inside */
+  --agent-trader: #91870b; /* 3.02:1 on --bg - Okabe-Ito yellow #F0E442 darkened, hue 55.5 held */
+  --agent-trader-belly: #cec224; /* 2.00:1 against the body */
+  --agent-pilot: #d55e00; /* 3.16:1 on --bg - Okabe-Ito vermillion, already clears 3:1, undarkened */
+  --agent-pilot-belly: #e29559; /* 1.60:1 against the body */
+  --agent-meter: #7f79e0; /* 3.00:1 on --bg - interpolated hue 243.5, inside the empty arc */
+  --agent-meter-belly: #bab7ee; /* 1.94:1 against the body */
+  --agent-steward: #ba5ed9; /* 3.01:1 on --bg - interpolated hue 284.9, inside the empty arc */
+  --agent-steward-belly: #ddb1ec; /* 2.03:1 against the body */
+
   /* ── Illustration constants ────────────────────────────────────────────
    * The fugu's own palette, shared with docs/brand/generate-svg.py so the fish
    * in the app and the fish on the landing page are literally the same fish.

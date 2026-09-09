@@ -1,5 +1,5 @@
 /**
- * A **mirror** of `backend/src/types.ts` — the single source of truth lives in the
+ * A **mirror** of `backend/src/types.ts`, the single source of truth lives in the
  * backend, this file is only a copy so the frontend can be built before the backend is
  * finished. If the backend changes the shape, this file is the one that follows, never
  * the other way round.
@@ -8,15 +8,33 @@
  *
  * 1. **Money is never a `number`.** `priceUsd8PerPeriod` is a `bigint` in 8-decimal
  *    base: `12345678n` means $0.12, not twelve million. That is why `AgentRecord` is
- *    not JSON-serializable as it stands — see `lib/data/wire.ts`.
+ *    not JSON-serializable as it stands, see `lib/data/wire.ts`.
  * 2. **An unknown field is `null`, not omitted.**
  */
 
-export const CATEGORIES = ["REBALANCING", "GRID", "YIELD", "HEALTH_FACTOR"] as const;
+/**
+ * The order is the on-chain enum order and nothing may move: a value's position IS
+ * its number in `FuguTypes.sol`, so inserting one in the middle would silently
+ * relabel every listing already recorded on the blockchain. New values are appended.
+ */
+export const CATEGORIES = [
+  "REBALANCING",
+  "GRID",
+  "YIELD",
+  "HEALTH_FACTOR",
+  "HIRING",
+  "COMMERCE",
+  "AUTONOMOUS",
+  "STREAMING",
+  "TREASURY",
+] as const;
 
 export type Category = (typeof CATEGORIES)[number];
 
-/** `contracts/src/types/FuguTypes.sol`: REBALANCING=0, GRID=1, YIELD=2, HEALTH_FACTOR=3. */
+/**
+ * `contracts/src/types/FuguTypes.sol`: REBALANCING=0, GRID=1, YIELD=2,
+ * HEALTH_FACTOR=3, HIRING=4, COMMERCE=5, AUTONOMOUS=6, STREAMING=7, TREASURY=8.
+ */
 export function categoryFromOnchainIndex(index: number): Category | null {
   return CATEGORIES[index] ?? null;
 }
@@ -103,7 +121,7 @@ export interface AgentListPage {
   /**
    * `false` when the source failed OR replied with a shape we do not recognise.
    * A legitimately empty list is still `healthy: true`, and so is a "not found"
-   * answer — an agent that genuinely does not exist is no sign of a sick upstream.
+   * answer, an agent that genuinely does not exist is no sign of a sick upstream.
    */
   healthy: boolean;
   /**
@@ -140,5 +158,14 @@ export function unhealthyPage(
   limit: number,
   offset: number,
 ): AgentListPage {
-  return { items: [], total: 0, limit, offset, source, healthy: false, reason, fetchedAt };
+  return {
+    items: [],
+    total: 0,
+    limit,
+    offset,
+    source,
+    healthy: false,
+    reason,
+    fetchedAt,
+  };
 }

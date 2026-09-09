@@ -5,15 +5,15 @@
  *
  *  1. **The OG images.** `app/opengraph-image.tsx` and `app/agent/[id]/opengraph-image.tsx`
  *     are rendered on the server by Satori. There is no document, no `:root`, and no
- *     cascade — a `var(--bg)` there resolves to nothing and the image comes out black.
+ *     cascade, a `var(--bg)` there resolves to nothing and the image comes out black.
  *  2. **The fugu SVG generator** (`lib/fugu.ts`), whose output is also fed to Satori as a
  *     data URI, so the same constraint applies to it.
  *
  * ## This file is a projection, not a second palette
  *
  * `theme/tokens.css` at the repository root is the source of truth, shared with the
- * landing page. These numbers are its server-side twin. They exist twice — here and
- * there — and nowhere else in this app: everything that CAN read a custom property does,
+ * landing page. These numbers are its server-side twin. They exist twice, here and
+ * there, and nowhere else in this app: everything that CAN read a custom property does,
  * and every one of the twenty-odd hex literals that used to be scattered through the
  * components is gone.
  *
@@ -36,9 +36,9 @@ export const TEXT = {
   faint: "#6f645e",
 } as const;
 
-/** Accent. Mirrors the `--accent*` block — orange, never BNB yellow (palette.md §1). */
+/** Accent. Mirrors the `--accent*` block, orange, never BNB yellow (palette.md §1). */
 export const ACCENT = {
-  /** Fills, chips, rules. 2.91:1 on `bg` — not for text. */
+  /** Fills, chips, rules. 2.91:1 on `bg`, not for text. */
   base: "#ea580c",
   /** The same orange as text and as a focus ring. 4.97:1 on `bg`. */
   strong: "#a8420a",
@@ -52,7 +52,7 @@ export const ACCENT = {
  * argument, the before/after table and the hue-gap check are in `theme/tokens.css`.
  *
  * These are the RING colours. An agent's body colour is its identity and never changes
- * with risk — that is `AGENT`, below.
+ * with risk, that is `AGENT`, below.
  */
 export const RISK = {
   1: "#007656", // Calm      · 4.60:1 on bg
@@ -72,11 +72,24 @@ export const AGENT = {
   rebalancer: { body: "#cc79a7", belly: "#e9a8cc" },
   grid: { body: "#56b4e9", belly: "#8fd3f4" },
   yield: { body: "#e69f00", belly: "#ffc24d" },
+
+  /*
+   * The five capabilities added in the second round. These five ARE darkened,
+   * because they were measured against this page rather than against the dark
+   * ground Okabe-Ito was published for, and each one was lowered at constant hue
+   * until it cleared the 3:1 a graphic needs. The numbers are computed, and the
+   * argument for the two interpolated hues is in theme/tokens.css.
+   */
+  broker: { body: "#00976e", belly: "#26d7a7" }, // 3.03:1 on bg, belly 2.01:1 on the body
+  trader: { body: "#91870b", belly: "#cec224" }, // 3.02:1 on bg, belly 2.00:1 on the body
+  pilot: { body: "#d55e00", belly: "#e29559" }, // 3.16:1 on bg, belly 1.60:1 on the body
+  meter: { body: "#7f79e0", belly: "#bab7ee" }, // 3.00:1 on bg, belly 1.94:1 on the body
+  steward: { body: "#ba5ed9", belly: "#ddb1ec" }, // 3.01:1 on bg, belly 2.03:1 on the body
 } as const;
 
 /**
  * The fugu's own palette, shared with `docs/brand/generate-svg.py` so that the fish in
- * this app and the fish on the landing page are the same fish. Illustration only — never
+ * this app and the fish on the landing page are the same fish. Illustration only, never
  * reach for these to paint UI.
  */
 export const ILLUSTRATION = {

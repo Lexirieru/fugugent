@@ -1,16 +1,21 @@
 /**
- * The presentation mapping for the four Fugugent categories.
+ * The presentation mapping for the nine Fugugent categories.
  *
  * The categories are locked in `contracts/src/types/FuguTypes.sol` and
- * `backend/src/types.ts`. All that lives here is how to show them — a name for humans,
+ * `backend/src/types.ts`. All that lives here is how to show them: a name for humans,
  * the fugu character, and the category's **primary risk metric**.
  *
  * A different metric per category is a deliberate choice, not an oversight: a health
- * factor must not be forced to be judged by APR. That is what makes the four categories
- * genuinely equal in depth, rather than merely four tabs (spec §7.5, point 8).
+ * factor must not be forced to be judged by APR. That is what makes the categories
+ * genuinely equal in depth, rather than merely nine tabs (spec §7.5, point 8).
+ *
+ * Every blurb below is one sentence a reader who has never touched crypto can follow.
+ * If a sentence needs a term of art to stay true, the term is explained in the same
+ * sentence rather than dropped.
  */
 
 import type { AgentRecord, Category } from "@/lib/agent-types";
+import { CATEGORIES } from "@/lib/agent-types";
 import type { FuguKind } from "@/lib/fugu";
 
 export interface CategoryMeta {
@@ -19,7 +24,7 @@ export interface CategoryMeta {
   kind: FuguKind;
   /** What an agent in this category does. */
   blurb: string;
-  /** The metric that maps to the puff level. Source: docs/brand/puff-levels.md §3–4. */
+  /** The metric that maps to the puff level. Source: docs/brand/puff-levels.md §3 and §4. */
   riskMetric: string;
 }
 
@@ -28,40 +33,78 @@ export const CATEGORY_META: Record<Category, CategoryMeta> = {
     category: "HEALTH_FACTOR",
     label: "Health factor",
     kind: "guardian",
-    blurb: "Keeps a lending position away from liquidation.",
-    riskMetric: "distance to liquidation",
+    blurb: "Pays down a loan before the collateral behind it can be sold off.",
+    riskMetric: "how far the collateral can fall before the loan is closed by force",
   },
   REBALANCING: {
     category: "REBALANCING",
     label: "Rebalancing",
     kind: "rebalancer",
-    blurb: "Keeps portfolio weights and LP ranges where you put them.",
-    riskMetric: "time spent out of range, rolling 24h",
+    blurb: "Keeps the split of what you hold where you set it, and moves it back when it drifts.",
+    riskMetric: "share of the last 24 hours the holding spent outside its set range",
   },
   GRID: {
     category: "GRID",
     label: "Grid",
     kind: "grid",
-    blurb: "Buys and sells at fixed levels. Loses in a trending market, and says so.",
-    riskMetric: "drawdown from peak equity",
+    blurb:
+      "Buys at fixed lower prices and sells at fixed higher ones. It loses in a one-way market, and says so.",
+    riskMetric: "how far the balance has fallen from its own best day",
   },
   YIELD: {
     category: "YIELD",
     label: "Yield",
     kind: "yield",
-    blurb: "Moves into the highest risk-adjusted APR pool it can verify.",
-    riskMetric: "utilisation of the pool holding your funds",
+    blurb: "Moves savings into the best paying place it can check for itself.",
+    riskMetric:
+      "how much of that place is already lent out, which is what makes taking money back slow",
+  },
+  HIRING: {
+    category: "HIRING",
+    label: "Hiring",
+    kind: "broker",
+    blurb: "Hires and pays other agents for you. The money is held until the work is done.",
+    riskMetric: "share of hires that ended without the work being delivered",
+  },
+  COMMERCE: {
+    category: "COMMERCE",
+    label: "Commerce",
+    kind: "trader",
+    blurb:
+      "Buys answers and data one call at a time, and neither side ever holds the other's keys.",
+    riskMetric: "share of paid calls that were charged and then failed",
+  },
+  AUTONOMOUS: {
+    category: "AUTONOMOUS",
+    label: "Autonomous",
+    kind: "pilot",
+    blurb: "Moves, lends and stakes money for you inside a spending limit it cannot go past.",
+    riskMetric: "how much of the spending limit has been used today",
+  },
+  STREAMING: {
+    category: "STREAMING",
+    label: "Streaming",
+    kind: "meter",
+    blurb: "Pays by the call, by the second or by the unit, without you approving each one.",
+    riskMetric: "how close the running total is to the ceiling you set",
+  },
+  TREASURY: {
+    category: "TREASURY",
+    label: "Treasury",
+    kind: "steward",
+    blurb: "Runs the payments that repeat: salaries, subscriptions, anything on a schedule.",
+    riskMetric: "how much is left to cover the payments already scheduled",
   },
 };
 
-/** The tab order. The same as the on-chain enum order. */
-export const CATEGORY_ORDER: Category[] = ["REBALANCING", "GRID", "YIELD", "HEALTH_FACTOR"];
+/** The tab order. The same as the on-chain enum order, so a tab cannot outrank its number. */
+export const CATEGORY_ORDER: Category[] = [...CATEGORIES];
 
 /**
  * The ids of our first-party agents. Only these four may carry a distinguishing prop
- * (shield, visor, leaf, scale arms) — `docs/brand/characters.md` §7. A third-party agent
- * always gets a neutral silhouette in a deterministic colour, so that our four read as a
- * quality floor rather than as four out of 309 thousand.
+ * (shield, visor, leaf, scale arms) per `docs/brand/characters.md` §7. A third-party
+ * agent always gets a neutral silhouette in a deterministic colour, so that our own
+ * agents read as a quality floor rather than as four out of 309 thousand.
  */
 export const FIRST_PARTY: Record<string, FuguKind> = {
   "97:1": "guardian",
@@ -80,5 +123,5 @@ export function categoryOf(record: AgentRecord): Category | null {
 }
 
 export function isCategory(value: string | null | undefined): value is Category {
-  return value === "REBALANCING" || value === "GRID" || value === "YIELD" || value === "HEALTH_FACTOR";
+  return typeof value === "string" && (CATEGORIES as readonly string[]).includes(value);
 }

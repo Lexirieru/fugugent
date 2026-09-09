@@ -1,7 +1,7 @@
 /**
  * The fugu characters as SVG markup.
  *
- * This is a **direct port** of `docs/brand/generate-svg.py` — the same generator that
+ * This is a **direct port** of `docs/brand/generate-svg.py`, the same generator that
  * produced the assets in `landingpage/public/brand/`. The reason: those static assets
  * exist at a single puff level only, for three of the four characters, whereas the
  * marketplace has to be able to draw any character x level combination. Because the
@@ -31,7 +31,7 @@ import { AGENT, ILLUSTRATION, RISK as RISK_COLOURS } from "@/lib/theme";
  * `landingpage/public/brand/guardian-kembung-*.svg` paint their own #0B1E2B tile and
  * therefore keep the original dark-ground Okabe–Ito rings, while the fish here is drawn
  * inline on a cream card and uses the light-ground ring colours. Same hues, same order,
- * different ground — see the puff-level block in theme/tokens.css.
+ * different ground, see the puff-level block in theme/tokens.css.
  */
 const OUTLINE = ILLUSTRATION.outline;
 const FOAM = ILLUSTRATION.foam;
@@ -48,9 +48,25 @@ const LEVEL_WH: Record<BloatLevel, [number, number]> = {
   5: [86, 82],
 };
 
-const LEVEL_EXT: Record<BloatLevel, number> = { 1: 0, 2: 0.25, 3: 0.6, 4: 1, 5: 1 };
+const LEVEL_EXT: Record<BloatLevel, number> = {
+  1: 0,
+  2: 0.25,
+  3: 0.6,
+  4: 1,
+  5: 1,
+};
 
-export type FuguKind = "guardian" | "rebalancer" | "grid" | "yield" | "fallback";
+export type FuguKind =
+  | "guardian"
+  | "rebalancer"
+  | "grid"
+  | "yield"
+  | "broker"
+  | "trader"
+  | "pilot"
+  | "meter"
+  | "steward"
+  | "fallback";
 
 interface CharSpec {
   body: string;
@@ -64,6 +80,11 @@ const CHARS: Record<Exclude<FuguKind, "fallback">, CharSpec> = {
   rebalancer: { ...AGENT.rebalancer, ws: 0.94, hs: 1.06 },
   grid: { ...AGENT.grid, ws: 0.98, hs: 1.02 },
   yield: { ...AGENT.yield, ws: 1.07, hs: 1.06 },
+  broker: { ...AGENT.broker, ws: 1.02, hs: 0.98 },
+  trader: { ...AGENT.trader, ws: 0.96, hs: 1.04 },
+  pilot: { ...AGENT.pilot, ws: 1.05, hs: 0.96 },
+  meter: { ...AGENT.meter, ws: 0.99, hs: 1.03 },
+  steward: { ...AGENT.steward, ws: 1.03, hs: 1.0 },
 };
 
 const CX = 50;
@@ -74,7 +95,7 @@ const f = (n: number) => n.toFixed(2);
 /**
  * The colour of a third-party fugu: a deterministic hue from the agent id, with
  * saturation and lightness LOCKED (`characters.md` §7) so no card ever glows brighter
- * than a curated agent. The green range (95–150) and the red range (0–20) are skipped —
+ * than a curated agent. The green range (95–150) and the red range (0–20) are skipped,
  * those two belong to the risk semantics, not to identity.
  */
 export function fallbackChar(seed: string): CharSpec {
@@ -219,7 +240,7 @@ function mouth(rx: number, ry: number, level: BloatLevel): string {
 }
 
 /**
- * Each character's distinguishing prop — shield, upright triangle, leaf, scale arms.
+ * Each character's distinguishing prop, shield, upright triangle, leaf, scale arms.
  * One function for both renderers (the filled body and the hollow silhouette), so that
  * the "no reading" silhouette never loses the agent's identity.
  */
@@ -228,7 +249,7 @@ function dorsal(kind: FuguKind, rx: number, ry: number, body: string, hollow: bo
   const out: string[] = [];
 
   if (kind === "guardian") {
-    // The dorsal shield — it makes the top edge of the silhouette straight. Guardian's
+    // The dorsal shield, it makes the top edge of the silhouette straight. Guardian's
     // 48 px differentiator.
     const sw = rx * 1.58;
     const sh = ry * 0.62;
@@ -246,6 +267,59 @@ function dorsal(kind: FuguKind, rx: number, ry: number, body: string, hollow: bo
   if (kind === "yield") {
     out.push(
       `<path fill="${fill(body)}" d="M${f(CX - 2)},${f(CY - ry + 3)} Q${f(CX + 14)},${f(CY - ry - 20)} ${f(CX + 22)},${f(CY - ry - 6)} Q${f(CX + 16)},${f(CY - ry + 3)} ${f(CX + 10)},${f(CY - ry + 4)} Z"/>`,
+    );
+  }
+  if (kind === "broker") {
+    // A case with a handle: the money is held in it until the work is done.
+    const w = rx * 0.66;
+    const h = ry * 0.44;
+    const x = CX - w / 2;
+    const y = CY - ry - h + 3;
+    out.push(
+      `<path fill="none" d="M${f(x + w * 0.33)},${f(y + 1)} q${f(w * 0.17)},-7 ${f(w * 0.34)},0"/>`,
+    );
+    out.push(
+      `<path fill="${fill(FOAM2)}" d="M${f(x + 4)},${f(y)} L${f(x + w - 4)},${f(y)} q4,0 4,4 L${f(x + w)},${f(y + h)} L${f(x)},${f(y + h)} L${f(x)},${f(y + 4)} q0,-4 4,-4 Z"/>`,
+    );
+  }
+  if (kind === "trader") {
+    // A price tag: one purchase, one price, paid per call.
+    const t = ry * 0.54;
+    const tx = CX + 1;
+    const ty = CY - ry - t * 0.42;
+    out.push(
+      `<path fill="${fill(body)}" d="M${f(tx - t * 0.92)},${f(ty + t * 0.2)} L${f(tx + t * 0.1)},${f(ty - t * 0.78)} L${f(tx + t * 0.95)},${f(ty + t * 0.05)} L${f(tx - t * 0.07)},${f(ty + t * 0.83)} Z"/>`,
+    );
+    out.push(
+      `<circle cx="${f(tx + t * 0.28)}" cy="${f(ty - t * 0.16)}" r="${f(t * 0.17)}" fill="${fill(FOAM)}" stroke-width="2"/>`,
+    );
+  }
+  if (kind === "pilot") {
+    // Two swept fins, not one upright one: this fish flies itself, inside a limit.
+    for (const sgn of [-1, 1]) {
+      out.push(
+        `<path fill="${fill(body)}" d="M${f(CX + sgn * 2)},${f(CY - ry + 3)} L${f(CX + sgn * 19)},${f(CY - ry - 12)} L${f(CX + sgn * 7)},${f(CY - ry + 3)} Z"/>`,
+      );
+    }
+  }
+  if (kind === "meter") {
+    // A dial: it counts what has been spent while it is being spent.
+    const r = ry * 0.44;
+    const cy = CY - ry + 2;
+    out.push(
+      `<path fill="${fill(FOAM)}" d="M${f(CX - r)},${f(cy)} A${f(r)},${f(r)} 0 0,1 ${f(CX + r)},${f(cy)} Z"/>`,
+    );
+    out.push(
+      `<path fill="none" stroke-width="2.4" d="M${f(CX)},${f(cy)} L${f(CX + r * 0.58)},${f(cy - r * 0.66)}"/>`,
+    );
+  }
+  if (kind === "steward") {
+    // A clock: the payments that repeat, on the day they are due.
+    const r = ry * 0.36;
+    const cy = CY - ry - r + 3;
+    out.push(`<circle cx="${f(CX + 1)}" cy="${f(cy)}" r="${f(r)}" fill="${fill(FOAM)}"/>`);
+    out.push(
+      `<path fill="none" stroke-width="2.4" d="M${f(CX + 1)},${f(cy)} L${f(CX + 1)},${f(cy - r * 0.62)} M${f(CX + 1)},${f(cy)} L${f(CX + 1 + r * 0.52)},${f(cy + r * 0.22)}"/>`,
     );
   }
   if (kind === "rebalancer") {
@@ -269,7 +343,7 @@ function polar(r: number, deg: number): [number, number] {
 }
 
 /**
- * The risk ring. It is the **pattern** that carries the message, not the colour — that
+ * The risk ring. It is the **pattern** that carries the message, not the colour, that
  * is what keeps the level readable in grayscale at 48 pixels.
  *
  * One small difference from the Python generator, at level 2: there, the twelve o'clock
@@ -323,7 +397,7 @@ function charFor(kind: FuguKind, seed: string): CharSpec {
 
 /**
  * The "no fresh reading" state: a hollow silhouette, no fill, no spikes, no ring.
- * `puff-levels.md` §3 — guessing a level from stale data is the most expensive lie this
+ * `puff-levels.md` §3, guessing a level from stale data is the most expensive lie this
  * product could tell, so we draw the not-knowing exactly as it is.
  */
 function hollowBody(kind: FuguKind, c: CharSpec): string {
@@ -338,14 +412,14 @@ function hollowBody(kind: FuguKind, c: CharSpec): string {
   const ny = CY - 0.34 * ry;
   const nearx = CX + 0.42 * rx;
   const farx = nearx - 2.15 * er;
-  // Identity stays readable — the silhouette and the distinguishing prop do not
+  // Identity stays readable, the silhouette and the distinguishing prop do not
   // disappear with it. What disappears is exactly the risk channels: the body fill,
   // the spikes, and the ring.
   //
   // The halo underneath is what makes that survive a light page. Everywhere else an
   // agent's colour is a FILL inside a 3px #05121A outline, and it is the outline that
   // carries the shape; here the identity colour IS the stroke, with nothing under it.
-  // On cream that leaves #E69F00 (Yield) at 1.84:1 and #56B4E9 (Grid) at 1.88:1 — the
+  // On cream that leaves #E69F00 (Yield) at 1.84:1 and #56B4E9 (Grid) at 1.88:1, the
   // fish all but evaporates. Drawing the same three paths first in the outline colour,
   // one unit wider and at 0.3, gives the silhouette a dark edge on any ground without
   // touching the identity colour itself, which the brand rule fixes.
@@ -367,7 +441,7 @@ function hollowBody(kind: FuguKind, c: CharSpec): string {
   );
 }
 
-/** The contents of the 100x100 box — without a wrapping `<svg>` element. */
+/** The contents of the 100x100 box, without a wrapping `<svg>` element. */
 export function fuguInner(opts: FuguOptions): string {
   const { kind, level, seed = kind, withRim = true, background = null } = opts;
   const uid = opts.uid ?? `${kind}-${level ?? "none"}`;
@@ -442,8 +516,14 @@ export function fuguInner(opts: FuguOptions): string {
   );
 
   if (kind === "guardian") {
-    // The health factor gauge bar on the edge of the shield — full when calm.
-    const fill: Record<BloatLevel, number> = { 1: 1, 2: 0.75, 3: 0.5, 4: 0.3, 5: 0.08 };
+    // The health factor gauge bar on the edge of the shield, full when calm.
+    const fill: Record<BloatLevel, number> = {
+      1: 1,
+      2: 0.75,
+      3: 0.5,
+      4: 0.3,
+      5: 0.08,
+    };
     const gx = CX + rx * 0.6;
     const gy = CY - ry - 3.5;
     const gw = 4.6;
@@ -461,7 +541,9 @@ export function fuguInner(opts: FuguOptions): string {
       [-7, -20, 2.3],
       [-11, -25, 1.6],
     ]) {
-      g.push(`<circle cx="${f(bx + dx)}" cy="${f(by + dy)}" r="${r}" fill="none" stroke-width="2"/>`);
+      g.push(
+        `<circle cx="${f(bx + dx)}" cy="${f(by + dy)}" r="${r}" fill="none" stroke-width="2"/>`,
+      );
     }
   }
 
@@ -480,7 +562,7 @@ export function fuguSvg(opts: FuguOptions & { size?: number }): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"${dim}>${fuguInner(opts)}</svg>`;
 }
 
-/** A data URI — the only way to get a fugu into an `ImageResponse`. */
+/** A data URI, the only way to get a fugu into an `ImageResponse`. */
 export function fuguDataUri(opts: FuguOptions & { size?: number }): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(fuguSvg(opts))}`;
 }
