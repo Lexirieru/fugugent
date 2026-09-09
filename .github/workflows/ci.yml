@@ -81,7 +81,13 @@ jobs:
 
       - uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: stable
+          # Pinned, not `stable`. `stable` is v1.8.1 today, and its Solidity
+          # linter aborts (SIGABRT, exit 134) inside `forge build` on this source
+          # — after "Compiler run successful!", so the contracts are fine and the
+          # crash is in the tooling. v1.7.1 is what the contracts were written,
+          # tested and verified on BscScan with; CI should run that, not whatever
+          # `stable` moves to next.
+          version: v1.7.1
 
       - name: forge build
         working-directory: contracts
