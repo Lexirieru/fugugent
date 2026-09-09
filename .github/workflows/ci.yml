@@ -143,6 +143,12 @@ jobs:
         working-directory: backend
         # The suite runs against @electric-sql/pglite, an in-process Postgres, so
         # no service container and no DATABASE_URL are needed.
+        env:
+          # vitest colours its summary whenever CI is set, and `tee` keeps the
+          # escape codes, so "Tests  484 passed" reaches the log as
+          # "Tests  <ESC>[1m484 passed<ESC>[22m" and the assert below matches
+          # nothing. That is how five green suites reported a failure.
+          NO_COLOR: '1'
         run: |
           set -o pipefail
           pnpm test 2>&1 | tee vitest.log
@@ -150,11 +156,21 @@ jobs:
       - name: assert the test count has not regressed
         working-directory: backend
         run: |
-          set -euo pipefail
+          set -uo pipefail
           baseline=484
           # "Tests  484 passed | 1 skipped (485)" — the PASSED figure is the one
           # that matters; a test converted to `.skip` must show up as a loss.
-          actual=$(grep -oE 'Tests[[:space:]]+[0-9]+ passed' vitest.log | tail -1 | grep -oE '[0-9]+')
+          #
+          # The sed strips ANSI escapes. NO_COLOR on the step above should mean
+          # there are none, but this assert is the only thing standing between a
+          # lost test and a green build, so it does not depend on that holding.
+          actual=$(sed -E 's/\x1b\[[0-9;]*m//g' vitest.log \
+            | grep -oE 'Tests[[:space:]]+[0-9]+ passed' | tail -1 | grep -oE '[0-9]+' || true)
+          if [ -z "$actual" ]; then
+            echo "::error::could not find a test count in backend/vitest.log — the assert cannot vouch for anything, so this is a failure, not a pass."
+            tail -20 vitest.log
+            exit 1
+          fi
           echo "backend: $actual passed, baseline $baseline"
           if [ "$actual" -lt "$baseline" ]; then
             echo "::error::backend test count fell from $baseline to $actual — tests were lost, not fixed."
@@ -208,6 +224,9 @@ jobs:
 
       - name: test
         working-directory: ai/${{ matrix.agent }}
+        env:
+          # See the backend job's test step: colour in the log breaks the assert.
+          NO_COLOR: '1'
         run: |
           set -o pipefail
           pnpm --filter ${{ matrix.agent }}-agent run test 2>&1 | tee vitest.log
@@ -215,9 +234,17 @@ jobs:
       - name: assert the test count has not regressed
         working-directory: ai/${{ matrix.agent }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           baseline=${{ matrix.baseline }}
-          actual=$(grep -oE 'Tests[[:space:]]+[0-9]+ passed' vitest.log | tail -1 | grep -oE '[0-9]+')
+          # See the backend job for why the escapes are stripped and why a missing
+          # count is a failure rather than an empty comparison.
+          actual=$(sed -E 's/\x1b\[[0-9;]*m//g' vitest.log \
+            | grep -oE 'Tests[[:space:]]+[0-9]+ passed' | tail -1 | grep -oE '[0-9]+' || true)
+          if [ -z "$actual" ]; then
+            echo "::error::could not find a test count in ai/${{ matrix.agent }}/vitest.log — the assert cannot vouch for anything, so this is a failure, not a pass."
+            tail -20 vitest.log
+            exit 1
+          fi
           echo "${{ matrix.agent }}: $actual passed, baseline $baseline"
           if [ "$actual" -lt "$baseline" ]; then
             echo "::error::${{ matrix.agent }} test count fell from $baseline to $actual — tests were lost, not fixed."
