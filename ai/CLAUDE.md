@@ -1,95 +1,99 @@
-# ai — empat agent Fugu
+# ai — the four Fugu agents
 
-Empat agent DeFi otonom, di-scaffold dengan BNB Agent Studio (`bag`), dijalankan
-sendiri di VPS, mengeksekusi lewat session key Altana non-custodial.
+Four autonomous DeFi agents, scaffolded with BNB Agent Studio (`bag`), self-hosted on a
+VPS, executing through non-custodial Altana session keys.
 
-| Agent | Kategori | Protokol | Trigger |
+| Agent | Category | Protocols | Trigger |
 |---|---|---|---|
-| `fugurebalancer` | Rebalancing | PancakeSwap v3 | keluar range / deviasi / interval |
-| `fugugrid` | Grid Trading | PancakeSwap v3 swap | keeper pantau `slot0()` |
-| `fuguyield` | Yield Optimisation | Venus, Aave v3, Lista | selisih APR > ambang biaya |
-| `fuguguardian` | Health Factor | Venus, Aave v3 | HF di bawah ambang |
+| `fugurebalancer` | Rebalancing | PancakeSwap v3 | out of range / deviation / interval |
+| `fugugrid` | Grid Trading | PancakeSwap v3 swaps | a keeper watching `slot0()` |
+| `fuguyield` | Yield Optimisation | Venus, Aave v3, Lista | APR spread > the cost threshold |
+| `fuguguardian` | Health Factor | Venus, Aave v3 | HF below the threshold |
 
-Nama project ≤23 char, alfanumerik, diawali huruf (aturan AgentCore) — tanpa `-`/`_`/`.`.
+Project names are ≤23 chars, alphanumeric, starting with a letter (an AgentCore rule) — no
+`-`/`_`/`.`.
 
-## Aturan
+## Rules
 
-1. **Strategi = kode deterministik murni** di `app/agent/src/strategy/`, tanpa I/O,
-   bisa di-unit-test dan di-backtest. LLM tidak pernah memutuskan uang.
-2. **dGrid hanya untuk penjelasan asinkron & riset.** Model `openai/gpt-5.6-luna`,
-   latensi terukur 30–46 detik. Kalau ini di jalur kritis, Guardian telat 45 detik
-   saat harga jatuh.
-3. **Studio tidak punya scheduler** — README-nya eksplisit "there is no background
-   poller". Penjadwalan datang dari BullMQ di `backend/`.
-4. **Tidak ada template strategi di Studio.** Seluruh 14 skill dan 7 recipe-nya soal
-   plumbing komersial. Alpha adalah kerja kita.
-5. **Signing adalah kode tetap**, tidak pernah tool yang bisa dipanggil LLM.
+1. **A strategy is pure deterministic code** in `app/agent/src/strategy/`, with no I/O,
+   unit-testable and backtestable. An LLM never decides money.
+2. **dGrid is only for asynchronous explanations & research.** The model
+   `openai/gpt-5.6-luna` has a measured latency of 30–46 seconds. If that sat on the
+   critical path, Guardian would be 45 seconds late while the price is falling.
+3. **Studio has no scheduler** — its README says explicitly "there is no background
+   poller". Scheduling comes from BullMQ in `backend/`.
+4. **Studio has no strategy templates.** All 14 of its skills and 7 of its recipes are
+   about commercial plumbing. The alpha is our own work.
+5. **Signing is fixed code**, never a tool an LLM can call.
 
-## Jebakan Altana yang sudah memakan korban
+## Altana traps that have already claimed victims
 
-- `calls: []` kosong = izin **tanpa batas**. Selalu isi allowlist eksplisit.
-- USDT/USDC di BNB **18 desimal**, bukan 6.
-- Native spend cap juga membayar relay fee — cap kekecilan bikin semua eksekusi
-  `FAILED` code 300.
-- `execute()` **tidak melempar saat gagal** → cek `result.status !== "CONFIRMED"`.
-- `getKeys` tidak membuang key expired, hanya yang di-revoke → wajib cross-check.
-- `bag init --wallet-kind altana --llm-provider pieverse-llm` **ditolak** (Altana
-  menolak generic message signing). Pakai provider ber-API-key.
-- `@altananetwork/mcp` wajib `bunx`, `npx` gagal.
+- An empty `calls: []` means **unlimited** permission. Always fill in an explicit allowlist.
+- USDT/USDC on BNB have **18 decimals**, not 6.
+- The native spend cap also pays the relay fee — a cap that is too small makes every
+  execution `FAILED` with code 300.
+- `execute()` **does not throw on failure** → check `result.status !== "CONFIRMED"`.
+- `getKeys` does not drop expired keys, only revoked ones → a cross-check is mandatory.
+- `bag init --wallet-kind altana --llm-provider pieverse-llm` is **rejected** (Altana
+  refuses generic message signing). Use a provider that takes an API key.
+- `@altananetwork/mcp` requires `bunx`; `npx` fails.
 
-## Perintah
+## Commands
 
 ```bash
-bag init <nama> --wallet-kind altana --destination self --no-onboard
+bag init <name> --wallet-kind altana --destination self --no-onboard
 bag wallet new && bag wallet session grant
 bag doctor && bag dev
 ```
 
-`.env` berisi `DGRID_API_KEY` — gitignored.
+`.env` holds `DGRID_API_KEY` — gitignored.
 
-## Status wallet & session (BSC testnet)
+## Wallet & session status (BSC testnet)
 
-Keempat agent punya wallet Altana sendiri dengan session ber-batas yang terdaftar di
-Keystore on-chain `0x6b8361C29d05D498b1a12B54A37310f94171E94A`. Semuanya diverifikasi
-dengan `isValidKey` → `true` dan lolos `bag doctor` 14 PASS / 0 FAIL.
+All four agents have their own Altana wallet with a bounded session registered in the
+on-chain Keystore `0x6b8361C29d05D498b1a12B54A37310f94171E94A`. All of them are verified
+with `isValidKey` → `true` and pass `bag doctor` 14 PASS / 0 FAIL.
 
-| Agent | Kategori | Wallet admin Altana |
+| Agent | Category | Altana admin wallet |
 |---|---|---|
 | `fuguguardian` | Health Factor | `0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0` |
 | `fugurebalancer` | Rebalancing | `0xb8f155D1278f0437b9De7c63911f2C0EDa485941` |
 | `fugugrid` | Grid Trading | `0x2AA59d5cf540c8f1b1CE4C667C2e745475d4EAd9` |
 | `fuguyield` | Yield Optimisation | `0x15dE73F47Ca58a11A6Ef9dB24dfDc6F096b0a866` |
 
-Semua session: **10 U/hari + 0,02 tBNB/hari, expiry 30 hari (8 Okt 2026)**, `register=true`.
+Every session: **10 U/day + 0.02 tBNB/day, expiry 30 days (8 Oct 2026)**, `register=true`.
 
-`fuguguardian` punya **session kedua** khusus DeFi, terpisah dari session komersial di atas:
-file `.studio/wallets/altana-session-guardian.json`, allowlist hanya
-`MockLendingPool.repay(address,uint256)` + `mUSD.approve(address,uint256)`, cap 0,02 tBNB +
-100 mUSD/hari, keyHash `0x7a467115cdf6d03f85f0f059733843b43cbe291d9f4489e3bf27d45e5148b377`.
-Di-grant lewat `app/agent/scripts/grant-session-guardian.ts`, bukan `bag wallet session grant`
-(CLI itu tidak punya opsi allowlist). Session ini **tidak** bisa dimuat lewat
-`ensureAltanaSessionLoaded()`/`getWallet()`: studio-runtime menolak sesi yang `permissions.calls`
--nya bukan salinan persis `defaultAgentPermissions()`. Muat lewat `deserializeSession` +
-`AltanaWalletProvider` (lihat `app/agent/scripts/altana.ts`).
+`fuguguardian` has a **second session** dedicated to DeFi, separate from the commercial
+session above: the file `.studio/wallets/altana-session-guardian.json`, an allowlist of only
+`MockLendingPool.repay(address,uint256)` + `mUSD.approve(address,uint256)`, caps of
+0.02 tBNB + 100 mUSD/day, keyHash
+`0x7a467115cdf6d03f85f0f059733843b43cbe291d9f4489e3bf27d45e5148b377`.
+It is granted through `app/agent/scripts/grant-session-guardian.ts`, not
+`bag wallet session grant` (that CLI has no allowlist option). This session **cannot** be
+loaded through `ensureAltanaSessionLoaded()`/`getWallet()`: the studio runtime rejects a
+session whose `permissions.calls` is not an exact copy of `defaultAgentPermissions()`. Load
+it through `deserializeSession` + `AltanaWalletProvider` (see
+`app/agent/scripts/altana.ts`).
 
-**Perangkap Porto yang sudah memakan satu jalan:** kunci sesi ber-spend-cap dijalankan lewat
-guarded executor yang **mengembalikan allowance ERC-20 ke nol di akhir userOp yang sama**.
-`approve` di transaksi terpisah karena itu sia-sia — `approve` dan pemakaiannya wajib satu
-userOp (`client.execute({ session, calls: [...] })`).
+**The Porto trap that has already cost one route:** a spend-capped session key runs through
+a guarded executor that **returns the ERC-20 allowance to zero at the end of the same
+userOp**. An `approve` in a separate transaction is therefore pointless — `approve` and its
+use must be in one userOp (`client.execute({ session, calls: [...] })`).
 
-**Temuan:** grant session **tidak** memerlukan saldo U di wallet — U hanya dipakai untuk
-allowance Commerce. `bag doctor` akan WARN soal saldo U, tapi session tetap sah dan
-terdaftar. Berguna karena faucet U dibatasi 10 U per 30 menit.
+**A finding:** granting a session does **not** require a U balance in the wallet — U is only
+used for the Commerce allowance. `bag doctor` will WARN about the U balance, but the session
+is still valid and registered. Useful, because the U faucet is limited to 10 U per 30
+minutes.
 
-Verifikasi publik tanpa API key apa pun:
+Public verification without any API key:
 ```bash
 cast call --rpc-url https://data-seed-prebsc-1-s1.bnbchain.org:8545 \
   0x6b8361C29d05D498b1a12B54A37310f94171E94A \
-  'isValidKey(address,bytes32)(bool)' <WALLET_AGENT> <KEY_HASH>
+  'isValidKey(address,bytes32)(bool)' <AGENT_WALLET> <KEY_HASH>
 ```
-`KEY_HASH` = `cast keccak <session public key>`; public key dari `bag wallet session status`
-(dijalankan di `app/agent/`).
+`KEY_HASH` = `cast keccak <session public key>`; the public key comes from
+`bag wallet session status` (run inside `app/agent/`).
 
-Perpanjang: `bag wallet session grant --force`. Cabut: `bag wallet session revoke --yes`.
+Renew: `bag wallet session grant --force`. Revoke: `bag wallet session revoke --yes`.
 
-**Jangan pernah** mencetak, menyalin, atau mem-parse bagian `signer` dari file session.
+**Never** print, copy, or parse the `signer` portion of a session file.

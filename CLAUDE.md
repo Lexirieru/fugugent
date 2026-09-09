@@ -1,57 +1,59 @@
 # Fugugent
 
-Marketplace agent DeFi di BNB Chain untuk hackathon BNB Chain "The Smart Money Era".
-Setiap agent adalah karakter kartun ikan fugu; **fugu mengembang seiring beban risiko**
-— metrik risiko nyata divisualisasikan sebagai tingkat kembung.
+A DeFi agent marketplace on BNB Chain for the BNB Chain "The Smart Money Era" hackathon.
+Every agent is a cartoon fugu fish character; **the fugu puffs up as risk load rises**
+— real risk metrics are visualized as the puff level.
 
-Domain: `hellofugu.xyz` (landing, sudah dibeli) · `app.hellofugu.xyz` (marketplace) · `api.hellofugu.xyz`
-**Belum ada yang di-deploy ke domain ini.**
+Domains: `hellofugu.xyz` (landing, already purchased) · `app.hellofugu.xyz` (marketplace) · `api.hellofugu.xyz`
+**Nothing is deployed to these domains yet.**
 
-## Dokumen wajib baca sebelum mengubah apa pun
+## Documents to read before changing anything
 
-| File | Isi |
+| File | Contents |
 |---|---|
-| `docs/specs/2026-09-08-fugugent-design.md` | Spec arsitektur — **otoritas yang mengikat** |
-| `docs/research/00-decisions.md` | 10 keputusan terkunci + hasil uji dGrid |
-| `docs/setup/ENVIRONMENT.md` | Kredensial, alamat kontrak terverifikasi, konstanta jaringan |
-| `docs/plans/` | Rencana implementasi per subsistem |
-| `docs/research/01`–`06` | Riset terverifikasi (Agent Studio, HelloMinds, Altana, 8004scan, kompetitor, strategi) |
+| `docs/specs/2026-09-08-fugugent-design.md` | The architecture spec — **the binding authority** |
+| `docs/research/00-decisions.md` | 10 locked decisions + the dGrid test results |
+| `docs/setup/ENVIRONMENT.md` | Credentials, verified contract addresses, network constants |
+| `docs/plans/` | Implementation plans per subsystem |
+| `docs/research/01`–`06` | Verified research (Agent Studio, HelloMinds, Altana, 8004scan, competitors, strategy) |
 
-## Struktur
+## Structure
 
-| Folder | Isi | Status |
+| Folder | Contents | Status |
 |---|---|---|
-| `contracts/` | 4 kontrak UUPS (Foundry) | live di testnet, 131 test |
-| `ai/` | 4 agent Fugu (BNB Agent Studio, wallet Altana) | Guardian terbukti on-chain lewat session key (249 test); Rebalancer/Grid/Yield punya mesin keputusan + backtest (88/99/93), belum tersambung eksekusi |
-| `backend/` | Hono + Postgres + Redis: BFF, classifier, fallback berjenjang | jalan di Docker Compose, 374 test; fallback 4 tingkat terbukti live |
-| `frontend/` | Next.js 16 marketplace | daftar + detail ber-URL + alur sewa, build hijau |
-| `landingpage/` | Next.js 16 landing | selesai, build hijau |
+| `contracts/` | 4 UUPS contracts (Foundry) | live on testnet, 131 tests |
+| `ai/` | 4 Fugu agents (BNB Agent Studio, Altana wallets) | Guardian proven on-chain through a session key (249 tests); Rebalancer/Grid/Yield have a decision engine + backtest (88/99/93), execution not yet wired |
+| `backend/` | Hono + Postgres + Redis: BFF, classifier, tiered fallback | running on Docker Compose, 374 tests; the 4-level fallback proven live |
+| `frontend/` | Next.js 16 marketplace | list + URL-addressable detail + rental flow, build green |
+| `landingpage/` | Next.js 16 landing | finished, build green |
 
-## Aturan yang tidak boleh dilanggar
+## Rules that must never be broken
 
-1. **Keputusan finansial tidak pernah melewati LLM.** Strategi = kode deterministik yang
-   bisa di-backtest. dGrid (`openai/gpt-5.6-luna`) latensinya 30–46 detik — hanya untuk
-   penjelasan asinkron dan agent riset, tidak pernah di jalur kritis.
-2. **Semua token di BSC 18 desimal, termasuk USDT.** Bukan 6.
-3. **`RPC_URL` wajib di-override.** Default SDK memakai domain `binance.org` yang
-   diblokir dari Indonesia. Pakai `https://data-seed-prebsc-1-s1.bnbchain.org:8545`.
-4. **Panggilan ke 8004scan wajib menyertakan `User-Agent` browser** — tanpa itu API
-   membalas HTTP 500, bukan 429. Selalu lewat backend, tidak pernah dari browser.
-5. **Session Altana: `calls: []` kosong = izin tanpa batas.** Selalu isi allowlist eksplisit.
-6. **Jangan pernah commit `.env`.** Semua sudah di-gitignore; jangan longgarkan.
-7. **Testnet only** (chainId 97). Jangan pernah pakai private key yang menyentuh mainnet.
+1. **A financial decision never passes through an LLM.** A strategy is deterministic code
+   that can be backtested. dGrid (`openai/gpt-5.6-luna`) has a latency of 30–46 seconds —
+   it is only for asynchronous explanations and the research agent, never on the critical
+   path.
+2. **Every token on BSC has 18 decimals, USDT included.** Not 6.
+3. **`RPC_URL` must be overridden.** The SDK default uses the `binance.org` domain, which
+   is blocked from Indonesia. Use `https://data-seed-prebsc-1-s1.bnbchain.org:8545`.
+4. **Every call to 8004scan must carry a browser `User-Agent`** — without it the API
+   answers HTTP 500, not 429. Always through the backend, never from the browser.
+5. **Altana sessions: an empty `calls: []` means unlimited permission.** Always fill in an
+   explicit allowlist.
+6. **Never commit `.env`.** Everything is already gitignored; do not loosen it.
+7. **Testnet only** (chainId 97). Never use a private key that touches mainnet.
 
-## Perintah
+## Commands
 
 ```bash
-cd contracts && forge test          # test kontrak
+cd contracts && forge test          # contract tests
 cd contracts && forge build         # build
 bun --cwd frontend dev              # marketplace
 bun --cwd landingpage dev           # landing page
 bag --help                          # BNB Agent Studio CLI
 ```
 
-## Gaya
+## Style
 
 - **English for all documentation, code comments, and commit messages.** Code identifiers
   stay in English as always.
