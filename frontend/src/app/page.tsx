@@ -90,7 +90,7 @@ export default async function MarketplacePage({ searchParams }: PageProps<"/">) 
                   <ButtonLink href={category ? `/?category=${category}` : "/"}>
                     Try again
                   </ButtonLink>
-                  <ButtonLink href="https://fugugent.xyz" variant="ghost" external>
+                  <ButtonLink href="https://hellofugu.xyz" variant="ghost" external>
                     What is actually shipped ↗
                   </ButtonLink>
                 </>

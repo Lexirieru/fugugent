@@ -3,7 +3,7 @@
  *
  * The backend does not exist yet. So that swapping it in later does not mean rewriting
  * the UI, every page talks only to `MarketplaceSource` — one interface, two
- * implementations (`seed` today, `http` as soon as `api.fugugent.xyz` answers). Not one
+ * implementations (`seed` today, `http` as soon as `api.hellofugu.xyz` answers). Not one
  * component may call `fetch` itself.
  *
  * Two properties copied straight from `backend/src/types.ts` that must not be lost:

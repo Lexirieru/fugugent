@@ -599,7 +599,7 @@ const LIVE = [
 ];
 
 const NOT_LIVE = [
-  "The marketplace app. There is no app.fugugent.xyz to open yet — this page is the only thing that is live.",
+  "The marketplace app. There is no app.hellofugu.xyz to open yet — this page is the only thing that is live.",
   "The backend: indexer, classifier and scheduler are not written.",
   "The strategy is not wired into the agent runtime we serve. What ran the proven cycle is an E2E script; the served agent still returns text.",
   "Three of the four agents have no strategy — Rebalancer, Grid and Yield are scaffolds with a session key.",
@@ -662,7 +662,7 @@ function Closing() {
         <H2>There is nothing to sign up for. There is plenty to check.</H2>
         <p className="mt-4 max-w-2xl text-pretty text-base leading-relaxed text-muted">
           Fugugent runs on BNB Smart Chain testnet, chainId {CHAIN.id}. No private key that touches
-          mainnet is used anywhere in this project. The marketplace at app.fugugent.xyz is not open —
+          mainnet is used anywhere in this project. The marketplace at app.hellofugu.xyz is not open —
           when it ships, this page will link to it, and not one day earlier.
         </p>
 

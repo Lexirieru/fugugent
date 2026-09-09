@@ -540,7 +540,7 @@ This is a special path that **explicitly allows `XApiKey`** (the other endpoints
 The register body ✅:
 ```json
 {
-  "webhook_url": "https://api.fugugent.xyz/hooks/8004scan",
+  "webhook_url": "https://api.hellofugu.xyz/hooks/8004scan",
   "events": ["validation.requested", "validation.completed"]
 }
 ```

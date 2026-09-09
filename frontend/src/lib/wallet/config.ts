@@ -35,8 +35,8 @@ export const networks: [AppKitNetwork, ...AppKitNetwork[]] = [bscTestnet];
 export const metadata = {
   name: "Fugugent",
   description: "Hire a DeFi agent on BNB Chain and check its work yourself.",
-  url: "https://app.fugugent.xyz",
-  icons: ["https://app.fugugent.xyz/icon.svg"],
+  url: "https://app.hellofugu.xyz",
+  icons: ["https://app.hellofugu.xyz/icon.svg"],
 };
 
 /**

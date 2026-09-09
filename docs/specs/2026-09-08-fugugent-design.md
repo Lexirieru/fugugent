@@ -46,7 +46,7 @@ design session:
 ## 3. System Architecture
 
 ```
-                    fugugent.xyz              app.fugugent.xyz
+                    hellofugu.xyz              app.hellofugu.xyz
                    ┌────────────┐            ┌──────────────────┐
                    │ landingpage│            │ frontend (Next 16)│
                    │  (Next 16) │            │ SSR discovery     │
@@ -54,7 +54,7 @@ design session:
                                              │ perms+revoke panel│
                                              └─────────┬─────────┘
                                                        │ REST + WS
-                                             api.fugugent.xyz
+                                             api.hellofugu.xyz
                    ┌───────────────────────────────────▼─────────────────────┐
                    │ backend (Hono)                                          │
                    │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────────┐  │
@@ -440,9 +440,9 @@ VPS, Docker Compose + Caddy:
 | Service | Contents |
 |---|---|
 | `caddy` | automatic TLS, reverse proxy |
-| `frontend` | Next.js → `app.fugugent.xyz` |
-| `landing` | Next.js → `fugugent.xyz` |
-| `api` | Hono → `api.fugugent.xyz` |
+| `frontend` | Next.js → `app.hellofugu.xyz` |
+| `landing` | Next.js → `hellofugu.xyz` |
+| `api` | Hono → `api.hellofugu.xyz` |
 | `worker` | BullMQ scheduler + indexer |
 | `agent-*` | the 4 Fugu agents (A2A/MCP/x402) |
 | `postgres`, `redis` | data |

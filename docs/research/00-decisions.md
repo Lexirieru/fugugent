@@ -4,7 +4,7 @@ Date: 2026-09-08
 Status: initial decisions from the brainstorming session, before the final design doc.
 
 ## Product
-- **Name**: Fugugent. Domain: `fugugent.xyz`
+- **Name**: Fugugent. Domain: `hellofugu.xyz`
 - **UX benchmark**: hellominds.ai
 - **Visual identity**: every agent is a cartoon fugu fish character, with several
   expression states (idle, working, alert, profit). Assets are generated.

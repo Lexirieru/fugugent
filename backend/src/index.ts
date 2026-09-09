@@ -1,5 +1,5 @@
 /**
- * The `api.fugugent.xyz` entry point.
+ * The `api.hellofugu.xyz` entry point.
  *
  * The only file that touches the real world: it reads the environment, opens
  * connections, and starts the server. The HTTP contract itself is assembled in

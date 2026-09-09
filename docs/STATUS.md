@@ -274,7 +274,7 @@ median latency, run count, active hirers, equity charts, a live run feed, AUM/TV
 ratings (`totalFeedbacks = 0`), a leaderboard, and guessed puff levels — the three agents with
 no reading are drawn hollow and dashed with a "no live reading" chip, their identity still
 readable, only their risk channel missing. The landing page also carries no link to
-`app.fugugent.xyz` (checked: no `href` to it anywhere in `page.tsx`).
+`app.hellofugu.xyz` (checked: no `href` to it anywhere in `page.tsx`).
 
 **Found while checking this, and not fixed here because this document may only touch itself:**
 the landing page's own honesty copy is now out of date in both directions.
@@ -578,7 +578,7 @@ payloads say so in their own `costModel.why` field rather than hiding it.
     One thing that cannot be settled from inside this repo: the domain name itself. `README.md`
     and the root `CLAUDE.md` say `hellofugu.xyz`; `docs/setup/ENVIRONMENT.md`, the rest of
     `docs/`, and the shipped code (`landingpage-fugugent/src/app/layout.tsx`,
-    `frontend/src/app/layout.tsx`) all say `fugugent.xyz`. Which one is actually registered is
+    `frontend/src/app/layout.tsx`) all say `hellofugu.xyz`. Which one is actually registered is
     not verifiable here, and this document will not guess. Either way the answer to "is it
     live?" is no.
 

@@ -63,7 +63,7 @@ export function DataProvenance({
           real status written on its card. Every transaction hash is real and opens on BscScan.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <ButtonLink href="https://fugugent.xyz" variant="ghost" external>
+          <ButtonLink href="https://hellofugu.xyz" variant="ghost" external>
             What is actually shipped ↗
           </ButtonLink>
         </div>

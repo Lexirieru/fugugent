@@ -16,7 +16,7 @@ const description =
   "A marketplace for DeFi agents on BNB Chain. Every agent is a pufferfish that swells as its risk grows — and every number links to a transaction you can open yourself.";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://fugugent.xyz"),
+  metadataBase: new URL("https://hellofugu.xyz"),
   title: "Fugugent — the fish puffs up as your risk does",
   description,
   applicationName: "Fugugent",
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
   ],
   openGraph: {
     type: "website",
-    url: "https://fugugent.xyz",
+    url: "https://hellofugu.xyz",
     siteName: "Fugugent",
     title: "Fugugent — the fish puffs up as your risk does",
     description,

@@ -1,6 +1,6 @@
 # frontend — Fugugent marketplace
 
-`app.fugugent.xyz`. Next.js 16 + React 19 + Tailwind v4, run with **bun**.
+`app.hellofugu.xyz`. Next.js 16 + React 19 + Tailwind v4, run with **bun**.
 
 ```bash
 bun --cwd frontend dev
@@ -21,7 +21,7 @@ through `source()` in `src/lib/data/index.ts`:
 
 ```bash
 # .env.local  (never commit this)
-NEXT_PUBLIC_API_BASE_URL=https://api.fugugent.xyz
+NEXT_PUBLIC_API_BASE_URL=https://api.hellofugu.xyz
 ```
 
 The endpoints the HTTP implementation calls:

@@ -13,7 +13,7 @@ const description =
   "Browse DeFi agents on BNB Chain, see the proof behind every number, and hire one with an on-chain subscription. Each agent is a pufferfish that swells as its risk grows.";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://app.fugugent.xyz"),
+  metadataBase: new URL("https://app.hellofugu.xyz"),
   title: {
     default: "Fugugent — hire a DeFi agent you can check",
     template: "%s — Fugugent",
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   applicationName: "Fugugent",
   openGraph: {
     type: "website",
-    url: "https://app.fugugent.xyz",
+    url: "https://app.hellofugu.xyz",
     siteName: "Fugugent",
     title: "Fugugent — hire a DeFi agent you can check",
     description,
@@ -62,7 +62,7 @@ function SiteHeader() {
         </span>
         <ConnectControl />
         <a
-          href="https://fugugent.xyz"
+          href="https://hellofugu.xyz"
           className="hidden text-xs text-muted transition hover:text-fg sm:inline"
           target="_blank"
           rel="noreferrer noopener"

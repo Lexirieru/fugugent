@@ -17,7 +17,7 @@ Split into three groups: **you provide**, **I generate**, and **produced by tool
 | A4 | `BSCSCAN_API_KEY` | https://bscscan.com/myapikey (free) | contract verification on testnet.bscscan.com | 🟠 at deploy time |
 | A5 | `BSC_TESTNET_RPC_URL` | NodeReal / QuickNode / Ankr (free tier is enough) | the indexer's `eth_getLogs` is heavy — public RPCs will rate-limit it | 🟠 at indexer time |
 | A6 | VPS access | yours | deploy | 🟡 at deploy time |
-| A7 | DNS `fugugent.xyz` | your registrar | `@`, `app`, `api` → VPS IP | 🟡 at deploy time |
+| A7 | DNS `hellofugu.xyz` | your registrar | `@`, `app`, `api` → VPS IP | 🟡 at deploy time |
 
 ### Notes per item
 

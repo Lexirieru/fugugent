@@ -21,7 +21,7 @@ export interface ApiDeps {
 export function createApp(deps: ApiDeps): Hono {
   const app = new Hono();
 
-  // The marketplace is served from another domain (`app.fugugent.xyz` → `api.fugugent.xyz`).
+  // The marketplace is served from another domain (`app.hellofugu.xyz` → `api.hellofugu.xyz`).
   // GET only: this backend has not a single state-changing endpoint.
   app.use("/api/*", cors({ origin: "*", allowMethods: ["GET", "OPTIONS"] }));
 

@@ -1,6 +1,6 @@
 # backend — Fugugent
 
-Hono + Postgres (Drizzle) + Redis + BullMQ. TypeScript. Serves `api.fugugent.xyz`.
+Hono + Postgres (Drizzle) + Redis + BullMQ. TypeScript. Serves `api.hellofugu.xyz`.
 
 ## Four responsibilities
 
