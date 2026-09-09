@@ -1,6 +1,14 @@
 /**
- * Shared Altana plumbing for the operational scripts (granting a session, setting up a
- * position, probing the boundary, and E2E). No strategy logic here.
+ * Shared Altana plumbing: the ONE place that turns the bounded session file on disk into a
+ * "send this batch" function. Used by the operational scripts (granting a session, setting
+ * up a position, probing the boundary, E2E) AND by the agent runtime
+ * (`guardianRuntime.ts`). No strategy logic here.
+ *
+ * It lives in `src/` rather than `scripts/` because the running agent needs it: a copy of
+ * this file inside the runtime would be a second definition of "how the session sends a
+ * repay", and the first one to drift would be discovered by a transaction, not by a test.
+ * `src/strategy/` still contains none of it — the strategy modules must not depend on a
+ * third-party SDK, which is exactly why `createGuardian` takes `sendCalls` as an argument.
  *
  * Why NOT `ensureAltanaSessionLoaded()` + `getWallet()` from
  * `@bnbagent/studio-runtime/wallet`: that path forces a session's `permissions.calls` to

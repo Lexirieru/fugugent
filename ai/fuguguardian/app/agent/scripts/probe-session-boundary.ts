@@ -31,7 +31,7 @@ import {
   relaySender,
   sessionProvider,
   type RelayCall,
-} from "./altana.js";
+} from "../src/altana.js";
 import {
   DEFAULT_BSC_TESTNET_RPC_URL,
   MOCK_LENDING_POOL_ADDRESS,

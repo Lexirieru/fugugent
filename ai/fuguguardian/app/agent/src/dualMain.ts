@@ -30,6 +30,18 @@
  * Buyers reach this endpoint with an OAuth2 (Cognito) bearer — AgentCore A2A
  * mandates inbound auth (see agentCard.ts + `bag deploy provision-cognito`).
  *
+ * ## The Fugu Guardian loop
+ *
+ * This process ALSO runs the Fugu Guardian monitoring loop when
+ * `FUGU_GUARDIAN_ENABLED=1` (see `guardianRuntime.ts`): read position ->
+ * `decide` -> `executeDecision` -> repay through a bounded Altana session, on
+ * a configurable interval, with the daily budget / cooldown / kill switch
+ * persisted to a JSON file. Its four tools (`guardian_position`,
+ * `guardian_execute_state`, `guardian_run_cycle`, `guardian_kill_switch`) are
+ * exposed on BOTH faces here — in the agent's tool set for A2A and on the
+ * `/mcp` server. A configuration fault stops the boot; it is never demoted to
+ * a log line under a healthy `/ping`.
+ *
  * ## Boundaries (do NOT cross — they are the whole point)
  *
  * - The agent does ALL deterministic SIGNING (quote-sign + submit + settle +
@@ -78,6 +90,12 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { buildAgentCard } from "./agentCard.js";
 import { SellerAgentExecutor } from "./executor.js";
+import {
+  consoleGuardianLogger,
+  startGuardianRuntimeFromEnv,
+  type GuardianRuntime,
+} from "./guardianRuntime.js";
+import { guardianLlmTools, guardianToolHandlers, type GuardianToolHandlers } from "./guardianTools.js";
 import { buildMcpServer } from "./mcpMain.js";
 import { buildModel } from "./model.js";
 import { requestLimitContext } from "./requestLimits.js";
@@ -170,7 +188,12 @@ function defaultNetwork(): string {
 // recipe's PAID fetch tools — see the `tools:` note below — the LLM picks the
 // URL, but who gets paid and the per-call/daily caps stay locked in
 // studio.toml.)
-export function buildRunWork(): RunWork {
+export function buildRunWork(guardian?: GuardianToolHandlers): RunWork {
+  // The Guardian tools ride in the SAME read-only-plus-bounded set as the chain tools. The
+  // model may ask for a position, ask for the execution state, ask for one deterministic
+  // cycle, or pull the kill switch — never for an amount, a threshold, or a decision. See
+  // the header of `guardianTools.ts`.
+  const guardianToolSet = guardian ? guardianLlmTools(guardian) : {};
   // The model is resolved LAZILY on first delivery, not at boot: a seller
   // with no provider key yet must still serve negotiate (which never calls
   // the LLM) — missing-key errors surface at notify_funded delivery time.
@@ -199,7 +222,7 @@ export function buildRunWork(): RunWork {
       // studio.toml:
       //   import { X402_BUYER_TOOLS } from "./x402Buyer.js";
       //   tools: { ...LLM_READ_TOOLS, ...X402_BUYER_TOOLS },
-      tools: LLM_READ_TOOLS,
+      tools: { ...LLM_READ_TOOLS, ...guardianToolSet },
       stopWhen: stepCountIs(8), // bounded tool-call loop, then final text
       abortSignal,
     });
@@ -251,6 +274,8 @@ function b402Work(runWork: RunWork): B402RunWork {
 export async function buildDualApp(): Promise<{
   app: express.Express;
   executor: SellerAgentExecutor;
+  /** The Guardian monitoring loop running in THIS process, or null when it is switched off. */
+  guardian: GuardianRuntime | null;
 }> {
   await loadRuntimeSecrets();
 
@@ -269,7 +294,17 @@ export async function buildDualApp(): Promise<{
   const rails = { erc8183: hasErc8183Rail(cfg) };
   const sellPath = b402SellPath(cfg);
   const port = Number(process.env.AGENT_PORT || "9000");
-  const runWork = buildRunWork();
+
+  // The Fugu Guardian monitoring loop, running inside this process on a configurable
+  // interval. It is started BEFORE any listener opens and its failures are NOT caught: a
+  // broken repay path (a session that is too loose, the wrong chain, an asset the pool has
+  // disabled) must stop the boot, not become a log line under a healthy `/ping`.
+  const guardian = await startGuardianRuntimeFromEnv(
+    process.env,
+    consoleGuardianLogger("[fugu-guardian]"),
+  );
+  const guardianTools = guardianToolHandlers(guardian);
+  const runWork = buildRunWork(guardianTools);
 
   // The executor backs the seller skills with signing.ts fixed code (NEVER an
   // LLM tool). The express app hosts the agent card + JSON-RPC message/send
@@ -364,7 +399,7 @@ export async function buildDualApp(): Promise<{
           delete transports[t.sessionId];
         }
       };
-      await buildMcpServer({ commerceSkills: rails.erc8183 }).connect(t);
+      await buildMcpServer({ commerceSkills: rails.erc8183, guardian: guardianTools }).connect(t);
       transport = t;
     }
     await transport.handleRequest(req, res, req.body);
@@ -377,13 +412,22 @@ export async function buildDualApp(): Promise<{
     }),
   );
 
-  return { app, executor };
+  return { app, executor, guardian };
 }
 
 async function main(): Promise<void> {
   const host = process.env.AGENT_BIND_HOST || "0.0.0.0";
   const port = Number(process.env.AGENT_PORT || "9000");
-  const { app } = await buildDualApp();
+  const { app, guardian } = await buildDualApp();
+
+  // A clean shutdown stops the monitoring loop's timer. It deliberately does NOT clear the
+  // kill switch: that latch lives in the persisted state file and must survive a restart.
+  for (const signal of ["SIGINT", "SIGTERM"] as const) {
+    process.once(signal, () => {
+      guardian?.stop();
+      process.exit(0);
+    });
+  }
 
   // AgentCore's A2A contract is 0.0.0.0:9000. Do not honor the HTTP
   // protocol's $PORT=8080 convention here; AGENT_PORT is the local-dev /

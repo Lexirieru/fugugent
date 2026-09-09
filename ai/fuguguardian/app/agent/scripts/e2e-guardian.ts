@@ -66,7 +66,7 @@ import {
   relaySender,
   sessionProvider,
   type RelayResult,
-} from "./altana.js";
+} from "../src/altana.js";
 import {
   assertBoundedAllowlist,
   assertNativeSpendCap,

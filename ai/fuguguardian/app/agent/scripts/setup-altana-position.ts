@@ -21,7 +21,7 @@ import { createPublicClient, createWalletClient, http, type Hash, type PublicCli
 import { privateKeyToAccount } from "viem/accounts";
 import { bscTestnet } from "viem/chains";
 
-import { AGENT_ROOT, WORKSPACE_ROOT, adminProvider, armAltanaSdk, relaySender, type RelayCall } from "./altana.js";
+import { AGENT_ROOT, WORKSPACE_ROOT, adminProvider, armAltanaSdk, relaySender, type RelayCall } from "../src/altana.js";
 import {
   DEFAULT_BSC_TESTNET_RPC_URL,
   MOCK_LENDING_POOL_ADDRESS,

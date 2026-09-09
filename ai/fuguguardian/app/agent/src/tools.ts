@@ -24,6 +24,16 @@
  * (`pieverseUsage` is the one exception in the underlying module: it does a
  * SIWE EIP-191 personal_sign, domain-locked to llm.pieverse.io, no on-chain
  * effect. It is commented out below.)
+ *
+ * **This is not the whole tool set the agent runs with.** When the Fugu
+ * Guardian monitoring loop is enabled (`FUGU_GUARDIAN_ENABLED=1`), the four
+ * Guardian tools from `guardianTools.ts` are spread in alongside this set by
+ * `dualMain.ts` / `mcpMain.ts`. Two of those are NOT read-only —
+ * `guardian_run_cycle` can send a repay and `guardian_kill_switch` changes
+ * durable state — but neither hands the LLM a number: the action, the amount,
+ * the thresholds, the daily cap, and the cooldown are all deterministic code
+ * in `src/strategy/`. Keep THIS set read-only; that is where the bounded ones
+ * live.
  */
 
 import * as cr from "@bnbagent/studio-runtime/tools";

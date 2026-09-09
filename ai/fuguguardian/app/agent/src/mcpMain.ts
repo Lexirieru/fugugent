@@ -18,6 +18,13 @@
  *                      then return the on-chain result.
  *     + the read-only chain tools (wallet / balances / ERC-8004 / ERC-8183 /
  *       block / tx / contract-view), so an MCP client can inspect state.
+ *     + the four Fugu Guardian tools (`guardian_position`,
+ *       `guardian_execute_state`, `guardian_run_cycle`,
+ *       `guardian_kill_switch`) — always registered, and backed by the
+ *       monitoring loop in this process when `FUGU_GUARDIAN_ENABLED=1`.
+ *       `guardian_kill_switch` is the user's lever: after it, no following
+ *       cycle sends anything. See `guardianTools.ts` for why none of these
+ *       hands the LLM control over an amount or a threshold.
  *
  * ## How delivery works under MCP (synchronous, ≤ ~15 min)
  *
@@ -79,6 +86,17 @@ import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { generateText, stepCountIs } from "ai";
 import express from "express";
 import { z } from "zod";
+import {
+  consoleGuardianLogger,
+  startGuardianRuntimeFromEnv,
+  type GuardianRuntime,
+} from "./guardianRuntime.js";
+import {
+  guardianLlmTools,
+  guardianToolHandlers,
+  registerGuardianMcpTools,
+  type GuardianToolHandlers,
+} from "./guardianTools.js";
 import {
   isCommerceRateLimitError,
   limitCommerceOperation,
@@ -201,10 +219,20 @@ function flatQuery(query: Record<string, unknown>): Record<string, string> {
 type RunLlm = (prompt: string) => Promise<string>;
 let cachedRunLlm: RunLlm | null = null;
 
+/**
+ * The Guardian tools offered to the deliverable-producing LLM on this face, set once by
+ * `main()`. Module-scoped because `runLlm` is itself a module-level lazy singleton; there is
+ * exactly one Guardian loop per process, so there is nothing to key it by.
+ */
+let llmGuardianTools: GuardianToolHandlers | null = null;
+
 async function runLlm(prompt: string): Promise<string> {
   if (cachedRunLlm === null) {
     const { buildModel } = await import("./model.js");
     const { LLM_READ_TOOLS } = await import("./tools.js");
+    // The Guardian tools are bounded, not read-only: see the header of `guardianTools.ts`
+    // for why the LLM can still never choose an amount, a threshold, or whether to pay.
+    const guardianToolSet = llmGuardianTools === null ? {} : guardianLlmTools(llmGuardianTools);
     const model = buildModel(); // managed model w/ budget-gated LLM-credit auto-renew
     cachedRunLlm = async (p: string) => {
       const result = await generateText({
@@ -224,7 +252,7 @@ async function runLlm(prompt: string): Promise<string> {
         // PAID x402 fetch tools (bag x402 trust + x402-buyer recipe):
         //   import { X402_BUYER_TOOLS } from "./x402Buyer.js";
         //   tools: { ...LLM_READ_TOOLS, ...X402_BUYER_TOOLS },
-        tools: LLM_READ_TOOLS,
+        tools: { ...LLM_READ_TOOLS, ...guardianToolSet },
         stopWhen: stepCountIs(8),
       });
       return result.text.trim();
@@ -280,11 +308,18 @@ async function reportProgress(
   });
 }
 
-/** Build the seller MCP server, gating commerce tools on the ERC-8183 rail. */
+/**
+ * Build the seller MCP server, gating commerce tools on the ERC-8183 rail.
+ *
+ * The four Fugu Guardian tools are ALWAYS registered, even when the monitoring loop is not
+ * running in this process: a caller must be able to see that Guardian exists and read back
+ * why it is off, rather than find the tool missing and have to guess.
+ */
 export function buildMcpServer(
-  opts: { commerceSkills?: boolean } = {},
+  opts: { commerceSkills?: boolean; guardian?: GuardianToolHandlers } = {},
 ): McpServer {
   const server = new McpServer({ name: "bnbagent-seller", version: "1.0.0" });
+  registerGuardianMcpTools(server, opts.guardian ?? guardianToolHandlers(null));
 
   // ── Commerce tools (signing is FIXED code in signing.ts) ──────────────────
   if (opts.commerceSkills !== false) {
@@ -628,6 +663,23 @@ async function main(): Promise<void> {
   const sellPath = b402SellPath(cfg);
   const host = process.env.AGENT_BIND_HOST || "0.0.0.0";
   const port = Number(process.env.AGENT_PORT || "8000");
+
+  // The Guardian monitoring loop runs inside this process too, started before the listener
+  // opens. Its failures are deliberately NOT caught: a broken repay path must stop the boot.
+  const guardian: GuardianRuntime | null = await startGuardianRuntimeFromEnv(
+    process.env,
+    consoleGuardianLogger("[fugu-guardian]"),
+  );
+  const guardianTools = guardianToolHandlers(guardian);
+  llmGuardianTools = guardianTools;
+  for (const signal of ["SIGINT", "SIGTERM"] as const) {
+    // Stops the loop's timer only. The kill switch latch lives in the state file and must
+    // survive a restart.
+    process.once(signal, () => {
+      guardian?.stop();
+      process.exit(0);
+    });
+  }
   const seller = await B402Seller.create({
     cfg,
     runWork: ({ prompt }) => runLlm(prompt),
@@ -690,7 +742,7 @@ async function main(): Promise<void> {
           delete transports[t.sessionId];
         }
       };
-      await buildMcpServer({ commerceSkills: rails.erc8183 }).connect(t);
+      await buildMcpServer({ commerceSkills: rails.erc8183, guardian: guardianTools }).connect(t);
       transport = t;
     }
     await transport.handleRequest(req, res, req.body);
