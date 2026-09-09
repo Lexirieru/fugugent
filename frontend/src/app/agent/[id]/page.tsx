@@ -400,13 +400,23 @@ function AgentDetail({
             </p>
           </Card>
         ) : (
+          /*
+           * Two very different things used to share this one sentence: "we do not read
+           * this here" and "this agent has no permission". They are not the same claim,
+           * and saying the second when the first is true is a lie in our own favour's
+           * opposite direction, which is still a lie. Guardian's page said no permission
+           * was wired directly underneath a paragraph describing the permission it signed
+           * with.
+           */
           <Card>
             <p className="text-pretty text-sm leading-relaxed text-fg">
-              No limited permission is wired into this page for this agent.
+              This page does not read this agent&apos;s permissions from the chain yet.
             </p>
             <p className="mt-3 text-pretty text-sm leading-relaxed text-muted">
-              It cannot be hired either, so nothing can spend on your behalf today. When it does get
-              one, this panel will list every call it may make before you can hire it, not after.
+              That is a gap in this page, not a statement about the agent. It may hold a
+              limited key already, or none at all, and we are not going to guess which from
+              here. When this panel reads them, it will list every call the agent may make
+              before you can hire it, not after.
             </p>
           </Card>
         )}
@@ -423,8 +433,14 @@ function AgentDetail({
           <ProofList proofs={proofs} />
         ) : (
           <EmptyState
-            title="No transactions yet"
-            body="This agent has never touched the blockchain, so there is nothing to link to. An empty list is the honest answer here."
+            title="No transactions listed here"
+            /*
+             * "This agent has never touched the blockchain" was an assertion about the
+             * agent that this page has no way to make. All it knows is that nobody put a
+             * transaction in this list. Guardian's own page carried that sentence while
+             * quoting its on-chain repay two sections above.
+             */
+            body="Nobody has attached a transaction to this list. That is not the same as the agent never having sent one, and this page will not pretend to know the difference."
             actions={
               <>
                 <ButtonLink href={ourAgentHref}>See an agent that has</ButtonLink>
