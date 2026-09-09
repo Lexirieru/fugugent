@@ -1,0 +1,26 @@
+{
+  "name": "hellofugu-demo-video",
+  "version": "0.1.0",
+  "license": "GPL-3.0-or-later",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "capture": "node scripts/capture.mjs",
+    "voice": "node scripts/voice.mjs",
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts Demo out/hellofugu-demo.mp4 --concurrency 2",
+    "music": "node scripts/music.mjs 76"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.400",
+    "@remotion/media-utils": "4.0.400",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "remotion": "4.0.400",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.14",
+    "typescript": "5.9.3"
+  }
+}

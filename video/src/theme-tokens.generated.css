@@ -1,0 +1,261 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+ * HelloFugu — the design tokens. One file, two apps.
+ *
+ * Imported by BOTH front ends, and defined in neither:
+ *
+ *   landingpage/src/index.css     @import "../../theme/tokens.css";   (Vite)
+ *   frontend/src/app/globals.css  @import "../../../theme/tokens.css"; (Next.js)
+ *
+ * It exists because the two shipped side by side looking like different
+ * products: the landing page warm and editorial, the marketplace a dark navy
+ * dashboard. They had two palettes because they had two copies of the palette.
+ * Fixing the colours without fixing that would only buy six hours.
+ *
+ * ## The vocabulary is semantic on purpose
+ *
+ * `--bg`, not `--cream`. A token named after a colour is wrong the moment the
+ * colour changes — the day a dark mode lands, `--cream: #05080f` is a lie that
+ * every reader has to decode. The marketplace already had the better naming;
+ * this file keeps that vocabulary and fills it with the landing page's warm
+ * values. A future dark mode redefines these same names under a
+ * `[data-theme]` / `prefers-color-scheme` block and nothing downstream moves.
+ *
+ * ## Every contrast number below is measured, not estimated
+ *
+ * WCAG 2.1 relative luminance. Thresholds: 4.5:1 normal text · 3:1 large text
+ * and non-text components. Where a number is written next to a colour it was
+ * computed against the ground that colour is actually painted on, which for
+ * almost everything is `--bg #F1E6E1` — the darkest of the light grounds and
+ * therefore the binding one. If you change a value here, recompute the number
+ * beside it in the same edit. That comment is the only thing standing between
+ * this palette and the next quiet regression.
+ *
+ * ## What is NOT here
+ *
+ * Type sizes. The landing page sizes everything fluidly with `clamp()` against
+ * a 1600px reference; the marketplace uses Tailwind's fixed steps. Those are
+ * two different sizing philosophies, and collapsing them is a layout rewrite,
+ * not a retheme. What the two DO share — the family, the weights, the eyebrow
+ * tracking — is below. See also the note on font loading at the bottom.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Ground and surfaces ───────────────────────────────────────────────
+   *
+   * `--bg` is not a rounded-off cream. It was measured against Chrome's own
+   * rendering of the hero video rather than a decoded still: ffmpeg's first
+   * frame decoded to #ede3dc, but Chrome colour-manages video, so on screen
+   * the sky came out #efe7e1 against a page of #ebe3dc — about +4/+4/+5, which
+   * read as a hairline seam across the full width. This value is the page
+   * shifted by that delta. Both sides were sampled from one screenshot, so the
+   * capture profile cancels out. Do not "tidy" it to a rounder number.
+   */
+  --bg: #f1e6e1;
+
+  /* A hair lighter than the page, so a card reads as a card without a shadow. */
+  --surface: #f8f0ec;
+  /* Card hover. Lighter again — on a light ground, raised means lighter. */
+  --surface-strong: #fcf7f4;
+  /* Inputs, code wells, the action-band boxes: elevated, above a card. */
+  --bg-elev: #faf3ef;
+
+  /* ── Text ──────────────────────────────────────────────────────────────
+   *
+   * Three tiers. On a cream ground there is much less headroom under the
+   * primary than there was on navy: by the time a grey is visibly lighter than
+   * --fg-muted it has already fallen through 4.5:1. So --fg-faint separates
+   * itself by warmth (hue 21°, the ground's own hue) as much as by lightness,
+   * and it still clears AA as normal text. Do not lighten it further; the
+   * marketplace sets 10–11px labels in it.
+   */
+  --fg: #000000; /* 17.15:1 on --bg — AAA */
+  --fg-muted: #616161; /* 5.06:1 on --bg — AA */
+  --fg-faint: #6f645e; /* 4.68:1 on --bg — AA */
+
+  /* ── Lines ─────────────────────────────────────────────────────────────
+   * Alpha rather than a hex, so a border reads correctly over the page, over a
+   * card, and over a hover state without three separate tokens.
+   */
+  --border: rgba(0, 0, 0, 0.12);
+  --border-strong: rgba(0, 0, 0, 0.28);
+
+  /* ── Accent ────────────────────────────────────────────────────────────
+   *
+   * Orange, not BNB yellow. `docs/brand/palette.md` §1 has the full argument
+   * and it is binding: (1) yellow already carries "Watchful" on the risk
+   * scale, so a yellow brand makes every button look like a warning and the
+   * real warnings lose their voice; (2) #F0B90B measures 1.47:1 on this page —
+   * a brand colour that cannot be used for writing gets violated by its own
+   * implementation; (3) every entrant in this hackathon is already yellow.
+   * #F0B90B stays available for exactly one thing: the ecosystem badge, on a
+   * dark ground, as fill — never as text, never inside a risk component.
+   *
+   * Three accent tokens because one orange cannot do three jobs on cream:
+   *   --accent         fills, chips, rules, decorative borders   2.91:1 on --bg
+   *   --accent-strong  the same orange as TEXT and as focus ring 4.97:1 on --bg
+   *   --accent-ink     what you write ON TOP of an accent fill   5.29:1 on --accent
+   * --accent-strong sits 0.8° of hue from --accent, so it reads as the same
+   * colour and not as a second one.
+   */
+  --accent: #ea580c; /* hue 20.5 · 2.91:1 on --bg — fills and rules only */
+  --accent-strong: #a8420a; /* hue 21.3 · 4.97:1 on --bg — AA as text */
+  --accent-hover: #f97316; /* lighter on hover, like the landing page's brightness(1.16) */
+  --accent-ink: #06131a; /* 5.29:1 on --accent, 6.71:1 on --accent-hover */
+  --accent-soft: rgba(234, 88, 12, 0.12);
+
+  /* The focus ring. Deliberately --accent-strong and not --accent: WCAG 2.2
+   * wants 3:1 against what surrounds it, and --accent only reaches 2.91:1 on
+   * this page. The landing page still writes `var(--accent)` in its own
+   * :focus-visible rules — migrating it would change how that page renders,
+   * which the current task forbids. Flagged, not forgotten. */
+  --focus-ring: var(--accent-strong);
+
+  /* ── Puff-level (risk) colours ─────────────────────────────────────────
+   *
+   * READ THIS BEFORE TOUCHING THE FIVE VALUES BELOW.
+   *
+   * The ancestors are Okabe–Ito, chosen so the five levels stay separable
+   * under deuteranopia, protanopia and tritanopia. Those values were picked
+   * for a DARK ground and they do not survive a move to cream:
+   *
+   *   level  Okabe–Ito   on #F1E6E1   verdict
+   *     1    #009E73        2.79:1     fails AA text, fails 3:1 graphic
+   *     2    #F0E442        1.08:1     effectively invisible
+   *     3    #E69F00        1.84:1     fails
+   *     4    #D55E00        3.16:1     fails AA text
+   *     5    #A4210E        6.12:1     passes
+   *
+   * The chip in the marketplace paints these as its border AND its label text,
+   * so 4.5:1 is the real requirement, not 3:1.
+   *
+   * What actually protects a dichromatic reader is the ORDER of the hues and
+   * the DISTANCE between them, not the exact hex. So each colour below is its
+   * Okabe–Ito ancestor darkened at constant hue. Hue is preserved to within
+   * half a degree and the gaps are preserved with it:
+   *
+   *   gaps Okabe–Ito   107.8°   14.4°   15.0°   18.9°
+   *   gaps here        108.2°   14.0°   15.2°   18.7°
+   *
+   * And the contrast ramp is monotone by severity — 4.60 → 5.03 → 5.46 → 5.80
+   * → 6.12 — so weight on the page increases with danger. That is a second
+   * ordered channel, free, on top of hue.
+   *
+   * Colour is still never the only channel. `docs/brand/puff-levels.md` §0
+   * lists six: body width, spikes, face, ring PATTERN, ring colour, and the
+   * numeric chip. Ring pattern (arc / solid+notch / dashed / double / hazard
+   * stripes) is what survives grayscale; do not make any UI depend on the hue
+   * alone.
+   *
+   * Level 5 is unchanged, and is always a SOLID FILL with white text — never
+   * red text. As text on a dark ground it is 2.53:1, which would make the
+   * gravest state the hardest one to read. Filled, white on it is 7.49:1.
+   *
+   * The five static plates in landingpage/public/brand/guardian-kembung-*.svg
+   * still carry the original Okabe–Ito rings. That is correct, not stale:
+   * each of those files paints its own #0B1E2B tile behind the fish, so those
+   * rings sit on the dark ground they were chosen for.
+   */
+  --risk-1: #007656; /* Calm      · hue 163.7 · 4.60:1 on --bg · was #009E73 */
+  --risk-2: #6b6300; /* Watchful  · hue  55.5 · 5.03:1 on --bg · was #F0E442 */
+  --risk-3: #7b5500; /* Strained  · hue  41.5 · 5.46:1 on --bg · was #E69F00 */
+  --risk-4: #924000; /* Critical  · hue  26.3 · 5.80:1 on --bg · was #D55E00 */
+  --risk-5: #a4210e; /* Emergency · hue   7.6 · 6.12:1 on --bg · unchanged  */
+
+  /* ── Agent identity colours ────────────────────────────────────────────
+   *
+   * `docs/brand/palette.md` §4. The absolute rule, restated because it is the
+   * easiest one to break: an agent's body colour NEVER changes because of its
+   * risk. A Guardian in an emergency is still cobalt; it just gets round,
+   * spiky and ringed in hazard stripes.
+   *
+   * These are Okabe–Ito too and they are NOT darkened, because they are never
+   * text and never the boundary of a shape. They are the fill inside a 3px
+   * #05121A outline, and it is that outline that has to be visible:
+   *
+   *   #05121A vs --bg       15.48:1
+   *   #05121A vs --surface  16.85:1
+   *
+   * On their own against cream they measure 4.23 / 2.50 / 1.88 / 1.84 — which
+   * would matter if identity were carried by colour. It is not: every card
+   * names its category in text, and the silhouettes differ (shield, scale
+   * arms, triangle, leaf). Colour here is the third channel, never the first.
+   */
+  --agent-guardian: #0072b2;
+  --agent-guardian-belly: #58a9e0;
+  --agent-rebalancer: #cc79a7;
+  --agent-rebalancer-belly: #e9a8cc;
+  --agent-grid: #56b4e9;
+  --agent-grid-belly: #8fd3f4;
+  --agent-yield: #e69f00;
+  --agent-yield-belly: #ffc24d;
+
+  /* The five capabilities added in the second round. Okabe-Ito has eight colours
+   * and four of them are already agent identities, so three of these five are the
+   * three unused Okabe-Ito hues and two are interpolated into the palette's single
+   * largest empty arc (201.6 deg to 326.7 deg, 125 deg wide and holding nothing).
+   * Hue order is preserved and the gaps stay wide: 26.5 Pilot, 41.5 Yield,
+   * 55.5 Trader, 163.7 Broker, 201.6 Guardian and Grid, 243.5 Meter, 284.9 Steward,
+   * 326.7 Rebalancer. The narrowest gap is 14.0 deg, which is what Okabe-Ito itself
+   * carries between its orange and its yellow.
+   *
+   * Contrast is measured against this page, --bg #F1E6E1, not against the dark
+   * ground the original Okabe-Ito values were chosen for. A body colour is a
+   * graphic and never text, so the bar is 3:1; each one clears it, and each was
+   * darkened at constant hue until it did. The numbers beside them are computed,
+   * and if you change a value here you recompute the number in the same edit. */
+  --agent-broker: #00976e; /* 3.03:1 on --bg - Okabe-Ito bluish green #009E73 darkened, hue 163.7 held */
+  --agent-broker-belly: #26d7a7; /* 2.01:1 against the body it sits inside */
+  --agent-trader: #91870b; /* 3.02:1 on --bg - Okabe-Ito yellow #F0E442 darkened, hue 55.5 held */
+  --agent-trader-belly: #cec224; /* 2.00:1 against the body */
+  --agent-pilot: #d55e00; /* 3.16:1 on --bg - Okabe-Ito vermillion, already clears 3:1, undarkened */
+  --agent-pilot-belly: #e29559; /* 1.60:1 against the body */
+  --agent-meter: #7f79e0; /* 3.00:1 on --bg - interpolated hue 243.5, inside the empty arc */
+  --agent-meter-belly: #bab7ee; /* 1.94:1 against the body */
+  --agent-steward: #ba5ed9; /* 3.01:1 on --bg - interpolated hue 284.9, inside the empty arc */
+  --agent-steward-belly: #ddb1ec; /* 2.03:1 against the body */
+
+  /* ── Illustration constants ────────────────────────────────────────────
+   * The fugu's own palette, shared with docs/brand/generate-svg.py so the fish
+   * in the app and the fish on the landing page are literally the same fish.
+   * Not page colours — do not reach for these to paint UI. */
+  --outline: #05121a;
+  --foam-100: #f4f8f9;
+  --foam-200: #e3ecef;
+
+  /* The ecosystem-only yellow. Badge fill on a dark ground, nothing else.
+   * palette.md §1 lists the rules; the short version is that this is not a
+   * brand colour and must never become --accent again. */
+  --bnb-yellow: #f0b90b;
+
+  /* ── Shape ─────────────────────────────────────────────────────────────
+   * Fluid so a card keeps the same optical roundness at 390px and at 1600px. */
+  --radius-card: clamp(16px, 1.2vw, 22px);
+  --radius-pill: 999px;
+
+  /* ── Typography ────────────────────────────────────────────────────────
+   *
+   * Geist is the shared family and the two apps meet there. The eyebrow's
+   * tracking is shared too — it is a small, recognisable signature and it is
+   * cheap to keep identical.
+   *
+   * Kalam (the handwritten eyebrow) is deliberately NOT adopted by the
+   * marketplace. It earns its bytes on the landing page, where a handwritten
+   * eyebrow heads every section; in the marketplace there is exactly one
+   * eyebrow on one page, and a whole webfont for sixteen characters is a
+   * network cost with no return. The marketplace's eyebrow instead borrows the
+   * part that carries the brand — the accent colour and the tracking.
+   *
+   * The three role names below are declared by each app, not here, because the
+   * loading mechanisms genuinely differ: the landing page pulls Geist from
+   * Figma's CDN with @font-face, the marketplace uses next/font. A shared
+   * family LIST would name faces that only one of them has loaded. The roles
+   * are the contract; the binding is local.
+   *
+   *   --font-display  headings and figures   (Geist 600)
+   *   --font-body     everything else        (Geist 500)
+   *   --font-hand     eyebrows               (Kalam 700, landing page only)
+   */
+  --weight-body: 500;
+  --weight-display: 600;
+  --tracking-eyebrow: -0.352px;
+}

@@ -1,0 +1,39 @@
+/*
+ * The video's look is the product's look, on purpose.
+ *
+ * `theme-tokens.generated.css` is copied from `theme/tokens.css` at the repository root,
+ * the same file both front ends read. That is what stops the demo from becoming a third
+ * design: the cream, the orange, the risk ramp and the agent identity colours here are
+ * the ones on screen at hellofugu.xyz, not a re-pick that looks close.
+ *
+ * The fonts are the landing page's fonts, loaded from the same Figma URLs, so the title
+ * cards and the recorded footage are set in one typeface rather than two that almost match.
+ */
+@import "./theme-tokens.generated.css";
+
+@font-face {
+  font-family: 'Kalam:Bold';
+  font-style: normal;
+  font-weight: 700;
+  src: url('https://static.figma.com/font/Kalam-Bold_1') format('woff2');
+}
+
+@font-face {
+  font-family: 'Geist:SemiBold';
+  font-style: normal;
+  font-weight: 600;
+  src: url('https://static.figma.com/font/Geist_wght__1') format('woff2');
+}
+
+@font-face {
+  font-family: 'Geist:Medium';
+  font-style: normal;
+  font-weight: 500;
+  src: url('https://static.figma.com/font/Geist_wght__1') format('woff2');
+}
+
+:root {
+  --font-display: 'Geist:SemiBold', system-ui, sans-serif;
+  --font-body: 'Geist:Medium', system-ui, sans-serif;
+  --font-hand: 'Kalam:Bold', cursive;
+}
