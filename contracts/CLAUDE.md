@@ -2,7 +2,7 @@
 
 Foundry. Solidity `^0.8.30`, OpenZeppelin 5.7.0 (a submodule in `lib/`). BSC testnet (97).
 
-## The four contracts
+## The five contracts
 
 | Contract | Responsibility |
 |---|---|
@@ -10,9 +10,16 @@ Foundry. Solidity `^0.8.30`, OpenZeppelin 5.7.0 (a submodule in `lib/`). BSC tes
 | `FuguRegistry` | The catalogue of agent listings per category. Touches no funds. |
 | `FuguSubscription` | **The only one that holds funds.** Escrow, pro-rata claims, refunds, revenue share. |
 | `FuguReputation` | Reviews gated on proof of subscription. Touches no funds. |
+| `FuguAuditEscrow` | Holds an audit fee and an auditor bond until a job settles. |
 
 ## Rules
 
+- **`Category` in `src/types/FuguTypes.sol` is append-only.** Never reorder it, never insert
+  into the middle, never delete. The enum index is what is stored inside every listing in the
+  live `FuguRegistry` proxy, and an upgrade replaces code without rewriting storage, so moving
+  a value silently relabels listings that already exist. Nothing reverts and nothing warns.
+  `test/CategoryUpgradeSafety.t.sol` is the tripwire; it upgrades a proxy from the frozen
+  pre-expansion source in `test/legacy/` and reads the old listings back.
 - **Do not write `__gap`.** OZ 5.x uses ERC-7201 namespaced storage, so a parent cannot
   shift a child's slots. What does apply: **append-only** — a new variable goes only at the
   end, never inserted and never removed. Guarded by `test/Upgrade.t.sol`.
