@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Kalam } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
 import { PillNav } from "@/components/pill-nav";
@@ -11,6 +11,26 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+/**
+ * Kalam, the handwritten face the landing page uses for its eyebrows, and the reason
+ * `globals.css` no longer says this app declines to load it.
+ *
+ * It is here for exactly one word: the emphasised word in the "What the chain says"
+ * heading on the start page. That heading was ported with a second face built into it,
+ * and the brand already owns a handwritten face, so the alternative was either to load
+ * a foreign one or to drop the only thing that stops a 44px heading reading like every
+ * other 44px heading in the hackathon.
+ *
+ * One weight, latin only, and `next/font` self-hosts it and preloads it only on the
+ * routes that use it, so the pages that do not carry the word do not carry the file.
+ */
+const kalam = Kalam({
+  variable: "--font-kalam",
+  subsets: ["latin"],
+  weight: "700",
+  display: "swap",
 });
 
 const description =
@@ -40,7 +60,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${kalam.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col bg-bg text-fg">
         <WalletProvider>
           <SiteHeader />

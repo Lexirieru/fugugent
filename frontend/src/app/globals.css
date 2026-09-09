@@ -67,6 +67,8 @@
 
   --font-sans: var(--font-body);
   --font-mono: var(--font-geist-mono);
+  /* `font-hand`. One word on one heading, see the note under the font roles below. */
+  --font-hand: var(--font-hand-stack);
 }
 
 /*
@@ -74,14 +76,23 @@
   Geist arrives through `next/font` in `app/layout.tsx` (the landing page pulls the same
   family from Figma's CDN — same typeface, two loaders, because the frameworks differ).
 
-  There is no `--font-hand` here on purpose. Kalam gives the landing page its handwritten
-  eyebrow, but this app has one eyebrow on one page; a whole webfont for sixteen
-  characters is network cost with no return. The marketplace eyebrow instead borrows the
-  parts of that signature that are free — the accent colour and the tracking.
+  `--font-hand` used to be missing here, and the comment in theme/tokens.css still says
+  it is: the argument was that Kalam earns its bytes on the landing page, where a
+  handwritten eyebrow heads every section, and that this app had one eyebrow on one page
+  and no reason to pay for a webfont to set it. That was true, and it stopped being true
+  when the "What the chain says" section landed on the start page: its heading was
+  designed around a second face, and the choice was Kalam or a foreign one. So Kalam is
+  loaded now, through next/font, one weight, latin only, preloaded on the routes that
+  actually use it. The eyebrow is unaffected and still borrows only the accent colour
+  and the tracking; the hand is for the heading word and nothing else.
+
+  The stack is declared here rather than in theme/tokens.css because the binding is
+  local: that file names the roles, each app names the faces it has loaded.
 */
 :root {
   --font-display: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-body: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-hand-stack: var(--font-kalam), "Bradley Hand", "Segoe Print", cursive;
 }
 
 html {
@@ -140,6 +151,48 @@ body {
 }
 .fugu-motion-4 {
   animation: fugu-pulse 1.2s ease-in-out infinite;
+}
+
+/*
+  The entrance used by the "What the chain says" section, ported with the component in
+  `components/chain-notes-carousel.tsx`: 0.8s, ease-out, and four staggered delays set
+  per element (0.1s heading, 0.2s the count beside it, 0.3s the track, 0.4s the buttons).
+
+  `.fugu-reveal` alone is the before state, and it is deliberately the state the server
+  renders, so nothing flashes into place and then re-hides on hydration. The component
+  carries a <noscript> override for the reader whose scripts never ran, because an
+  entrance that only JavaScript can end must not be the reason a section is invisible.
+
+  The reduced-motion block below is not covered by the global one further down: that one
+  shortens animations to nothing, which for an animation that starts at zero opacity
+  still leaves the element hidden for the length of its delay. Here the animation is
+  removed outright and the final state is the only state.
+*/
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.fugu-reveal {
+  opacity: 0;
+}
+
+.fugu-reveal.is-in {
+  animation: fadeInUp 0.8s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fugu-reveal,
+  .fugu-reveal.is-in {
+    opacity: 1;
+    animation: none !important;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

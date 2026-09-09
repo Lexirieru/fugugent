@@ -1,11 +1,18 @@
 import Link from "next/link";
+import { ChainNotesCarousel } from "@/components/chain-notes-carousel";
 import { Fugu } from "@/components/fugu";
 import { ProofList } from "@/components/proof";
 import { ButtonLink, Page, PageHeader, Section, SectionHeader } from "@/components/ui";
 import { CATEGORY_META, CATEGORY_ORDER } from "@/lib/agents";
+import { readCatalogueCount } from "@/lib/chain-notes";
 import { MARKETPLACE_CYCLE } from "@/lib/data/sample";
 
-export default function StartPage() {
+export default async function StartPage() {
+  // Both counts beside "What the chain says" are read here, at request time: one
+  // `eth_call` for the registry's listing count and one call to the catalogue. Neither
+  // can throw, and either may come back unknown, which the card then states.
+  const catalogueCount = await readCatalogueCount();
+
   return (
     <Page>
       <Section>
@@ -21,6 +28,22 @@ export default function StartPage() {
           </ButtonLink>
         </div>
       </Section>
+
+      {/*
+        The evidence goes directly under the claim. The paragraph above promises that
+        every number on this site links to its record, and this is that promise being
+        kept before the reader has had to navigate anywhere: five things that happened
+        on the chain, four of them one click from the block they happened in, and the
+        fifth saying plainly why it has no block to point at.
+
+        It sits on `/` because `/` is the door, and because the sentence it answers is
+        on `/`. The three other candidates were all worse: `/agents` has a job to do and
+        a filter row to keep, and burying the argument behind a nav click is the same as
+        not making it. The band deliberately keeps the wider `max-w-7xl` measure and the
+        right-hung column it was designed with, so it reads as a break in the page rather
+        than as another card grid.
+      */}
+      <ChainNotesCarousel counts={catalogueCount} />
 
       <Section labelledBy="where-to-go">
         <SectionHeader
