@@ -766,6 +766,19 @@ to 9 were registered before their code existed, and each one says so on chain. S
     they created a wallet, which is the only reason this is a note rather than three permanently
     wrong listings.
 
+19. **"By HelloFugu" is a list in our own code, and the chain cannot back it up.** The
+    `curated` flag on all nine of our listings is `false`, and it will stay that way:
+    `FuguRegistry.setCurated` reverts with `CannotCurateOwnListing` when the caller is the
+    listing owner, and requires `isCurator[msg.sender]`. The deployer owns all nine, so it
+    can never mark its own listings curated. That is the contract working as designed:
+    curation is meant to be a second party's judgement, not a self-assessment.
+
+    The consequence is small but must not be blurred: the badge on the card comes from a
+    hardcoded id list in `frontend/`, not from anything a stranger can verify. It is kept
+    separate from "Ready to hire" precisely because the two mean different things, and the
+    tooltip says it describes who wrote the agent rather than whether it works. Nobody should
+    read it as an on-chain claim, because it is not one.
+
 ---
 
 ## C. Known limitations
