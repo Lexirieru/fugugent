@@ -1,0 +1,7 @@
+# agent/ sub-project. Local state kept out of version control.
+.studio/wallets/
+.studio/audit-log.jsonl
+.env.local
+
+node_modules/
+dist/
