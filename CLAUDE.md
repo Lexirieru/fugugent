@@ -1,11 +1,13 @@
-# Fugugent
+# HelloFugu
 
 A DeFi agent marketplace on BNB Chain for the BNB Chain "The Smart Money Era" hackathon.
 Every agent is a cartoon fugu fish character; **the fugu puffs up as risk load rises**
 — real risk metrics are visualized as the puff level.
 
-Domains: `hellofugu.xyz` (landing, already purchased) · `app.hellofugu.xyz` (marketplace) · `api.hellofugu.xyz`
-**Nothing is deployed to these domains yet.**
+Domains: `hellofugu.xyz` (landing) · `app.hellofugu.xyz` (marketplace) · `api.hellofugu.xyz`
+(backend, on the VPS) · `agents.hellofugu.xyz` (each agent's A2A endpoint).
+All four are live and served over TLS. A push to `main` runs CI, and a green run deploys
+the VPS stack; Vercel builds the two front ends from the same push.
 
 ## Documents to read before changing anything
 
@@ -21,11 +23,15 @@ Domains: `hellofugu.xyz` (landing, already purchased) · `app.hellofugu.xyz` (ma
 
 | Folder | Contents | Status |
 |---|---|---|
-| `contracts/` | 4 UUPS contracts (Foundry) | live on testnet, 147 tests |
-| `ai/` | 4 Fugu agents (BNB Agent Studio, Altana wallets) | Guardian proven on-chain through a session key (249 tests); Rebalancer/Grid/Yield have a decision engine + backtest (88/99/93) and are listed on FuguRegistry, but on-chain execution is not yet wired |
-| `backend/` | Hono + Postgres + Redis: BFF, classifier, tiered fallback | running on Docker Compose, 484 tests; the 4-level fallback proven live |
-| `frontend/` | Next.js 16 marketplace | list + URL-addressable detail + rental flow, build green |
-| `landingpage/` | Next.js 16 landing | finished, build green |
+| `contracts/` | 4 UUPS contracts (Foundry) | live and source-verified on testnet; the catalogue holds 9 categories and 9 listings |
+| `ai/` | 9 Fugu agents (BNB Agent Studio, Altana wallets) | **Only Guardian has ever sent a transaction.** Rebalancer/Grid/Yield have a decision engine and a backtest and are listed, but cannot execute. Broker/Trader/Pilot/Meter/Steward are newer still: listed, tested, wallets funded with nothing, no session key granted, nothing sent. Pilot/Meter/Steward have no `bag` scaffolding yet either |
+| `backend/` | Hono + Postgres + Redis: BFF, classifier, tiered fallback | live at `api.hellofugu.xyz`; the 4-level fallback proven live |
+| `frontend/` | Next.js 16 marketplace | live at `app.hellofugu.xyz` |
+| `landingpage/` | Vite + React landing | live at `hellofugu.xyz` |
+
+**Test counts are deliberately not written here.** They went stale three times in one
+day. `.github/workflows/ci.yml` holds the baselines CI actually asserts against, and it
+fails when a suite loses tests, so it cannot drift the way a table in a document does.
 
 ## Rules that must never be broken
 

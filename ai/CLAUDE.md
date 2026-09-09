@@ -1,14 +1,26 @@
-# ai — the four Fugu agents
+# ai — the nine Fugu agents
 
-Four autonomous DeFi agents, scaffolded with BNB Agent Studio (`bag`), self-hosted on a
-VPS, executing through non-custodial Altana session keys.
+Nine agents, self-hosted on a VPS, meant to execute through non-custodial Altana session
+keys. Read the status column before believing anything else in this file: **exactly one of
+them has ever sent a transaction.**
 
-| Agent | Category | Protocols | Trigger |
-|---|---|---|---|
-| `fugurebalancer` | Rebalancing | PancakeSwap v3 | out of range / deviation / interval |
-| `fugugrid` | Grid Trading | PancakeSwap v3 swaps | a keeper watching `slot0()` |
-| `fuguyield` | Yield Optimisation | Venus, Aave v3, Lista | APR spread > the cost threshold |
-| `fuguguardian` | Health Factor | Venus, Aave v3 | HF below the threshold |
+| Agent | Category | Protocols | Trigger | Can it act? |
+|---|---|---|---|---|
+| `fuguguardian` | Health Factor | Venus, Aave v3 | HF below the threshold | **Yes.** Repaid real debt through a bounded session key |
+| `fugurebalancer` | Rebalancing | PancakeSwap v3 | out of range / deviation / interval | No. Decision engine and backtest only |
+| `fugugrid` | Grid Trading | PancakeSwap v3 swaps | a keeper watching `slot0()` | No. Same |
+| `fuguyield` | Yield Optimisation | Venus, Aave v3, Lista | APR spread > the cost threshold | No. Same |
+| `fugubroker` | Hiring | FuguRegistry, FuguSubscription | a rental worth its price | No. Wallet holds nothing, no session granted |
+| `fugutrader` | Commerce | x402 / b402 | one paid request worth paying for | No. Both halves built, nothing settled |
+| `fugupilot` | Autonomous | PancakeSwap, Venus, Lista staking | inside a cap it cannot exceed | No. No `bag` scaffolding yet |
+| `fugumeter` | Streaming | expiring session key | usage crossing a billing unit | No. No `bag` scaffolding, and b402 untouched |
+| `fugusteward` | Treasury | scoped permissions on one wallet | a payment falling due | No. No `bag` scaffolding yet |
+
+Five of the nine (`fugubroker`, `fugutrader`, `fugupilot`, `fugumeter`, `fugusteward`) are
+plain pnpm packages, not Agent Studio projects. `fugubroker` and `fugutrader` have adopted
+their on-chain wallet and pass `bag doctor`; the other three have not been scaffolded at
+all. Their listings and `agentWallet` addresses are already fixed on chain, so those
+addresses must be adopted rather than generated. See `docs/setup/ENVIRONMENT.md` §G3.
 
 Project names are ≤23 chars, alphanumeric, starting with a letter (an AgentCore rule) — no
 `-`/`_`/`.`.
@@ -50,18 +62,28 @@ bag doctor && bag dev
 
 ## Wallet & session status (BSC testnet)
 
-All four agents have their own Altana wallet with a bounded session registered in the
-on-chain Keystore `0x6b8361C29d05D498b1a12B54A37310f94171E94A`. All of them are verified
-with `isValidKey` → `true` and pass `bag doctor` 14 PASS / 0 FAIL.
+**The first four** have their own Altana wallet with a bounded session registered in the
+on-chain Keystore `0x6b8361C29d05D498b1a12B54A37310f94171E94A`, verified with `isValidKey`
+→ `true`, and pass `bag doctor` 14 PASS / 0 FAIL.
 
-| Agent | Category | Altana admin wallet |
-|---|---|---|
-| `fuguguardian` | Health Factor | `0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0` |
-| `fugurebalancer` | Rebalancing | `0xb8f155D1278f0437b9De7c63911f2C0EDa485941` |
-| `fugugrid` | Grid Trading | `0x2AA59d5cf540c8f1b1CE4C667C2e745475d4EAd9` |
-| `fuguyield` | Yield Optimisation | `0x15dE73F47Ca58a11A6Ef9dB24dfDc6F096b0a866` |
+| Agent | Category | Altana admin wallet | Session |
+|---|---|---|---|
+| `fuguguardian` | Health Factor | `0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0` | granted |
+| `fugurebalancer` | Rebalancing | `0xb8f155D1278f0437b9De7c63911f2C0EDa485941` | granted |
+| `fugugrid` | Grid Trading | `0x2AA59d5cf540c8f1b1CE4C667C2e745475d4EAd9` | granted |
+| `fuguyield` | Yield Optimisation | `0x15dE73F47Ca58a11A6Ef9dB24dfDc6F096b0a866` | granted |
+| `fugubroker` | Hiring | `0x1E77279cf18Da89EEF1477F010D2e6B1E2A1E2c3` | **none** |
+| `fugutrader` | Commerce | `0x1B82F72346a8553a968fafD6AC07A21d4A88589f` | **none** |
+| `fugupilot` | Autonomous | `0x79AFD7B81a1D7CA57270d53Cf9FC315Cd5698c8D` | **none** |
+| `fugumeter` | Streaming | `0x95c3c77e3B7d3873BcF6b9F4b12f47775e7312c8` | **none** |
+| `fugusteward` | Treasury | `0xB92Dd50E84560E719627AcE28b32060dbF0E7083` | **none** |
 
-Every session: **10 U/day + 0.02 tBNB/day, expiry 30 days (8 Oct 2026)**, `register=true`.
+The five newest hold a zero balance, so no session has been granted for any of them and
+none can sign anything. The wallets are real and already named by their on-chain listings;
+what is missing is funding and a grant, not an address.
+
+Every session on the first four: **10 U/day + 0.02 tBNB/day, expiry 30 days (8 Oct 2026)**,
+`register=true`.
 
 `fuguguardian` has a **second session** dedicated to DeFi, separate from the commercial
 session above: the file `.studio/wallets/altana-session-guardian.json`, an allowlist of only

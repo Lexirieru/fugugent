@@ -81,7 +81,10 @@ receives money**, not when the user subscribes.
 
 ### A2. Four agent wallets with Altana session keys registered on-chain
 
-All four agents have their own wallet with a bounded session **registered in the Keystore**
+**Four of nine.** The five newest agents have a wallet address fixed by their listing and no
+session at all; see B17 and B18. Everything below is about the original four.
+
+All four have their own wallet with a bounded session **registered in the Keystore**
 `0x6b8361C29d05D498b1a12B54A37310f94171E94A`. Anyone can verify this without any API key at
 all, with a single `eth_call`:
 
@@ -672,43 +675,75 @@ to 9 were registered before their code existed, and each one says so on chain. S
     Nobody has re-run `UpdateGuardianMetadata` since, so the chain is currently more pessimistic
     than the repo — which is the safe direction to be wrong in, but it is still wrong.
 
-15. **There is no public deployment.** The backend and agents are meant for a VPS and the
-    frontend for Vercel; neither has happened, and nothing answers on any domain. A landing
-    domain has been purchased and **nothing is deployed to it** — do not expect a site there.
-    One thing that cannot be settled from inside this repo: the domain name itself. `README.md`
-    and the root `CLAUDE.md` say `hellofugu.xyz`; `docs/setup/ENVIRONMENT.md`, the rest of
-    `docs/`, and the shipped code (`landingpage/index.html`,
-    `frontend/src/app/layout.tsx`) all say `hellofugu.xyz`. Which one is actually registered is
-    not verifiable here, and this document will not guess. Either way the answer to "is it
-    live?" is no.
+15. ~~**There is no public deployment.**~~ **Resolved 2026-09-09.** Four hosts answer over TLS:
+    `hellofugu.xyz` (landing, Vercel), `app.hellofugu.xyz` (marketplace, Vercel),
+    `api.hellofugu.xyz` (backend, nginx to the VPS) and `agents.hellofugu.xyz` (each agent's
+    A2A endpoint, one path prefix each). A push to `main` runs CI, and a green run builds the
+    images and deploys the VPS stack; Vercel builds the two front ends from the same push.
+    The domain question this entry used to raise is settled: `hellofugu.xyz` is registered and
+    its DNS points at Vercel and at the VPS.
 
-16. **The backend does not know the five new categories yet, and its test suite is red because
-    of it.** `CATEGORIES` in `backend/src/types.ts` was widened to nine so it keeps matching the
-    contract enum, which is the only ordering that can be correct. Nothing else in the backend
-    was widened with it, and TypeScript caught exactly where:
+    **What is still not true:** the backend is a BFF over public data, so "deployed" means the
+    catalogue and the health endpoints answer. It does not mean any agent runs on a schedule.
+    Only `fuguguardian` is in the running compose stack; the other agents sit behind a profile
+    or are not containerised at all.
 
-    - `src/classify.ts:264` — `RULES` is a `Record<Category, Rule[]>` and has no entry for
-      `HIRING`, `COMMERCE`, `AUTONOMOUS`, `STREAMING`, `TREASURY`. At runtime
-      `RULES[category]` is `undefined` and `classify()` throws.
-    - `src/service/agents.ts:394` — another exhaustive `Record<Category, string>`, same five
-      keys missing.
-    - `src/service/seed.ts` — the curated seed holds four agents, so the promise that the
-      marketplace is never empty is now only kept for four of nine categories.
+    Two failures worth keeping, because both looked like working code: a Vercel build only
+    sees its own project directory, so a CSS `@import` reaching above it resolved locally and
+    failed in CI, and a failed deploy leaves the previous alias serving, so the site stayed
+    four hours old while every change looked shipped. Later, a "skip the build if this
+    directory did not change" optimisation compared only the last commit of a push, so a push
+    whose final commit touched something else silently skipped the front-end deploy. Both are
+    the same failure: a deploy that fails quietly is worse than one that fails loudly.
 
-    Measured, not guessed: `cd backend && npx vitest run` gives **91 failed / 554 passed /
-    1 skipped**, in `classify.test.ts`, `agents.routes.test.ts`, `service/agents.test.ts` and
-    `service/seed.test.ts`; `npx tsc --noEmit` gives the two errors above. Until this is
-    finished the marketplace can serve the five new listings only through the on-chain read,
-    and `/api/categories` cannot answer for them at all.
+16. ~~**The backend does not know the five new categories yet.**~~ **Resolved 2026-09-09.**
+    Widening `CATEGORIES` to nine broke two exhaustive `Record<Category, …>` tables and left
+    91 tests red. Both are filled in, the curated seed holds nine agents instead of four, and
+    the suite is green at 659.
 
-17. **The five new agents can be rented and can do nothing.** Broker, Trader, Pilot, Meter and
-    Steward are listed on chain (A11), and that is the entire extent of them. At the moment
-    they were registered there was no code in `ai/fugubroker`, `ai/fugutrader`, `ai/fugupilot`,
-    `ai/fugumeter` or `ai/fugusteward`; there is no test suite to quote, no decision engine, no
-    backtest, and not one of the five wallets has ever signed anything. Their on-chain metadata
-    says exactly that: `implemented: false`, `onchainExecution: false`, a `limits` string
-    beginning *"Not built yet"*, and a `verify` command that shows the absence rather than
-    quoting a test count. Renting one today holds the money and starts nothing.
+    Three things are worth keeping from the fix, because they are not obvious:
+
+    - The five new classifier rule sets are shaped around **homonyms**, not around the category
+      names. "Hiring" that means recruiting people, "commerce" that means buying goods,
+      "streaming" that means video, "treasury" that means a reporting dashboard. Each has a
+      negative test taken from that homonym.
+    - **Naming a spending cap does not move an agent into `AUTONOMOUS`.** Writing the test found
+      that: a specialised strategy keeps its own shelf because it carries more decisive cues.
+      That is the right way round, since nearly every agent here runs under a cap and a cap that
+      outranked the strategy would empty the other shelves.
+    - The examples for the five new categories are **written, not surveyed.** The four original
+      categories are tested with sentences copied verbatim from production 8004scan; nothing in
+      that corpus described an agent that hires another agent or streams a payment, so there was
+      nothing to copy. That is weaker evidence and the test file says so at the top.
+
+17. **The five new agents now have code, and still cannot do anything.** This entry used to
+    say they were empty directories. They are not any more: Broker 156 tests, Trader 119,
+    Pilot 147, Meter 146, Steward 169, all in CI, with 65 mutations of their money-safety rules
+    run and 65 caught. What has **not** changed is the sentence that matters.
+
+    | | Broker | Trader | Pilot | Meter | Steward |
+    |---|---|---|---|---|---|
+    | Decision engine + tests | yes | yes | yes | yes | yes |
+    | Adopted its on-chain wallet | yes | yes | no | no | no |
+    | `bag` Studio scaffolding | yes | yes | **no** | **no** | **no** |
+    | Wallet balance | 0 | 0 | 0 | 0 | 0 |
+    | Session key granted | **no** | **no** | **no** | **no** | **no** |
+    | Transaction ever sent | **no** | **no** | **no** | **no** | **no** |
+
+    With a zero balance and no session, none of the five can sign anything at all. Three of
+    them are plain pnpm packages rather than Agent Studio projects, so `bag deploy` does not
+    apply to them yet.
+
+    Two gaps inside the code itself, which the test counts do not reveal:
+    - **Fugu Meter has not touched b402.** Its expiring-session-key half is built and tested
+      hard; the payment protocol half is absent.
+    - **Fugu Broker's spending window has no home.** Its engine is stateless and takes the
+      running total from its caller. The thing that should persist it is the backend, and that
+      does not exist, so nothing enforces the window across restarts today.
+
+    Their on-chain metadata still says `implemented: false` and a `limits` string beginning
+    *"Not built yet"*, which is now understated rather than wrong. Renting one still holds the
+    money and starts nothing.
     → The correct sentence is: *"nine categories are listed"*, never *"nine agents work"*.
 
 18. **The five new agent wallets were created before their agents, and the chain cannot be
@@ -722,6 +757,14 @@ to 9 were registered before their code existed, and each one says so on chain. S
     generate a fresh one, the listing points at a wallet the agent does not use, permanently,
     exactly like listing 1 already does (B13). Only the metadata could then carry the real
     address, because metadata is the one field still changeable.
+
+    **Outcome so far, 2026-09-09: the risk did not land.** Broker and Trader adopted their
+    addresses, verified the keys in `contracts/.env` derive to exactly `0x1E77279c…` and
+    `0x1B82F723…`, and pass `bag doctor`. Pilot, Meter and Steward have not been scaffolded at
+    all, so they have generated nothing wrong either; they pinned their addresses as constants
+    with tests that name the values. The instruction reached the agents building them before
+    they created a wallet, which is the only reason this is a note rather than three permanently
+    wrong listings.
 
 ---
 
