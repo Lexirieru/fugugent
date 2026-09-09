@@ -653,9 +653,13 @@ stated plainly.
   images came from a generative model — both image MCP servers were disconnected when that work
   ran, four attempts, all failed. The prompts in `docs/brand/image-prompts.md` have never been
   executed and are therefore an unverified specification, not a proven recipe.
-- No CI runs on this repository. The test counts in this README were counted by running the
-  suites; the commands to recount them are in [Try it yourself](#-try-it-yourself).
-- No `LICENSE` file has been added yet.
+- CI now runs every suite on every push, and a deploy to the VPS follows a green run on `main`.
+  Each job asserts its suite has not lost tests, so a `describe.skip` or a glob that stops
+  matching shows up as a failure instead of a quieter green.
+- The test counts in the table below are **stale**. They were counted before the catalogue grew
+  from four categories to nine and before five more agents existed. The current baselines live in
+  `.github/workflows/ci.yml`, which is the file CI actually asserts against.
+- Licensed **GPL-3.0-or-later**; see [Licence](#-licence).
 
 ---
 
@@ -732,3 +736,24 @@ one session key that was told no by a contract we do not control.
 *Every claim on this page links to something you can check without asking us.*
 
 </div>
+
+---
+
+## 📜 Licence
+
+**GPL-3.0-or-later.** The full text is in [`LICENSE`](LICENSE).
+
+This is not a preference, it is an obligation we chose to meet rather than work around.
+`ai/fugutrader` imports `@altananetwork/x402-server`, which is GPL-3.0-or-later, into
+`src/x402/merchant.ts` and `src/x402/route.ts`. Linking GPL code into a distributed work makes
+that work a derivative, so either the whole repository goes GPL or the seller side gets
+rewritten without that package. We took the licence.
+
+What that means for anyone reading this: you may use, study, modify and redistribute this code,
+and if you distribute a modified version you have to offer the source under the same terms.
+
+**The contracts are the exception, and deliberately so.** Every file in `contracts/src` carries
+`// SPDX-License-Identifier: MIT`, and those exact bytes are what is published and verified on
+BscScan. MIT is compatible with GPL-3.0 in the direction that matters here: MIT code can be
+included in a GPL work. Changing the header would change the source hash and break verification
+against what is already deployed, so it stays as it is.

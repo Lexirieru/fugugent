@@ -1,6 +1,7 @@
 {
   "name": "fuguguardian-agent",
   "version": "0.1.0",
+  "license": "GPL-3.0-or-later",
   "private": true,
   "description": "The fuguguardian Agent (sole signer, value layer).",
   "type": "module",

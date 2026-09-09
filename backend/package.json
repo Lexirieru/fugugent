@@ -1,8 +1,9 @@
 {
   "name": "fugugent-backend",
   "version": "0.1.0",
+  "license": "GPL-3.0-or-later",
   "private": true,
-  "description": "The Fugugent backend — an 8004scan BFF, on-chain indexer, classifier, and scheduler for api.fugugent.xyz.",
+  "description": "The Fugugent backend \u2014 an 8004scan BFF, on-chain indexer, classifier, and scheduler for api.fugugent.xyz.",
   "type": "module",
   "engines": {
     "node": ">=22"

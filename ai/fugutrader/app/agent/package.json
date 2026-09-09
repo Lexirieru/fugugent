@@ -1,6 +1,7 @@
 {
   "name": "fugutrader-agent",
   "version": "0.1.0",
+  "license": "GPL-3.0-or-later",
   "private": true,
   "description": "The Fugu Trader Agent (sole signer, value layer): buys one call at a time over HTTP 402, and sells the same way.",
   "type": "module",

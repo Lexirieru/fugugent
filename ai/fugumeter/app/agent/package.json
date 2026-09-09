@@ -1,6 +1,7 @@
 {
   "name": "fugumeter-agent",
   "version": "0.1.0",
+  "license": "GPL-3.0-or-later",
   "private": true,
   "description": "Fugu Meter: pays per call, per second, per unit, with no human approving each one.",
   "type": "module",
