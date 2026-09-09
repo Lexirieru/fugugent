@@ -84,11 +84,11 @@ const NOTIFY_FUNDED: AgentSkill = {
   name: "Notify the seller a job is funded (request delivery)",
   description:
     'After you fund the job on-chain, send {"skill": "notify_funded", ' +
-    '"job_id": <int>} to tell the seller "I funded job X — please deliver". ' +
+    '"job_id": <int>} to tell the seller "I funded job X, please deliver". ' +
     "The seller verifies the funded job carries its signed quote and replies " +
     'AT ONCE with {"status": "accepted"|"rejected", "job_id"}; delivery then ' +
     "runs in the background (work takes time). Do NOT wait on this call for " +
-    "the result — read the deliverable back from the CHAIN once the job " +
+    "the result. Read the deliverable back from the CHAIN once the job " +
     "reaches SUBMITTED (the `submit` tx carries the deliverable_url; " +
     "ERC-8183 `get_deliverable_url`). The agent serves no job-query endpoint.",
   tags: ["erc8183", "delivery", "bnb-chain"],
