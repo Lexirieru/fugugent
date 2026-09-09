@@ -3019,8 +3019,14 @@ html.scroll-reveal-ready .feature .feature__stage > * {
 }
 
 @media (max-width: 560px) {
+  /*
+   * The top padding is not decoration. The badge overhangs the card by 28px and
+   * is 72px tall, and its handwritten note hangs below that, so the nav has to
+   * start below roughly 76px or the note lands on the column headings. Change
+   * the cube size at this width and this number moves with it.
+   */
   .footer-right {
-    padding: 64px 24px 24px;
+    padding: 84px 24px 24px;
   }
 
   .footer-lucky-graphic {

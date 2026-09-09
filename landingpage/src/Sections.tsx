@@ -198,8 +198,14 @@ export function ProofSection() {
             <Out href={AGENT_WALLET_URL}>
               <code>{AGENT_WALLET.slice(0, 10)}…</code>
             </Out>
-            , not an all-powerful owner key. It may call {ALLOWLIST.length} things and
-            spend up to {ALLOWLIST_CAP}.
+            , not an all-powerful owner key. It may call two functions,{" "}
+            {ALLOWLIST.map((call, i) => (
+              <span key={call}>
+                {i > 0 ? " and " : ""}
+                <code>{call.split("(")[0]}</code>
+              </span>
+            ))}
+            , and spend up to {ALLOWLIST_CAP}. Nothing else.
           </p>
         </StaggerItem>
 
