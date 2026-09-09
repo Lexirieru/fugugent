@@ -8,16 +8,19 @@ import { WalletProvider } from "@/components/wallet/provider";
 import { CHAIN, CONTRACT_LIST, addressUrl, shorten } from "@/lib/chain";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
 
 const description =
-  "Browse DeFi agents on BNB Chain, see the proof behind every number, and hire one with an on-chain subscription. Each agent is a pufferfish that swells as its risk grows.";
+  "Browse DeFi agents on BNB Chain, see the proof behind every number, and hire one with a subscription recorded on the blockchain. Each agent is a pufferfish that swells as its risk grows.";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://app.hellofugu.xyz"),
   title: {
-    default: "HelloFugu — hire a DeFi agent you can check",
-    template: "%s — HelloFugu",
+    default: "HelloFugu, hire a DeFi agent you can check",
+    template: "%s · HelloFugu",
   },
   description,
   applicationName: "HelloFugu",
@@ -25,12 +28,12 @@ export const metadata: Metadata = {
     type: "website",
     url: "https://app.hellofugu.xyz",
     siteName: "HelloFugu",
-    title: "HelloFugu — hire a DeFi agent you can check",
+    title: "HelloFugu, hire a DeFi agent you can check",
     description,
   },
   twitter: {
     card: "summary_large_image",
-    title: "HelloFugu — hire a DeFi agent you can check",
+    title: "HelloFugu, hire a DeFi agent you can check",
     description,
   },
 };
@@ -41,7 +44,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col bg-bg text-fg">
         <WalletProvider>
           <SiteHeader />
-          <main className="flex-1 pb-20">{children}</main>
+          <main className="flex-1">{children}</main>
           <SiteFooter />
         </WalletProvider>
       </body>
@@ -50,18 +53,22 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
 }
 
 /**
- * The header carries the whole product in one line: which of the two marketplaces you
- * are in, which chain you are on, and whether a wallet is connected.
+ * The header carries the whole product in one line: which page you are on, which
+ * network you are on, and whether a wallet is connected.
  *
- * At 390px the three nav links take a full-width row of their own below the wallet
- * control — `order-last w-full` until `sm`, where everything folds back into one line.
- * Nothing is hidden behind a menu button at any width.
+ * At 390px the four nav links take a full-width row of their own below the wallet
+ * control, and everything folds back into one line at `sm`. Nothing is hidden behind a
+ * menu button at any width.
  */
 function SiteHeader() {
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3 sm:px-8">
-        <Link href="/" className="text-sm font-semibold tracking-tight text-fg">
+      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 sm:px-8">
+        <Link
+          href="/"
+          className="text-sm font-semibold tracking-tight text-fg"
+          aria-label="HelloFugu, start page"
+        >
           HelloFugu
         </Link>
         <SiteNav className="order-last w-full border-t border-line pt-2 sm:order-none sm:w-auto sm:border-t-0 sm:pt-0" />
@@ -77,40 +84,44 @@ function SiteHeader() {
 }
 
 /**
- * The footer carries all four contract addresses, and not as decoration: anyone who
- * wants to check a claim on this page can start here without having to ask.
+ * The footer carries all five contract addresses, and not as decoration: anyone who
+ * wants to check a claim on this site can start here without having to ask.
  */
 function SiteFooter() {
   return (
     <footer className="border-t border-line">
-      <div className="mx-auto w-full max-w-6xl px-5 py-10 sm:px-8">
-        <p className="text-xs uppercase tracking-[0.16em] text-faint">
-          Live contracts · chain id {CHAIN.id}
-        </p>
-        <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mx-auto w-full max-w-6xl px-5 py-10 sm:px-8 sm:py-12">
+        <h2 className="text-xs uppercase tracking-[0.16em] text-faint">
+          Live contracts on network {CHAIN.id}
+        </h2>
+        <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {CONTRACT_LIST.map((c) => (
-            <li key={c.address}>
+            <li key={c.address} className="flex">
               <a
                 href={addressUrl(c.address)}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="block rounded-xl border border-line px-3 py-2.5 transition hover:border-line-strong hover:bg-surface"
+                className="flex w-full flex-col rounded-xl border border-line px-3 py-3 transition hover:border-line-strong hover:bg-surface"
               >
                 <span className="block text-sm font-medium text-fg">{c.name}</span>
-                <span className="mt-0.5 block font-mono text-[11px] text-accent-strong">
+                <span className="mt-1 block font-mono text-[11px] text-accent-strong">
                   {shorten(c.address)} ↗
                 </span>
-                <span className="mt-1 block text-[11px] leading-snug text-faint">{c.role}</span>
+                <span className="mt-2 block text-[11px] leading-snug text-faint">{c.role}</span>
               </a>
             </li>
           ))}
         </ul>
-        <nav aria-label="Elsewhere" className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
-          <Link href="/" className="text-muted transition hover:text-fg">
-            Agent marketplace
+
+        <nav
+          aria-label="Elsewhere"
+          className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs"
+        >
+          <Link href="/agents" className="text-muted transition hover:text-fg">
+            Agents
           </Link>
           <Link href="/skills" className="text-muted transition hover:text-fg">
-            Audited skills
+            Skills
           </Link>
           <Link href="/auditors" className="text-muted transition hover:text-fg">
             Auditors
@@ -121,15 +132,15 @@ function SiteFooter() {
             target="_blank"
             rel="noreferrer noopener"
           >
-            About ↗
+            About HelloFugu ↗
           </a>
         </nav>
 
-        <p className="mt-6 max-w-3xl text-xs leading-relaxed text-faint">
-          Testnet only. All four implementations are deployed, exercised end to end, and verified
-          on BscScan, so the explorer shows Solidity rather than bytecode — the links above go
-          straight to the source. Nothing on this site is financial advice, and every strategy on it
-          can lose money.
+        <p className="mt-8 max-w-3xl text-xs leading-relaxed text-faint">
+          Test network only. All five contracts are deployed, exercised end to end, and verified on
+          BscScan, so the explorer shows the source code rather than raw bytes. The links above go
+          straight to it. Nothing on this site is financial advice, and every strategy on it can
+          lose money.
         </p>
       </div>
     </footer>

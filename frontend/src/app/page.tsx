@@ -1,119 +1,147 @@
-import { AgentCard } from "@/components/agent-card";
-import { CategoryTabs } from "@/components/category-tabs";
-import { DataProvenance } from "@/components/data-provenance";
+import Link from "next/link";
+import { Fugu } from "@/components/fugu";
 import { ProofList } from "@/components/proof";
-import { RiskLegend } from "@/components/risk-legend";
-import { ButtonLink, EmptyState, Eyebrow, Section } from "@/components/ui";
-import { CATEGORY_META, isCategory } from "@/lib/agents";
-import { source } from "@/lib/data";
+import { ButtonLink, Page, PageHeader, Section, SectionHeader } from "@/components/ui";
+import { CATEGORY_META, CATEGORY_ORDER } from "@/lib/agents";
 import { MARKETPLACE_CYCLE } from "@/lib/data/sample";
 
-export default async function MarketplacePage({ searchParams }: PageProps<"/">) {
-  const sp = await searchParams;
-  const raw = typeof sp.category === "string" ? sp.category : null;
-  const category = isCategory(raw) ? raw : null;
-
-  const src = source();
-  const [page, cats] = await Promise.all([
-    src.listAgents({ category, limit: 24, offset: 0 }),
-    src.listCategories(),
-  ]);
-  const totalAll = cats.categories.reduce((sum, c) => sum + c.count, 0);
-  const meta = category ? CATEGORY_META[category] : null;
-
+export default function StartPage() {
   return (
-    <>
-      <Section className="pt-10 sm:pt-14">
-        <Eyebrow>Agent marketplace</Eyebrow>
-        <h1 className="mt-3 text-balance text-3xl font-semibold leading-[1.15] tracking-tight sm:text-4xl">
-          Hire an agent, then check its work yourself.
-        </h1>
-        <p className="mt-4 max-w-2xl text-pretty text-base leading-relaxed text-muted">
-          Every number on these pages links to a transaction on BscScan. Where we have no proof,
-          the page says so instead of filling the gap — that failure mode is what closed
-          Giza/ARMA in February 2026, and it is the one thing we refuse to repeat.
-        </p>
-
-        <div className="mt-8">
-          <DataProvenance provenance={page.provenance} origin={src.origin} />
-        </div>
-
-        <div className="mt-8">
-          <CategoryTabs counts={cats.categories} active={category} total={totalAll} />
-          {meta ? (
-            <p className="mt-3 text-sm text-muted">
-              {meta.blurb}{" "}
-              <span className="text-faint">
-                Risk here is measured as {meta.riskMetric} — not as APR, because APR is the wrong
-                question for this category.
-              </span>
-            </p>
-          ) : (
-            <p className="mt-3 text-sm text-faint">
-              Four categories, each judged by the risk metric that actually fits it.
-            </p>
-          )}
-        </div>
-
-        <div className="mt-8">
-          {page.agents.length > 0 ? (
-            <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {page.agents.map((view) => (
-                <li key={view.record.id} className="flex">
-                  <AgentCard view={view} />
-                </li>
-              ))}
-            </ul>
-          ) : page.provenance.healthy ? (
-            <EmptyState
-              title={`Nothing in ${meta ? meta.label : "this filter"} yet`}
-              body={
-                meta
-                  ? `${meta.blurb} No agent in this category is listed on FuguRegistry today. The other categories have agents you can open right now.`
-                  : "No agents matched. The other categories have agents you can open right now."
-              }
-              actions={
-                <>
-                  <ButtonLink href="/">Show all agents</ButtonLink>
-                  <ButtonLink href="/agent/97%3A1" variant="ghost">
-                    Open Fugu Guardian
-                  </ButtonLink>
-                </>
-              }
-            />
-          ) : (
-            <EmptyState
-              title="We have nothing we can stand behind"
-              body="The catalogue did not answer, so this list is empty on purpose. Showing a cached copy without saying so would be exactly the kind of unverifiable number this marketplace exists to stop."
-              actions={
-                <>
-                  <ButtonLink href={category ? `/?category=${category}` : "/"}>
-                    Try again
-                  </ButtonLink>
-                  <ButtonLink href="https://hellofugu.xyz" variant="ghost" external>
-                    What is actually shipped ↗
-                  </ButtonLink>
-                </>
-              }
-            />
-          )}
+    <Page>
+      <Section>
+        <PageHeader
+          eyebrow="HelloFugu"
+          title="Hire an agent to look after your money, then check its work yourself."
+          lede="An agent here is a small program that watches something for you and acts on it. Every number on these pages links to the record of it on the blockchain, and where there is no record the page says so instead of filling the gap."
+        />
+        <div className="mt-8 flex flex-wrap gap-3">
+          <ButtonLink href="/agents">Browse the agents</ButtonLink>
+          <ButtonLink href="/skills" variant="ghost">
+            See what agents are allowed to install
+          </ButtonLink>
         </div>
       </Section>
 
-      <Section className="pt-12">
-        <RiskLegend />
+      <Section labelledBy="where-to-go">
+        <SectionHeader
+          id="where-to-go"
+          title="Three pages, three questions"
+          lede="Each one is its own address, so you can send someone straight to it."
+        />
+        <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {DESTINATIONS.map((d) => (
+            <li key={d.href} className="flex">
+              <Link
+                href={d.href}
+                className="group flex w-full flex-col rounded-[var(--radius-card)] border border-line bg-surface p-5 transition hover:border-line-strong hover:bg-surface-strong sm:p-6"
+              >
+                <h3 className="text-base font-semibold text-fg">{d.title}</h3>
+                <p className="mt-1 text-xs uppercase tracking-[0.14em] text-faint">{d.question}</p>
+                <p className="mt-3 text-pretty text-sm leading-relaxed text-muted">{d.body}</p>
+                <div className="grow" />
+                <span className="mt-6 block text-xs text-faint transition group-hover:text-accent-strong">
+                  {d.cta} →
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
       </Section>
 
-      <Section className="pt-12">
-        <h2 className="text-lg font-semibold tracking-tight text-fg">What happens when you hire</h2>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
-          The full cycle — list, hire, the agent draws only the time it served, review gated by
-          proof of payment — has been run on BNB Chain testnet. These are those transactions.
-        </p>
-        <div className="mt-5">
-          <ProofList proofs={MARKETPLACE_CYCLE.map((p) => ({ ...p }))} />
+      <Section labelledBy="categories">
+        <SectionHeader
+          id="categories"
+          title="Nine kinds of agent, and the one number each is judged on"
+          lede="Each kind is measured on the number that fits it, because a loan cannot be judged by an interest rate. Every character below is drawn at the same puff level: this is the cast, not a reading."
+        />
+        <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {CATEGORY_ORDER.map((category) => {
+            const meta = CATEGORY_META[category];
+            return (
+              <li key={category} className="flex">
+                <Link
+                  href={`/agents?category=${category}`}
+                  className="group flex w-full flex-col rounded-[var(--radius-card)] border border-line bg-surface p-5 transition hover:border-line-strong hover:bg-surface-strong"
+                >
+                  <div className="flex items-start gap-4">
+                    <Fugu
+                      kind={meta.kind}
+                      level={2}
+                      animated={false}
+                      className="size-14 shrink-0"
+                      label={`The character for the ${meta.label} kind of agent.`}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-base font-semibold leading-tight text-fg">
+                        {meta.label}
+                      </h3>
+                      <p className="mt-1 text-xs text-faint">{FISH_NAME[category]}</p>
+                    </div>
+                  </div>
+                  <p className="mt-4 text-pretty text-sm leading-relaxed text-muted">
+                    {meta.blurb}
+                  </p>
+                  <div className="grow" />
+                  <p className="mt-5 border-t border-line pt-4 text-xs leading-relaxed text-faint">
+                    The fish swells on {meta.riskMetric}.
+                  </p>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </Section>
+
+      <Section labelledBy="cycle">
+        <SectionHeader
+          id="cycle"
+          title="What happens when you hire"
+          lede="The whole cycle has been run on the BNB Chain test network: an agent is listed, somebody hires it, the agent draws only the time it has served, and a review can only be written by a wallet that paid. These are those four records."
+        />
+        <ProofList proofs={MARKETPLACE_CYCLE.map((p) => ({ ...p }))} />
+        <div className="mt-6">
+          <ButtonLink href="/agents" variant="ghost">
+            Open the agent list
+          </ButtonLink>
         </div>
       </Section>
-    </>
+    </Page>
   );
 }
+
+const DESTINATIONS = [
+  {
+    href: "/agents",
+    title: "Agents",
+    question: "Who do I hire?",
+    body: "Every agent listed, what it has actually done, what it costs, and how much trouble the money it watches is in right now.",
+    cta: "Browse the agents",
+  },
+  {
+    href: "/skills",
+    title: "Skills",
+    question: "What is it allowed to install?",
+    body: "An agent gains abilities by installing code that nobody vets. Each entry here carries what is actually known about it, and five of the seven states are ways of not knowing.",
+    cta: "Read the verdicts",
+  },
+  {
+    href: "/auditors",
+    title: "Auditors",
+    question: "Who paid to be wrong?",
+    body: "An auditor puts money down before starting, is paid when the verdict stands, and loses it when the verdict is overturned. These are the people and what they have at stake.",
+    cta: "Meet the auditors",
+  },
+] as const;
+
+/** The character behind each kind. The name is on the card so the fish is never a riddle. */
+const FISH_NAME: Record<string, string> = {
+  REBALANCING: "Fugu Rebalancer",
+  GRID: "Fugu Grid",
+  YIELD: "Fugu Yield",
+  HEALTH_FACTOR: "Fugu Guardian",
+  HIRING: "Fugu Broker",
+  COMMERCE: "Fugu Trader",
+  AUTONOMOUS: "Fugu Pilot",
+  STREAMING: "Fugu Meter",
+  TREASURY: "Fugu Steward",
+};
