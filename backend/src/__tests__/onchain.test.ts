@@ -39,7 +39,7 @@ interface FakeChain {
   listings: Map<bigint, RawListing | "revert">;
 }
 
-/** Transport viem palsu — test TIDAK PERNAH menyentuh RPC sungguhan. */
+/** A fake viem transport — the tests NEVER touch a real RPC. */
 function fakeTransport(chainState: FakeChain) {
   const calls: {
     to: string;
@@ -89,8 +89,8 @@ function fakeTransport(chainState: FakeChain) {
           });
         },
       },
-      // Tanpa ini viem mengulang setiap panggilan yang gagal tiga kali dengan
-      // jeda — test revert jadi lambat dan menghitung ulang jumlah panggilan.
+      // Without this viem retries every failed call three times with a delay —
+      // the revert tests become slow and the call counts get recounted.
       { retryCount: 0 },
     ),
   });
@@ -109,7 +109,7 @@ function makeSource(chainState: FakeChain) {
 }
 
 describe("readFuguListings", () => {
-  it("memanggil alamat FuguRegistry yang diambil dari config, bukan hardcode di modul", async () => {
+  it("calls the FuguRegistry address taken from the config, not one hardcoded in the module", async () => {
     const { source, calls } = makeSource({
       listingCount: 0n,
       listings: new Map(),
@@ -123,7 +123,7 @@ describe("readFuguListings", () => {
     }
   });
 
-  it("listingCount 0 menghasilkan daftar kosong yang tetap dianggap sehat", async () => {
+  it("a listingCount of 0 yields an empty list that is still considered healthy", async () => {
     const { source } = makeSource({ listingCount: 0n, listings: new Map() });
 
     const page = await source.readFuguListings();
@@ -134,7 +134,7 @@ describe("readFuguListings", () => {
     expect(page.fetchedAt).toBe(FETCHED_AT.toISOString());
   });
 
-  it("membaca listing mulai dari id 1 dan memetakannya ke AgentRecord", async () => {
+  it("reads listings starting from id 1 and maps them onto AgentRecords", async () => {
     const { source, calls } = makeSource({
       listingCount: 2n,
       listings: new Map([
@@ -166,7 +166,7 @@ describe("readFuguListings", () => {
     expect(first.registryAddress).toBe(CONTRACT_ADDRESSES.registry);
   });
 
-  it("menyimpan seluruh nilai uang on-chain sebagai bigint", async () => {
+  it("keeps every on-chain money value as a bigint", async () => {
     const { source } = makeSource({
       listingCount: 1n,
       listings: new Map([[1n, listing({ priceUsd8PerPeriod: 1_500_000_000n })]]),
@@ -183,7 +183,7 @@ describe("readFuguListings", () => {
     expect(l.metadataURI).toBe("ipfs://Qm-rebalancer");
   });
 
-  it("kategori on-chain dipakai sebagai klasifikasi dengan kepercayaan penuh", async () => {
+  it("the on-chain category is used as the classification with full confidence", async () => {
     const { source } = makeSource({
       listingCount: 2n,
       listings: new Map([
@@ -197,12 +197,12 @@ describe("readFuguListings", () => {
     expect(page.items[0]!.classification).toEqual({
       category: "GRID",
       confidence: 1,
-      reason: "kategori on-chain dari FuguRegistry",
+      reason: "on-chain category from FuguRegistry",
     });
     expect(page.items[1]!.fuguListing!.category).toBe("HEALTH_FACTOR");
   });
 
-  it("satu getListing yang revert tidak menjatuhkan listing lain", async () => {
+  it("a single reverting getListing does not take the other listings down", async () => {
     const { source } = makeSource({
       listingCount: 3n,
       listings: new Map<bigint, RawListing | "revert">([
@@ -218,7 +218,7 @@ describe("readFuguListings", () => {
     expect(page.reason).toContain("1");
   });
 
-  it("listingCount yang gagal menghasilkan daftar kosong dan sumber tidak sehat, bukan lemparan", async () => {
+  it("a failing listingCount yields an empty list and an unhealthy source, not a throw", async () => {
     const { source } = makeSource({
       listingCount: () => {
         throw new Error("RPC tumbang");
@@ -237,7 +237,7 @@ describe("readFuguListings", () => {
     expect(page.reason).toBeTruthy();
   });
 
-  it("menghormati limit dan offset atas rentang listing id", async () => {
+  it("honours limit and offset over the listing id range", async () => {
     const { source, calls } = makeSource({
       listingCount: 5n,
       listings: new Map([
@@ -259,7 +259,7 @@ describe("readFuguListings", () => {
 });
 
 describe("readFuguListing", () => {
-  it("mengembalikan satu record untuk listing yang ada", async () => {
+  it("returns a single record for a listing that exists", async () => {
     const { source } = makeSource({
       listingCount: 1n,
       listings: new Map([[1n, listing()]]),
@@ -270,7 +270,7 @@ describe("readFuguListing", () => {
     expect(res.healthy).toBe(true);
   });
 
-  it("listing yang revert menghasilkan agent null tanpa melempar", async () => {
+  it("a reverting listing yields a null agent without throwing", async () => {
     const { source } = makeSource({ listingCount: 1n, listings: new Map() });
 
     const res = await source.readFuguListing(42n);

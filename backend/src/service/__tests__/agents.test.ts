@@ -1,20 +1,20 @@
 /**
- * Fallback berjenjang — **inti nilai produk**.
+ * The tiered fallback — **the core value of the product**.
  *
  * Upstream 8004scan terbukti membalas `500 DATABASE_ERROR` secara intermiten
- * (4 dari 5 percobaan gagal saat riset). Test di berkas ini adalah bukti bahwa
- * kegagalan itu tidak pernah sampai ke pengguna sebagai marketplace kosong,
- * **dan** tidak pernah disamarkan: setiap hasil membawa `source` + `ageSeconds`.
+ * (4 out of 5 attempts failed during the research). The tests in this file are
+ * the proof that this failure never reaches the user as an empty marketplace,
+ * **and** is never disguised: every result carries `source` + `ageSeconds`.
  *
- * Yang dikunci:
- * 1. Keempat tingkat dipicu **berurutan** pada satu instance yang sama.
- * 2. `source` benar di tiap tingkat, dan tingkat berikutnya tidak pernah
- *    disentuh selama tingkat sebelumnya masih menjawab.
- * 3. Tiap tingkat yang **melempar** (bukan hanya kosong) ditangani — sampai
- *    keempat-empatnya melempar sekaligus, dan pemanggil tetap tidak kena
+ * What is locked down:
+ * 1. All four levels are exercised **in order** on one and the same instance.
+ * 2. `source` is correct at each level, and the next level is never touched
+ *    while the previous one is still answering.
+ * 3. Every level that **throws** (not merely comes back empty) is handled — up
+ *    to all four throwing at once, with the caller still taking no exception.
  *    exception.
- * 4. `DEFAULT_SPAM_FILTERS` yang mengosongkan chain 97 adalah kasus normal,
- *    bukan kegagalan.
+ * 4. A `DEFAULT_SPAM_FILTERS` that empties chain 97 is the normal case, not a
+ *    failure.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OnchainSource, ReadFuguListingsOptions } from "../../sources/onchain.js";
@@ -37,14 +37,14 @@ import {
 } from "../agents.js";
 
 // ---------------------------------------------------------------------------
-// Perkakas
+// Helpers
 // ---------------------------------------------------------------------------
 
 const NOW = new Date("2026-09-10T12:00:00.000Z");
 const now = () => NOW;
 const CHAIN_ID = 97;
 
-/** Jejak urutan pemanggilan — inilah yang membuktikan "berurutan", bukan mock.toHaveBeenCalled. */
+/** The call-order trail — this is what proves "in order", not mock.toHaveBeenCalled. */
 let trace: string[] = [];
 
 function record(partial: Partial<AgentRecord> & { tokenId: string }): AgentRecord {
@@ -102,7 +102,7 @@ function page(items: AgentRecord[], overrides: Partial<AgentListPage> = {}): Age
   };
 }
 
-/** Sumber 8004scan palsu yang bisa dipindah-pindah keadaannya di tengah test. */
+/** A fake 8004scan source whose state can be moved around mid-test. */
 class FakeScan implements Scan8004Source {
   page: AgentListPage = page([]);
   detail: AgentDetailResult = {
@@ -143,7 +143,7 @@ class FakeCache implements AgentCachePort {
   saved: AgentRecord[][] = [];
   recorded: SourceHealth[] = [];
   latest: SourceHealth[] = [];
-  /** Argumen yang BENAR-BENAR diterima. Tanpa ini, regresi penyaring lolos tanpa suara. */
+  /** The arguments ACTUALLY received. Without these, a filter regression passes silently. */
   filters: CachedAgentFilter[] = [];
   detailArgs: Array<{ id: string; now: Date }> = [];
 
@@ -196,9 +196,9 @@ class FakeCache implements AgentCachePort {
   }
 
   async latestHealth(): Promise<SourceHealth[]> {
-    // Postgres yang mati mematikan pembacaan ini juga. Fake yang membiarkannya
-    // berhasil sementara `getAgents` gagal menggambarkan dunia yang tidak ada,
-    // dan justru menyembunyikan bahwa pembacaan ini adalah probe Postgres.
+    // A dead Postgres kills this read too. A fake that lets it succeed while
+    // `getAgents` fails paints a world that does not exist, and hides the fact
+    // that this read is the Postgres probe.
     if (this.throws) throw this.throws;
     return this.latest;
   }
@@ -251,14 +251,14 @@ function harness(overrides: Partial<AgentServiceDeps> = {}): Harness {
   return { scan, cache, onchain, service };
 }
 
-/** Record on-chain lengkap dengan listing bigint — untuk membuktikan uang tetap bigint. */
+/** An on-chain record complete with a bigint listing — to prove money stays a bigint. */
 function onchainRecord(tokenId: string, category: Category): AgentRecord {
   return record({
     tokenId,
     name: `Agent #${tokenId}`,
     description: "",
     source: "onchain",
-    classification: { category, confidence: 1, reason: "kategori on-chain dari FuguRegistry" },
+    classification: { category, confidence: 1, reason: "on-chain category from FuguRegistry" },
     fuguListing: {
       listingId: 1n,
       erc8004AgentId: BigInt(tokenId),
@@ -279,11 +279,11 @@ beforeEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// Tingkat demi tingkat
+// Level by level
 // ---------------------------------------------------------------------------
 
-describe("getAgentsByCategory — tingkat 1: 8004scan", () => {
-  it("memakai 8004scan saat sehat dan tidak menyentuh tingkat berikutnya sama sekali", async () => {
+describe("getAgentsByCategory — level 1: 8004scan", () => {
+  it("uses 8004scan while healthy and does not touch the next level at all", async () => {
     const h = harness();
     h.scan.page = page([record({ tokenId: "1" }), record({ tokenId: "2" })]);
     h.cache.items = [record({ tokenId: "999", source: "cache" })];
@@ -305,14 +305,14 @@ describe("getAgentsByCategory — tingkat 1: 8004scan", () => {
     expect(result.trail.map((t) => t.source)).toEqual(["scan8004"]);
   });
 
-  it("mengirim query semantic milik kategori yang diminta", async () => {
+  it("sends the semantic query belonging to the requested category", async () => {
     const h = harness();
     h.scan.page = page([record({ tokenId: "1" })]);
     await h.service.getAgentsByCategory("GRID");
     expect(h.scan.queries).toEqual([CATEGORY_SEMANTIC_QUERIES.GRID]);
   });
 
-  it("mengklasifikasi hasil upstream dan membuang yang bukan kategori diminta", async () => {
+  it("classifies the upstream results and discards those outside the requested category", async () => {
     const h = harness();
     h.scan.page = page([
       record({ tokenId: "1" }), // grid trading — cocok
@@ -326,11 +326,11 @@ describe("getAgentsByCategory — tingkat 1: 8004scan", () => {
     const result = await h.service.getAgentsByCategory("GRID");
     expect(result.items.map((i) => i.tokenId)).toEqual(["1"]);
     expect(result.items[0]!.classification?.category).toBe("GRID");
-    // Total yang dilaporkan adalah yang benar-benar bisa kita pertanggungjawabkan.
+    // The total reported is what we can genuinely account for.
     expect(result.total).toBe(1);
   });
 
-  it("menulis balik hasil segar ke cache supaya tingkat 2 punya isi lain kali", async () => {
+  it("writes fresh results back to the cache so level 2 has content next time", async () => {
     const h = harness();
     h.scan.page = page([record({ tokenId: "1" })]);
     await h.service.getAgentsByCategory("GRID");
@@ -339,7 +339,7 @@ describe("getAgentsByCategory — tingkat 1: 8004scan", () => {
     expect(h.cache.saved[0]![0]!.classification?.category).toBe("GRID");
   });
 
-  it("kegagalan tulis-balik cache tidak menjatuhkan hasil yang sudah didapat", async () => {
+  it("a cache write-back failure does not take down the result already obtained", async () => {
     const h = harness();
     h.scan.page = page([record({ tokenId: "1" })]);
     h.cache.saveAgents = async () => {
@@ -351,8 +351,8 @@ describe("getAgentsByCategory — tingkat 1: 8004scan", () => {
   });
 });
 
-describe("getAgentsByCategory — tingkat 2: cache Postgres", () => {
-  it("turun ke cache saat 8004scan tidak sehat, dan menandainya stale", async () => {
+describe("getAgentsByCategory — level 2: the Postgres cache", () => {
+  it("drops to the cache when 8004scan is unhealthy, and flags it stale", async () => {
     const h = harness();
     h.scan.page = page([], { healthy: false, reason: "UpstreamError 500: DATABASE_ERROR" });
     h.cache.items = [
@@ -373,7 +373,7 @@ describe("getAgentsByCategory — tingkat 2: cache Postgres", () => {
     ]);
   });
 
-  it("alasan kegagalan tingkat 1 ikut terbawa di jejak, supaya bisa diperiksa", async () => {
+  it("the level 1 failure reason travels along in the trail, so it can be inspected", async () => {
     const h = harness();
     h.scan.page = page([], { healthy: false, reason: "UpstreamError 500: DATABASE_ERROR" });
     h.cache.items = [record({ tokenId: "7", source: "cache" })];
@@ -384,7 +384,7 @@ describe("getAgentsByCategory — tingkat 2: cache Postgres", () => {
     expect(result.trail[1]).toMatchObject({ source: "cache", outcome: "ok" });
   });
 
-  it("turun ke cache juga saat 8004scan sehat tapi kosong", async () => {
+  it("drops to the cache when 8004scan is healthy but empty too", async () => {
     const h = harness();
     h.scan.page = page([]);
     h.cache.items = [record({ tokenId: "7", source: "cache" })];
@@ -394,19 +394,19 @@ describe("getAgentsByCategory — tingkat 2: cache Postgres", () => {
     expect(result.trail[0]).toMatchObject({ source: "scan8004", outcome: "empty" });
   });
 
-  it("tidak menulis balik cache dari cache", async () => {
+  it("does not write the cache back from the cache", async () => {
     const h = harness();
-    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.scan.page = page([], { healthy: false, reason: "down" });
     h.cache.items = [record({ tokenId: "7", source: "cache" })];
     await h.service.getAgentsByCategory("GRID");
     expect(h.cache.saved).toHaveLength(0);
   });
 });
 
-describe("getAgentsByCategory — tingkat 3: on-chain FuguRegistry", () => {
-  it("turun ke on-chain saat cache kosong", async () => {
+describe("getAgentsByCategory — level 3: the on-chain FuguRegistry", () => {
+  it("drops to the on-chain read when the cache is empty", async () => {
     const h = harness();
-    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.scan.page = page([], { healthy: false, reason: "down" });
     h.cache.items = [];
     h.onchain.page = page([onchainRecord("500", "GRID")], { source: "onchain" });
 
@@ -426,9 +426,9 @@ describe("getAgentsByCategory — tingkat 3: on-chain FuguRegistry", () => {
     ]);
   });
 
-  it("menyaring listing on-chain per kategori", async () => {
+  it("filters on-chain listings by category", async () => {
     const h = harness();
-    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.scan.page = page([], { healthy: false, reason: "down" });
     h.onchain.page = page(
       [onchainRecord("500", "GRID"), onchainRecord("501", "YIELD")],
       { source: "onchain" },
@@ -439,9 +439,9 @@ describe("getAgentsByCategory — tingkat 3: on-chain FuguRegistry", () => {
     expect(result.total).toBe(1);
   });
 
-  it("uang on-chain tetap bigint sepanjang jalur layanan", async () => {
+  it("on-chain money stays a bigint all the way through the service", async () => {
     const h = harness();
-    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.scan.page = page([], { healthy: false, reason: "down" });
     h.onchain.page = page([onchainRecord("500", "GRID")], { source: "onchain" });
 
     const result = await h.service.getAgentsByCategory("GRID");
@@ -451,11 +451,11 @@ describe("getAgentsByCategory — tingkat 3: on-chain FuguRegistry", () => {
     expect(typeof listing.listingId).toBe("bigint");
   });
 
-  it("turun ke on-chain saat cache tidak sehat (bukan hanya kosong)", async () => {
+  it("drops to the on-chain read when the cache is unhealthy (not merely empty)", async () => {
     const h = harness();
-    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.scan.page = page([], { healthy: false, reason: "down" });
     h.cache.healthy = false;
-    h.cache.reason = "cache Postgres gagal: connection refused";
+    h.cache.reason = "Postgres cache failed: connection refused";
     h.cache.items = [record({ tokenId: "7", source: "cache" })];
     h.onchain.page = page([onchainRecord("500", "GRID")], { source: "onchain" });
 
@@ -465,10 +465,10 @@ describe("getAgentsByCategory — tingkat 3: on-chain FuguRegistry", () => {
   });
 });
 
-describe("getAgentsByCategory — tingkat 4: seed terkurasi", () => {
-  it("turun ke seed saat ketiga tingkat sebelumnya tidak memberi apa-apa", async () => {
+describe("getAgentsByCategory — level 4: the curated seed", () => {
+  it("drops to the seed when the three levels above give nothing", async () => {
     const h = harness();
-    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.scan.page = page([], { healthy: false, reason: "down" });
 
     const result = await h.service.getAgentsByCategory("GRID");
 
@@ -478,23 +478,23 @@ describe("getAgentsByCategory — tingkat 4: seed terkurasi", () => {
     expect(result.items[0]!.source).toBe("seed");
     expect(result.degraded).toBe(true);
     expect(result.healthy).toBe(true);
-    // Umur seed dilaporkan apa adanya: ia memang data kurasi, bukan data segar.
+    // The seed's age is reported plainly: it really is curated data, not fresh data.
     expect(result.ageSeconds).toBeGreaterThan(0);
     expect(result.stale).toBe(true);
   });
 
-  it("tidak pernah menulis seed ke cache — cache harus tetap berisi data nyata", async () => {
+  it("never writes the seed into the cache — the cache must keep holding real data", async () => {
     const h = harness();
-    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.scan.page = page([], { healthy: false, reason: "down" });
     await h.service.getAgentsByCategory("GRID");
     expect(h.cache.saved).toHaveLength(0);
   });
 
-  it("keempat kategori punya isi di seed — marketplace tidak pernah kosong", async () => {
+  it("all four categories have content in the seed — the marketplace is never empty", async () => {
     const categories: Category[] = ["REBALANCING", "GRID", "YIELD", "HEALTH_FACTOR"];
     for (const category of categories) {
       const h = harness();
-      h.scan.page = page([], { healthy: false, reason: "mati" });
+      h.scan.page = page([], { healthy: false, reason: "down" });
       const result = await h.service.getAgentsByCategory(category);
       expect(result.source).toBe("seed");
       expect(result.items.length).toBeGreaterThan(0);
@@ -504,32 +504,32 @@ describe("getAgentsByCategory — tingkat 4: seed terkurasi", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Keempat tingkat, berurutan, pada satu instance
+// All four levels, in order, on one instance
 // ---------------------------------------------------------------------------
 
-describe("keempat tingkat dipicu berurutan", () => {
-  it("menurun satu tingkat setiap kali tingkat di atasnya berhenti menjawab", async () => {
-    // Gerbang upstream dimatikan di sini: test ini menguji URUTAN tingkat,
-    // bukan gerbang latensi. Keduanya punya test sendiri-sendiri.
+describe("all four levels are exercised in order", () => {
+  it("drops one level each time the level above stops answering", async () => {
+    // The upstream gate is switched off here: this test exercises the ORDER of
+    // the levels, not the latency gate. Both have their own tests.
     const h = harness({ upstreamCooldownMs: 0 });
 
-    // Tingkat 1.
+    // Level 1.
     h.scan.page = page([record({ tokenId: "1" })]);
     h.cache.items = [record({ tokenId: "7", source: "cache" })];
     h.onchain.page = page([onchainRecord("500", "GRID")], { source: "onchain" });
     const lvl1 = await h.service.getAgentsByCategory("GRID");
 
-    // Tingkat 2 — upstream tumbang.
+    // Level 2 — upstream is down.
     trace = [];
     h.scan.page = page([], { healthy: false, reason: "500 DATABASE_ERROR" });
     const lvl2 = await h.service.getAgentsByCategory("GRID");
 
-    // Tingkat 3 — cache ikut kosong.
+    // Level 3 — the cache is empty too.
     trace = [];
     h.cache.items = [];
     const lvl3 = await h.service.getAgentsByCategory("GRID");
 
-    // Tingkat 4 — registry on-chain pun belum berisi.
+    // Level 4 — even the on-chain registry has no content yet.
     trace = [];
     h.onchain.page = page([], { source: "onchain" });
     const lvl4 = await h.service.getAgentsByCategory("GRID");
@@ -540,7 +540,7 @@ describe("keempat tingkat dipicu berurutan", () => {
       "onchain",
       "seed",
     ]);
-    // Tiap tingkat menyisakan jejak sepanjang tingkat yang ia tempuh.
+    // Each level leaves a trail as long as the levels it walked.
     expect(lvl1.trail.map((t) => t.source)).toEqual(["scan8004"]);
     expect(lvl2.trail.map((t) => t.source)).toEqual(["scan8004", "cache"]);
     expect(lvl3.trail.map((t) => t.source)).toEqual(["scan8004", "cache", "onchain"]);
@@ -550,7 +550,7 @@ describe("keempat tingkat dipicu berurutan", () => {
       "onchain",
       "seed",
     ]);
-    // Dan tidak ada satu pun hasil tanpa provenance.
+    // And not a single result comes without provenance.
     for (const result of [lvl1, lvl2, lvl3, lvl4]) {
       expect(result.source).toBeTruthy();
       expect(result.ageSeconds).not.toBeUndefined();
@@ -563,10 +563,10 @@ describe("keempat tingkat dipicu berurutan", () => {
     ]);
   });
 
-  it("DEFAULT_SPAM_FILTERS yang mengosongkan chain 97 bukan kegagalan — ia justru alasan tingkat 3 dan 4 ada", async () => {
+  it("a DEFAULT_SPAM_FILTERS that empties chain 97 is not a failure — it is precisely why levels 3 and 4 exist", async () => {
     // Persis peringatan implementer Task 2: `is_registered` + `min_score:10` +
-    // `has_a2a` realistis menyisakan NOL agent di testnet. Upstream sehat,
-    // jawabannya sah, isinya kosong.
+    // `has_a2a` realistically leaves ZERO agents on testnet. Upstream is healthy,
+    // its answer is valid, its content is empty.
     const h = harness();
     h.scan.page = page([], { healthy: true, reason: null, total: 0 });
     h.cache.items = [];
@@ -583,11 +583,11 @@ describe("keempat tingkat dipicu berurutan", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tiap tingkat MELEMPAR, bukan hanya kosong
+// Every level THROWS, not merely comes back empty
 // ---------------------------------------------------------------------------
 
-describe("tidak pernah melempar ke pemanggil", () => {
-  it("tingkat 1 melempar → turun ke tingkat 2", async () => {
+describe("never throws to the caller", () => {
+  it("level 1 throws → drops to level 2", async () => {
     const h = harness();
     h.scan.throws = new Error("socket hang up");
     h.cache.items = [record({ tokenId: "7", source: "cache" })];
@@ -598,9 +598,9 @@ describe("tidak pernah melempar ke pemanggil", () => {
     expect(result.trail[0]!.reason).toContain("socket hang up");
   });
 
-  it("tingkat 2 melempar → turun ke tingkat 3", async () => {
+  it("level 2 throws → drops to level 3", async () => {
     const h = harness();
-    h.scan.throws = new Error("mati");
+    h.scan.throws = new Error("down");
     h.cache.throws = new Error("connection terminated unexpectedly");
     h.onchain.page = page([onchainRecord("500", "GRID")], { source: "onchain" });
 
@@ -609,10 +609,10 @@ describe("tidak pernah melempar ke pemanggil", () => {
     expect(result.trail[1]).toMatchObject({ source: "cache", outcome: "threw" });
   });
 
-  it("tingkat 3 melempar → turun ke tingkat 4", async () => {
+  it("level 3 throws → drops to level 4", async () => {
     const h = harness();
-    h.scan.throws = new Error("mati");
-    h.cache.throws = new Error("mati");
+    h.scan.throws = new Error("down");
+    h.cache.throws = new Error("down");
     h.onchain.throws = new Error("HttpRequestError: RPC menolak");
 
     const result = await h.service.getAgentsByCategory("GRID");
@@ -621,39 +621,39 @@ describe("tidak pernah melempar ke pemanggil", () => {
     expect(result.trail[2]).toMatchObject({ source: "onchain", outcome: "threw" });
   });
 
-  it("tingkat 4 melempar → halaman kosong yang jujur, bukan exception", async () => {
+  it("level 4 throws → an honest empty page, not an exception", async () => {
     const h = harness({
       seed: {
         async listAgents() {
           trace.push("seed.listAgents");
-          throw new Error("berkas seed rusak");
+          throw new Error("the seed file is corrupt");
         },
         async getAgent() {
-          throw new Error("berkas seed rusak");
+          throw new Error("the seed file is corrupt");
         },
       },
     });
-    h.scan.throws = new Error("mati");
-    h.cache.throws = new Error("mati");
-    h.onchain.throws = new Error("mati");
+    h.scan.throws = new Error("down");
+    h.cache.throws = new Error("down");
+    h.onchain.throws = new Error("down");
 
     const result = await h.service.getAgentsByCategory("GRID");
     expect(result.items).toEqual([]);
     expect(result.source).toBe("seed");
     expect(result.healthy).toBe(false);
-    expect(result.reason).toContain("berkas seed rusak");
+    expect(result.reason).toContain("the seed file is corrupt");
     expect(result.ageSeconds).toBeNull();
     expect(result.trail.map((t) => t.outcome)).toEqual(["threw", "threw", "threw", "threw"]);
   });
 
-  it("keempat tingkat melempar sekaligus tetap tidak melempar ke pemanggil", async () => {
+  it("all four levels throwing at once still does not throw to the caller", async () => {
     const h = harness({
       seed: {
         async listAgents() {
-          throw new Error("seed rusak");
+          throw new Error("the seed is corrupt");
         },
         async getAgent() {
-          throw new Error("seed rusak");
+          throw new Error("the seed is corrupt");
         },
       },
     });
@@ -666,10 +666,10 @@ describe("tidak pernah melempar ke pemanggil", () => {
     await expect(h.service.getHealth()).resolves.toBeDefined();
   });
 
-  it("sumber yang melempar sesuatu yang bukan Error pun tidak lolos", async () => {
+  it("a source that throws something other than an Error does not slip through either", async () => {
     const h = harness();
     h.scan.semanticSearch = async () => {
-      throw "bukan Error";
+      throw "not an Error";
     };
     h.cache.items = [record({ tokenId: "7", source: "cache" })];
     const result = await h.service.getAgentsByCategory("GRID");
@@ -679,11 +679,11 @@ describe("tidak pernah melempar ke pemanggil", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tingkat yang tidak dipasang
+// A level that is not installed
 // ---------------------------------------------------------------------------
 
-describe("tingkat yang tidak tersedia", () => {
-  it("tanpa cache dan tanpa on-chain, layanan tetap menjawab dari seed", async () => {
+describe("a level that is unavailable", () => {
+  it("with no cache and no on-chain read, the service still answers from the seed", async () => {
     const service = createAgentService({
       scan8004: new FakeScan(),
       chainId: CHAIN_ID,
@@ -706,7 +706,7 @@ describe("tingkat yang tidak tersedia", () => {
 // ---------------------------------------------------------------------------
 
 describe("paging", () => {
-  it("meneruskan limit/offset ke 8004scan", async () => {
+  it("forwards limit/offset to 8004scan", async () => {
     const seen: unknown[] = [];
     const h = harness();
     h.scan.semanticSearch = async (query: string, opts?: unknown) => {
@@ -717,9 +717,9 @@ describe("paging", () => {
     expect(seen[0]).toMatchObject({ limit: 5, offset: 10 });
   });
 
-  it("memotong sendiri hasil on-chain dan seed sesuai limit/offset", async () => {
+  it("slices the on-chain and seed results itself according to limit/offset", async () => {
     const h = harness();
-    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.scan.page = page([], { healthy: false, reason: "down" });
     h.onchain.page = page(
       [onchainRecord("1", "GRID"), onchainRecord("2", "GRID"), onchainRecord("3", "GRID")],
       { source: "onchain" },
@@ -748,7 +748,7 @@ describe("getAgentDetail", () => {
     fetchedAt: NOW.toISOString(),
   });
 
-  it("tingkat 1: 8004scan", async () => {
+  it("level 1: 8004scan", async () => {
     const h = harness();
     h.scan.detail = detail(record({ tokenId: "42" }));
     const result = await h.service.getAgentDetail("97:42");
@@ -763,7 +763,7 @@ describe("getAgentDetail", () => {
     ]);
   });
 
-  it("tingkat 2: cache, ditandai stale", async () => {
+  it("level 2: the cache, flagged stale", async () => {
     const h = harness();
     h.scan.detail = { ...detail(record({ tokenId: "42" })), agent: null, healthy: false, reason: "500" };
     h.cache.items = [
@@ -775,7 +775,7 @@ describe("getAgentDetail", () => {
     expect(result.ageSeconds).toBe(3600);
   });
 
-  it("tingkat 3: on-chain, dicari lewat listing FuguRegistry", async () => {
+  it("level 3: on-chain, looked up through the FuguRegistry listing", async () => {
     const h = harness();
     h.scan.detail = { ...detail(record({ tokenId: "42" })), agent: null, healthy: false, reason: "500" };
     h.onchain.page = page([onchainRecord("42", "GRID"), onchainRecord("43", "YIELD")], {
@@ -787,7 +787,7 @@ describe("getAgentDetail", () => {
     expect(typeof result.agent?.fuguListing?.priceUsd8PerPeriod).toBe("bigint");
   });
 
-  it("tingkat 4: seed", async () => {
+  it("level 4: the seed", async () => {
     const h = harness();
     h.scan.detail = { ...detail(record({ tokenId: "1" })), agent: null, healthy: false, reason: "500" };
     const result = await h.service.getAgentDetail("97:seed-fugurebalancer");
@@ -796,25 +796,25 @@ describe("getAgentDetail", () => {
     expect(result.ageSeconds).toBeGreaterThan(0);
   });
 
-  it("id tak dikenal saat upstream MATI: `tidak tahu`, bukan `tidak ada`", async () => {
-    // Ini akar 404 palsu. Agent yang dicari bisa saja ada di 8004scan — kita
-    // hanya tidak bisa bertanya. Mengaku sehat di sini membuat rute detail
-    // membalas 404 untuk agent yang sebenarnya ada.
+  it("an unknown id while upstream is DOWN: `don't know`, not `does not exist`", async () => {
+    // This is the root of the false 404. The agent being looked for might well
+    // exist on 8004scan — we simply cannot ask. Claiming health here makes the
+    // detail route answer 404 for an agent that does exist.
     const h = harness();
     h.scan.detail = { ...detail(record({ tokenId: "1" })), agent: null, healthy: false, reason: "500" };
     const result = await h.service.getAgentDetail("97:123456");
     expect(result.agent).toBeNull();
     expect(result.source).toBe("seed");
     expect(result.healthy).toBe(false);
-    expect(result.reason).toContain("tidak dapat dipastikan");
+    expect(result.reason).toContain("cannot be confirmed");
     expect(result.reason).toContain("scan8004");
     expect(result.ageSeconds).toBeNull();
     expect(result.trail).toHaveLength(4);
   });
 
-  it("id tak dikenal saat semua sumber SEHAT: `tidak ada` yang bisa dipercaya", async () => {
-    // Ketiga tingkat di atas menjawab sehat dan memang kosong. Di sini "tidak
-    // ditemukan" adalah fakta, dan 404 dari rute detail memang benar.
+  it("an unknown id while every source is HEALTHY: a `does not exist` that can be trusted", async () => {
+    // The three levels above answered healthily and were genuinely empty. Here
+    // "not found" is a fact, and a 404 from the detail route is right.
     const h = harness();
     h.scan.detail = { ...detail(record({ tokenId: "1" })), agent: null, healthy: true, reason: null };
     const result = await h.service.getAgentDetail("97:123456");
@@ -824,10 +824,10 @@ describe("getAgentDetail", () => {
     expect(result.trail.map((t) => t.outcome)).toEqual(["empty", "empty", "empty", "empty"]);
   });
 
-  it("id berbentuk salah melewati tingkat yang butuh chainId/tokenId, bukan melempar", async () => {
+  it("a malformed id skips the levels that need chainId/tokenId rather than throwing", async () => {
     const h = harness();
     h.cache.items = [];
-    const result = await h.service.getAgentDetail("bukan-id");
+    const result = await h.service.getAgentDetail("not-an-id");
     expect(result.agent).toBeNull();
     expect(result.healthy).toBe(true);
     expect(result.trail[0]).toMatchObject({ source: "scan8004", outcome: "unavailable" });
@@ -835,11 +835,11 @@ describe("getAgentDetail", () => {
     expect(trace).not.toContain("scan8004.getAgent");
   });
 
-  it("setiap tingkat yang melempar diturunkan, tidak dilemparkan", async () => {
+  it("every level that throws is dropped, not rethrown", async () => {
     const h = harness();
-    h.scan.throws = new Error("mati");
-    h.cache.throws = new Error("mati");
-    h.onchain.throws = new Error("mati");
+    h.scan.throws = new Error("down");
+    h.cache.throws = new Error("down");
+    h.onchain.throws = new Error("down");
     const result = await h.service.getAgentDetail("97:seed-fuguyield");
     expect(result.source).toBe("seed");
     expect(result.agent?.name).toBe("FuguYield");
@@ -852,7 +852,7 @@ describe("getAgentDetail", () => {
 // ---------------------------------------------------------------------------
 
 describe("getHealth", () => {
-  it("melaporkan status tiap sumber apa adanya setelah dipakai", async () => {
+  it("reports each source's status verbatim once it has been used", async () => {
     const h = harness();
     h.scan.page = page([], { healthy: false, reason: "500 DATABASE_ERROR" });
     h.cache.items = [record({ tokenId: "7", source: "cache" })];
@@ -868,14 +868,14 @@ describe("getHealth", () => {
     expect(health.checkedAt).toBe(NOW.toISOString());
   });
 
-  it("seed selalu sehat — itulah gunanya", async () => {
+  it("the seed is always healthy — that is the whole point of it", async () => {
     const h = harness();
     const health = await h.service.getHealth();
     const seed = health.sources.find((s) => s.source === "seed");
     expect(seed?.healthy).toBe(true);
   });
 
-  it("mengambil status yang tersimpan di DB untuk sumber yang belum dipakai proses ini", async () => {
+  it("picks up the status stored in the DB for a source this process has not used yet", async () => {
     const h = harness();
     h.cache.latest = [
       { source: "onchain", healthy: false, reason: "RPC timeout", checkedAt: "2026-09-10T11:00:00.000Z" },
@@ -883,15 +883,15 @@ describe("getHealth", () => {
     const health = await h.service.getHealth();
     const onchain = health.sources.find((s) => s.source === "onchain");
     expect(onchain?.healthy).toBe(false);
-    // Observasi berumur 1 jam: statusnya tetap dilaporkan, tapi sebagai
-    // "belum diperiksa ulang", lengkap dengan umurnya.
+    // An observation one hour old: its status is still reported, but as
+    // "not re-checked yet", complete with its age.
     expect(onchain?.stale).toBe(true);
     expect(onchain?.ageSeconds).toBe(3600);
     expect(onchain?.reason).toContain("RPC timeout");
-    expect(onchain?.reason).toContain("belum diperiksa ulang");
+    expect(onchain?.reason).toContain("not re-checked yet");
   });
 
-  it("status dalam proses ini menang atas riwayat DB yang lebih tua", async () => {
+  it("the status in this process wins over an older DB history", async () => {
     const h = harness();
     h.cache.latest = [
       { source: "scan8004", healthy: true, reason: null, checkedAt: "2026-09-10T10:00:00.000Z" },
@@ -903,9 +903,9 @@ describe("getHealth", () => {
     expect(health.sources.find((s) => s.source === "scan8004")?.healthy).toBe(false);
   });
 
-  it("tidak melempar walau cache mati, dan tidak mengaku sehat karenanya", async () => {
+  it("does not throw even when the cache is down, and does not claim health because of it", async () => {
     const h = harness();
-    h.cache.throws = new Error("mati");
+    h.cache.throws = new Error("down");
     const health = await h.service.getHealth();
     expect(health.sources.length).toBeGreaterThan(0);
     expect(health.sources.find((s) => s.source === "cache")?.healthy).toBe(false);
@@ -918,10 +918,10 @@ describe("getHealth", () => {
 // Kredensial
 // ---------------------------------------------------------------------------
 
-describe("kredensial tidak pernah bocor", () => {
+describe("credentials never leak", () => {
   const SECRET = "sk-8004-super-rahasia-abcdef0123456789";
 
-  it("API key yang ikut di pesan error upstream disunting dari jejak dan alasan", async () => {
+  it("an API key riding along in an upstream error message is redacted from the trail and the reason", async () => {
     const h = harness();
     h.scan.throws = new Error(
       `fetch gagal: GET https://api.8004scan.io/api/v1/agents?x-api-key=${SECRET}`,
@@ -936,14 +936,14 @@ describe("kredensial tidak pernah bocor", () => {
     expect(result.trail[0]!.reason).toContain("[redacted]");
   });
 
-  it("header Authorization di pesan error juga disunting", async () => {
+  it("an Authorization header in an error message is redacted too", async () => {
     const h = harness();
     h.scan.throws = new Error(`UpstreamError 401: Authorization: Bearer ${SECRET}`);
     const result = await h.service.getAgentsByCategory("GRID");
     expect(JSON.stringify(result.trail)).not.toContain(SECRET);
   });
 
-  it("alasan yang sangat panjang dipotong supaya log tidak jadi tempat sampah", async () => {
+  it("a very long reason is truncated so the logs do not become a dumping ground", async () => {
     const h = harness();
     h.scan.throws = new Error("x".repeat(5000));
     const result = await h.service.getAgentsByCategory("GRID");
@@ -952,11 +952,11 @@ describe("kredensial tidak pernah bocor", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Kesehatan dicatat
+// Health is recorded
 // ---------------------------------------------------------------------------
 
-describe("riwayat kesehatan sumber", () => {
-  it("mencatat tiap tingkat yang ditempuh ke tabel source_health", async () => {
+describe("source health history", () => {
+  it("records each level walked into the source_health table", async () => {
     const h = harness();
     h.scan.page = page([], { healthy: false, reason: "500 DATABASE_ERROR" });
     h.cache.items = [record({ tokenId: "7", source: "cache" })];
@@ -967,7 +967,7 @@ describe("riwayat kesehatan sumber", () => {
     expect(h.cache.recorded[0]!.checkedAt).toBe(NOW.toISOString());
   });
 
-  it("hanya PERUBAHAN status yang ditulis — tabelnya riwayat, bukan log akses", async () => {
+  it("only status CHANGES are written — the table is a history, not an access log", async () => {
     const h = harness({ upstreamCooldownMs: 0 });
     h.scan.page = page([], { healthy: false, reason: "500 DATABASE_ERROR" });
     h.cache.items = [record({ tokenId: "7", source: "cache" })];
@@ -975,29 +975,29 @@ describe("riwayat kesehatan sumber", () => {
     await h.service.getAgentsByCategory("GRID");
     expect(h.cache.recorded.map((r) => r.source)).toEqual(["scan8004", "cache"]);
 
-    // Permintaan kedua dengan keadaan yang persis sama: tidak ada yang berubah,
-    // jadi tidak ada baris baru. Empat insert per tampilan halaman akan
-    // mengubah `source_health` jadi log akses dan menenggelamkan transisinya.
+    // A second request with exactly the same state: nothing changed, so there is
+    // no new row. Four inserts per page view would turn `source_health` into an
+    // access log and drown its transitions.
     await h.service.getAgentsByCategory("GRID");
     expect(h.cache.recorded).toHaveLength(2);
 
-    // Upstream pulih: itu transisi, dan transisi WAJIB tercatat.
+    // Upstream recovers: that is a transition, and a transition MUST be recorded.
     h.scan.page = page([record({ tokenId: "1" })]);
     await h.service.getAgentsByCategory("GRID");
     expect(h.cache.recorded).toHaveLength(3);
     expect(h.cache.recorded[2]).toMatchObject({ source: "scan8004", healthy: true });
   });
 
-  it("bisa dimatikan lewat opsi, dan mematikannya tidak mengubah hasil", async () => {
+  it("can be switched off through an option, and switching it off changes no results", async () => {
     const h = harness({ persistHealth: false });
-    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.scan.page = page([], { healthy: false, reason: "down" });
     h.cache.items = [record({ tokenId: "7", source: "cache" })];
     const result = await h.service.getAgentsByCategory("GRID");
     expect(h.cache.recorded).toHaveLength(0);
     expect(result.source).toBe("cache");
   });
 
-  it("kegagalan mencatat kesehatan tidak menjatuhkan permintaan", async () => {
+  it("a failure to record health does not take the request down", async () => {
     const h = harness();
     h.cache.recordHealth = async () => {
       throw new Error("tabel hilang");
@@ -1009,11 +1009,11 @@ describe("riwayat kesehatan sumber", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Invariant lintas tingkat
+// Cross-level invariants
 // ---------------------------------------------------------------------------
 
-describe("invariant yang berlaku di semua tingkat", () => {
-  it("setiap hasil membawa source, ageSeconds, fetchedAt, dan jejak", async () => {
+describe("invariants that hold at every level", () => {
+  it("every result carries source, ageSeconds, fetchedAt, and a trail", async () => {
     const setups: Array<() => Harness> = [
       () => {
         const h = harness();
@@ -1022,19 +1022,19 @@ describe("invariant yang berlaku di semua tingkat", () => {
       },
       () => {
         const h = harness();
-        h.scan.page = page([], { healthy: false, reason: "mati" });
+        h.scan.page = page([], { healthy: false, reason: "down" });
         h.cache.items = [record({ tokenId: "7", source: "cache" })];
         return h;
       },
       () => {
         const h = harness();
-        h.scan.page = page([], { healthy: false, reason: "mati" });
+        h.scan.page = page([], { healthy: false, reason: "down" });
         h.onchain.page = page([onchainRecord("500", "GRID")], { source: "onchain" });
         return h;
       },
       () => {
         const h = harness();
-        h.scan.page = page([], { healthy: false, reason: "mati" });
+        h.scan.page = page([], { healthy: false, reason: "down" });
         return h;
       },
     ];
@@ -1046,14 +1046,14 @@ describe("invariant yang berlaku di semua tingkat", () => {
       expect(typeof result.fetchedAt).toBe("string");
       expect(result.ageSeconds === null || typeof result.ageSeconds === "number").toBe(true);
       expect(result.trail.length).toBeGreaterThan(0);
-      // Setiap item mengaku dari sumber yang sama dengan halamannya.
+      // Every item admits the same source as its page.
       for (const item of result.items) expect(item.source).toBe(result.source);
       seenSources.push(result.source);
     }
     expect(seenSources).toEqual(["scan8004", "cache", "onchain", "seed"]);
   });
 
-  it("tidak pernah memanggil sumber setelah tingkat yang menjawab", async () => {
+  it("never calls a source after the level that answered", async () => {
     // With the overlay disabled, the ladder must not touch tier 3 at all when
     // tier 1 answered — the original claim, isolated from the overlay.
     const h = harness({ firstPartyOverlay: false });
@@ -1065,14 +1065,14 @@ describe("invariant yang berlaku di semua tingkat", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Important 1 — `total` tidak boleh melebih-lebihkan
+// Important 1 — `total` must not overstate
 // ---------------------------------------------------------------------------
 
-describe("total yang dilaporkan bisa dipertanggungjawabkan", () => {
-  it("total upstream query semantic TIDAK dipakai sebagai total kategori", async () => {
-    // Kasus yang paling mudah ketahuan juri: semua item halaman ini lolos
-    // classifier, dan upstream melaporkan 4812 hasil untuk query semantic-nya.
-    // Melaporkan 4812 sebagai "agent Grid" menjanjikan halaman yang tidak ada —
+describe("the reported total can be accounted for", () => {
+  it("the upstream semantic query total is NOT used as the category total", async () => {
+    // The case the judges would spot most easily: every item on this page passes
+    // the classifier, and upstream reports 4812 results for its semantic query.
+    // Reporting 4812 as "Grid agents" promises a page that does not exist —
     // juri cukup menekan "next page".
     const h = harness();
     h.scan.page = page([record({ tokenId: "1" }), record({ tokenId: "2" })], { total: 4812 });
@@ -1080,12 +1080,12 @@ describe("total yang dilaporkan bisa dipertanggungjawabkan", () => {
     const result = await h.service.getAgentsByCategory("GRID");
     expect(result.items).toHaveLength(2);
     expect(result.total).toBe(2);
-    // Angka upstream tetap bisa diperiksa — di jejak, tempat ia jadi bahan
-    // penyelidikan alih-alih janji halaman yang tidak ada.
+    // The upstream number stays inspectable — in the trail, where it is material
+    // for an investigation rather than a promise of a page that does not exist.
     expect(result.trail[0]!.upstreamTotal).toBe(4812);
   });
 
-  it("total tetap jumlah yang lolos ketika classifier membuang sebagian", async () => {
+  it("the total stays the count that passed when the classifier discards some", async () => {
     const h = harness();
     h.scan.page = page(
       [
@@ -1104,9 +1104,9 @@ describe("total yang dilaporkan bisa dipertanggungjawabkan", () => {
     expect(result.trail[0]!.upstreamTotal).toBe(4812);
   });
 
-  it("tingkat selain 8004scan tidak pernah membawa angka upstream", async () => {
+  it("a level other than 8004scan never carries an upstream number", async () => {
     const h = harness();
-    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.scan.page = page([], { healthy: false, reason: "down" });
     h.cache.items = [record({ tokenId: "7", source: "cache" })];
     const fromCache = await h.service.getAgentsByCategory("GRID");
     expect(fromCache.trail[1]!.upstreamTotal).toBeUndefined();
@@ -1122,7 +1122,7 @@ describe("total yang dilaporkan bisa dipertanggungjawabkan", () => {
     expect(fromSeed.total).toBe(1);
   });
 
-  it("upstream yang sehat tapi kosong tetap melaporkan angkanya di jejak", async () => {
+  it("a healthy but empty upstream still reports its number in the trail", async () => {
     const h = harness();
     h.scan.page = page([], { healthy: true, total: 4812 });
     const result = await h.service.getAgentsByCategory("GRID");
@@ -1132,16 +1132,16 @@ describe("total yang dilaporkan bisa dipertanggungjawabkan", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Important 2 — argumen yang diterima tiap tingkat, bukan hanya urutannya
+// Important 2 — the arguments each level receives, not merely their order
 // ---------------------------------------------------------------------------
 
-describe("filter yang benar-benar diterima tiap tingkat", () => {
-  it("cache menerima kategori, chainId, paging, dan ambang umur yang diminta", async () => {
-    // Tanpa assertion ini, menghapus `category` dari filter membuat tingkat 2
-    // mengembalikan SEMUA kategori berlabel `source: "cache"` — persis saat
-    // fallback seharusnya bersinar — dan seluruh suite tetap hijau.
+describe("the filters each level actually receives", () => {
+  it("the cache receives the requested category, chainId, paging, and age threshold", async () => {
+    // Without these assertions, removing `category` from the filter makes level 2
+    // return ALL categories labelled `source: "cache"` — exactly when the
+    // fallback should be shining — and the whole suite stays green.
     const h = harness();
-    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.scan.page = page([], { healthy: false, reason: "down" });
     h.cache.items = [record({ tokenId: "7", source: "cache" })];
 
     await h.service.getAgentsByCategory("YIELD", { limit: 7, offset: 14, maxAgeSeconds: 120 });
@@ -1156,25 +1156,25 @@ describe("filter yang benar-benar diterima tiap tingkat", () => {
     });
   });
 
-  it("kategori yang diminta selalu ikut, untuk keempat kategori", async () => {
+  it("the requested category always travels along, for all four categories", async () => {
     for (const category of ["REBALANCING", "GRID", "YIELD", "HEALTH_FACTOR"] as Category[]) {
       const h = harness();
-      h.scan.page = page([], { healthy: false, reason: "mati" });
+      h.scan.page = page([], { healthy: false, reason: "down" });
       h.cache.items = [record({ tokenId: "7", source: "cache" })];
       await h.service.getAgentsByCategory(category);
       expect(h.cache.filters[0]!.category).toBe(category);
     }
   });
 
-  it("cache menerima jam yang disuntikkan, bukan jam dinding", async () => {
+  it("the cache receives the injected clock, not the wall clock", async () => {
     const h = harness();
-    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.scan.page = page([], { healthy: false, reason: "down" });
     h.cache.items = [record({ tokenId: "7", source: "cache" })];
     await h.service.getAgentsByCategory("GRID");
     expect((h.cache.filters[0] as CachedAgentFilter & { now: Date }).now).toEqual(NOW);
   });
 
-  it("cache detail menerima id utuh dan jam yang disuntikkan", async () => {
+  it("the cache detail path receives the whole id and the injected clock", async () => {
     const h = harness();
     h.scan.detail = {
       agent: null,
@@ -1187,37 +1187,37 @@ describe("filter yang benar-benar diterima tiap tingkat", () => {
     expect(h.cache.detailArgs).toEqual([{ id: "97:42", now: NOW }]);
   });
 
-  it("jendela baca on-chain melebar mengikuti offset, tidak tetap di 100", async () => {
+  it("the on-chain read window widens with the offset, it is not fixed at 100", async () => {
     const h = harness();
-    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.scan.page = page([], { healthy: false, reason: "down" });
     h.onchain.page = page([onchainRecord("500", "GRID")], { source: "onchain" });
 
     // Overlay disabled so that `reads` contains only tier-3 windows.
     const t3 = harness({ firstPartyOverlay: false });
-    t3.scan.page = page([], { healthy: false, reason: "mati" });
+    t3.scan.page = page([], { healthy: false, reason: "down" });
     t3.onchain.page = page([onchainRecord("500", "GRID")], { source: "onchain" });
 
     await t3.service.getAgentsByCategory("GRID", { limit: 20, offset: 0 });
     expect(t3.onchain.reads[0]).toMatchObject({ limit: 100, offset: 0 });
 
     await t3.service.getAgentsByCategory("GRID", { limit: 20, offset: 200 });
-    // Jendela tetap 100 akan membuat halaman ini jatuh ke seed sementara
-    // halaman 1 dilayani on-chain — sumber melompat tanpa sebab yang bisa
-    // dijelaskan ke pengguna.
+    // A fixed window of 100 would make this page fall to the seed while page 1
+    // is served on-chain — the source jumping for a reason that cannot be
+    // explained to the user.
     expect(t3.onchain.reads[1]!.limit).toBe(220);
 
     await t3.service.getAgentsByCategory("GRID", { limit: 100, offset: 100000 });
-    // Tetap dibatasi ONCHAIN_MAX_LIMIT supaya satu permintaan tidak membanjiri RPC.
+    // Still bounded by ONCHAIN_MAX_LIMIT so one request never floods the RPC.
     expect(t3.onchain.reads[2]!.limit).toBe(500);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Important 3 — chainId dari pemanggil tidak dipercaya
+// Important 3 — the caller's chainId is not trusted
 // ---------------------------------------------------------------------------
 
-describe("chainId tidak boleh dikendalikan pemanggil", () => {
-  it("id chain lain tidak pernah dikirim ke 8004scan maupun ke pembacaan on-chain", async () => {
+describe("chainId must not be caller-controlled", () => {
+  it("another chain's id is never sent to 8004scan nor to the on-chain read", async () => {
     const h = harness();
     h.scan.detail = {
       agent: record({ tokenId: "12345" }),
@@ -1238,7 +1238,7 @@ describe("chainId tidak boleh dikendalikan pemanggil", () => {
     expect(result.healthy).toBe(true);
   });
 
-  it("id chain sendiri tetap dilayani sepenuhnya", async () => {
+  it("our own chain's id is still served in full", async () => {
     const h = harness();
     h.scan.detail = {
       agent: record({ tokenId: "12345" }),
@@ -1252,8 +1252,8 @@ describe("chainId tidak boleh dikendalikan pemanggil", () => {
     expect(trace).toContain("scan8004.getAgent");
   });
 
-  it("pencocokan on-chain memakai id utuh, bukan tokenId telanjang", async () => {
-    // Token 42 di chain 1 dan di chain 97 adalah agent yang berbeda.
+  it("on-chain matching uses the whole id, not a bare tokenId", async () => {
+    // Token 42 on chain 1 and on chain 97 are different agents.
     const h = harness({ chainId: 1 });
     h.scan.detail = {
       agent: null,
@@ -1271,14 +1271,14 @@ describe("chainId tidak boleh dikendalikan pemanggil", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Bentuk balasan yang aneh
+// Odd response shapes
 // ---------------------------------------------------------------------------
 
-describe("bentuk balasan yang tidak dikenali", () => {
-  it("halaman `healthy: true` dengan items bukan array turun ke tingkat berikutnya", async () => {
+describe("a response shape we do not recognize", () => {
+  it("a `healthy: true` page whose items are not an array drops to the next level", async () => {
     const h = harness();
-    // Ini yang terjadi bila upstream berubah bentuk dan normalizer meleset:
-    // `page.items.map(...)` melempar TypeError di dalam `try` tingkat 1.
+    // This is what happens when upstream changes shape and the normalizer misses:
+    // `page.items.map(...)` throws a TypeError inside level 1's `try`.
     h.scan.page = { ...page([]), items: undefined as unknown as AgentRecord[] };
     h.cache.items = [record({ tokenId: "7", source: "cache" })];
 
@@ -1287,9 +1287,9 @@ describe("bentuk balasan yang tidak dikenali", () => {
     expect(result.trail[0]).toMatchObject({ source: "scan8004", outcome: "threw" });
   });
 
-  it("halaman on-chain dengan items bukan array turun ke seed", async () => {
+  it("an on-chain page whose items are not an array drops to the seed", async () => {
     const h = harness();
-    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.scan.page = page([], { healthy: false, reason: "down" });
     h.onchain.page = {
       ...page([], { source: "onchain" }),
       items: null as unknown as AgentRecord[],
@@ -1299,10 +1299,10 @@ describe("bentuk balasan yang tidak dikenali", () => {
     expect(result.trail[2]).toMatchObject({ source: "onchain", outcome: "threw" });
   });
 
-  it("detail dengan agent berbentuk aneh tidak menjatuhkan permintaan", async () => {
+  it("a detail with an oddly shaped agent does not take the request down", async () => {
     const h = harness();
     h.scan.detail = {
-      agent: "bukan record" as unknown as AgentRecord,
+      agent: "not a record" as unknown as AgentRecord,
       source: "scan8004",
       healthy: true,
       reason: null,
@@ -1313,11 +1313,11 @@ describe("bentuk balasan yang tidak dikenali", () => {
 });
 
 // ---------------------------------------------------------------------------
-// `fetchedAt` halaman tidak boleh bertentangan dengan `ageSeconds`
+// A page's `fetchedAt` must not contradict its `ageSeconds`
 // ---------------------------------------------------------------------------
 
-describe("fetchedAt halaman menunjuk umur datanya, bukan waktu penyajian", () => {
-  it("ageSeconds selalu bisa diturunkan dari fetchedAt halaman, di keempat tingkat", async () => {
+describe("a page's fetchedAt names the age of its data, not the time it was served", () => {
+  it("ageSeconds can always be derived from the page's fetchedAt, at all four levels", async () => {
     const setups: Array<() => Harness> = [
       () => {
         const h = harness();
@@ -1326,7 +1326,7 @@ describe("fetchedAt halaman menunjuk umur datanya, bukan waktu penyajian", () =>
       },
       () => {
         const h = harness();
-        h.scan.page = page([], { healthy: false, reason: "mati" });
+        h.scan.page = page([], { healthy: false, reason: "down" });
         h.cache.items = [
           record({ tokenId: "7", source: "cache", fetchedAt: "2026-09-10T11:00:00.000Z" }),
         ];
@@ -1334,54 +1334,54 @@ describe("fetchedAt halaman menunjuk umur datanya, bukan waktu penyajian", () =>
       },
       () => {
         const h = harness();
-        h.scan.page = page([], { healthy: false, reason: "mati" });
+        h.scan.page = page([], { healthy: false, reason: "down" });
         h.onchain.page = page([onchainRecord("500", "GRID")], { source: "onchain" });
         return h;
       },
       () => {
         const h = harness();
-        h.scan.page = page([], { healthy: false, reason: "mati" });
+        h.scan.page = page([], { healthy: false, reason: "down" });
         return h;
       },
     ];
 
     for (const setup of setups) {
       const result = await setup().service.getAgentsByCategory("GRID");
-      // Invariant yang menghapus kontradiksi: umur halaman selalu bisa
-      // diturunkan dari `fetchedAt`-nya sendiri terhadap jam sekarang.
+      // The invariant that removes the contradiction: a page's age can always be
+      // derived from its own `fetchedAt` against the current clock.
       const derived = Math.floor((NOW.getTime() - Date.parse(result.fetchedAt)) / 1000);
       expect(derived).toBe(result.ageSeconds);
     }
   });
 
-  it("halaman seed tidak mengaku baru diambil", async () => {
+  it("a seed page does not claim to have been just fetched", async () => {
     const h = harness();
-    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.scan.page = page([], { healthy: false, reason: "down" });
     const result = await h.service.getAgentsByCategory("GRID");
     expect(result.fetchedAt).not.toBe(NOW.toISOString());
     expect(Date.parse(result.fetchedAt)).toBeLessThan(NOW.getTime());
   });
 
-  it("halaman kosong memakai waktu penyajian, karena tidak ada data yang punya umur", async () => {
+  it("an empty page uses the serving time, because no data has an age", async () => {
     const h = harness({
       seed: {
         async listAgents() {
-          throw new Error("seed rusak");
+          throw new Error("the seed is corrupt");
         },
         async getAgent() {
-          throw new Error("seed rusak");
+          throw new Error("the seed is corrupt");
         },
       },
     });
-    h.scan.throws = new Error("mati");
-    h.cache.throws = new Error("mati");
-    h.onchain.throws = new Error("mati");
+    h.scan.throws = new Error("down");
+    h.cache.throws = new Error("down");
+    h.onchain.throws = new Error("down");
     const result = await h.service.getAgentsByCategory("GRID");
     expect(result.fetchedAt).toBe(NOW.toISOString());
     expect(result.ageSeconds).toBeNull();
   });
 
-  it("detail juga: fetchedAt milik agennya, bukan waktu penyajian", async () => {
+  it("the detail path too: fetchedAt belongs to its agent, not to the serving time", async () => {
     const h = harness();
     h.scan.detail = {
       agent: null,
@@ -1400,11 +1400,11 @@ describe("fetchedAt halaman menunjuk umur datanya, bukan waktu penyajian", () =>
 });
 
 // ---------------------------------------------------------------------------
-// Halaman kosong wajib menjelaskan dirinya
+// An empty page must explain itself
 // ---------------------------------------------------------------------------
 
-describe("halaman kosong membawa alasannya di reason", () => {
-  it("offset yang melewati isi seed saat semua sumber SEHAT menjelaskan kenapa kosong", async () => {
+describe("an empty page carries its reason in reason", () => {
+  it("an offset past the seed's content while every source is HEALTHY explains why it is empty", async () => {
     const h = harness();
     h.scan.page = page([]);
     const result = await h.service.getAgentsByCategory("GRID", { limit: 20, offset: 50 });
@@ -1417,20 +1417,20 @@ describe("halaman kosong membawa alasannya di reason", () => {
     expect(result.reason).toContain("50");
   });
 
-  it("halaman kosong saat sumber di atas MATI mengaku tidak dapat dipastikan", async () => {
+  it("an empty page while a source above is DOWN admits it cannot be confirmed", async () => {
     const h = harness();
     h.scan.page = page([], { healthy: false, reason: "500 DATABASE_ERROR" });
     const result = await h.service.getAgentsByCategory("GRID", { limit: 20, offset: 50 });
 
     expect(result.items).toEqual([]);
     expect(result.healthy).toBe(false);
-    expect(result.reason).toContain("TIDAK dapat dipastikan");
+    expect(result.reason).toContain("NOT confirmable");
     expect(result.reason).toContain("DATABASE_ERROR");
   });
 
-  it("halaman seed yang berisi tidak membawa alasan palsu", async () => {
+  it("a seed page with content carries no fake reason", async () => {
     const h = harness();
-    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.scan.page = page([], { healthy: false, reason: "down" });
     const result = await h.service.getAgentsByCategory("GRID");
     expect(result.items).toHaveLength(1);
     expect(result.reason).toBeNull();
@@ -1438,56 +1438,56 @@ describe("halaman kosong membawa alasannya di reason", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Isi query semantic, bukan hanya kabelnya
+// The content of the semantic query, not merely its wiring
 // ---------------------------------------------------------------------------
 
-describe("query semantic memuat frasa yang membedakan kategorinya", () => {
-  it("tiap kategori memakai frasa majemuk, bukan kata telanjang", () => {
-    // Kata telanjang `grid`/`yield` di korpus 8004scan jauh lebih sering berarti
-    // hal lain (layanan pembayaran `Grid-hub`, "crop yield"). Yang mengunci
-    // kualitas query adalah frasa majemuknya, bukan bahwa konstantanya terpasang.
+describe("the semantic query holds phrases that discriminate its category", () => {
+  it("each category uses a compound phrase, not a bare word", () => {
+    // The bare words `grid`/`yield` in the 8004scan corpus far more often mean
+    // something else (the `Grid-hub` payment service, "crop yield"). What pins down the
+    // query is its compound phrases, not that the constant is wired up.
     expect(CATEGORY_SEMANTIC_QUERIES.GRID).toContain("grid trading");
     expect(CATEGORY_SEMANTIC_QUERIES.YIELD).toContain("yield farming");
     expect(CATEGORY_SEMANTIC_QUERIES.REBALANCING).toContain("portfolio rebalancing");
     expect(CATEGORY_SEMANTIC_QUERIES.HEALTH_FACTOR).toContain("health factor");
   });
 
-  it("query tiap kategori berbeda satu sama lain", () => {
+  it("each category's query differs from the others", () => {
     const queries = Object.values(CATEGORY_SEMANTIC_QUERIES);
     expect(new Set(queries).size).toBe(queries.length);
   });
 });
 
 // ---------------------------------------------------------------------------
-// `healthy` harus bisa bernilai false — kalau tidak, /api/health tidak berguna
+// `healthy` must be able to be false — otherwise /api/health is useless
 // ---------------------------------------------------------------------------
 
-describe("getHealth — seed tidak boleh menyalakan lampu hijau", () => {
-  it("ketiga sumber sungguhan tumbang → healthy false, walau seed masih menjawab", async () => {
-    // Inilah yang akan dilakukan juri: matikan 8004scan, Postgres, dan RPC,
-    // lalu lihat apakah kita jujur. Marketplace tetap berisi (dari seed) —
-    // tapi spanduk statusnya TIDAK boleh hijau.
+describe("getHealth — the seed must not light the green lamp", () => {
+  it("all three real sources down → healthy false, even though the seed still answers", async () => {
+    // This is what the judges will do: take down 8004scan, Postgres, and the RPC,
+    // then see whether we are honest. The marketplace still has content (from the
+    // seed) — but its status banner must NOT be green.
     const h = harness();
     h.scan.throws = new Error("500 DATABASE_ERROR");
     h.cache.throws = new Error("connection refused");
-    h.onchain.throws = new Error("RPC tidak terjangkau");
+    h.onchain.throws = new Error("RPC unreachable");
 
     const page = await h.service.getAgentsByCategory("GRID");
     expect(page.source).toBe("seed");
-    expect(page.items).toHaveLength(1); // marketplace tetap berisi
+    expect(page.items).toHaveLength(1); // the marketplace still has content
 
     const health = await h.service.getHealth();
     expect(health.healthy).toBe(false);
     expect(health.degraded).toBe(true);
-    // Seed tetap dilaporkan sehat — jaring pengamannya memang utuh, dan itu
-    // informasi yang berguna. Ia hanya tidak ikut menentukan `healthy`.
+    // The seed is still reported healthy — its safety net really is intact, and
+    // that is useful information. It just does not get to determine `healthy`.
     expect(health.sources.find((s) => s.source === "seed")?.healthy).toBe(true);
     for (const source of ["scan8004", "cache", "onchain"] as const) {
       expect(health.sources.find((s) => s.source === source)?.healthy).toBe(false);
     }
   });
 
-  it("cache masih hidup saat 8004scan mati → healthy true tapi degraded", async () => {
+  it("a cache still alive while 8004scan is down → healthy true but degraded", async () => {
     const h = harness();
     h.scan.page = page([], { healthy: false, reason: "500 DATABASE_ERROR" });
     h.cache.items = [record({ tokenId: "7", source: "cache" })];
@@ -1498,10 +1498,10 @@ describe("getHealth — seed tidak boleh menyalakan lampu hijau", () => {
     expect(health.degraded).toBe(true);
   });
 
-  it("on-chain saja yang hidup tetap dihitung sebagai sumber sungguhan", async () => {
+  it("the on-chain read alone being alive still counts as a real source", async () => {
     const h = harness();
-    h.scan.throws = new Error("mati");
-    h.cache.throws = new Error("mati");
+    h.scan.throws = new Error("down");
+    h.cache.throws = new Error("down");
     h.onchain.page = page([onchainRecord("500", "GRID")], { source: "onchain" });
     await h.service.getAgentsByCategory("GRID");
 
@@ -1510,7 +1510,7 @@ describe("getHealth — seed tidak boleh menyalakan lampu hijau", () => {
     expect(health.degraded).toBe(true);
   });
 
-  it("8004scan sehat → healthy true dan tidak degraded", async () => {
+  it("8004scan healthy → healthy true and not degraded", async () => {
     const h = harness();
     h.scan.page = page([record({ tokenId: "1" })]);
     await h.service.getAgentsByCategory("GRID");
@@ -1520,9 +1520,9 @@ describe("getHealth — seed tidak boleh menyalakan lampu hijau", () => {
     expect(health.degraded).toBe(false);
   });
 
-  it("tanpa sumber sungguhan yang bisa diperiksa, tidak mengaku sehat", async () => {
-    // Hanya 8004scan yang dipasang, dan ia belum pernah dipanggil: tidak ada
-    // satu pun bukti bahwa sesuatu bekerja. Belum tahu bukan berarti sehat.
+  it("with no real source that can be checked, it does not claim health", async () => {
+    // Only 8004scan is installed, and it has never been called: there is not a
+    // shred of evidence that anything works. Not knowing does not mean healthy.
     const service = createAgentService({ scan8004: new FakeScan(), chainId: CHAIN_ID, now });
     const health = await service.getHealth();
     expect(health.healthy).toBe(false);
@@ -1530,7 +1530,7 @@ describe("getHealth — seed tidak boleh menyalakan lampu hijau", () => {
     expect(health.sources.find((s) => s.source === "seed")?.healthy).toBe(true);
   });
 
-  it("riwayat DB atas sumber sungguhan ikut dihitung", async () => {
+  it("a DB history over a real source counts too", async () => {
     const h = harness();
     h.cache.latest = [
       {
@@ -1544,11 +1544,11 @@ describe("getHealth — seed tidak boleh menyalakan lampu hijau", () => {
     expect(health.healthy).toBe(true);
   });
 
-  it("observasi seed — dari DB maupun dari ingatan — tidak pernah cukup untuk hijau", async () => {
+  it("a seed observation — from the DB or from memory — is never enough for green", async () => {
     const scan = new FakeScan();
     scan.page = page([], { healthy: false, reason: "500 DATABASE_ERROR" });
     const service = createAgentService({ scan8004: scan, chainId: CHAIN_ID, now });
-    // Layani satu permintaan sampai seed, sehingga seed benar-benar tercatat sehat.
+    // Serve one request down to the seed, so the seed really is recorded healthy.
     const served = await service.getAgentsByCategory("GRID");
     expect(served.source).toBe("seed");
 
@@ -1559,24 +1559,24 @@ describe("getHealth — seed tidak boleh menyalakan lampu hijau", () => {
 });
 
 // ---------------------------------------------------------------------------
-// /api/health tidak boleh melapor dari ingatan yang sudah basi
+// /api/health must not report from a memory that has gone stale
 // ---------------------------------------------------------------------------
 
 describe("getHealth — pembacaan basi menandai dirinya", () => {
-  it("Postgres yang baru mati ketahuan pada panggilan PERTAMA", async () => {
-    // Inilah jendela bohong yang ditemukan di compose: cache tercatat sehat
-    // beberapa detik lalu, lalu Postgres dimatikan. Panggilan pertama ke
-    // /api/health dulu masih berkata `cache: healthy` karena ingatan menimpa
-    // hasil probe. Sekarang probe yang menang.
+  it("a Postgres that just died is caught on the FIRST call", async () => {
+    // This is the lying window found on compose: the cache was recorded healthy
+    // a few seconds earlier, then Postgres was taken down. The first call to
+    // /api/health used to still say `cache: healthy` because memory overwrote the
+    // probe result. Now the probe wins.
     const h = harness();
-    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.scan.page = page([], { healthy: false, reason: "down" });
     h.cache.items = [record({ tokenId: "7", source: "cache" })];
     await h.service.getAgentsByCategory("GRID");
     expect((await h.service.getHealth()).sources.find((s) => s.source === "cache")?.healthy).toBe(
       true,
     );
 
-    // Postgres mati. Tidak ada permintaan lain yang lewat — langsung /api/health.
+    // Postgres is down. No other request goes through — straight to /api/health.
     h.cache.throws = new Error("connection refused");
     const health = await h.service.getHealth();
 
@@ -1587,25 +1587,25 @@ describe("getHealth — pembacaan basi menandai dirinya", () => {
     expect(health.healthy).toBe(false);
   });
 
-  it("probe yang berhasil menang atas ingatan yang berkata cache mati", async () => {
+  it("a successful probe wins over a memory that says the cache is down", async () => {
     const h = harness();
-    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.scan.page = page([], { healthy: false, reason: "down" });
     h.cache.throws = new Error("connection refused");
-    await h.service.getAgentsByCategory("GRID"); // ingatan: cache mati
+    await h.service.getAgentsByCategory("GRID"); // memory: the cache is down
 
-    h.cache.throws = null; // Postgres hidup lagi
+    h.cache.throws = null; // Postgres is alive again
     const health = await h.service.getHealth();
     expect(health.sources.find((s) => s.source === "cache")?.healthy).toBe(true);
     expect(health.sources.find((s) => s.source === "cache")?.stale).toBe(false);
     expect(health.healthy).toBe(true);
   });
 
-  it("observasi yang melewati ambang umur berhenti mengklaim sehat", async () => {
+  it("an observation past the age threshold stops claiming health", async () => {
     const h = harness({ healthTtlSeconds: 30 });
     h.cache.latest = [
-      // 8004scan tercatat SEHAT satu jam lalu. Umur itu membuat klaimnya tak
-      // bisa dipakai lagi — `healthy: true` yang basi persis jenis kebohongan
-      // yang endpoint ini ada untuk mencegah.
+      // 8004scan was recorded HEALTHY an hour ago. That age makes its claim
+      // unusable — a stale `healthy: true` is exactly the kind of lie this
+      // endpoint exists to prevent.
       { source: "scan8004", healthy: true, reason: null, checkedAt: "2026-09-10T11:00:00.000Z" },
     ];
 
@@ -1615,14 +1615,14 @@ describe("getHealth — pembacaan basi menandai dirinya", () => {
     expect(scan?.stale).toBe(true);
     expect(scan?.ageSeconds).toBe(3600);
     expect(scan?.reason).toContain("3600");
-    expect(scan?.reason).toContain("belum diperiksa ulang");
-    expect(scan?.reason).toContain("status terakhir: sehat");
-    // `checkedAt` tetap waktu observasi aslinya, bukan disegarkan diam-diam.
+    expect(scan?.reason).toContain("not re-checked yet");
+    expect(scan?.reason).toContain("last known status: healthy");
+    // `checkedAt` stays the original observation time, not quietly refreshed.
     expect(scan?.checkedAt).toBe("2026-09-10T11:00:00.000Z");
     expect(health.degraded).toBe(true);
   });
 
-  it("observasi yang masih dalam ambang tetap dipercaya dan ditandai segar", async () => {
+  it("an observation still within the threshold is still trusted and flagged fresh", async () => {
     const h = harness({ healthTtlSeconds: 30 });
     h.cache.latest = [
       { source: "scan8004", healthy: true, reason: null, checkedAt: "2026-09-10T11:59:50.000Z" },
@@ -1635,7 +1635,7 @@ describe("getHealth — pembacaan basi menandai dirinya", () => {
     expect(health.degraded).toBe(false);
   });
 
-  it("seed tidak pernah kedaluwarsa — observasinya selalu dibuat sekarang", async () => {
+  it("the seed never expires — its observation is always made now", async () => {
     const h = harness({ healthTtlSeconds: 1 });
     const health = await h.service.getHealth();
     const seed = health.sources.find((s) => s.source === "seed");
@@ -1644,9 +1644,9 @@ describe("getHealth — pembacaan basi menandai dirinya", () => {
     expect(seed?.ageSeconds).toBe(0);
   });
 
-  it("setiap baris membawa umurnya, supaya tidak bisa salah dibaca", async () => {
+  it("every row carries its age, so it cannot be misread", async () => {
     const h = harness();
-    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.scan.page = page([], { healthy: false, reason: "down" });
     h.cache.items = [record({ tokenId: "7", source: "cache" })];
     await h.service.getAgentsByCategory("GRID");
 
@@ -1660,15 +1660,15 @@ describe("getHealth — pembacaan basi menandai dirinya", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Anggaran waktu — 31 detik tidak boleh terulang
+// The time budget — 31 seconds must not happen again
 // ---------------------------------------------------------------------------
 
-/** Sumber yang menggantung selamanya — persis upstream yang tidak menutup koneksi. */
+/** A source that hangs forever — exactly an upstream that never closes the connection. */
 function hangs(): Promise<never> {
   return new Promise<never>(() => undefined);
 }
 
-describe("anggaran waktu per tingkat", () => {
+describe("the per-level time budget", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
@@ -1677,7 +1677,7 @@ describe("anggaran waktu per tingkat", () => {
     vi.useRealTimers();
   });
 
-  it("tingkat 1 yang menggantung ditinggalkan setelah anggaran habis, bukan ditunggu", async () => {
+  it("a hanging level 1 is abandoned once its budget runs out, not waited on", async () => {
     const h = harness({ budgetMs: 6_000 });
     h.scan.semanticSearch = () => hangs();
     h.cache.items = [record({ tokenId: "7", source: "cache" })];
@@ -1688,13 +1688,13 @@ describe("anggaran waktu per tingkat", () => {
 
     expect(result.source).toBe("cache");
     expect(result.trail[0]).toMatchObject({ source: "scan8004", outcome: "unhealthy" });
-    expect(result.trail[0]!.reason).toContain("anggaran waktu");
+    expect(result.trail[0]!.reason).toContain("time budget");
   });
 
-  it("anggaran tingkat 1 yang habis TIDAK ikut melaparkan jaring pengaman", async () => {
-    // Anggaran bersama untuk keempat tingkat pernah dicoba dan salah arah:
-    // tingkat 1 menghabiskan seluruh jatah, lalu cache ditolak sebelum sempat
-    // menjawab. Tingkat 2 dan 3 punya anggarannya sendiri.
+  it("a spent level-1 budget does NOT starve the safety net", async () => {
+    // A budget shared across all four levels was tried and pointed the wrong way:
+    // level 1 consumed the whole allowance, then the cache was refused before it
+    // could answer. Levels 2 and 3 have their own budget.
     const h = harness({ budgetMs: 6_000, localBudgetMs: 2_000 });
     h.scan.semanticSearch = () => hangs();
     h.cache.items = [record({ tokenId: "7", source: "cache" })];
@@ -1707,9 +1707,9 @@ describe("anggaran waktu per tingkat", () => {
     expect(result.items).toHaveLength(1);
   });
 
-  it("cache yang menggantung juga tidak menyandera permintaan", async () => {
+  it("a hanging cache does not hold the request hostage either", async () => {
     const h = harness({ budgetMs: 6_000, localBudgetMs: 2_000 });
-    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.scan.page = page([], { healthy: false, reason: "down" });
     h.cache.getAgents = () => hangs();
     h.onchain.page = page([onchainRecord("500", "GRID")], { source: "onchain" });
 
@@ -1718,12 +1718,12 @@ describe("anggaran waktu per tingkat", () => {
     const result = await pending;
 
     expect(result.source).toBe("onchain");
-    expect(result.trail[1]!.reason).toContain("anggaran waktu");
+    expect(result.trail[1]!.reason).toContain("time budget");
   });
 
-  it("on-chain yang menggantung turun ke seed", async () => {
+  it("a hanging on-chain read drops to the seed", async () => {
     const h = harness({ localBudgetMs: 2_000 });
-    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.scan.page = page([], { healthy: false, reason: "down" });
     h.onchain.readFuguListings = () => hangs();
 
     const pending = h.service.getAgentsByCategory("GRID");
@@ -1732,10 +1732,10 @@ describe("anggaran waktu per tingkat", () => {
     const result = await pending;
 
     expect(result.source).toBe("seed");
-    expect(result.trail[2]!.reason).toContain("anggaran waktu");
+    expect(result.trail[2]!.reason).toContain("time budget");
   });
 
-  it("seed tidak pernah dibatasi anggaran — ia jaring terakhir", async () => {
+  it("the seed is never bounded by a budget — it is the last net", async () => {
     const h = harness({ budgetMs: 1_000, localBudgetMs: 1_000 });
     h.scan.semanticSearch = () => hangs();
     h.cache.getAgents = () => hangs();
@@ -1749,7 +1749,7 @@ describe("anggaran waktu per tingkat", () => {
     expect(result.items).toHaveLength(1);
   });
 
-  it("upstream yang sehat walau lambat tidak pernah ditinggalkan", async () => {
+  it("a healthy though slow upstream is never abandoned", async () => {
     const h = harness({ budgetMs: 6_000 });
     h.scan.semanticSearch = async () => {
       await new Promise((resolve) => setTimeout(resolve, 2_000));
@@ -1764,7 +1764,7 @@ describe("anggaran waktu per tingkat", () => {
     expect(result.items).toHaveLength(1);
   });
 
-  it("jalur detail juga berbatas waktu", async () => {
+  it("the detail path is deadline-bounded too", async () => {
     const h = harness({ budgetMs: 6_000 });
     h.scan.getAgent = () => hangs();
     h.cache.items = [record({ tokenId: "42", source: "cache" })];
@@ -1774,11 +1774,11 @@ describe("anggaran waktu per tingkat", () => {
     const result = await pending;
 
     expect(result.source).toBe("cache");
-    expect(result.trail[0]!.reason).toContain("anggaran waktu");
+    expect(result.trail[0]!.reason).toContain("time budget");
   });
 });
 
-describe("gerbang upstream — satu anggaran per render, bukan empat", () => {
+describe("the upstream gate — one budget per render, not four", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
@@ -1787,10 +1787,10 @@ describe("gerbang upstream — satu anggaran per render, bukan empat", () => {
     vi.useRealTimers();
   });
 
-  it("empat kategori berturut-turut hanya membayar anggaran SEKALI", async () => {
-    // Temuan compose: 31 detik = 10 dtk timeout x 3 percobaan x 4 kategori.
-    // Setelah kategori pertama gagal, jaring pengaman sudah terbukti siap;
-    // membiarkan tiga kategori berikutnya mengulang penantian yang sama hanya
+  it("four consecutive categories pay the budget ONLY ONCE", async () => {
+    // The compose finding: 31 seconds = 10 s timeout x 3 attempts x 4 categories.
+    // Once the first category has failed, the safety net is proven ready;
+    // letting the next three categories repeat the same wait only burns
     // membakar waktu pengguna.
     const h = harness({ budgetMs: 6_000, upstreamCooldownMs: 30_000, now: () => new Date() });
     let attempts = 0;
@@ -1803,9 +1803,9 @@ describe("gerbang upstream — satu anggaran per render, bukan empat", () => {
     await vi.advanceTimersByTimeAsync(6_000);
     const results = [await first];
 
-    // Tiga kategori berikutnya diselesaikan TANPA memajukan jam sama sekali.
-    // Kalau gerbangnya tidak ada, ketiganya menggantung di sini dan test ini
-    // mati kehabisan waktu — itulah buktinya, bukan sekadar hitungan panggilan.
+    // The next three categories complete WITHOUT advancing the clock at all.
+    // If the gate did not exist, all three would hang here and this test would
+    // die of a timeout — that is the proof, not merely a call count.
     for (const category of ["GRID", "YIELD", "HEALTH_FACTOR"] as Category[]) {
       results.push(await h.service.getAgentsByCategory(category));
     }
@@ -1817,11 +1817,11 @@ describe("gerbang upstream — satu anggaran per render, bukan empat", () => {
     }
     for (const result of results.slice(1)) {
       expect(result.trail[0]).toMatchObject({ source: "scan8004", outcome: "unhealthy" });
-      expect(result.trail[0]!.reason).toContain("gerbang tertutup");
+      expect(result.trail[0]!.reason).toContain("gate closed");
     }
   });
 
-  it("gerbang membuka lagi setelah cooldown lewat", async () => {
+  it("the gate opens again once the cooldown has elapsed", async () => {
     const h = harness({ upstreamCooldownMs: 30_000, now: () => new Date() });
     h.scan.page = page([], { healthy: false, reason: "500 DATABASE_ERROR" });
 
@@ -1830,7 +1830,7 @@ describe("gerbang upstream — satu anggaran per render, bukan empat", () => {
 
     await vi.advanceTimersByTimeAsync(29_000);
     await h.service.getAgentsByCategory("GRID");
-    expect(h.scan.queries).toHaveLength(1); // masih dalam cooldown
+    expect(h.scan.queries).toHaveLength(1); // still within the cooldown
 
     await vi.advanceTimersByTimeAsync(2_000);
     h.scan.page = page([record({ tokenId: "1" })]);
@@ -1839,7 +1839,7 @@ describe("gerbang upstream — satu anggaran per render, bukan empat", () => {
     expect(recovered.source).toBe("scan8004");
   });
 
-  it("upstream yang sehat tidak pernah menutup gerbang", async () => {
+  it("a healthy upstream never closes the gate", async () => {
     const h = harness({ upstreamCooldownMs: 30_000, now: () => new Date() });
     h.scan.page = page([record({ tokenId: "1" })]);
     await h.service.getAgentsByCategory("GRID");
@@ -1847,10 +1847,10 @@ describe("gerbang upstream — satu anggaran per render, bukan empat", () => {
     expect(h.scan.queries).toHaveLength(2);
   });
 
-  it("upstream sehat-tapi-kosong TIDAK menutup gerbang", async () => {
-    // `DEFAULT_SPAM_FILTERS` yang mengosongkan chain 97 adalah jawaban sah dari
-    // upstream yang sehat. Menutup gerbang karenanya akan membuat marketplace
-    // berhenti bertanya pada sumber yang sebenarnya bekerja.
+  it("a healthy-but-empty upstream does NOT close the gate", async () => {
+    // A `DEFAULT_SPAM_FILTERS` that empties chain 97 is a valid answer from a
+    // healthy upstream. Closing the gate over it would make the marketplace stop
+    // asking a source that is in fact working.
     const h = harness({ upstreamCooldownMs: 30_000, now: () => new Date() });
     h.scan.page = page([], { healthy: true, total: 0 });
     await h.service.getAgentsByCategory("GRID");
@@ -1858,7 +1858,7 @@ describe("gerbang upstream — satu anggaran per render, bukan empat", () => {
     expect(h.scan.queries).toHaveLength(2);
   });
 
-  it("jalur detail berbagi gerbang yang sama dengan jalur daftar", async () => {
+  it("the detail path shares the same gate as the list path", async () => {
     const h = harness({ upstreamCooldownMs: 30_000, now: () => new Date() });
     h.scan.page = page([], { healthy: false, reason: "500 DATABASE_ERROR" });
     await h.service.getAgentsByCategory("GRID");
@@ -1866,11 +1866,11 @@ describe("gerbang upstream — satu anggaran per render, bukan empat", () => {
     trace = [];
     const detail = await h.service.getAgentDetail("97:42");
     expect(trace).not.toContain("scan8004.getAgent");
-    expect(detail.trail[0]!.reason).toContain("gerbang tertutup");
+    expect(detail.trail[0]!.reason).toContain("gate closed");
   });
 });
 
-describe("gerbang upstream — pemulihan", () => {
+describe("the upstream gate — recovery", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
@@ -1879,22 +1879,22 @@ describe("gerbang upstream — pemulihan", () => {
     vi.useRealTimers();
   });
 
-  it("balasan sehat-tapi-kosong setelah pulih tidak menutup gerbang lagi", async () => {
-    // Upstream pulih tapi kebetulan tidak punya isi untuk kategori itu —
-    // kasus `DEFAULT_SPAM_FILTERS` di chain 97. Kalau kosong diperlakukan
-    // sebagai kegagalan, gerbang langsung tertutup lagi dan marketplace
-    // berhenti bertanya pada sumber yang sebenarnya sudah bekerja.
+  it("a healthy-but-empty answer after recovery does not close the gate again", async () => {
+    // Upstream has recovered but happens to have no content for that category —
+    // the `DEFAULT_SPAM_FILTERS` case on chain 97. If empty were treated as a
+    // failure, the gate would close again immediately and the marketplace would
+    // stop asking a source that is already working.
     const h = harness({ upstreamCooldownMs: 30_000, now: () => new Date() });
     h.scan.page = page([], { healthy: false, reason: "500 DATABASE_ERROR" });
     await h.service.getAgentsByCategory("GRID");
     expect(h.scan.queries).toHaveLength(1);
 
     await vi.advanceTimersByTimeAsync(31_000);
-    h.scan.page = page([], { healthy: true, total: 0 }); // pulih, tapi kosong
+    h.scan.page = page([], { healthy: true, total: 0 }); // recovered, but empty
     await h.service.getAgentsByCategory("GRID");
     expect(h.scan.queries).toHaveLength(2);
 
-    // Gerbang harus sudah terbuka: kategori berikutnya bertanya lagi TANPA
+    // The gate must already be open: the next category asks again WITHOUT any
     // menunggu cooldown kedua.
     await h.service.getAgentsByCategory("YIELD");
     expect(h.scan.queries).toHaveLength(3);
@@ -1902,45 +1902,46 @@ describe("gerbang upstream — pemulihan", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Polling berulang harus jujur SENDIRI, tanpa ditolong lalu lintas lain
+// Repeated polling must be honest ON ITS OWN, without help from other traffic
 // ---------------------------------------------------------------------------
 
-describe("getHealth — polling berulang saat Postgres mati", () => {
-  it("12 polling berturut-turut jujur tanpa satu pun permintaan lain menolong", async () => {
-    // Persis yang diukur di compose: dengan Postgres mati, 12 polling ke
-    // /api/health tetap melaporkan `cache.healthy = true` dengan umur merangkak
-    // 100 → 101 detik, dan baru jujur bila kebetulan ada permintaan lain yang
-    // menabrak cache dan gagal. Jendela itu tidak boleh ada.
+describe("getHealth — repeated polling while Postgres is down", () => {
+  it("12 consecutive polls are honest without a single other request helping", async () => {
+    // Exactly what was measured on compose: with Postgres down, 12 polls of
+    // /api/health kept reporting `cache.healthy = true` with an age crawling
+    // 100 → 101 seconds, and only became honest if some other request happened
+    // to hit the cache and fail. That window must not exist.
     let clock = new Date("2026-09-10T12:00:00.000Z");
     const h = harness({ now: () => clock });
 
-    // Satu permintaan sukses lebih dulu, supaya ingatan benar-benar berisi
-    // "cache sehat" — tanpa ini tidak ada yang bisa menimpa hasil probe.
-    h.scan.page = page([], { healthy: false, reason: "mati" });
+    // One successful request first, so memory really does hold
+    // "the cache is healthy" — without this there is nothing to overwrite the
+    // probe result with.
+    h.scan.page = page([], { healthy: false, reason: "down" });
     h.cache.items = [record({ tokenId: "7", source: "cache" })];
     const served = await h.service.getAgentsByCategory("GRID");
     expect(served.source).toBe("cache");
 
-    // Postgres mati. Mulai sekarang TIDAK ada permintaan lain sama sekali.
+    // Postgres is down. From here on there is NO other request at all.
     h.cache.throws = new Error("connection refused");
 
     for (let poll = 0; poll < 12; poll++) {
-      clock = new Date(clock.getTime() + 10_000); // polling tiap 10 detik
+      clock = new Date(clock.getTime() + 10_000); // polling every 10 seconds
       const health = await h.service.getHealth();
       const cache = health.sources.find((s) => s.source === "cache");
       expect(cache?.healthy).toBe(false);
       expect(cache?.reason).toContain("connection refused");
-      // Dan umur observasinya tidak merangkak: tiap polling adalah probe baru.
+      // And the observation's age does not crawl: each poll is a fresh probe.
       expect(cache?.ageSeconds).toBe(0);
       expect(cache?.stale).toBe(false);
       expect(health.healthy).toBe(false);
     }
   });
 
-  it("catatan 8004scan yang sehat tapi menua akhirnya membuat degraded true", async () => {
-    // Ini yang membuat `?strict=1` bisa membalas 503: `degraded` dihitung dari
-    // status 8004scan, dan catatan sehat berumur 100 detik tidak lagi boleh
-    // menahannya di `false`.
+  it("a healthy but ageing 8004scan record eventually makes degraded true", async () => {
+    // This is what lets `?strict=1` answer 503: `degraded` is computed from
+    // 8004scan's status, and a healthy record 100 seconds old must no longer
+    // hold it at `false`.
     let clock = new Date("2026-09-10T12:00:00.000Z");
     const h = harness({ now: () => clock, healthTtlSeconds: 30 });
     h.scan.page = page([record({ tokenId: "1" })]);
@@ -1948,7 +1949,7 @@ describe("getHealth — polling berulang saat Postgres mati", () => {
 
     expect((await h.service.getHealth()).degraded).toBe(false);
 
-    // 100 detik berlalu tanpa satu pun permintaan baru.
+    // 100 seconds pass with not a single new request.
     clock = new Date(clock.getTime() + 100_000);
     const health = await h.service.getHealth();
     const scan = health.sources.find((s) => s.source === "scan8004");
@@ -1958,9 +1959,9 @@ describe("getHealth — polling berulang saat Postgres mati", () => {
     expect(health.degraded).toBe(true);
   });
 
-  it("Postgres mati + catatan 8004scan kedaluwarsa → healthy false DAN degraded true", async () => {
-    // Keadaan yang diukur di compose. Keduanya harus benar supaya rute
-    // `?strict=1` (yang mengaitkan 503 pada `degraded`) berhenti membalas 200.
+  it("Postgres down + an expired 8004scan record → healthy false AND degraded true", async () => {
+    // The state measured on compose. Both must be right so that the `?strict=1`
+    // route (which ties its 503 to `degraded`) stops answering 200.
     let clock = new Date("2026-09-10T12:00:00.000Z");
     const h = harness({ now: () => clock, healthTtlSeconds: 30 });
     h.scan.page = page([record({ tokenId: "1" })]);
@@ -1976,15 +1977,15 @@ describe("getHealth — polling berulang saat Postgres mati", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Probe harus membaca NILAI BALIK, bukan ada-tidaknya exception
+// The probe must read the RETURN VALUE, not the absence of an exception
 // ---------------------------------------------------------------------------
 
-describe("getHealth — probe cache membaca hasil, bukan absennya exception", () => {
+describe("getHealth — the cache probe reads the result, not the absence of an exception", () => {
   /**
-   * Bentuk persis yang dikembalikan `db/repo.ts` saat Postgres tak terjangkau.
-   * Kedua fungsi bacanya **tidak melempar** — itu kontraknya — melainkan
-   * menyatakan kegagalan di dalam nilai balik. Fake ini meniru itu apa adanya,
-   * karena di situlah bug-nya bersembunyi.
+   * The exact shape `db/repo.ts` returns when Postgres is unreachable. Both of
+   * its read functions **do not throw** — that is their contract — they state the
+   * failure inside the return value instead. This fake mirrors that faithfully,
+   * because that is where the bug was hiding.
    */
   function deadPostgresCache(): FakeCache {
     const cache = new FakeCache();
@@ -1992,7 +1993,7 @@ describe("getHealth — probe cache membaca hasil, bukan absennya exception", ()
       {
         source: "cache",
         healthy: false,
-        reason: "cache Postgres gagal: connect ECONNREFUSED 172.18.0.2:5432",
+        reason: "Postgres cache failed: connect ECONNREFUSED 172.18.0.2:5432",
         checkedAt: NOW.toISOString(),
       },
     ];
@@ -2000,7 +2001,7 @@ describe("getHealth — probe cache membaca hasil, bukan absennya exception", ()
       ...page([], {
         source: "cache",
         healthy: false,
-        reason: "cache Postgres gagal: connect ECONNREFUSED 172.18.0.2:5432",
+        reason: "Postgres cache failed: connect ECONNREFUSED 172.18.0.2:5432",
       }),
       ageSeconds: null,
       stale: false,
@@ -2008,11 +2009,11 @@ describe("getHealth — probe cache membaca hasil, bukan absennya exception", ()
     return cache;
   }
 
-  it("Postgres mati yang TIDAK melempar tetap dilaporkan mati", async () => {
-    // Reproduksi galat produksi: `docker stop fugugent-postgres`, tunggu 8 dtk,
-    // GET /api/health. Dulu jawabannya `cache: true, age: 0` dengan alasan
-    // "probe: pembacaan source_health berhasil" — pembacaan segar yang salah,
-    // karena "tidak melempar" disimpulkan sebagai "berhasil".
+  it("a Postgres that is down and does NOT throw is still reported as down", async () => {
+    // Reproducing the production error: `docker stop fugugent-postgres`, wait 8 s,
+    // GET /api/health. The answer used to be `cache: true, age: 0` with the reason
+    // "probe: source_health read succeeded" — a fresh reading that was wrong,
+    // because "did not throw" was inferred as "succeeded".
     const cache = deadPostgresCache();
     const service = createAgentService({
       scan8004: new FakeScan(),
@@ -2027,22 +2028,22 @@ describe("getHealth — probe cache membaca hasil, bukan absennya exception", ()
       expect(row?.healthy).toBe(false);
       expect(row?.reason).toContain("ECONNREFUSED");
       expect(health.healthy).toBe(false);
-      // `degraded` juga true, karena 8004scan belum pernah terbukti sehat —
-      // inilah yang membuat `?strict=1` membalas 503.
+      // `degraded` is true as well, because 8004scan has never been proven
+      // healthy — this is what makes `?strict=1` answer 503.
       expect(health.degraded).toBe(true);
     }
   });
 
-  it("probe yang berhasil tetap dilaporkan sehat, dengan alasan yang jujur", async () => {
+  it("a successful probe is still reported healthy, with an honest reason", async () => {
     const h = harness();
     const health = await h.service.getHealth();
     const row = health.sources.find((s) => s.source === "cache");
     expect(row?.healthy).toBe(true);
-    expect(row?.reason).toContain("kueri cache berhasil");
+    expect(row?.reason).toContain("cache query succeeded");
     expect(health.healthy).toBe(true);
   });
 
-  it("probe cache berbatas waktu — /api/health tidak ikut menggantung", async () => {
+  it("the cache probe is deadline-bounded — /api/health does not hang along with it", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
     try {
@@ -2060,10 +2061,10 @@ describe("getHealth — probe cache membaca hasil, bukan absennya exception", ()
     }
   });
 
-  it("seed tidak punya keadaan `belum diobservasi`, juga pada boot yang masih bersih", async () => {
-    // Baris `seed` yang tersimpan dari boot sebelumnya dulu ikut menua dan
-    // akhirnya dilaporkan `healthy: false` — membingungkan untuk sumber yang
-    // menurut penjelasan kita sendiri tidak bisa mati.
+  it("the seed has no `not yet observed` state, not even on a still-clean boot", async () => {
+    // A `seed` row stored from an earlier boot used to age along with everything
+    // else and eventually be reported `healthy: false` — confusing for a source
+    // that by our own explanation cannot die.
     const h = harness();
     h.cache.latest = [
       {
@@ -2239,7 +2240,7 @@ describe("first-party FuguRegistry overlay", () => {
   it("seed pages stay listing-free — seed deliberately claims no price", async () => {
     const h = harness();
     h.onchain.page = page([], { source: "onchain" });
-    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.scan.page = page([], { healthy: false, reason: "down" });
 
     const result = await h.service.getAgentsByCategory("GRID");
     expect(result.source).toBe("seed");
@@ -2328,7 +2329,7 @@ describe("first-party FuguRegistry overlay", () => {
 
     h.onchain.page = page([], { source: "onchain" });
     const h2 = harness({ upstreamCooldownMs: 0 });
-    h2.scan.page = page([], { healthy: false, reason: "mati" });
+    h2.scan.page = page([], { healthy: false, reason: "down" });
     h2.onchain.page = page([], { source: "onchain" });
     const lvl4 = await h2.service.getAgentsByCategory("GRID");
 
@@ -2650,7 +2651,7 @@ describe("listing 1 (Guardian) carries no on-chain JSON — verified on-chain", 
       ],
       { source: "onchain" },
     );
-    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.scan.page = page([], { healthy: false, reason: "down" });
     h.cache.items = [];
 
     const result = await h.service.getAgentsByCategory("HEALTH_FACTOR");
@@ -2938,7 +2939,7 @@ describe("a stale cached listing never outranks the live registry read", () => {
     h.onchain.page = page([fresh], { source: "onchain" });
 
     // What Postgres still holds: same agent, older listing.
-    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.scan.page = page([], { healthy: false, reason: "down" });
     h.scan.detail = {
       agent: null,
       source: "scan8004",
@@ -2976,7 +2977,7 @@ describe("a stale cached listing never outranks the live registry read", () => {
   it("a record with no matching listing keeps whatever it had", async () => {
     const h = harness();
     h.onchain.page = page([onchainRecord("8006", "GRID")], { source: "onchain" });
-    h.scan.page = page([], { healthy: false, reason: "mati" });
+    h.scan.page = page([], { healthy: false, reason: "down" });
     const other = onchainRecord("777", "GRID");
     h.cache.items = [{ ...other, source: "cache" }];
 

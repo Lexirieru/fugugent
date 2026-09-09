@@ -2,7 +2,7 @@
   "name": "fugugent-backend",
   "version": "0.1.0",
   "private": true,
-  "description": "Backend Fugugent — BFF 8004scan, indexer on-chain, classifier, scheduler untuk api.fugugent.xyz.",
+  "description": "The Fugugent backend — an 8004scan BFF, on-chain indexer, classifier, and scheduler for api.fugugent.xyz.",
   "type": "module",
   "engines": {
     "node": ">=22"

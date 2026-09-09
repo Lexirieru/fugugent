@@ -1,11 +1,11 @@
 /**
- * Seed terkurasi — **tingkat keempat**, jaring terakhir sebelum marketplace kosong.
+ * The curated seed — **level four**, the last net before an empty marketplace.
  *
- * Yang dikunci di sini bukan "ada isinya", melainkan **kejujurannya**: setiap
- * agent di seed harus benar-benar ada (wallet Altana-nya bisa dicek di
- * `ai/<agent>/app/agent/studio.toml` dan di Keystore on-chain), harus mengaku
- * `source: "seed"`, dan tidak boleh mengklaim apa pun yang belum terjadi —
- * tidak ada listing `FuguRegistry` palsu, tidak ada reputasi karangan.
+ * What is locked down here is not "it has content" but **its honesty**: every
+ * agent in the seed must really exist (its Altana wallet can be checked in
+ * `ai/<agent>/app/agent/studio.toml` and in the on-chain Keystore), must admit
+ * `source: "seed"`, and must not claim anything that has not happened yet — no
+ * fake `FuguRegistry` listing, no invented reputation.
  */
 import { describe, expect, it } from "vitest";
 import { classify } from "../../classify.js";
@@ -18,8 +18,8 @@ import {
 
 const NOW = new Date("2026-09-10T00:00:00.000Z");
 
-describe("seed terkurasi", () => {
-  it("berisi empat agent Fugugent kita sendiri, satu per kategori", () => {
+describe("the curated seed", () => {
+  it("holds our own four Fugugent agents, one per category", () => {
     const items = seedAgents(NOW);
     expect(items).toHaveLength(4);
 
@@ -35,7 +35,7 @@ describe("seed terkurasi", () => {
     );
   });
 
-  it("memakai wallet Altana sungguhan dari studio.toml tiap agent", () => {
+  it("uses the real Altana wallet from each agent's studio.toml", () => {
     const wallets = seedAgents(NOW).map((a) => a.agentWallet);
     expect(wallets.sort()).toEqual(
       [
@@ -47,31 +47,31 @@ describe("seed terkurasi", () => {
     );
   });
 
-  it("setiap record mengaku source seed dan berumur sejak tanggal kurasi", () => {
+  it("every record admits source seed and is aged from the curation date", () => {
     const items = seedAgents(NOW);
     for (const agent of items) {
       expect(agent.source).toBe("seed");
       expect(agent.fetchedAt).toBe(CURATED_SEED_AT);
     }
-    // Dua hari setelah tanggal kurasi.
+    // Two days after the curation date.
     expect(Math.floor((NOW.getTime() - Date.parse(CURATED_SEED_AT)) / 1000)).toBe(172_800);
   });
 
-  it("CURATED_SEED_AT wajib di masa lalu — bukan `now` yang menyamar", () => {
-    // Seluruh kejujuran `ageSeconds` seed bertumpu pada satu konstanta ini.
-    // Menggantinya dengan `new Date().toISOString()` di menit terakhir akan
-    // membuat data kurasi tampil sebagai data segar, dan assertion
-    // `fetchedAt === CURATED_SEED_AT` di atas tetap hijau. Karena itu
-    // konstantanya diperiksa terhadap jam sungguhan, bukan terhadap dirinya.
+  it("CURATED_SEED_AT must be in the past — not a `now` in disguise", () => {
+    // The whole honesty of the seed's `ageSeconds` rests on this one constant.
+    // Replacing it with `new Date().toISOString()` at the last minute would make
+    // curated data appear as fresh data, and the `fetchedAt === CURATED_SEED_AT`
+    // assertion above would stay green. So the constant is checked against a real
+    // clock, not against itself.
     const parsed = Date.parse(CURATED_SEED_AT);
     expect(Number.isNaN(parsed)).toBe(false);
     expect(parsed).toBeLessThanOrEqual(Date.now() - 3_600_000);
   });
 
-  it("tidak mengklaim apa pun yang belum terjadi", () => {
+  it("claims nothing that has not happened yet", () => {
     for (const agent of seedAgents(NOW)) {
-      // Belum ada listing di FuguRegistry, belum ada agentId ERC-8004 —
-      // mengarangnya akan membuat UI menampilkan harga yang tidak bisa dibayar.
+      // No FuguRegistry listing yet, no ERC-8004 agentId yet — inventing either
+      // would make the UI show a price that cannot be paid.
       expect(agent.fuguListing).toBeNull();
       expect(agent.agentId).toBeNull();
       expect(agent.registryAddress).toBeNull();
@@ -80,17 +80,17 @@ describe("seed terkurasi", () => {
       expect(agent.reputation.totalScore).toBeNull();
       expect(agent.reputation.totalFeedbacks).toBe(0);
       expect(agent.reputation.starCount).toBe(0);
-      // tokenId-nya sengaja TIDAK berbentuk desimal: ia bukan token ERC-8004,
-      // dan tidak boleh bisa disalahartikan sebagai satu.
+      // Its tokenId is deliberately NOT decimal-shaped: it is not an ERC-8004
+      // token, and it must not be mistakable for one.
       expect(agent.tokenId).toMatch(/^seed-/);
       expect(agent.id).toBe(`97:${agent.tokenId}`);
     }
   });
 
-  it("deskripsinya cukup deskriptif sehingga classifier setuju dengan kategorinya", () => {
-    // Ini yang menahan seed jadi teks pemasaran kosong: kalau deskripsi seed
-    // tidak lagi menjelaskan apa yang agent lakukan, classifier akan
-    // berselisih dengan kategori kurasi dan test ini merah.
+  it("its descriptions are descriptive enough that the classifier agrees with their category", () => {
+    // This is what stops the seed from becoming empty marketing copy: if a seed
+    // description no longer explains what the agent does, the classifier will
+    // disagree with the curated category and this test goes red.
     for (const agent of seedAgents(NOW)) {
       const verdict = classify({ ...agent, classification: null });
       expect(verdict.category).toBe(agent.classification?.category);
@@ -98,7 +98,7 @@ describe("seed terkurasi", () => {
     }
   });
 
-  it("createSeedSource menyaring per kategori dan memberi halaman", async () => {
+  it("createSeedSource filters per category and pages", async () => {
     const seed = createSeedSource({ now: () => NOW });
 
     const grid = await seed.listAgents("GRID", { limit: 10, offset: 0 });
@@ -113,7 +113,7 @@ describe("seed terkurasi", () => {
     expect(empty.total).toBe(1);
   });
 
-  it("createSeedSource mencari satu agent per id", async () => {
+  it("createSeedSource looks up a single agent by id", async () => {
     const seed = createSeedSource({ now: () => NOW });
     const hit = await seed.getAgent("97:seed-fuguguardian");
     expect(hit.agent?.name).toBe("FuguGuardian");
@@ -123,15 +123,15 @@ describe("seed terkurasi", () => {
     const miss = await seed.getAgent("97:404");
     expect(miss.agent).toBeNull();
     expect(miss.healthy).toBe(true);
-    expect(miss.reason).toContain("tidak ada di seed");
+    expect(miss.reason).toContain("not in the curated seed");
   });
 
-  it("mengembalikan salinan — pemanggil tidak bisa merusak seed untuk pemanggil lain", () => {
+  it("returns a copy — a caller cannot corrupt the seed for another caller", () => {
     const first = seedAgents(NOW);
-    first[0]!.name = "dirusak";
-    first[0]!.tags.push("dirusak");
+    first[0]!.name = "corrupted";
+    first[0]!.tags.push("corrupted");
     const second = seedAgents(NOW);
-    expect(second[0]!.name).not.toBe("dirusak");
-    expect(second[0]!.tags).not.toContain("dirusak");
+    expect(second[0]!.name).not.toBe("corrupted");
+    expect(second[0]!.tags).not.toContain("corrupted");
   });
 });

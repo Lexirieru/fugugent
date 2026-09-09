@@ -26,7 +26,7 @@ function makeRecord(overrides: Partial<AgentRecord> = {}): AgentRecord {
     registryAddress: "0xb2f36070E6eae3353E8e755172B477DF213ae248",
     agentId: null,
     name: "Fugu Grid",
-    description: "Agent grid trading di PancakeSwap v3",
+    description: "Grid trading agent on PancakeSwap v3",
     imageUrl: null,
     agentType: "trading",
     tags: ["grid"],
@@ -72,7 +72,7 @@ describe("upsertAgents", () => {
     db = await freshDb();
   });
 
-  it("menyimpan record dan mengembalikannya lewat getCachedAgents", async () => {
+  it("stores a record and returns it through getCachedAgents", async () => {
     await upsertAgents(db, [makeRecord()]);
     const page = await getCachedAgents(db);
     expect(page.total).toBe(1);
@@ -81,7 +81,7 @@ describe("upsertAgents", () => {
     expect(page.items[0]!.id).toBe("97:49637");
   });
 
-  it("idempoten — dua kali dengan data sama tidak menghasilkan duplikat", async () => {
+  it("idempotent — twice with the same data produces no duplicate", async () => {
     const records = [makeRecord(), makeRecord({ tokenId: "2" })];
     await upsertAgents(db, records);
     await upsertAgents(db, records);
@@ -90,7 +90,7 @@ describe("upsertAgents", () => {
     expect(page.items.map((i) => i.id).sort()).toEqual(["97:2", "97:49637"]);
   });
 
-  it("memperbarui baris yang sudah ada, bukan menambah baris baru", async () => {
+  it("updates the existing row rather than adding a new one", async () => {
     await upsertAgents(db, [makeRecord()]);
     await upsertAgents(db, [makeRecord({ name: "Fugu Grid v2", fetchedAt: "2026-09-08T13:00:00.000Z" })]);
     const page = await getCachedAgents(db);
@@ -99,12 +99,12 @@ describe("upsertAgents", () => {
     expect(page.items[0]!.fetchedAt).toBe("2026-09-08T13:00:00.000Z");
   });
 
-  it("mengembalikan jumlah record yang ditulis", async () => {
+  it("returns the number of records written", async () => {
     expect(await upsertAgents(db, [makeRecord(), makeRecord({ tokenId: "2" })])).toBe(2);
     expect(await upsertAgents(db, [])).toBe(0);
   });
 
-  it("mempertahankan nilai uang bigint ekstrem lewat Postgres tanpa kehilangan presisi", async () => {
+  it("preserves extreme bigint money values through Postgres without losing precision", async () => {
     await upsertAgents(db, [
       makeRecord({
         fuguListing: {
@@ -126,9 +126,9 @@ describe("upsertAgents", () => {
     expect(page.items[0]!.fuguListing?.listingId).toBe(7n);
   });
 
-  it("menulis klasifikasi ke agent_categories dan tidak menggandakannya saat di-upsert ulang", async () => {
+  it("writes the classification into agent_categories and does not duplicate it on re-upsert", async () => {
     const classified = makeRecord({
-      classification: { category: "GRID", confidence: 0.9, reason: "kata kunci grid" },
+      classification: { category: "GRID", confidence: 0.9, reason: "grid keyword" },
     });
     await upsertAgents(db, [classified]);
     await upsertAgents(db, [classified]);
@@ -137,11 +137,11 @@ describe("upsertAgents", () => {
     expect(page.items[0]!.classification).toEqual({
       category: "GRID",
       confidence: 0.9,
-      reason: "kata kunci grid",
+      reason: "grid keyword",
     });
   });
 
-  it("mengganti kategori lama saat classifier berubah pikiran", async () => {
+  it("replaces the old category when the classifier changes its mind", async () => {
     await upsertAgents(db, [
       makeRecord({ classification: { category: "GRID", confidence: 0.9, reason: "a" } }),
     ]);
@@ -152,20 +152,20 @@ describe("upsertAgents", () => {
     expect((await getCachedAgents(db, { category: "YIELD" })).total).toBe(1);
   });
 
-  it("record tanpa klasifikasi tidak menghasilkan baris kategori", async () => {
+  it("a record with no classification produces no category row", async () => {
     await upsertAgents(db, [makeRecord()]);
     expect((await getCachedAgents(db, { category: "GRID" })).total).toBe(0);
     expect((await getCachedAgents(db)).total).toBe(1);
   });
 });
 
-describe("getCachedAgents — umur data selalu ikut terbawa", () => {
+describe("getCachedAgents — the age of the data always travels with it", () => {
   let db: FuguDb;
   beforeEach(async () => {
     db = await freshDb();
   });
 
-  it("melaporkan umur data dalam detik relatif terhadap `now` yang disuntikkan", async () => {
+  it("reports the data age in seconds relative to the injected `now`", async () => {
     await upsertAgents(db, [makeRecord()]);
     const page = await getCachedAgents(db, {}, new Date("2026-09-08T12:00:42.000Z"));
     expect(page.ageSeconds).toBe(42);
@@ -173,7 +173,7 @@ describe("getCachedAgents — umur data selalu ikut terbawa", () => {
     expect(page.newestFetchedAt).toBe(T0);
   });
 
-  it("umur dihitung dari record tertua di halaman", async () => {
+  it("the age is computed from the oldest record on the page", async () => {
     await upsertAgents(db, [
       makeRecord({ tokenId: "1", fetchedAt: "2026-09-08T12:00:00.000Z" }),
       makeRecord({ tokenId: "2", fetchedAt: "2026-09-08T11:00:00.000Z" }),
@@ -183,7 +183,7 @@ describe("getCachedAgents — umur data selalu ikut terbawa", () => {
     expect(page.freshestAgeSeconds).toBe(60);
   });
 
-  it("menandai stale ketika lebih tua dari maxAgeSeconds, tanpa menyembunyikan datanya", async () => {
+  it("flags stale once older than maxAgeSeconds, without hiding the data", async () => {
     await upsertAgents(db, [makeRecord()]);
     const stale = await getCachedAgents(
       db,
@@ -201,7 +201,7 @@ describe("getCachedAgents — umur data selalu ikut terbawa", () => {
     expect(fresh.stale).toBe(false);
   });
 
-  it("cache kosong tetap sehat: tidak ada umur untuk dilaporkan", async () => {
+  it("an empty cache is still healthy: there is no age to report", async () => {
     const page = await getCachedAgents(db);
     expect(page.items).toEqual([]);
     expect(page.total).toBe(0);
@@ -210,7 +210,7 @@ describe("getCachedAgents — umur data selalu ikut terbawa", () => {
     expect(page.stale).toBe(false);
   });
 
-  it("selalu menandai dirinya sebagai sumber cache", async () => {
+  it("always marks itself as the cache source", async () => {
     await upsertAgents(db, [makeRecord()]);
     const page = await getCachedAgents(db);
     expect(page.source).toBe("cache");
@@ -218,7 +218,7 @@ describe("getCachedAgents — umur data selalu ikut terbawa", () => {
     expect(page.reason).toBeNull();
   });
 
-  it("agentAgeSeconds menghitung umur satu record", () => {
+  it("agentAgeSeconds computes the age of a single record", () => {
     expect(agentAgeSeconds(makeRecord(), new Date("2026-09-08T12:00:10.000Z"))).toBe(10);
   });
 });
@@ -269,45 +269,45 @@ describe("getCachedAgents — filter", () => {
     ]);
   });
 
-  it("menyaring per chainId", async () => {
+  it("filters by chainId", async () => {
     expect((await getCachedAgents(db, { chainId: 56 })).total).toBe(1);
     expect((await getCachedAgents(db, { chainId: 97 })).total).toBe(2);
   });
 
-  it("menyaring per kategori Fugu", async () => {
+  it("filters by Fugu category", async () => {
     const page = await getCachedAgents(db, { category: "REBALANCING" });
     expect(page.items.map((i) => i.name)).toEqual(["Rebalancer Pro"]);
   });
 
-  it("menyaring per ambang kepercayaan klasifikasi", async () => {
+  it("filters by the classification confidence threshold", async () => {
     expect((await getCachedAgents(db, { category: "GRID", minConfidence: 0.5 })).total).toBe(0);
     expect((await getCachedAgents(db, { category: "GRID", minConfidence: 0.3 })).total).toBe(1);
   });
 
-  it("mencari pada nama dan deskripsi tanpa peduli huruf besar-kecil", async () => {
+  it("searches the name and the description case-insensitively", async () => {
     expect((await getCachedAgents(db, { search: "grid bot" })).total).toBe(1);
     expect((await getCachedAgents(db, { search: "pancakeswap" })).total).toBe(3);
   });
 
-  it("menyaring hanya yang aktif", async () => {
+  it("filters to active ones only", async () => {
     expect((await getCachedAgents(db, { onlyActive: true })).total).toBe(2);
   });
 
-  it("menyaring hanya yang terdaftar di FuguRegistry dan yang terkurasi", async () => {
+  it("filters to only those listed in FuguRegistry and those curated", async () => {
     expect((await getCachedAgents(db, { onlyListed: true })).total).toBe(1);
     expect((await getCachedAgents(db, { onlyCurated: true })).items[0]!.name).toBe("Grid Bot");
   });
 
-  it("menyaring per skor reputasi minimum", async () => {
+  it("filters by minimum reputation score", async () => {
     expect((await getCachedAgents(db, { minTotalScore: 80 })).total).toBe(1);
   });
 
-  it("mengurutkan skor tertinggi lebih dulu secara bawaan", async () => {
+  it("orders the highest score first by default", async () => {
     const page = await getCachedAgents(db, { chainId: 97 });
     expect(page.items.map((i) => i.name)).toEqual(["Rebalancer Pro", "Grid Bot"]);
   });
 
-  it("memberi halaman: limit, offset, dan total keseluruhan", async () => {
+  it("pages: limit, offset, and the overall total", async () => {
     const page = await getCachedAgents(db, { limit: 2, offset: 2 });
     expect(page.total).toBe(3);
     expect(page.limit).toBe(2);
@@ -315,7 +315,7 @@ describe("getCachedAgents — filter", () => {
     expect(page.items).toHaveLength(1);
   });
 
-  it("getCachedAgent mengembalikan satu agent beserta umurnya", async () => {
+  it("getCachedAgent returns a single agent along with its age", async () => {
     const hit = await getCachedAgent(db, "97:1", new Date("2026-09-08T12:00:05.000Z"));
     expect(hit.agent?.name).toBe("Rebalancer Pro");
     expect(hit.ageSeconds).toBe(5);
@@ -334,7 +334,7 @@ describe("recordSourceHealth", () => {
     db = await freshDb();
   });
 
-  it("mencatat riwayat dan mengembalikan status terakhir per sumber", async () => {
+  it("records history and returns the latest status per source", async () => {
     await recordSourceHealth(db, {
       source: "scan8004",
       healthy: false,
@@ -363,30 +363,29 @@ describe("recordSourceHealth", () => {
     expect(latest.find((h) => h.source === "onchain")!.healthy).toBe(true);
   });
 
-  it("menyimpan alasan kegagalan apa adanya", async () => {
+  it("stores the failure reason verbatim", async () => {
     await recordSourceHealth(db, {
       source: "cache",
       healthy: false,
-      reason: "koneksi Postgres putus",
+      reason: "Postgres connection dropped",
       checkedAt: "2026-09-08T12:00:00.000Z",
     });
-    expect((await getLatestSourceHealth(db))[0]!.reason).toBe("koneksi Postgres putus");
+    expect((await getLatestSourceHealth(db))[0]!.reason).toBe("Postgres connection dropped");
   });
 
-  it("tanpa catatan sama sekali mengembalikan daftar kosong", async () => {
+  it("with no records at all it returns an empty list", async () => {
     expect(await getLatestSourceHealth(db)).toEqual([]);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Regresi review putaran 1 — Critical 3.1
+// Review round 1 regression — Critical 3.1
 //
-// Sebelum perbaikan, `upsertAgents` menimpa SELURUH kolom dengan `excluded.*`
-// dan menghapus `agent_categories` untuk semua id yang disentuh. Akibatnya
-// penyegaran 8004scan yang BERHASIL menghapus listing first-party kita sendiri
-// beserta hasil classifier — persis sebelum cache ini dibutuhkan sebagai
-// tingkat kedua fallback. Setiap test di blok ini gagal bila perbaikan itu
-// dibatalkan.
+// Before the fix, `upsertAgents` overwrote EVERY column with `excluded.*` and
+// deleted `agent_categories` for every id it touched. As a result, a SUCCESSFUL
+// 8004scan refresh erased our own first-party listing along with the classifier
+// output — right before this cache was needed as the second fallback level.
+// Every test in this block fails if that fix is reverted.
 // ---------------------------------------------------------------------------
 
 const LISTING = {
@@ -402,7 +401,7 @@ const LISTING = {
   metadataURI: "ipfs://bafy",
 };
 
-/** Bentuk record seperti yang benar-benar disusun `readFuguListings()`. */
+/** The record shape `readFuguListings()` actually builds. */
 function onchainRecord(overrides: Partial<AgentRecord> = {}): AgentRecord {
   return makeRecord({
     source: "onchain",
@@ -419,12 +418,12 @@ function onchainRecord(overrides: Partial<AgentRecord> = {}): AgentRecord {
       starCount: 0,
     },
     fuguListing: LISTING,
-    classification: { category: "YIELD", confidence: 0.95, reason: "kategori on-chain" },
+    classification: { category: "YIELD", confidence: 0.95, reason: "on-chain category" },
     ...overrides,
   });
 }
 
-/** Bentuk record seperti yang disusun normalizer 8004scan: kaya metadata, buta listing. */
+/** The record shape the 8004scan normalizer builds: rich in metadata, blind to listings. */
 function scanRecord(overrides: Partial<AgentRecord> = {}): AgentRecord {
   return makeRecord({
     source: "scan8004",
@@ -446,47 +445,47 @@ function scanRecord(overrides: Partial<AgentRecord> = {}): AgentRecord {
   });
 }
 
-describe("penggabungan lintas sumber — penulisan satu sumber tidak menghapus milik sumber lain", () => {
+describe("cross-source merging — one source's write never erases another source's data", () => {
   let db: FuguDb;
   beforeEach(async () => {
     db = await freshDb();
   });
 
-  it("penyegaran 8004scan tidak menghapus listing FuguRegistry yang dibaca on-chain", async () => {
+  it("an 8004scan refresh does not erase the FuguRegistry listing read on-chain", async () => {
     await upsertAgents(db, [onchainRecord()]);
     await upsertAgents(db, [scanRecord()]);
 
     const page = await getCachedAgents(db);
     const agent = page.items[0]!;
 
-    // yang HILANG sebelum perbaikan:
+    // what was LOST before the fix:
     expect(agent.fuguListing?.priceUsd8PerPeriod).toBe(1_500_000_000n);
     expect(agent.fuguListing?.curated).toBe(true);
     expect((await getCachedAgents(db, { onlyListed: true })).total).toBe(1);
     expect((await getCachedAgents(db, { onlyCurated: true })).total).toBe(1);
 
-    // yang memang seharusnya diperbarui oleh 8004scan:
+    // what 8004scan really should be updating:
     expect(agent.name).toBe("OpenOdds.Ai");
     expect(agent.tags).toEqual(["prediction", "sports"]);
     expect(agent.reputation.starCount).toBe(8);
   });
 
-  it("penyegaran 8004scan tidak menghapus klasifikasi maupun baris agent_categories", async () => {
+  it("an 8004scan refresh erases neither the classification nor the agent_categories rows", async () => {
     await upsertAgents(db, [onchainRecord()]);
     await upsertAgents(db, [scanRecord()]);
 
-    // kolom klasifikasi bertahan…
+    // the classification columns survive…
     const page = await getCachedAgents(db);
     expect(page.items[0]!.classification).toEqual({
       category: "YIELD",
       confidence: 0.95,
-      reason: "kategori on-chain",
+      reason: "on-chain category",
     });
-    // …dan navigasi per kategori tetap menemukannya
+    // …and per-category navigation still finds it
     expect((await getCachedAgents(db, { category: "YIELD" })).total).toBe(1);
   });
 
-  it("pembacaan on-chain tidak mengganti nama sungguhan dengan placeholder `Agent #…`", async () => {
+  it("the on-chain read does not replace a real name with an `Agent #…` placeholder", async () => {
     await upsertAgents(db, [scanRecord()]);
     await upsertAgents(db, [onchainRecord({ classification: null })]);
 
@@ -498,11 +497,11 @@ describe("penggabungan lintas sumber — penulisan satu sumber tidak menghapus m
     expect(agent.reputation.starCount).toBe(8);
     expect(agent.reputation.totalScore).toBe(49.06);
 
-    // …sementara listing yang memang hanya diketahui on-chain tetap masuk
+    // …while the listing only the on-chain read knows about still goes in
     expect(agent.fuguListing?.priceUsd8PerPeriod).toBe(1_500_000_000n);
   });
 
-  it("urutan penulisan tidak mengubah hasil akhir", async () => {
+  it("the write order does not change the final result", async () => {
     await upsertAgents(db, [onchainRecord(), scanRecord()]);
     const forward = (await getCachedAgents(db)).items[0]!;
 
@@ -516,13 +515,13 @@ describe("penggabungan lintas sumber — penulisan satu sumber tidak menghapus m
     expect(forward.classification?.category).toBe(backward.classification?.category);
   });
 
-  it("penggabungan tidak membekukan status: `isActive` tetap bisa diubah menjadi false", async () => {
+  it("merging does not freeze the status: `isActive` can still be changed to false", async () => {
     await upsertAgents(db, [scanRecord()]);
     await upsertAgents(db, [scanRecord({ isActive: false })]);
     expect((await getCachedAgents(db, { onlyActive: true })).total).toBe(0);
   });
 
-  it("sumber yang sama tetap boleh memperbarui metadatanya sendiri", async () => {
+  it("the same source may still update its own metadata", async () => {
     await upsertAgents(db, [scanRecord()]);
     await upsertAgents(db, [scanRecord({ name: "OpenOdds.Ai v2", tags: ["prediction"] })]);
     const agent = (await getCachedAgents(db)).items[0]!;
@@ -531,19 +530,19 @@ describe("penggabungan lintas sumber — penulisan satu sumber tidak menghapus m
   });
 });
 
-describe("record cacat dilewati, batch tetap tersimpan", () => {
+describe("a malformed record is skipped, the batch is still stored", () => {
   let db: FuguDb;
   beforeEach(async () => {
     db = await freshDb();
   });
 
-  it("satu `fetchedAt` tidak sah tidak menjatuhkan 2 record sehat", async () => {
+  it("one invalid `fetchedAt` does not take down 2 healthy records", async () => {
     const skipped: { id: string; reason: string }[] = [];
     const written = await upsertAgents(
       db,
       [
         makeRecord({ tokenId: "1" }),
-        makeRecord({ tokenId: "2", fetchedAt: "kemarin sore" }),
+        makeRecord({ tokenId: "2", fetchedAt: "yesterday afternoon" }),
         makeRecord({ tokenId: "3" }),
       ],
       { onSkipped: (entry) => skipped.push(entry) },
@@ -555,7 +554,7 @@ describe("record cacat dilewati, batch tetap tersimpan", () => {
     expect(skipped[0]!.reason).toMatch(/fetchedAt/);
   });
 
-  it("`tokenId` yang bukan bilangan bulat desimal dilewati, bukan menjadi kunci primer palsu", async () => {
+  it("a `tokenId` that is not a decimal integer is skipped, not turned into a fake primary key", async () => {
     const skipped: { id: string; reason: string }[] = [];
     const written = await upsertAgents(
       db,
@@ -573,7 +572,7 @@ describe("record cacat dilewati, batch tetap tersimpan", () => {
     expect(skipped[0]!.reason).toMatch(/tokenId/);
   });
 
-  it("nilai uang yang tidak muat numeric(78,0) dilewati, bukan melempar dari tengah transaksi", async () => {
+  it("a money value that does not fit numeric(78,0) is skipped, not thrown from mid-transaction", async () => {
     const skipped: { id: string; reason: string }[] = [];
     const written = await upsertAgents(
       db,
@@ -592,19 +591,19 @@ describe("record cacat dilewati, batch tetap tersimpan", () => {
     expect(skipped[0]!.reason).toMatch(/numeric\(78, 0\)/);
   });
 
-  it("batch yang seluruhnya cacat mengembalikan 0 tanpa menyentuh database", async () => {
+  it("an entirely malformed batch returns 0 without touching the database", async () => {
     expect(await upsertAgents(db, [makeRecord({ tokenId: "1.5" })])).toBe(0);
     expect((await getCachedAgents(db)).total).toBe(0);
   });
 });
 
-describe("kegagalan infrastruktur — pelaporan kesehatan tetap hidup", () => {
+describe("infrastructure failure — health reporting stays alive", () => {
   let db: FuguDb;
   beforeEach(async () => {
     db = await freshDb();
   });
 
-  it("`recordSourceHealth` mengembalikan false alih-alih melempar saat tabelnya hilang", async () => {
+  it("`recordSourceHealth` returns false rather than throwing when its table is gone", async () => {
     await db.execute(sql`drop table source_health`);
     await expect(
       recordSourceHealth(db, {
@@ -616,17 +615,17 @@ describe("kegagalan infrastruktur — pelaporan kesehatan tetap hidup", () => {
     ).resolves.toBe(false);
   });
 
-  it("`getLatestSourceHealth` melaporkan cache-nya sendiri sakit, bukan melempar", async () => {
+  it("`getLatestSourceHealth` reports its own cache as sick rather than throwing", async () => {
     await db.execute(sql`drop table source_health`);
     const latest = await getLatestSourceHealth(db, new Date("2026-09-08T12:00:00.000Z"));
     expect(latest).toHaveLength(1);
     expect(latest[0]!.source).toBe("cache");
     expect(latest[0]!.healthy).toBe(false);
-    expect(latest[0]!.reason).toMatch(/cache Postgres gagal/);
+    expect(latest[0]!.reason).toMatch(/Postgres cache failed/);
     expect(latest[0]!.checkedAt).toBe("2026-09-08T12:00:00.000Z");
   });
 
-  it("`upsertAgents` sengaja tetap melempar — penulisan yang gagal harus terlihat", async () => {
+  it("`upsertAgents` deliberately still throws — a failed write must be visible", async () => {
     await db.execute(sql`drop table agent_categories`);
     await db.execute(sql`drop table agents`);
     await expect(upsertAgents(db, [makeRecord()])).rejects.toThrow();

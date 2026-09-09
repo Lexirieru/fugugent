@@ -1,16 +1,16 @@
 /**
- * Uji integrasi terhadap Postgres **sungguhan**.
+ * An integration test against a **real** Postgres.
  *
- * Dilewati secara bawaan. Jalankan dengan sengaja:
+ * Skipped by default. Run it deliberately:
  *
  * ```bash
  * FUGU_TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/fugugent_test pnpm test
  * ```
  *
- * Test ini membuat skema di database yang ditunjuk dan **menghapus isi ketiga
- * tabelnya**. Jangan pernah arahkan ke database berisi data yang kamu sayangi.
- * Tanpa env tersebut `pnpm test` tetap hijau di mesin tanpa Postgres — tidak ada
- * satu pun test lain di berkas ini yang menyentuh jaringan.
+ * This test creates the schema in the database it is pointed at and **truncates
+ * all three of its tables**. Never point it at a database holding data you care
+ * about. Without that env var `pnpm test` stays green on a machine with no
+ * Postgres — not one other test in this file touches the network.
  */
 import { sql } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
@@ -26,11 +26,11 @@ const record: AgentRecord = {
   tokenId: "900001",
   registryAddress: null,
   agentId: null,
-  name: "Integrasi Fugu",
-  description: "record uji integrasi",
+  name: "Fugu Integration",
+  description: "an integration test record",
   imageUrl: null,
   agentType: null,
-  tags: ["integrasi"],
+  tags: ["integration"],
   categories: [],
   skills: [],
   domains: [],
@@ -50,7 +50,7 @@ const record: AgentRecord = {
     averageScore: null,
     starCount: 0,
   },
-  classification: { category: "YIELD", confidence: 0.55, reason: "integrasi" },
+  classification: { category: "YIELD", confidence: 0.55, reason: "integration" },
   fuguListing: {
     listingId: 1n,
     erc8004AgentId: 900001n,
@@ -61,7 +61,7 @@ const record: AgentRecord = {
     periodSeconds: 86_400,
     active: true,
     curated: false,
-    metadataURI: "ipfs://integrasi",
+    metadataURI: "ipfs://integration",
   },
   source: "scan8004",
   fetchedAt: "2026-09-08T12:00:00.000Z",
@@ -76,8 +76,8 @@ afterAll(async () => {
   if (handle) await closeDb(handle);
 });
 
-describe.skipIf(!handle)("integrasi Postgres sungguhan (butuh FUGU_TEST_DATABASE_URL)", () => {
-  it("membuat skema, upsert idempoten, dan mengembalikan bigint persis sama", async () => {
+describe.skipIf(!handle)("real Postgres integration (requires FUGU_TEST_DATABASE_URL)", () => {
+  it("creates the schema, upserts idempotently, and returns bigints exactly as written", async () => {
     const db = handle!.db;
     await ensureSchema(db);
     await db.execute(sql`truncate table agent_categories, agents, source_health`);
@@ -90,14 +90,14 @@ describe.skipIf(!handle)("integrasi Postgres sungguhan (butuh FUGU_TEST_DATABASE
     expect(page.items[0]!.fuguListing?.priceUsd8PerPeriod).toBe(2n ** 200n);
     expect(page.ageSeconds).toBe(30);
 
-    // Aturan penggabungan dijalankan lewat SQL (`coalesce`/`nullif`/`case`), jadi
-    // ia harus dibuktikan di Postgres sungguhan, bukan hanya di PGlite.
+    // The merge rules run through SQL (`coalesce`/`nullif`/`case`), so they must
+    // be proven on a real Postgres, not only on PGlite.
     await upsertAgents(db, [
-      { ...record, name: "Integrasi Fugu v2", fuguListing: null, classification: null },
+      { ...record, name: "Fugu Integration v2", fuguListing: null, classification: null },
     ]);
     const merged = await getCachedAgents(db, { onlyListed: true });
     expect(merged.total).toBe(1);
-    expect(merged.items[0]!.name).toBe("Integrasi Fugu v2");
+    expect(merged.items[0]!.name).toBe("Fugu Integration v2");
     expect(merged.items[0]!.fuguListing?.priceUsd8PerPeriod).toBe(2n ** 200n);
     expect((await getCachedAgents(db, { category: "YIELD" })).total).toBe(1);
 

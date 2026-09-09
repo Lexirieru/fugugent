@@ -1,4 +1,4 @@
-# Konteks build sekecil mungkin: hanya sumber + manifest yang ikut ke daemon.
+# Keep the build context as small as possible: only sources + manifests reach the daemon.
 node_modules
 dist
 .env

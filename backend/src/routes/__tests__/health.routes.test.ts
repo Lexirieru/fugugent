@@ -1,10 +1,10 @@
 /**
- * `/api/health` — endpoint yang membuat klaim ketahanan bisa **diperiksa**.
+ * `/api/health` — the endpoint that makes the resilience claims **checkable**.
  *
- * Juri akan mematikan 8004scan lalu membuka endpoint ini. Kalau ia menjawab
- * "semua hijau", seluruh cerita ketahanan produk ini runtuh; kalau ia ikut
- * mati bersama Postgres, ia hilang persis pada saat ia paling dibutuhkan.
- * Kedua kegagalan itu punya test sendiri di bawah.
+ * The judges will take 8004scan down and then open this endpoint. If it answers
+ * "all green", the product's entire resilience story collapses; if it dies along
+ * with Postgres, it disappears at exactly the moment it is needed most. Both
+ * failures have their own test below.
  */
 import { describe, expect, it } from "vitest";
 import { createApp } from "../app.js";
@@ -15,14 +15,14 @@ async function get(app: ReturnType<typeof createApp>, path: string): Promise<Res
   return app.request(`http://api.test${path}`);
 }
 
-/** `Response.json()` bertipe `unknown` di typing Node; badan JSON di test memang dinamis. */
+/** `Response.json()` is typed `unknown` in Node's typings; JSON bodies in tests really are dynamic. */
 // eslint-disable-next-line -eslint/no-explicit-any
 async function json(res: Response): Promise<any> {
   return res.json();
 }
 
 describe("GET /api/health", () => {
-  it("melaporkan status tiap sumber apa adanya", async () => {
+  it("reports each source's status verbatim", async () => {
     const app = createApp({ service: fakeService() });
     const res = await get(app, "/api/health");
 
@@ -34,7 +34,7 @@ describe("GET /api/health", () => {
     expect(body.checkedAt).toBe(FIXED_NOW);
   });
 
-  it("mengaku saat 8004scan tumbang, bukan menampilkan semua hijau", async () => {
+  it("admits when 8004scan is down rather than showing all green", async () => {
     const app = createApp({
       service: fakeService({
         health: async () =>
@@ -61,12 +61,12 @@ describe("GET /api/health", () => {
     const scan = body.sources.find((s: { source: string }) => s.source === "scan8004");
     expect(scan.healthy).toBe(false);
     expect(scan.reason).toContain("DATABASE_ERROR");
-    // Masih melayani — dari jaring pengaman, dan mengatakannya.
+    // Still serving — from the safety net, and saying so.
     expect(body.healthy).toBe(true);
     expect(body.source).toBe("seed");
   });
 
-  it("tidak 500 saat Postgres mati — justru saat itu ia paling dibutuhkan", async () => {
+  it("no 500 when Postgres is down — that is precisely when it is needed most", async () => {
     const app = createApp({
       service: fakeService({
         health: async () =>
@@ -94,7 +94,7 @@ describe("GET /api/health", () => {
     expect(cache.reason).toContain("ECONNREFUSED");
   });
 
-  it("tetap menjawab 200 walau getHealth sendiri melempar", async () => {
+  it("still answers 200 even when getHealth itself throws", async () => {
     const app = createApp({
       service: fakeService({
         health: async () => {
@@ -112,7 +112,7 @@ describe("GET /api/health", () => {
     expect(Array.isArray(body.sources)).toBe(true);
   });
 
-  it("tidak pernah memuat API key, termasuk di reason tiap sumber", async () => {
+  it("never contains an API key, including in each source's reason", async () => {
     const app = createApp({
       service: fakeService({
         health: async () =>
@@ -122,7 +122,7 @@ describe("GET /api/health", () => {
               {
                 source: "scan8004",
                 healthy: false,
-                reason: "GET /agents X-API-Key: sk-RAHASIA-123 -> 401",
+                reason: "GET /agents X-API-Key: sk-SECRET-123 -> 401",
                 checkedAt: FIXED_NOW,
               },
             ],
@@ -131,11 +131,11 @@ describe("GET /api/health", () => {
     });
     const body = await json(await get(app, "/api/health"));
 
-    expect(JSON.stringify(body)).not.toContain("sk-RAHASIA-123");
+    expect(JSON.stringify(body)).not.toContain("sk-SECRET-123");
     expect(body.sources[0].reason).toContain("[redacted]");
   });
 
-  it("melaporkan healthy: false hanya bila tidak ada satu pun sumber sehat", async () => {
+  it("reports healthy: false only when not a single source is healthy", async () => {
     const app = createApp({
       service: fakeService({
         health: async () =>
@@ -143,29 +143,29 @@ describe("GET /api/health", () => {
             healthy: false,
             degraded: true,
             sources: [
-              { source: "scan8004", healthy: false, reason: "mati", checkedAt: FIXED_NOW },
-              { source: "cache", healthy: false, reason: "mati", checkedAt: FIXED_NOW },
+              { source: "scan8004", healthy: false, reason: "down", checkedAt: FIXED_NOW },
+              { source: "cache", healthy: false, reason: "down", checkedAt: FIXED_NOW },
             ],
           }),
       }),
     });
     const res = await get(app, "/api/health");
 
-    // Tetap 200: endpoint ini melaporkan kesehatan, bukan ikut mati bersamanya.
+    // Still 200: this endpoint reports health, it does not die along with it.
     expect(res.status).toBe(200);
     expect((await json(res)).healthy).toBe(false);
   });
 });
 
 /**
- * Temuan I2. Tanpa mode ini tidak ada satu jalur otomatis pun — status code
- * maupun badan — yang bisa dipakai uptime monitor, liveness probe, atau
- * `curl -f` untuk tahu kami sedang berjalan dari jaring pengaman: `healthy`
- * tingkat atas praktis konstan `true` karena `seed` selalu disisipkan sehat
- * di `service/agents.ts`. `?strict=1` memberi mereka satu bit yang jujur
- * tanpa mengubah apa yang dilihat pembaca badan respons.
+ * Finding I2. Without this mode there is not one automated path — status code or
+ * body — that an uptime monitor, a liveness probe, or `curl -f` could use to
+ * learn that we are running from the safety net: the top-level `healthy` is
+ * practically a constant `true` because `seed` is always inserted as healthy in
+ * `service/agents.ts`. `?strict=1` gives them one honest bit without changing
+ * what a reader of the response body sees.
  *
- * Seluruh test di bawah gagal bila cabang `strict && degraded` dicabut.
+ * Every test below fails if the `strict && degraded` branch is removed.
  */
 describe("GET /api/health?strict=1", () => {
   const degradedHealth = async () =>
@@ -178,7 +178,7 @@ describe("GET /api/health?strict=1", () => {
       ],
     });
 
-  it("503 saat degraded, dengan badan yang persis sama", async () => {
+  it("503 when degraded, with exactly the same body", async () => {
     const app = createApp({ service: fakeService({ health: degradedHealth }) });
 
     const lenient = await get(app, "/api/health");
@@ -186,11 +186,11 @@ describe("GET /api/health?strict=1", () => {
 
     expect(lenient.status).toBe(200);
     expect(strict.status).toBe(503);
-    // Badannya identik: yang berbeda hanya bit yang bisa dibaca monitor.
+    // The body is identical: the only difference is the bit a monitor can read.
     expect(await json(strict)).toEqual(await json(lenient));
   });
 
-  it("200 saat tidak degraded", async () => {
+  it("200 when not degraded", async () => {
     const app = createApp({ service: fakeService() });
     const res = await get(app, "/api/health?strict=1");
 
@@ -198,7 +198,7 @@ describe("GET /api/health?strict=1", () => {
     expect((await json(res)).degraded).toBe(false);
   });
 
-  it("503 juga saat getHealth sendiri melempar", async () => {
+  it("503 as well when getHealth itself throws", async () => {
     const app = createApp({
       service: fakeService({
         health: async () => {
@@ -212,7 +212,7 @@ describe("GET /api/health?strict=1", () => {
     expect((await json(res)).reason).toContain("ECONNREFUSED");
   });
 
-  it("strict=0 dan strict kosong berarti mode bawaan", async () => {
+  it("strict=0 and an empty strict mean the default mode", async () => {
     const app = createApp({ service: fakeService({ health: degradedHealth }) });
 
     expect((await get(app, "/api/health?strict=0")).status).toBe(200);
@@ -220,16 +220,16 @@ describe("GET /api/health?strict=1", () => {
   });
 
   /**
-   * Regresi utama: **hanya Postgres yang mati**, 8004scan segar.
+   * The main regression: **only Postgres is down**, 8004scan is fresh.
    *
-   * Mutu data yang dilihat pengguna memang tidak turun — `degraded: false`,
-   * `healthy: true` — jadi syarat lama (`strict && degraded`) membalas 200 dan
-   * monitor tidak pernah tahu satu sumber benar-benar tumbang. Diukur di
-   * container hidup sebelum perbaikan ini.
+   * The quality of the data the user sees really has not dropped —
+   * `degraded: false`, `healthy: true` — so the old condition
+   * (`strict && degraded`) answered 200 and the monitor never learned that a
+   * source was genuinely down. Measured on a live container before this fix.
    *
-   * Gagal bila klausa `liveBroken` dicabut dari `shouldAlarm`.
+   * Fails if the `liveBroken` clause is removed from `shouldAlarm`.
    */
-  it("503 saat HANYA cache mati walau degraded: false dan healthy: true", async () => {
+  it("503 when ONLY the cache is down even though degraded: false and healthy: true", async () => {
     const app = createApp({
       service: fakeService({
         health: async () =>
@@ -241,7 +241,7 @@ describe("GET /api/health?strict=1", () => {
               {
                 source: "cache",
                 healthy: false,
-                reason: "probe: kueri cache gagal — ECONNREFUSED 127.0.0.1:5432",
+                reason: "probe: cache query failed — ECONNREFUSED 127.0.0.1:5432",
                 checkedAt: FIXED_NOW,
               },
               { source: "seed", healthy: true, reason: null, checkedAt: FIXED_NOW },
@@ -254,15 +254,15 @@ describe("GET /api/health?strict=1", () => {
     const lenient = await get(app, "/api/health");
 
     expect(strict.status).toBe(503);
-    // Mode bawaan tetap 200: pengguna memang belum merasakan apa pun.
+    // The default mode is still 200: the user genuinely has not felt anything yet.
     expect(lenient.status).toBe(200);
     const body = await json(strict);
     expect(body.degraded).toBe(false);
     expect(body.healthy).toBe(true);
-    expect(body.reason).toContain("cache tidak sehat");
+    expect(body.reason).toContain("cache unhealthy");
   });
 
-  it("503 saat HANYA on-chain mati", async () => {
+  it("503 when ONLY the on-chain read is down", async () => {
     const app = createApp({
       service: fakeService({
         health: async () =>
@@ -282,12 +282,12 @@ describe("GET /api/health?strict=1", () => {
   });
 
   /**
-   * "Tidak dipasang" bukan "rusak". Backend tanpa `DATABASE_URL` adalah
-   * konfigurasi yang sah — `index.ts` sengaja mengizinkannya — dan tidak boleh
-   * membuat monitor merah selamanya. `cache` tidak muncul di `sources` sama
-   * sekali pada keadaan itu.
+   * "Not installed" is not "broken". A backend without `DATABASE_URL` is a valid
+   * configuration — `index.ts` deliberately allows it — and must not turn the
+   * monitor red forever. `cache` does not appear in `sources` at all in that
+   * state.
    */
-  it("200 saat cache tidak dipasang dan sisanya sehat", async () => {
+  it("200 when the cache is not installed and the rest is healthy", async () => {
     const app = createApp({
       service: fakeService({
         health: async () =>
@@ -306,10 +306,10 @@ describe("GET /api/health?strict=1", () => {
   });
 
   /**
-   * `seed` bukan sumber sungguhan: ia berkas di dalam bundel proses ini.
-   * Gagal bila `LIVE_SOURCES` diganti "semua sumber".
+   * `seed` is not a real source: it is a file inside this process's own bundle.
+   * Fails if `LIVE_SOURCES` is replaced by "every source".
    */
-  it("200 saat hanya seed yang dilaporkan tidak sehat", async () => {
+  it("200 when only the seed is reported unhealthy", async () => {
     const app = createApp({
       service: fakeService({
         health: async () =>
@@ -319,7 +319,7 @@ describe("GET /api/health?strict=1", () => {
             sources: [
               { source: "scan8004", healthy: true, reason: null, checkedAt: FIXED_NOW },
               { source: "cache", healthy: true, reason: null, checkedAt: FIXED_NOW },
-              { source: "seed", healthy: false, reason: "observasi basi", checkedAt: FIXED_NOW },
+              { source: "seed", healthy: false, reason: "stale observation", checkedAt: FIXED_NOW },
             ],
           }),
       }),
@@ -328,12 +328,12 @@ describe("GET /api/health?strict=1", () => {
     expect((await get(app, "/api/health?strict=1")).status).toBe(200);
   });
 
-  it("503 saat belum ada satu pun sumber sungguhan yang terkonfirmasi sehat", async () => {
+  it("503 when not a single real source is confirmed healthy yet", async () => {
     const app = createApp({
       service: fakeService({
         health: async () =>
           makeHealth({
-            // Persis keadaan sesaat setelah boot: belum ada observasi apa pun.
+            // Exactly the state just after boot: no observation exists yet.
             healthy: false,
             degraded: true,
             sources: [{ source: "seed", healthy: true, reason: null, checkedAt: FIXED_NOW }],
@@ -345,15 +345,15 @@ describe("GET /api/health?strict=1", () => {
   });
 
   /**
-   * Observasi kedaluwarsa berarti **belum diperiksa ulang**, bukan gagal.
-   * `onchain` hanya tersentuh ketika tingkat 1 dan 2 gagal, jadi observasinya
-   * nyaris selalu melewati TTL; menghitungnya sebagai kerusakan membuat monitor
-   * merah permanen — sama tidak bergunanya dengan monitor yang hijau permanen.
-   * Terukur di container hidup sebelum pengecualian ini dipasang.
+   * An expired observation means **not re-checked yet**, not failed. `onchain` is
+   * only touched when levels 1 and 2 fail, so its observation is almost always
+   * past its TTL; counting it as breakage makes the monitor permanently red —
+   * just as useless as a permanently green one. Measured on a live container
+   * before this exception was added.
    *
-   * Gagal bila syarat `source.stale !== true` dicabut.
+   * Fails if the `source.stale !== true` condition is removed.
    */
-  it("200 saat satu-satunya sumber tidak sehat hanyalah observasi yang stale", async () => {
+  it("200 when the only unhealthy source is merely a stale observation", async () => {
     const app = createApp({
       service: fakeService({
         health: async () =>
@@ -365,7 +365,7 @@ describe("GET /api/health?strict=1", () => {
               {
                 source: "onchain",
                 healthy: false,
-                reason: "observasi berumur 2061 dtk, melewati ambang 30 dtk — belum diperiksa ulang",
+                reason: "observation is 2061 s old, past the 30 s threshold — not re-checked yet",
                 checkedAt: FIXED_NOW,
                 stale: true,
               },
@@ -377,7 +377,7 @@ describe("GET /api/health?strict=1", () => {
     expect((await get(app, "/api/health?strict=1")).status).toBe(200);
   });
 
-  it("503 tetap berbunyi bila sumber yang sama gagal SEGAR, bukan kedaluwarsa", async () => {
+  it("503 still sounds when the same source fails FRESHLY, not expired", async () => {
     const app = createApp({
       service: fakeService({
         health: async () =>
@@ -401,12 +401,12 @@ describe("GET /api/health?strict=1", () => {
     expect((await get(app, "/api/health?strict=1")).status).toBe(503);
   });
 
-  it("ejaan lain ditolak 400, bukan diam-diam dianggap mati", async () => {
+  it("any other spelling is rejected with 400, not silently treated as off", async () => {
     const app = createApp({ service: fakeService({ health: degradedHealth }) });
     const res = await get(app, "/api/health?strict=yes");
 
-    // `?strict=yes` yang diam-diam berarti mati akan membuat monitor melapor
-    // hijau selamanya tanpa pernah memberi tahu ia tidak memeriksa apa pun.
+    // A `?strict=yes` that silently means off would make a monitor report green
+    // forever without ever telling anyone it is checking nothing.
     expect(res.status).toBe(400);
     const body = await json(res);
     expect(body.error).toBe("invalid_query");
@@ -415,24 +415,24 @@ describe("GET /api/health?strict=1", () => {
 });
 
 /**
- * Kontrak `shouldAlarm` diuji juga secara langsung, bukan hanya lewat rute.
+ * The `shouldAlarm` contract is also tested directly, not only through the route.
  *
- * Alasannya sama dengan pelajaran C1: rute tidak boleh menggantungkan
- * kebenarannya pada invariant yang kebetulan berlaku di `service/` hari ini.
- * Kombinasi `healthy: false` + `degraded: false` misalnya **tidak bisa**
- * dihasilkan definisi `getHealth()` saat ini (`degraded: false` berarti
- * 8004scan sehat, dan itu sendiri sudah membuat `healthy: true`). Justru karena
- * itu ia diuji di sini: bila definisi salah satunya berubah kelak, klausa
- * ketiga adalah yang menahan monitor tetap berbunyi.
+ * The reason is the same as lesson C1: a route must not rest its correctness on
+ * an invariant that happens to hold in `service/` today. The combination
+ * `healthy: false` + `degraded: false`, for instance, **cannot** be produced by
+ * the current definition of `getHealth()` (`degraded: false` means 8004scan is
+ * healthy, and that alone already makes `healthy: true`). Precisely for that
+ * reason it is tested here: if either definition changes later, the third clause
+ * is what keeps the monitor sounding.
  */
 describe("shouldAlarm", () => {
   const ok = { source: "scan8004" as const, healthy: true, reason: null, checkedAt: FIXED_NOW };
 
-  it("berbunyi bila tidak ada sumber sungguhan yang terkonfirmasi sehat, walau degraded: false", () => {
+  it("sounds when no real source is confirmed healthy, even with degraded: false", () => {
     expect(shouldAlarm({ healthy: false, degraded: false, sources: [ok] })).toBe(true);
   });
 
-  it("berbunyi bila ada sumber sungguhan yang rusak", () => {
+  it("sounds when a real source is broken", () => {
     expect(
       shouldAlarm({
         healthy: true,
@@ -445,11 +445,11 @@ describe("shouldAlarm", () => {
     ).toBe(true);
   });
 
-  it("berbunyi bila degraded, walau daftar sumbernya kosong", () => {
+  it("sounds when degraded, even with an empty source list", () => {
     expect(shouldAlarm({ healthy: true, degraded: true, sources: [] })).toBe(true);
   });
 
-  it("diam bila satu-satunya yang tidak sehat adalah observasi kedaluwarsa", () => {
+  it("stays quiet when the only unhealthy entry is an expired observation", () => {
     expect(
       shouldAlarm({
         healthy: true,
@@ -459,7 +459,7 @@ describe("shouldAlarm", () => {
           {
             source: "cache",
             healthy: false,
-            reason: "observasi kedaluwarsa",
+            reason: "expired observation",
             checkedAt: FIXED_NOW,
             stale: true,
           },
@@ -468,7 +468,7 @@ describe("shouldAlarm", () => {
     ).toBe(false);
   });
 
-  it("berbunyi bila kegagalannya segar, bukan kedaluwarsa", () => {
+  it("sounds when the failure is fresh, not expired", () => {
     expect(
       shouldAlarm({
         healthy: true,
@@ -487,7 +487,7 @@ describe("shouldAlarm", () => {
     ).toBe(true);
   });
 
-  it("diam bila jalur utama sehat dan tidak ada bukti kerusakan", () => {
+  it("stays quiet when the main path is healthy and there is no evidence of breakage", () => {
     expect(
       shouldAlarm({
         healthy: true,

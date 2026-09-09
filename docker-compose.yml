@@ -1,31 +1,31 @@
 # ---------------------------------------------------------------------------
-# Tumpukan lokal Fugugent: postgres, redis, api.
+# The local Fugugent stack: postgres, redis, api.
 #
 #     docker compose up -d --build
 #     curl -s localhost:8787/api/health | jq
 #
-# ## Yang perlu diketahui sebelum mengubah berkas ini
+# ## What to know before changing this file
 #
-# 1. **Tidak ada satu pun nilai rahasia di sini.** Kata sandi Postgres/Redis
-#    dan kedua API key dibaca dari environment (`.env` di root untuk
-#    interpolasi compose, `backend/.env` untuk proses api). Default
-#    `fugugent_local_dev` di bawah adalah kata sandi pengembangan yang memang
-#    tidak rahasia — jangan pernah menggantinya dengan kata sandi sungguhan
-#    di berkas yang di-commit.
+# 1. **There is not a single secret value here.** The Postgres/Redis passwords
+#    and both API keys are read from the environment (`.env` at the root for
+#    compose interpolation, `backend/.env` for the api process). The
+#    `fugugent_local_dev` default below is a development password that is
+#    genuinely not secret — never replace it with a real password in a committed
+#    file.
 #
-# 2. **Port host sengaja digeser** (55432 / 56379). Mesin pengembang di tim ini
-#    sudah menjalankan Postgres di :5432; memakai port yang sama membuat
-#    container gagal menyala dengan pesan yang menyesatkan, atau — lebih buruk —
-#    membuat `psql localhost` menyentuh database yang salah.
+# 2. **The host ports are deliberately shifted** (55432 / 56379). Developer
+#    machines on this team already run Postgres on :5432; using the same port
+#    makes the container fail to start with a misleading message, or — worse —
+#    makes `psql localhost` reach the wrong database.
 #
-# 3. **`api` menunggu postgres & redis benar-benar sehat**, bukan sekadar
-#    "sudah dibuat". Tapi itu kenyamanan, bukan syarat: `src/index.ts` boot
-#    tanpa `DATABASE_URL` sekalipun, dan `/api/health` yang melaporkan cache
-#    tidak ada jauh lebih berguna daripada proses yang menolak menyala.
+# 3. **`api` waits for postgres & redis to be genuinely healthy**, not merely
+#    "created". But that is a convenience, not a requirement: `src/index.ts`
+#    boots even without `DATABASE_URL`, and an `/api/health` that reports the
+#    cache is missing is far more useful than a process that refuses to start.
 #
-# 4. **Redis belum dipakai kode mana pun.** Ia disiapkan untuk scheduler
-#    BullMQ (tanggung jawab #4 di `backend/CLAUDE.md`) dan sengaja sudah
-#    dinyalakan di sini supaya bagian itu tidak perlu menyentuh compose lagi.
+# 4. **Redis is not used by any code yet.** It is prepared for the BullMQ
+#    scheduler (responsibility #4 in `backend/CLAUDE.md`) and is deliberately
+#    already running here so that piece of work need not touch compose again.
 # ---------------------------------------------------------------------------
 
 name: fugugent
@@ -39,8 +39,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-fugugent}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fugugent_local_dev}
       POSTGRES_DB: ${POSTGRES_DB:-fugugent}
-      # Tanpa ini, initdb memakai `trust` dan container menerima koneksi apa pun
-      # tanpa kata sandi begitu port-nya terekspos.
+      # Without this, initdb uses `trust` and the container accepts any
+      # connection with no password the moment its port is exposed.
       POSTGRES_HOST_AUTH_METHOD: scram-sha-256
       POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
     ports:
@@ -48,8 +48,8 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      # `-U`/`-d` eksplisit: `pg_isready` tanpa keduanya memakai user `root`
-      # dan melaporkan sehat sebelum database aplikasi benar-benar ada.
+      # `-U`/`-d` explicitly: without them `pg_isready` uses the `root` user and
+      # reports healthy before the application database actually exists.
       test:
         ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fugugent} -d ${POSTGRES_DB:-fugugent}"]
       interval: 5s
@@ -62,8 +62,8 @@ services:
     image: redis:7-alpine
     container_name: fugugent-redis
     restart: unless-stopped
-    # `--save 60 1` cukup untuk antrean job; AOF tidak dibutuhkan karena job
-    # yang hilang saat restart dijadwalkan ulang oleh scheduler, bukan dipulihkan.
+    # `--save 60 1` is enough for a job queue; AOF is not needed because a job
+    # lost on restart is rescheduled by the scheduler, not recovered.
     command: >
       sh -c 'exec redis-server --save 60 1 --appendonly no
       ${REDIS_PASSWORD:+--requirepass "$$REDIS_PASSWORD"}'
@@ -87,10 +87,10 @@ services:
       dockerfile: Dockerfile
     container_name: fugugent-api
     restart: unless-stopped
-    # Kredensial upstream (SCAN8004_API_KEY, DGRID_API_KEY) HANYA dari sini.
-    # Sengaja tidak diulang di `environment:` — `environment` menang atas
-    # `env_file`, jadi menuliskannya di sana dengan default kosong justru
-    # akan menghapus key yang sudah benar terisi di `backend/.env`.
+    # Upstream credentials (SCAN8004_API_KEY, DGRID_API_KEY) come ONLY from here.
+    # Deliberately not repeated under `environment:` — `environment` wins over
+    # `env_file`, so writing them there with an empty default would erase the
+    # keys already correctly filled in in `backend/.env`.
     env_file:
       - path: ./backend/.env
         required: false
@@ -99,8 +99,8 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgres://${POSTGRES_USER:-fugugent}:${POSTGRES_PASSWORD:-fugugent_local_dev}@postgres:5432/${POSTGRES_DB:-fugugent}
       REDIS_URL: redis://${REDIS_PASSWORD:+:$REDIS_PASSWORD@}redis:6379
-      # Wajib: default bawaan SDK memakai domain `binance.org` yang terbukti
-      # diblokir dari jaringan Indonesia.
+      # Mandatory: the SDK default uses the `binance.org` domain, which is proven
+      # to be blocked from Indonesian networks.
       RPC_URL: ${RPC_URL:-https://data-seed-prebsc-1-s1.bnbchain.org:8545}
       SCAN8004_BASE_URL: ${SCAN8004_BASE_URL:-https://api.8004scan.io/api/v1}
       DGRID_BASE_URL: ${DGRID_BASE_URL:-https://api.dgrid.ai/v1}

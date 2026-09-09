@@ -1,26 +1,27 @@
 /**
- * Sumber data 8004scan — klien untuk `GET /agents`, `GET /agents/search/semantic`,
- * dan `GET /agents/{chain_id}/{token_id}`.
+ * The 8004scan data source — a client for `GET /agents`,
+ * `GET /agents/search/semantic`, and `GET /agents/{chain_id}/{token_id}`.
  *
- * ## Kontrak modul ini
+ * ## This module's contract
  *
- * **Tidak ada satu pun fungsi di sini yang melempar.** Kegagalan upstream —
- * `500 DATABASE_ERROR` yang terbukti intermiten (4 dari 5 percobaan gagal saat
- * riset), circuit breaker yang terbuka, atau bentuk respons yang berubah —
- * semuanya menjadi `healthy: false` + `reason`. Pemanggil (Task 5) memakai itu
- * untuk turun ke tingkat fallback berikutnya, bukan untuk menangkap exception.
+ * **Not a single function here throws.** Upstream failures — the
+ * `500 DATABASE_ERROR` proven to be intermittent (4 out of 5 attempts failed
+ * during the research), an open circuit breaker, or a changed response shape —
+ * all become `healthy: false` + `reason`. The caller (Task 5) uses that to drop
+ * to the next fallback level, not to catch an exception.
  *
- * ## Yang TIDAK dilakukan modul ini
+ * ## What this module does NOT do
  *
- * Tidak ada `fetch` sendiri. Header `User-Agent` browser (tanpa itu upstream
- * membalas HTTP 500, bukan 429 — terverifikasi live), retry backoff, timeout,
- * dan circuit breaker semuanya milik `createHttpClient` dari Task 1. Klien itu
- * disuntikkan; test tidak pernah menyentuh jaringan sungguhan.
+ * No `fetch` of its own. The browser `User-Agent` header (without it upstream
+ * answers HTTP 500, not 429 — verified live), backoff retries, timeouts, and
+ * the circuit breaker all belong to `createHttpClient` from Task 1. That client
+ * is injected; tests never touch a real network.
  *
  * ## API key
  *
- * Dikirim HANYA lewat `withApiKey()` — properti non-enumerable, jadi tidak ikut
- * ke `JSON.stringify`/`console.log` opsi, dan tidak pernah menyentuh query string.
+ * Sent ONLY through `withApiKey()` — a non-enumerable property, so it does not
+ * travel into `JSON.stringify`/`console.log` of the options, and never touches
+ * the query string.
  */
 
 import type { FugugentConfig } from "../config.js";
@@ -42,19 +43,19 @@ import {
   type NormalizeContext,
 } from "./normalize.js";
 
-/** `"any"` = jangan filter berdasarkan field ini (nilai yang dipahami upstream). */
+/** `"any"` = do not filter on this field (a value upstream understands). */
 export type TriState = boolean | "any";
 
 /**
- * Filter yang dikirim ke `GET /agents`. Nama field di sini camelCase; pemetaan
- * ke query snake_case ada di `buildAgentListQuery`.
+ * Filters sent to `GET /agents`. Field names here are camelCase; the mapping to
+ * snake_case query parameters lives in `buildAgentListQuery`.
  */
 export interface AgentListFilters {
-  /** Buang placeholder & domain test (`localhost`, `example.com`). */
+  /** Drops placeholders & test domains (`localhost`, `example.com`). */
   isRegistered?: TriState;
-  /** Field `active` ERC-8004. */
+  /** The ERC-8004 `active` field. */
   isActive?: TriState;
-  /** 0–100. Nilai 0/undefined berarti tidak memfilter. */
+  /** 0–100. A value of 0/undefined means no filtering. */
   minScore?: number;
   minFeedbacks?: number;
   minValidations?: number;
@@ -68,10 +69,10 @@ export interface AgentListFilters {
   supportedProtocol?: string;
   supportedTrust?: string;
   isTestnet?: boolean;
-  /** Multi-value, logika OR — dikirim sebagai parameter berulang. */
+  /** Multi-value, OR logic — sent as a repeated parameter. */
   oasfSkill?: string[];
   oasfDomain?: string[];
-  /** Multi-value, logika OR — dikirim sebagai satu parameter dipisah koma. */
+  /** Multi-value, OR logic — sent as a single comma-separated parameter. */
   tags?: string[];
   categories?: string[];
   search?: string;
@@ -84,22 +85,23 @@ export interface AgentListFilters {
 }
 
 /**
- * Filter anti-spam default.
+ * The default anti-spam filters.
  *
- * Dari 309.444 agent di BSC, mayoritas adalah bulk registration tanpa deskripsi
- * dan dengan `total_score: 0`. Tanpa ketiga filter ini marketplace akan penuh
- * `"Agent #340784"`. Ketiganya adalah yang disebut spec §6.1 sebagai pre-filter
- * populasi, dan ketiganya benar-benar dikirim sebagai query (ada test-nya).
+ * Of the 309,444 agents on BSC, the majority are bulk registrations with no
+ * description and `total_score: 0`. Without these filters the marketplace would
+ * be full of `"Agent #340784"`. They are what spec §6.1 calls the population
+ * pre-filter, and they really are sent as query parameters (there is a test for
+ * it).
  *
- * **Cara mematikan salah satu:** oper `undefined` secara eksplisit, mis.
- * `listAgents({ filters: { hasA2a: undefined } })`. Spread menimpa kunci itu
- * dengan `undefined` dan parameternya tidak ikut dikirim.
+ * **How to turn one off:** pass `undefined` explicitly, e.g.
+ * `listAgents({ filters: { hasA2a: undefined } })`. The spread overwrites that
+ * key with `undefined` and the parameter is not sent.
  *
- * **Trade-off yang disadari:** di testnet (chain 97) populasi agent jauh lebih
- * kecil, dan `hasA2a` bisa mengosongkan hasil. Itu bukan kegagalan — Task 5
- * turun ke cache lalu ke `FuguRegistry` on-chain. Melonggarkan default di sini
- * berarti menukar marketplace kosong dengan marketplace penuh spam; yang kedua
- * lebih buruk.
+ * **A deliberate trade-off:** on testnet (chain 97) the agent population is far
+ * smaller, and `hasA2a` can empty out the results. That is not a failure —
+ * Task 5 drops to the cache and then to the on-chain `FuguRegistry`. Loosening
+ * the defaults here would trade an empty marketplace for a spam-filled one; the
+ * second is worse.
  */
 export const DEFAULT_SPAM_FILTERS: AgentListFilters = {
   isRegistered: true,
@@ -108,19 +110,19 @@ export const DEFAULT_SPAM_FILTERS: AgentListFilters = {
   hasA2a: true,
 };
 
-/** Spec §6.1: semantic search per kategori memakai bobot dan ambang ini. */
+/** Spec §6.1: per-category semantic search uses this weight and threshold. */
 export const DEFAULT_SEMANTIC_WEIGHT = 0.7;
 export const DEFAULT_SIMILARITY_THRESHOLD = 0.55;
 
 export const DEFAULT_LIMIT = 20;
-/** Batas keras upstream. */
+/** The upstream hard limit. */
 export const MAX_LIMIT = 100;
 
 export interface ListAgentsOptions {
   chainId?: number;
   limit?: number;
   offset?: number;
-  /** Digabung DI ATAS `DEFAULT_SPAM_FILTERS`. */
+  /** Merged ON TOP OF `DEFAULT_SPAM_FILTERS`. */
   filters?: AgentListFilters;
 }
 
@@ -140,10 +142,10 @@ export interface Scan8004Source {
 }
 
 export interface Scan8004SourceOptions {
-  /** Klien Task 1 — sudah membawa User-Agent browser, retry, dan breaker. */
+  /** The Task 1 client — it already carries the browser User-Agent, retries, and the breaker. */
   http: HttpClient;
   config: FugugentConfig;
-  /** Disuntikkan supaya `fetchedAt` deterministik di test. */
+  /** Injected so `fetchedAt` is deterministic in tests. */
   now?: () => Date;
 }
 
@@ -188,9 +190,9 @@ function setRepeated(params: URLSearchParams, key: string, values: string[] | un
 }
 
 /**
- * Susun query untuk `GET /agents`. Diekspor supaya bisa diuji langsung —
- * bahwa filter anti-spam benar-benar terkirim adalah klaim yang harus dibuktikan,
- * bukan diasumsikan.
+ * Builds the query for `GET /agents`. Exported so it can be tested directly —
+ * that the anti-spam filters really are sent is a claim that must be proven,
+ * not assumed.
  */
 export function buildAgentListQuery(
   chainId: number,
@@ -233,7 +235,7 @@ export function buildAgentListQuery(
   return params;
 }
 
-/** Pesan kegagalan yang aman untuk di-log dan dikirim ke frontend. */
+/** A failure message safe to log and to send to the frontend. */
 function describeFailure(err: unknown): string {
   if (err instanceof Error) {
     const status = (err as { status?: unknown }).status;
@@ -241,14 +243,14 @@ function describeFailure(err: unknown): string {
       ? `${err.name} ${status}: ${err.message}`
       : `${err.name}: ${err.message}`;
   }
-  return "kegagalan tak dikenal saat memanggil 8004scan";
+  return "unknown failure while calling 8004scan";
 }
 
 export function createScan8004Source(options: Scan8004SourceOptions): Scan8004Source {
   const { http, config } = options;
   const now = options.now ?? (() => new Date());
   const baseUrl = config.scan8004.baseUrl.replace(/\/+$/, "");
-  // Dibaca sekali di sini, lalu HANYA dioper lewat `withApiKey`.
+  // Read once here, then passed ONLY through `withApiKey`.
   const apiKey = config.scan8004.apiKey;
 
   function requestOptions(): HttpGetOptions | undefined {
@@ -292,9 +294,9 @@ export function createScan8004Source(options: Scan8004SourceOptions): Scan8004So
 
       const trimmed = query.trim();
       if (trimmed === "") {
-        // Upstream mewajibkan `q` 1–500 karakter; memanggilnya dengan query
-        // kosong hanya membakar kuota rate limit untuk dijawab 422.
-        return unhealthyPage("scan8004", "query semantic kosong", ctx.fetchedAt, limit, offset);
+        // Upstream requires `q` to be 1–500 characters; calling it with an
+        // empty query only burns rate-limit quota to be answered with a 422.
+        return unhealthyPage("scan8004", "empty semantic query", ctx.fetchedAt, limit, offset);
       }
 
       const params = new URLSearchParams();
@@ -322,17 +324,17 @@ export function createScan8004Source(options: Scan8004SourceOptions): Scan8004So
         const result = await http.get<unknown>(url, requestOptions());
         return normalizeAgentDetailBody(result.data, ctx);
       } catch (err) {
-        // HTTP 404 berarti upstream MENJAWAB dengan benar: agent itu tidak ada.
-        // Menandainya tidak sehat akan menyalakan lampu merah `/api/health` dan
-        // mendorong seluruh sistem ke fallback hanya karena seseorang salah
-        // mengetik token id. Kegagalan sungguhan (5xx, timeout, breaker) tetap
-        // ditandai tidak sehat.
+        // HTTP 404 means upstream ANSWERED correctly: that agent does not
+        // exist. Marking it unhealthy would turn the `/api/health` light red and
+        // push the whole system into the fallbacks just because someone
+        // mistyped a token id. Real failures (5xx, timeout, breaker) are still
+        // marked unhealthy.
         const notFound = err instanceof UpstreamError && err.status === 404;
         return {
           agent: null,
           source: "scan8004",
           healthy: notFound,
-          reason: notFound ? `agent tidak ditemukan (HTTP 404)` : describeFailure(err),
+          reason: notFound ? `agent not found (HTTP 404)` : describeFailure(err),
           fetchedAt: ctx.fetchedAt,
         };
       }

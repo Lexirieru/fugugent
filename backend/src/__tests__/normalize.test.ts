@@ -18,7 +18,7 @@ const ctx: NormalizeContext = {
   offset: 0,
 };
 
-/** Bentuk item agent seperti yang benar-benar dibalas 8004scan (riset live 8 Sep 2026). */
+/** An agent item exactly as 8004scan really answers it (live research 8 Sep 2026). */
 const liveAgentItem = {
   id: "1a629df6-cec2-4251-839c-dfba07e604e3",
   agent_id: "56:0x8004a169fb4a3325136eb29fa0ceb6d2e539a432:49637",
@@ -47,39 +47,39 @@ const liveAgentItem = {
   updated_at: "2026-09-08T00:41:11.096927Z",
 };
 
-describe("unwrapEnvelope — tiga bentuk respons 8004scan yang terverifikasi", () => {
-  it("mengenali bentuk datar {items,total,limit,offset}", () => {
+describe("unwrapEnvelope — the three verified 8004scan response shapes", () => {
+  it("recognizes the flat {items,total,limit,offset} shape", () => {
     const env = unwrapEnvelope({ items: [liveAgentItem], total: 309444, limit: 1, offset: 0 });
     expect(env.kind).toBe("list");
-    if (env.kind !== "list") throw new Error("bentuk salah");
+    if (env.kind !== "list") throw new Error("wrong shape");
     expect(env.items).toHaveLength(1);
     expect(env.total).toBe(309444);
   });
 
-  it("mengenali bentuk terbungkus {success:true,data}", () => {
+  it("recognizes the enveloped {success:true,data} shape", () => {
     const env = unwrapEnvelope({ success: true, data: { items: [liveAgentItem], total: 1 } });
     expect(env.kind).toBe("list");
   });
 
-  it("mengenali bentuk error {success:false,error}", () => {
+  it("recognizes the error {success:false,error} shape", () => {
     const env = unwrapEnvelope({
       success: false,
       error: { code: "DATABASE_ERROR", message: "transient" },
     });
     expect(env.kind).toBe("error");
-    if (env.kind !== "error") throw new Error("bentuk salah");
+    if (env.kind !== "error") throw new Error("wrong shape");
     expect(env.code).toBe("DATABASE_ERROR");
   });
 
-  it("tidak melempar pada bentuk yang sama sekali tak dikenal", () => {
+  it("does not throw on a completely unknown shape", () => {
     for (const body of [null, undefined, "<html>502 Bad Gateway</html>", 42, true]) {
       expect(() => unwrapEnvelope(body)).not.toThrow();
       expect(unwrapEnvelope(body).kind).toBe("unknown");
     }
   });
 
-  it("mengupas pembungkus bersarang sampai batas MAX_ENVELOPE_DEPTH", () => {
-    // Satu lapis dan dua lapis masih dikupas.
+  it("strips nested envelopes up to the MAX_ENVELOPE_DEPTH limit", () => {
+    // One layer and two layers are still stripped.
     expect(unwrapEnvelope({ success: true, data: { items: [] } }).kind).toBe("list");
     expect(
       unwrapEnvelope({ success: true, data: { success: true, data: { items: [] } } }).kind,
@@ -87,24 +87,24 @@ describe("unwrapEnvelope — tiga bentuk respons 8004scan yang terverifikasi", (
     expect(MAX_ENVELOPE_DEPTH).toBe(2);
   });
 
-  it("bersarang lebih dalam dari batas menjadi `unknown`, BUKAN lemparan", () => {
+  it("nesting deeper than the limit becomes `unknown`, NOT a throw", () => {
     const overLimit = { success: true, data: { success: true, data: { success: true, data: { items: [] } } } };
     const env = unwrapEnvelope(overLimit);
     expect(env.kind).toBe("unknown");
-    if (env.kind !== "unknown") throw new Error("bentuk salah");
-    expect(env.message).toContain("bersarang");
+    if (env.kind !== "unknown") throw new Error("wrong shape");
+    expect(env.message).toContain("nested");
   });
 
-  it("20.000 lapis bersarang tidak menghabiskan call stack", () => {
-    // Regresi Important 2.4: sebelum ada penghitung kedalaman, bentuk ini
-    // melempar RangeError — melanggar aturan "bentuk tak dikenal tidak melempar".
+  it("20,000 nested layers do not exhaust the call stack", () => {
+    // Important 2.4 regression: before the depth counter existed, this shape
+    // threw a RangeError — breaking the rule "an unknown shape does not throw".
     let body: unknown = { items: [] };
     for (let i = 0; i < 20_000; i++) body = { success: true, data: body };
 
     expect(() => unwrapEnvelope(body)).not.toThrow();
     expect(unwrapEnvelope(body).kind).toBe("unknown");
 
-    // Dan lewat jalur normalizer, tanpa jaring `try` milik pemanggil mana pun.
+    // And through the normalizer path, with no caller's `try` net.
     let page!: ReturnType<typeof normalizeAgentListBody>;
     expect(() => {
       page = normalizeAgentListBody(body, ctx);
@@ -115,7 +115,7 @@ describe("unwrapEnvelope — tiga bentuk respons 8004scan yang terverifikasi", (
 });
 
 describe("normalizeAgentListBody", () => {
-  it("bentuk {items} menghasilkan daftar terisi dan sumber sehat", () => {
+  it("the {items} shape yields a populated list and a healthy source", () => {
     const page = normalizeAgentListBody({ items: [liveAgentItem], total: 309444 }, ctx);
     expect(page.healthy).toBe(true);
     expect(page.items).toHaveLength(1);
@@ -125,19 +125,19 @@ describe("normalizeAgentListBody", () => {
     expect(page.items[0]!.source).toBe("scan8004");
   });
 
-  it("bentuk {success,data} menghasilkan daftar terisi", () => {
+  it("the {success,data} shape yields a populated list", () => {
     const page = normalizeAgentListBody({ success: true, data: { items: [liveAgentItem] } }, ctx);
     expect(page.healthy).toBe(true);
     expect(page.items).toHaveLength(1);
   });
 
-  it("bentuk {success,data} berisi satu objek agent menghasilkan satu item", () => {
+  it("a {success,data} holding a single agent object yields one item", () => {
     const page = normalizeAgentListBody({ success: true, data: liveAgentItem }, ctx);
     expect(page.items).toHaveLength(1);
     expect(page.healthy).toBe(true);
   });
 
-  it("bentuk {success:false,error} menghasilkan daftar kosong dan menandai sumber tidak sehat", () => {
+  it("the {success:false,error} shape yields an empty list and marks the source unhealthy", () => {
     const page = normalizeAgentListBody(
       { success: false, error: { code: "DATABASE_ERROR", message: "transient" } },
       ctx,
@@ -147,7 +147,7 @@ describe("normalizeAgentListBody", () => {
     expect(page.reason).toContain("DATABASE_ERROR");
   });
 
-  it("bentuk tak dikenal TIDAK melempar — daftar kosong plus sumber tidak sehat", () => {
+  it("an unknown shape does NOT throw — an empty list plus an unhealthy source", () => {
     for (const body of [null, "<html>502</html>", 42, { foo: "bar" }, { success: true }]) {
       let page!: ReturnType<typeof normalizeAgentListBody>;
       expect(() => {
@@ -159,16 +159,16 @@ describe("normalizeAgentListBody", () => {
     }
   });
 
-  it("melewati item yang tidak punya identitas tanpa menggagalkan seluruh daftar", () => {
+  it("skips an item with no identity without failing the whole list", () => {
     const page = normalizeAgentListBody(
-      { items: [{ name: "tanpa identitas" }, liveAgentItem] },
+      { items: [{ name: "no identity" }, liveAgentItem] },
       ctx,
     );
     expect(page.items).toHaveLength(1);
     expect(page.healthy).toBe(true);
   });
 
-  it("daftar kosong yang sah tetap dianggap sehat", () => {
+  it("a legitimately empty list is still considered healthy", () => {
     const page = normalizeAgentListBody({ items: [], total: 0 }, ctx);
     expect(page.items).toEqual([]);
     expect(page.healthy).toBe(true);
@@ -176,7 +176,7 @@ describe("normalizeAgentListBody", () => {
 });
 
 describe("normalizeAgent", () => {
-  it("memetakan field 8004scan ke AgentRecord", () => {
+  it("maps the 8004scan fields onto an AgentRecord", () => {
     const rec = normalizeAgent(liveAgentItem, ctx);
     expect(rec).not.toBeNull();
     expect(rec!.chainId).toBe(56);
@@ -191,7 +191,7 @@ describe("normalizeAgent", () => {
     expect(rec!.classification).toBeNull();
   });
 
-  it("menurunkan token_id dari agent_id komposit bila token_id hilang", () => {
+  it("derives token_id from the composite agent_id when token_id is missing", () => {
     const rec = normalizeAgent(
       { agent_id: "97:0x8004A818BFB912233c491871b3d84c89A494BD9e:1675", name: "X" },
       ctx,
@@ -201,27 +201,27 @@ describe("normalizeAgent", () => {
     expect(rec!.chainId).toBe(97);
   });
 
-  it("mengembalikan null bila identitas tidak bisa ditetapkan", () => {
-    expect(normalizeAgent({ name: "tanpa id" }, ctx)).toBeNull();
+  it("returns null when the identity cannot be established", () => {
+    expect(normalizeAgent({ name: "no id" }, ctx)).toBeNull();
     expect(normalizeAgent(null, ctx)).toBeNull();
-    expect(normalizeAgent("bukan objek", ctx)).toBeNull();
+    expect(normalizeAgent("not an object", ctx)).toBeNull();
   });
 
-  it("menolak token_id yang bukan bilangan bulat desimal — `id` adalah kunci primer", () => {
-    // Regresi Minor 2.5: nilai-nilai ini dulu lolos jadi `id` seperti "97:1.5"
-    // dan "97:1e+21", lalu menyebar ke kunci cache dan URL detail.
+  it("rejects a token_id that is not a decimal integer — `id` is the primary key", () => {
+    // Minor 2.5 regression: these values used to slip through as `id`s like
+    // "97:1.5" and "97:1e+21", then spread into cache keys and detail URLs.
     for (const tokenId of [1.5, 1e21, -3, Number.NaN, "1e21", "12.0", " ", "0x1f", "abc"]) {
       expect(normalizeAgent({ token_id: tokenId, chain_id: 97 }, ctx)).toBeNull();
     }
   });
 
-  it("menerima token_id desimal sebagai string maupun angka bulat", () => {
+  it("accepts a decimal token_id as either a string or a whole number", () => {
     expect(normalizeAgent({ token_id: "49637", chain_id: 56 }, ctx)!.id).toBe("56:49637");
     expect(normalizeAgent({ token_id: 4242, chain_id: 97 }, ctx)!.id).toBe("97:4242");
     expect(normalizeAgent({ token_id: 0, chain_id: 97 }, ctx)!.id).toBe("97:0");
   });
 
-  it("jatuh ke agent_id komposit bila token_id ada tapi tidak sah", () => {
+  it("falls back to the composite agent_id when token_id is present but invalid", () => {
     const rec = normalizeAgent(
       { token_id: 1.5, agent_id: "97:0x8004A818BFB912233c491871b3d84c89A494BD9e:1675" },
       ctx,
@@ -229,7 +229,7 @@ describe("normalizeAgent", () => {
     expect(rec!.tokenId).toBe("1675");
   });
 
-  it("tidak melempar saat tipe field upstream berubah jadi sampah", () => {
+  it("does not throw when the upstream field types turn to garbage", () => {
     let rec: ReturnType<typeof normalizeAgent>;
     expect(() => {
       rec = normalizeAgent(
@@ -238,7 +238,7 @@ describe("normalizeAgent", () => {
           chain_id: "97",
           name: 12345,
           description: null,
-          tags: "bukan array",
+          tags: "not an array",
           categories: [1, "ok", null],
           supported_protocols: null,
           total_score: "abc",
@@ -257,7 +257,7 @@ describe("normalizeAgent", () => {
     expect(rec!.reputation.totalScore).toBeNull();
   });
 
-  it("mengumpulkan OASF skill/domain dari beberapa lokasi yang mungkin", () => {
+  it("collects OASF skills/domains from several possible locations", () => {
     const rec = normalizeAgent(
       {
         token_id: "1",
@@ -275,18 +275,18 @@ describe("normalizeAgent", () => {
 });
 
 describe("normalizeAgentDetailBody", () => {
-  it("membaca objek agent datar (tanpa pembungkus)", () => {
+  it("reads a flat agent object (no envelope)", () => {
     const res = normalizeAgentDetailBody(liveAgentItem, ctx);
     expect(res.healthy).toBe(true);
     expect(res.agent?.tokenId).toBe("49637");
   });
 
-  it("membaca objek agent terbungkus {success,data}", () => {
+  it("reads an agent object enveloped in {success,data}", () => {
     const res = normalizeAgentDetailBody({ success: true, data: liveAgentItem }, ctx);
     expect(res.agent?.tokenId).toBe("49637");
   });
 
-  it("bentuk error menghasilkan agent null dan sumber tidak sehat", () => {
+  it("the error shape yields a null agent and an unhealthy source", () => {
     const res = normalizeAgentDetailBody(
       { success: false, error: { code: "DATABASE_ERROR", message: "transient" } },
       ctx,
@@ -296,19 +296,19 @@ describe("normalizeAgentDetailBody", () => {
     expect(res.reason).toContain("DATABASE_ERROR");
   });
 
-  it("daftar kosong yang sah berarti TIDAK DITEMUKAN, bukan sumber sakit", () => {
-    // Regresi Minor 2.6: agent yang memang tidak ada bukan tanda 8004scan
-    // tumbang. Menandainya `healthy:false` menyalakan lampu merah /api/health
-    // untuk pengguna yang sekadar salah ketik token id.
+  it("a legitimately empty list means NOT FOUND, not a sick source", () => {
+    // Minor 2.6 regression: an agent that genuinely does not exist is not a sign
+    // that 8004scan is down. Marking it `healthy:false` turns the /api/health
+    // light red for a user who merely mistyped a token id.
     for (const body of [{ items: [] }, [], { success: true, data: { items: [] } }]) {
       const res = normalizeAgentDetailBody(body, ctx);
       expect(res.agent).toBeNull();
       expect(res.healthy).toBe(true);
-      expect(res.reason).toContain("tidak ditemukan");
+      expect(res.reason).toContain("not found");
     }
   });
 
-  it("error NOT_FOUND dari upstream juga bukan tanda sumber sakit", () => {
+  it("a NOT_FOUND error from upstream is not a sign of a sick source either", () => {
     const res = normalizeAgentDetailBody(
       { success: false, error: { code: "NOT_FOUND", message: "no such agent" } },
       ctx,
@@ -318,7 +318,7 @@ describe("normalizeAgentDetailBody", () => {
     expect(res.reason).toContain("NOT_FOUND");
   });
 
-  it("objek yang bukan agent tetap dianggap bentuk tak dikenal", () => {
+  it("an object that is not an agent is still treated as an unknown shape", () => {
     const res = normalizeAgentDetailBody({ foo: "bar" }, ctx);
     expect(res.agent).toBeNull();
     expect(res.healthy).toBe(false);

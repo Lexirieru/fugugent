@@ -1,23 +1,23 @@
 /**
- * Pembacaan parameter kueri — **satu-satunya** tempat teks dari luar berubah
- * jadi angka dan kategori.
+ * Query parameter parsing — the **only** place where text from outside turns
+ * into numbers and categories.
  *
- * Aturannya satu: parameter yang cacat **ditolak**, tidak diam-diam dijadikan
- * nilai bawaan dan tidak dibiarkan menjadi `NaN` yang muncul beberapa lapis
- * kemudian sebagai 500. `limit=abc` yang diam-diam menjadi 20 adalah kegagalan
- * yang lebih buruk daripada 400: pengguna melihat halaman yang bukan yang ia
- * minta dan tidak pernah diberi tahu.
+ * There is one rule: a malformed parameter is **rejected**, never silently
+ * turned into a default value and never allowed to become a `NaN` that surfaces
+ * a few layers later as a 500. A `limit=abc` that silently becomes 20 is a
+ * worse failure than a 400: the user sees a page other than the one they asked
+ * for and is never told.
  *
- * "Kosong" ≠ "cacat". `?category=&limit=&offset=` — bentuk yang benar-benar
- * dikirim `URLSearchParams` untuk field yang tidak diisi — berarti tidak diisi.
+ * "Empty" ≠ "malformed". `?category=&limit=&offset=` — exactly what
+ * `URLSearchParams` sends for fields that were left blank — means not set.
  */
 import { MAX_PAGE_LIMIT } from "../service/agents.js";
 import { CATEGORIES, type Category } from "../types.js";
 
-/** Hanya digit. `1.5`, `1e3`, ` 7`, dan `+7` bukan bilangan bulat non-negatif. */
+/** Digits only. `1.5`, `1e3`, ` 7`, and `+7` are not non-negative integers. */
 const UNSIGNED_INTEGER = /^\d+$/;
 
-/** Kegagalan validasi yang tahu field mana yang salah — itu yang dilihat pemanggil. */
+/** A validation failure that knows which field was wrong — that is what the caller sees. */
 export class QueryError extends Error {
   readonly field: string;
   readonly allowed?: readonly string[];
@@ -30,16 +30,16 @@ export class QueryError extends Error {
   }
 }
 
-/** Nilai yang tidak diisi: absen atau string kosong/whitespace. */
+/** An unset value: absent, or an empty/whitespace string. */
 function blank(raw: string | undefined): boolean {
   return raw === undefined || raw.trim() === "";
 }
 
 /**
- * `limit` — bilangan bulat 1..{@link MAX_PAGE_LIMIT}.
+ * `limit` — an integer in 1..{@link MAX_PAGE_LIMIT}.
  *
- * Batas atas ditolak, bukan dipangkas: `limit=1000` yang diam-diam menjadi 100
- * membuat klien mengira ia sudah melihat seluruh hasil.
+ * The upper bound is rejected, not clamped: a `limit=1000` that silently
+ * becomes 100 makes the client believe it has already seen every result.
  */
 export function parseLimit(raw: string | undefined, fallback: number): number {
   if (blank(raw)) return fallback;
@@ -47,49 +47,49 @@ export function parseLimit(raw: string | undefined, fallback: number): number {
   if (!UNSIGNED_INTEGER.test(value)) {
     throw new QueryError(
       "limit",
-      `limit harus bilangan bulat antara 1 dan ${MAX_PAGE_LIMIT}, bukan ${JSON.stringify(value)}`,
+      `limit must be an integer between 1 and ${MAX_PAGE_LIMIT}, not ${JSON.stringify(value)}`,
     );
   }
   const parsed = Number(value);
   if (parsed < 1 || parsed > MAX_PAGE_LIMIT) {
-    throw new QueryError("limit", `limit harus antara 1 dan ${MAX_PAGE_LIMIT}, bukan ${parsed}`);
+    throw new QueryError("limit", `limit must be between 1 and ${MAX_PAGE_LIMIT}, not ${parsed}`);
   }
   return parsed;
 }
 
 /**
- * Batas atas `offset`.
+ * Upper bound for `offset`.
  *
- * Tanpa ini `offset=9007199254740991` diteruskan apa adanya dan menjadi
- * `OFFSET 9007199254740991` di Postgres — permintaan tanpa autentikasi yang
- * tidak pernah bisa menghasilkan sesuatu yang berguna. 10.000 jauh di atas
- * apa pun yang bisa dijangkau UI hari ini.
+ * Without it an `offset=9007199254740991` is passed through as-is and becomes
+ * `OFFSET 9007199254740991` in Postgres — an unauthenticated request that can
+ * never produce anything useful. 10,000 is far above anything the UI can reach
+ * today.
  */
 export const MAX_OFFSET = 10_000;
 
-/** `offset` — bilangan bulat 0..{@link MAX_OFFSET}. `-1` ditolak, tidak dijadikan 0. */
+/** `offset` — an integer in 0..{@link MAX_OFFSET}. `-1` is rejected, not turned into 0. */
 export function parseOffset(raw: string | undefined): number {
   if (blank(raw)) return 0;
   const value = raw as string;
   if (!UNSIGNED_INTEGER.test(value)) {
     throw new QueryError(
       "offset",
-      `offset harus bilangan bulat >= 0, bukan ${JSON.stringify(value)}`,
+      `offset must be an integer >= 0, not ${JSON.stringify(value)}`,
     );
   }
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed) || parsed > MAX_OFFSET) {
-    throw new QueryError("offset", `offset harus <= ${MAX_OFFSET}, bukan ${value}`);
+    throw new QueryError("offset", `offset must be <= ${MAX_OFFSET}, not ${value}`);
   }
   return parsed;
 }
 
 /**
- * `category` — salah satu dari empat, persis huruf besarnya.
+ * `category` — one of the four, with exactly that capitalization.
  *
- * `grid` ditolak alih-alih dinormalkan: kategori adalah enum yang sama dengan
- * enum Solidity, dan menerima ejaan bebas di sini berarti perbedaan ejaan baru
- * ketahuan jauh di dalam. `null` berarti "semua kategori".
+ * `grid` is rejected rather than normalized: the category is the same enum as
+ * the Solidity one, and accepting free spelling here means a new spelling
+ * discrepancy is only discovered much deeper in. `null` means "all categories".
  */
 export function parseCategory(raw: string | undefined): Category | null {
   if (blank(raw)) return null;
@@ -97,15 +97,15 @@ export function parseCategory(raw: string | undefined): Category | null {
   if (!(CATEGORIES as readonly string[]).includes(value)) {
     throw new QueryError(
       "category",
-      `category tidak dikenal: ${JSON.stringify(value)}`,
+      `unknown category: ${JSON.stringify(value)}`,
       CATEGORIES,
     );
   }
   return value as Category;
 }
 
-/** `:id` dari path. Kosong ditolak — id kosong bukan permintaan yang bisa dilayani. */
+/** The `:id` from the path. Empty is rejected — an empty id is not a request that can be served. */
 export function parseAgentId(raw: string | undefined): string {
-  if (blank(raw)) throw new QueryError("id", "id agent tidak boleh kosong");
+  if (blank(raw)) throw new QueryError("id", "agent id must not be empty");
   return (raw as string).trim();
 }

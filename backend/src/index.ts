@@ -1,26 +1,28 @@
 /**
- * Titik masuk `api.fugugent.xyz`.
+ * The `api.fugugent.xyz` entry point.
  *
- * Satu-satunya berkas yang menyentuh dunia nyata: membaca environment, membuka
- * koneksi, dan menyalakan server. Seluruh kontrak HTTP-nya sendiri dirakit di
- * `src/routes/app.ts` sebagai fungsi murni, sehingga bisa diuji tanpa jaringan,
- * tanpa Postgres, dan tanpa RPC.
+ * The only file that touches the real world: it reads the environment, opens
+ * connections, and starts the server. The HTTP contract itself is assembled in
+ * `src/routes/app.ts` as a pure function, so it can be tested without a network,
+ * without Postgres, and without RPC.
  *
- * ## Tiga hal yang sengaja dilakukan begini
+ * ## Three things done deliberately this way
  *
- * 1. **Postgres opsional.** Tanpa `DATABASE_URL`, layanan tetap menyala dengan
- *    tingkat 2 berstatus `unavailable`. Backend yang menolak boot karena cache
- *    tidak ada akan mati persis pada keadaan yang seluruh fallback ini dibuat
- *    untuk bertahan; `/api/health` yang melaporkan cache tidak ada jauh lebih
- *    berguna daripada proses yang tidak pernah menjawab.
- * 2. **Kegagalan skema tidak menjatuhkan boot.** `ensureSchema` yang gagal
- *    (Postgres belum siap, izin kurang) mencabut tingkat 2, bukan seluruh API.
- * 3. **Adapter `node:http` ditulis sendiri.** Menambah dependensi hanya untuk
- *    ~30 baris jembatan `IncomingMessage` ke `Request` tidak sepadan; `app.fetch`
- *    adalah antarmuka standar dan itu semua yang dibutuhkan.
+ * 1. **Postgres is optional.** Without `DATABASE_URL` the service still starts
+ *    with level 2 marked `unavailable`. A backend that refuses to boot because
+ *    the cache is missing would die in precisely the situation this whole
+ *    fallback exists to survive; an `/api/health` that reports the cache is
+ *    missing is far more useful than a process that never answers.
+ * 2. **A schema failure does not take the boot down.** An `ensureSchema` that
+ *    fails (Postgres not ready, insufficient privileges) withdraws level 2, not
+ *    the whole API.
+ * 3. **The `node:http` adapter is hand-written.** Adding a dependency just for
+ *    ~30 lines bridging `IncomingMessage` to `Request` is not worth it;
+ *    `app.fetch` is the standard interface and that is all that is needed.
  *
- * `RPC_URL` wajib di-override: default SDK memakai domain `binance.org` yang
- * diblokir dari Indonesia. `loadConfig()` sudah memakai endpoint yang benar.
+ * `RPC_URL` must be overridden: the SDK default uses the `binance.org` domain,
+ * which is blocked from Indonesia. `loadConfig()` already uses the right
+ * endpoint.
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { pathToFileURL } from "node:url";
@@ -40,12 +42,12 @@ export type { ApiDeps } from "./routes/app.js";
 export const DEFAULT_PORT = 8787;
 
 /**
- * Pesan galat yang aman untuk klien.
+ * An error message safe to send to the client.
  *
- * `redact` bukan hiasan: jaring terakhir di bawah menangkap galat yang tidak
- * pernah melewati penyuntingan mana pun, dan pesan galat klien HTTP pernah
- * membawa URL beserta kredensialnya. Aturan "API key tidak pernah muncul di
- * respons" tidak boleh punya pengecualian yang kebetulan.
+ * `redact` is not decoration: the last-resort net below catches errors that
+ * passed through no redaction at all, and HTTP client error messages have
+ * carried URLs along with their credentials before. The rule "an API key never
+ * appears in a response" must not have an accidental exception.
  */
 export function describeFailure(err: unknown): string {
   return redact(
@@ -63,8 +65,8 @@ export interface BuiltServer {
 }
 
 /**
- * Rakit seluruh layanan dari environment. Mengembalikan `close` supaya proses
- * yang menerima SIGTERM bisa menutup kolam koneksi alih-alih meninggalkannya.
+ * Assembles the whole service from the environment. Returns `close` so a process
+ * receiving SIGTERM can close the connection pool instead of abandoning it.
  */
 export function buildServer(env: NodeJS.ProcessEnv = process.env): BuiltServer {
   const config = loadConfig(env);
@@ -81,9 +83,10 @@ export function buildServer(env: NodeJS.ProcessEnv = process.env): BuiltServer {
   const databaseUrl = env.DATABASE_URL?.trim();
   if (databaseUrl) {
     dbHandle = connectDb(databaseUrl);
-    // Best-effort: skema yang gagal dibuat mencabut tingkat 2, bukan seluruh API.
+    // Best-effort: a schema that fails to be created withdraws level 2, not the
+    // whole API.
     void ensureSchema(dbHandle.db).catch((err: unknown) => {
-      console.error("[fugugent] ensureSchema gagal, cache dilewati:", describe(err));
+      console.error("[fugugent] ensureSchema failed, cache skipped:", describe(err));
     });
   }
 
@@ -105,17 +108,17 @@ export function buildServer(env: NodeJS.ProcessEnv = process.env): BuiltServer {
 }
 
 // ---------------------------------------------------------------------------
-// Jembatan node:http ke Fetch API
+// The node:http to Fetch API bridge
 // ---------------------------------------------------------------------------
 
 /**
- * `IncomingMessage` → `Request`, atau alasan kenapa permintaannya tidak sah.
+ * `IncomingMessage` → `Request`, or the reason the request is invalid.
  *
- * `Host` yang cacat (`Host: bad host`) membuat `new URL` melempar. Itu
- * kesalahan **klien**, bisa dipicu siapa saja tanpa autentikasi, dan
- * membiarkannya jatuh ke jaring terakhir berarti 500 — mengotori metrik 5xx
- * dengan permintaan yang tidak pernah salah di sisi kita. Karena itu ia
- * dibedakan di sini dan dijawab 400.
+ * A malformed `Host` (`Host: bad host`) makes `new URL` throw. That is a
+ * **client** error, triggerable by anyone without authentication, and letting it
+ * fall through to the last-resort net would mean a 500 — polluting the 5xx
+ * metrics with requests that were never wrong on our side. So it is
+ * distinguished here and answered with a 400.
  */
 export function toRequest(req: IncomingMessage): { request: Request } | { badRequest: string } {
   const host = req.headers.host ?? "localhost";
@@ -123,7 +126,7 @@ export function toRequest(req: IncomingMessage): { request: Request } | { badReq
   try {
     url = new URL(req.url ?? "/", `http://${host}`);
   } catch {
-    return { badRequest: "header Host atau target permintaan tidak sah" };
+    return { badRequest: "invalid Host header or request target" };
   }
 
   const headers = new Headers();
@@ -132,16 +135,16 @@ export function toRequest(req: IncomingMessage): { request: Request } | { badReq
     if (Array.isArray(value)) for (const item of value) headers.append(key, item);
     else headers.set(key, value);
   }
-  // Backend ini hanya membaca; tidak ada rute yang punya badan permintaan.
+  // This backend only reads; no route has a request body.
   return { request: new Request(url, { method: req.method ?? "GET", headers }) };
 }
 
 export async function writeResponse(res: ServerResponse, response: Response): Promise<void> {
   const headers: Record<string, string | string[]> = {};
   response.headers.forEach((value, key) => {
-    // `Set-Cookie` adalah satu-satunya header yang tidak boleh digabung dengan
-    // koma, dan `forEach` menyajikannya sudah tergabung. `getSetCookie()`
-    // mengembalikan tiap nilai utuh; tanpa itu hanya yang terakhir yang lolos.
+    // `Set-Cookie` is the one header that must not be joined with commas, and
+    // `forEach` presents it already joined. `getSetCookie()` returns each value
+    // intact; without it only the last one would get through.
     if (key.toLowerCase() === "set-cookie") return;
     headers[key] = value;
   });
@@ -152,7 +155,7 @@ export async function writeResponse(res: ServerResponse, response: Response): Pr
   res.end(response.body === null ? undefined : Buffer.from(await response.arrayBuffer()));
 }
 
-/** Handler `node:http` untuk sebuah aplikasi Fetch. Diekspor supaya bisa diuji. */
+/** A `node:http` handler for a Fetch application. Exported so it can be tested. */
 export function createRequestListener(app: { fetch: (request: Request) => Response | Promise<Response> }) {
   return (req: IncomingMessage, res: ServerResponse): void => {
     void (async () => {
@@ -165,7 +168,7 @@ export function createRequestListener(app: { fetch: (request: Request) => Respon
         }
         await writeResponse(res, await app.fetch(converted.request));
       } catch (err) {
-        // Jaring terakhir. Tetap JSON: klien ini tidak bisa membaca apa pun lain.
+        // The last-resort net. Still JSON: this client cannot read anything else.
         if (!res.headersSent) res.writeHead(500, { "content-type": "application/json" });
         res.end(JSON.stringify({ error: "internal_error", message: describeFailure(err) }));
       }
@@ -180,8 +183,8 @@ export function startServer(port = Number(process.env.PORT ?? DEFAULT_PORT)) {
 
   server.listen(port, () => {
     console.log(
-      `[fugugent] api mendengarkan di :${port} - chain ${built.config.chainId}, ` +
-        `cache ${built.hasCache ? "aktif" : "tidak dipasang"}`,
+      `[fugugent] api listening on :${port} - chain ${built.config.chainId}, ` +
+        `cache ${built.hasCache ? "active" : "not installed"}`,
     );
   });
 
@@ -197,8 +200,8 @@ export function startServer(port = Number(process.env.PORT ?? DEFAULT_PORT)) {
 }
 
 /**
- * Hanya menyala bila berkas ini yang dijalankan. Meng-`import` modul ini dari
- * test tidak boleh pernah membuka port.
+ * Only starts when this file is the one being run. `import`ing this module from
+ * a test must never open a port.
  */
 const entry = process.argv[1];
 if (entry !== undefined && import.meta.url === pathToFileURL(entry).href) {

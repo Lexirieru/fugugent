@@ -1,30 +1,31 @@
 /**
- * `/api/health` — endpoint yang membuat klaim ketahanan bisa **diperiksa**.
+ * `/api/health` — the endpoint that makes the resilience claims **checkable**.
  *
- * Bukan probe liveness. Ini laporan keadaan **tiap sumber**, termasuk yang
- * sedang tumbang, dan itulah seluruh gunanya: siapa pun boleh mematikan
- * 8004scan lalu memeriksa apakah kami mengakuinya. Endpoint kesehatan yang
- * selalu hijau tidak membuktikan apa pun.
+ * Not a liveness probe. This is a report on the state of **each source**,
+ * including the ones that are down, and that is the whole point: anyone may take
+ * 8004scan down and then check whether we admit it. A health endpoint that is
+ * always green proves nothing.
  *
- * Dua aturan yang mengikat berkas ini:
+ * Two rules bind this file:
  *
- * 1. **Tidak pernah 5xx.** Termasuk saat Postgres mati — justru saat itulah ia
- *    paling dibutuhkan. `getHealth()` yang melempar menjadi laporan
- *    `healthy: false` yang jujur, bukan halaman error.
- * 2. **Tidak pernah memuat kredensial.** Setiap `reason` — juga yang datang
- *    dari pesan error upstream — disunting lewat `redact` sebelum keluar.
+ * 1. **Never a 5xx.** Including when Postgres is down — that is precisely when
+ *    it is needed most. A `getHealth()` that throws becomes an honest
+ *    `healthy: false` report, not an error page.
+ * 2. **Never contains credentials.** Every `reason` — including ones that came
+ *    from an upstream error message — is redacted through `redact` before it
+ *    leaves.
  *
- * ## Dua mode, karena ada dua pembaca
+ * ## Two modes, because there are two readers
  *
- * - **Bawaan: selalu 200**, bahkan saat `healthy: false`. Pembacanya adalah UI
- *   dan manusia, yang membaca badan respons. (`fetch` sendiri tidak membuang
- *   badan pada 503 — yang membuangnya adalah `getJson` di frontend, yang
- *   melempar pada non-2xx. Jadi 200 di sini adalah pilihan demi klien itu,
- *   bukan sifat HTTP.)
- * - **`?strict=1`: 503 ketika ada bukti kerusakan** (lihat {@link shouldAlarm}).
- *   Pembacanya adalah uptime monitor, liveness probe, dan `curl -f` — yang hanya
- *   melihat status code dan tidak bisa membaca apa pun. Badannya tetap lengkap
- *   dan identik dengan mode bawaan.
+ * - **Default: always 200**, even when `healthy: false`. Its readers are the UI
+ *   and humans, who read the response body. (`fetch` itself does not discard the
+ *   body on a 503 — what discards it is `getJson` in the frontend, which throws
+ *   on a non-2xx. So the 200 here is a choice made for that client, not a
+ *   property of HTTP.)
+ * - **`?strict=1`: 503 when there is evidence of breakage** (see
+ *   {@link shouldAlarm}). Its readers are uptime monitors, liveness probes, and
+ *   `curl -f` — which only see the status code and cannot read anything. The body
+ *   is still complete and identical to the default mode.
  */
 import { Hono } from "hono";
 import {
@@ -41,21 +42,21 @@ export interface HealthRoutesDeps {
   now?: () => Date;
 }
 
-/** Urutan fallback — dipakai untuk menyebut sumber mana yang sedang melayani. */
+/** The fallback order — used to name which source is currently serving. */
 const SOURCE_ORDER: readonly AgentSource[] = ["scan8004", "cache", "onchain", "seed"];
 
 export interface HealthResponse {
   healthy: boolean;
-  /** `true` bila 8004scan tidak sehat — kami berjalan dari jaring pengaman. */
+  /** `true` when 8004scan is unhealthy — we are running from the safety net. */
   degraded: boolean;
   /**
-   * Sumber teratas yang masih sehat: dari sinilah permintaan berikutnya
-   * kemungkinan besar dilayani. `"seed"` bila tidak ada yang sehat.
+   * The topmost source that is still healthy: this is most likely where the next
+   * request will be served from. `"seed"` when nothing is healthy.
    */
   source: AgentSource;
-  /** Ringkasan sumber yang tidak sehat. `null` bila semuanya sehat. */
+  /** A summary of the unhealthy sources. `null` when everything is healthy. */
   reason: string | null;
-  /** Tiap baris membawa umur observasinya (`ageSeconds`, `stale`). */
+  /** Each row carries the age of its observation (`ageSeconds`, `stale`). */
   sources: ObservedSourceHealth[];
   checkedAt: string;
 }
@@ -65,49 +66,48 @@ function scrub(health: ObservedSourceHealth): ObservedSourceHealth {
 }
 
 /**
- * **Kontrak `?strict=1`.** Ini yang akan dipegang orang lain, jadi ditulis sebagai
- * satu fungsi bernama alih-alih sebagai ekspresi di dalam handler.
+ * **The `?strict=1` contract.** This is what other people will rely on, so it is
+ * written as one named function rather than as an expression inside the handler.
  *
- * Alarm berbunyi bila **ada bukti kerusakan**, bukan hanya bila pengguna sudah
- * merasakannya:
+ * The alarm sounds when **there is evidence of breakage**, not only once the user
+ * has felt it:
  *
- * 1. **Ada sumber sungguhan yang diketahui tidak sehat.** Ini yang dulu hilang.
- *    `degraded` saja tidak cukup: kalau **hanya** Postgres mati sementara
- *    8004scan segar, mutu data yang dilihat pengguna memang tidak turun —
- *    `degraded: false`, `healthy: true` — dan monitor melihat 200 sementara
- *    satu sumber benar-benar tumbang. Justru keadaan itu yang ingin ditangkap
- *    **sebelum** menjadi masalah: cache yang mati adalah jaring yang hilang,
- *    dan ia baru terasa tepat ketika 8004scan menyusul tumbang.
- * 2. **`degraded`** — 8004scan tidak diketahui sehat. Tetap ada meski sebagian
- *    besar tercakup butir 1: bila 8004scan belum pernah terobservasi sama
- *    sekali, ia tidak muncul di `sources`, tetapi `degraded` tetap `true`.
- *    Membiarkan `strict` membalas 200 sementara badannya berkata
- *    `degraded: true` akan membuat dua pembaca endpoint yang sama saling
- *    bertentangan.
- * 3. **`!healthy`** — tidak ada satu pun sumber sungguhan yang terkonfirmasi
- *    sehat. Termasuk keadaan "belum diketahui apa pun" sesaat setelah boot:
- *    tidak adanya bukti sehat bukan bukti sehat, dan monitor yang membunyikan
- *    alarm pada keadaan belum-diketahui berperilaku benar. Ia diam sendiri
- *    begitu permintaan pertama lewat.
+ * 1. **A live source is known to be unhealthy.** This is what used to be
+ *    missing. `degraded` alone is not enough: if **only** Postgres is down while
+ *    8004scan is fresh, the quality of the data the user sees really has not
+ *    dropped — `degraded: false`, `healthy: true` — and the monitor sees a 200
+ *    while a source is genuinely down. That is precisely the state worth catching
+ *    **before** it becomes a problem: a dead cache is a missing net, and it is
+ *    only felt at the exact moment 8004scan goes down too.
+ * 2. **`degraded`** — 8004scan is not known to be healthy. It stays even though
+ *    point 1 covers most of it: if 8004scan has never been observed at all, it
+ *    does not appear in `sources`, yet `degraded` is still `true`. Letting
+ *    `strict` answer 200 while its body says `degraded: true` would make two
+ *    readers of the same endpoint contradict each other.
+ * 3. **`!healthy`** — not a single live source is confirmed healthy. This
+ *    includes the "nothing is known yet" state just after boot: the absence of
+ *    evidence of health is not evidence of health, and a monitor that raises the
+ *    alarm in the not-yet-known state is behaving correctly. It goes quiet by
+ *    itself once the first request has gone through.
  *
- * Yang **tidak** membunyikan alarm:
+ * What does **not** sound the alarm:
  *
- * - **Sumber sungguhan yang tidak pernah terobservasi.** Backend yang sengaja
- *   dijalankan tanpa `DATABASE_URL` adalah konfigurasi yang sah, bukan
- *   kerusakan; `cache` tidak pernah muncul di `sources` dan tidak boleh membuat
- *   monitor merah selamanya. "Tidak dipasang" bukan "rusak" — pembedaan yang
- *   sama dengan yang dipakai `/api/agents/:id` untuk tidak menghapus agent nyata.
- * - **`seed`.** Ia berkas di dalam bundel proses ini, bukan sumber sungguhan
- *   ({@link LIVE_SOURCES}); ia tidak bisa tumbang sendiri, jadi ia tidak bisa
- *   menjadi bukti kerusakan infrastruktur.
- * - **Observasi yang `stale`.** `observe()` di `service/agents.ts` mencabut klaim
- *   sehat dari observasi yang melewati TTL — `healthy: false` di sana berarti
- *   "belum diperiksa ulang", bukan "gagal". Menghitungnya sebagai kerusakan akan
- *   membuat monitor merah permanen: `onchain` hanya tersentuh ketika tingkat 1
- *   dan 2 gagal, jadi observasinya nyaris selalu kedaluwarsa. Ini pembedaan yang
- *   sama persis dengan yang dipakai `/api/agents/:id`: **tidak tahu bukan rusak**,
- *   seperti tidak tahu bukan tidak ada. Diukur di container hidup: tanpa
- *   pengecualian ini, `strict=1` membalas 503 walaupun tidak ada yang rusak.
+ * - **A live source that has never been observed.** A backend deliberately run
+ *   without `DATABASE_URL` is a valid configuration, not breakage; `cache` never
+ *   appears in `sources` and must not turn the monitor red forever. "Not
+ *   installed" is not "broken" — the same distinction `/api/agents/:id` uses so
+ *   as not to erase a real agent.
+ * - **`seed`.** It is a file inside this process's own bundle, not a live source
+ *   ({@link LIVE_SOURCES}); it cannot go down on its own, so it cannot be
+ *   evidence of infrastructure breakage.
+ * - **A `stale` observation.** `observe()` in `service/agents.ts` withdraws the
+ *   health claim of an observation past its TTL — a `healthy: false` there means
+ *   "not re-checked yet", not "failed". Counting it as breakage would make the
+ *   monitor permanently red: `onchain` is only touched when levels 1 and 2 fail,
+ *   so its observation is almost always expired. This is exactly the same
+ *   distinction `/api/agents/:id` uses: **not knowing is not being broken**, just
+ *   as not knowing is not not existing. Measured on a live container: without
+ *   this exception, `strict=1` answers 503 even though nothing is broken.
  */
 export function shouldAlarm(health: {
   healthy: boolean;
@@ -122,18 +122,18 @@ export function shouldAlarm(health: {
 }
 
 /**
- * `?strict=1` — nyala hanya pada `1` atau `true`.
+ * `?strict=1` — on only for `1` or `true`.
  *
- * Ejaan lain ditolak alih-alih dianggap "tidak nyala": `?strict=yes` yang
- * diam-diam berarti mati akan membuat monitor melaporkan hijau selamanya
- * tanpa pernah memberi tahu bahwa ia sedang tidak memeriksa apa pun.
+ * Any other spelling is rejected rather than treated as "off": a `?strict=yes`
+ * that silently means off would make a monitor report green forever without ever
+ * telling anyone that it is checking nothing.
  */
 export function parseStrict(raw: string | undefined): boolean {
   if (raw === undefined || raw.trim() === "") return false;
   const value = raw.trim().toLowerCase();
   if (value === "1" || value === "true") return true;
   if (value === "0" || value === "false") return false;
-  throw new QueryError("strict", `strict hanya menerima 1/true/0/false, bukan ${JSON.stringify(raw)}`);
+  throw new QueryError("strict", `strict only accepts 1/true/0/false, not ${JSON.stringify(raw)}`);
 }
 
 function servingSource(sources: readonly SourceHealth[]): AgentSource {
@@ -170,19 +170,18 @@ export function createHealthRoutes(deps: HealthRoutesDeps): Hono {
             ? null
             : redact(
                 unhealthy
-                  .map((s) => `${s.source} tidak sehat${s.reason ? `: ${s.reason}` : ""}`)
+                  .map((s) => `${s.source} unhealthy${s.reason ? `: ${s.reason}` : ""}`)
                   .join("; "),
               ),
         sources,
         checkedAt: health.checkedAt,
       };
-      // Badan yang sama persis; hanya status code-nya yang berbicara kepada
-      // pembaca yang tidak bisa membaca badan.
+      // Exactly the same body; only the status code speaks to the reader that
+      // cannot read a body.
       return strict && shouldAlarm(body) ? c.json(body, 503) : c.json(body);
     } catch (err) {
-      // Layanan berjanji tidak melempar; kalau ia tetap melempar, itu justru
-      // fakta kesehatan yang paling penting untuk dilaporkan — bukan alasan
-      // untuk ikut mati.
+      // The service promises not to throw; if it throws anyway, that is the most
+      // important health fact there is to report — not a reason to die with it.
       const message =
         err instanceof Error ? `${err.name}: ${err.message.split("\n")[0]}` : String(err);
       const body: HealthResponse = {

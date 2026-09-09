@@ -1,16 +1,16 @@
 /**
- * Kontrak HTTP `/api/agents`, `/api/agents/:id`, `/api/categories`.
+ * The HTTP contract of `/api/agents`, `/api/agents/:id`, `/api/categories`.
  *
- * Yang diuji di sini bukan "apakah Hono bekerja", melainkan empat janji yang
- * dibuat backend ini kepada frontend dan kepada juri:
+ * What is tested here is not "does Hono work" but the four promises this backend
+ * makes to the frontend and to the judges:
  *
- * 1. Uang tidak pernah menyeberang sebagai `number`, dan `bigint` tidak pernah
- *    lolos mentah (JSON.stringify atas `AgentRecord` **melempar** — itu dikunci
- *    di test pertama supaya premisnya tidak bisa hilang diam-diam).
- * 2. Setiap respons membawa `source` dan `ageSeconds`.
- * 3. Parameter cacat ditolak dengan alasan yang jelas, bukan 500 dan bukan
- *    diam-diam dianggap default.
- * 4. Upstream yang tumbang tidak pernah menjadi 5xx.
+ * 1. Money never crosses as a `number`, and a `bigint` never slips through raw
+ *    (JSON.stringify over an `AgentRecord` **throws** — that is locked down in
+ *    the first test so the premise cannot quietly disappear).
+ * 2. Every response carries `source` and `ageSeconds`.
+ * 3. A malformed parameter is rejected with a clear reason, not a 500 and not a
+ *    silent fallback to a default.
+ * 4. A downed upstream never becomes a 5xx.
  */
 import { describe, expect, it } from "vitest";
 import { CATEGORIES } from "../../types.js";
@@ -29,20 +29,20 @@ async function get(app: ReturnType<typeof createApp>, path: string): Promise<Res
   return app.request(`http://api.test${path}`);
 }
 
-/** `Response.json()` bertipe `unknown` di typing Node; badan JSON di test memang dinamis. */
+/** `Response.json()` is typed `unknown` in Node's typings; JSON bodies in tests really are dynamic. */
 // eslint-disable-next-line -eslint/no-explicit-any
 async function json(res: Response): Promise<any> {
   return res.json();
 }
 
-describe("premis serialisasi", () => {
-  it("`AgentRecord` mentah memang tidak JSON-serializable", () => {
+describe("the serialization premise", () => {
+  it("a raw `AgentRecord` really is not JSON-serializable", () => {
     expect(() => JSON.stringify(makeRecord())).toThrow(TypeError);
   });
 });
 
 describe("GET /api/agents", () => {
-  it("mengirim uang sebagai string desimal basis 8, tidak pernah number", async () => {
+  it("sends money as a base-8 decimal string, never as a number", async () => {
     const app = createApp({ service: fakeService() });
     const res = await get(app, "/api/agents?category=GRID");
 
@@ -55,7 +55,7 @@ describe("GET /api/agents", () => {
     expect(listing.erc8004AgentId).toBe("41");
   });
 
-  it("seluruh badan aman untuk JSON.parse, termasuk field provenansi baru", async () => {
+  it("the whole body is safe for JSON.parse, including the new provenance fields", async () => {
     const app = createApp({
       service: fakeService({
         list: async () =>
@@ -74,7 +74,7 @@ describe("GET /api/agents", () => {
     expect(raw).not.toContain("undefined");
   });
 
-  it("membawa source dan ageSeconds supaya UI bisa bilang umur datanya", async () => {
+  it("carries source and ageSeconds so the UI can state the age of its data", async () => {
     const app = createApp({
       service: fakeService({
         list: async () =>
@@ -90,7 +90,7 @@ describe("GET /api/agents", () => {
     expect(typeof body.fetchedAt).toBe("string");
   });
 
-  it("meneruskan limit dan offset apa adanya ke layanan", async () => {
+  it("forwards limit and offset verbatim to the service", async () => {
     const service = fakeService();
     const app = createApp({ service });
     await get(app, "/api/agents?category=YIELD&limit=7&offset=14");
@@ -100,7 +100,7 @@ describe("GET /api/agents", () => {
     expect(service.listCalls[0].opts).toMatchObject({ limit: 7, offset: 14 });
   });
 
-  it("tanpa category, menggabungkan keempat kategori", async () => {
+  it("with no category, it merges all four categories", async () => {
     const service = fakeService({
       list: async (category) =>
         makePage({
@@ -116,13 +116,13 @@ describe("GET /api/agents", () => {
   });
 
   /**
-   * Temuan I4. Tiap kategori dibaca paling banyak `MAX_PAGE_LIMIT` item, jadi
-   * jendela gabungan punya batas keras. Melaporkan jumlah keempat `total`
-   * (ribuan) akan menjanjikan halaman yang tidak pernah ada: klien membangun
-   * pagination dari angka itu lalu menerima halaman kosong `healthy: true`.
-   * Gagal bila `total` dikembalikan menjadi penjumlahan.
+   * Finding I4. Each category is read to at most `MAX_PAGE_LIMIT` items, so the
+   * merged window has a hard bound. Reporting the sum of the four `total`s
+   * (thousands) would promise pages that never existed: the client builds its
+   * pagination from that number and then receives an empty `healthy: true` page.
+   * Fails if `total` is turned back into a sum.
    */
-  it("total gabungan adalah item unik yang bisa dijangkau, bukan jumlah keempat total", async () => {
+  it("the merged total is the reachable unique items, not the sum of the four totals", async () => {
     const app = createApp({
       service: fakeService({
         list: async (category) =>
@@ -141,7 +141,7 @@ describe("GET /api/agents", () => {
     expect(body.total).toBe(8);
   });
 
-  it("item yang muncul di dua kategori hanya dihitung sekali", async () => {
+  it("an item appearing in two categories is counted only once", async () => {
     const app = createApp({
       service: fakeService({
         list: async () => makePage({ items: [makeRecord({ id: "97:kembar" })], total: 50 }),
@@ -153,7 +153,7 @@ describe("GET /api/agents", () => {
     expect(body.total).toBe(1);
   });
 
-  it("halaman kosong yang sah tetap 200 dan tetap sehat", async () => {
+  it("a legitimately empty page is still 200 and still healthy", async () => {
     const app = createApp({ service: fakeService({ list: async () => emptyPageFor("seed") }) });
     const res = await get(app, "/api/agents?category=GRID");
 
@@ -175,7 +175,7 @@ describe("GET /api/agents", () => {
  * that a page is mixed — the quiet over-claim this backend exists to avoid.
  * Every test below fails if either field stops being forwarded.
  */
-describe("GET /api/agents — provenansi campuran", () => {
+describe("GET /api/agents — mixed provenance", () => {
   const overlay = {
     count: 1,
     healthy: true,
@@ -183,7 +183,7 @@ describe("GET /api/agents — provenansi campuran", () => {
     ageSeconds: 12,
   };
 
-  it("meneruskan itemSources dan firstParty apa adanya", async () => {
+  it("forwards itemSources and firstParty verbatim", async () => {
     const app = createApp({
       service: fakeService({
         list: async () =>
@@ -206,7 +206,7 @@ describe("GET /api/agents — provenansi campuran", () => {
     expect(body.source).toBe("scan8004");
   });
 
-  it("sensus rute sepakat dengan sensus layanan", async () => {
+  it("the route's census agrees with the service's census", async () => {
     const items = [
       makeRecord({ id: "97:1", tokenId: "1", source: "scan8004" }),
       makeRecord({ id: "97:2", tokenId: "2", source: "onchain" }),
@@ -222,7 +222,7 @@ describe("GET /api/agents — provenansi campuran", () => {
     expect(body.itemSources).toEqual({ scan8004: 1, onchain: 2 });
   });
 
-  it("itemSources tetap terisi walau layanan tidak mengirimnya", async () => {
+  it("itemSources is still populated even when the service does not send it", async () => {
     const app = createApp({
       service: fakeService({
         list: async () =>
@@ -241,7 +241,7 @@ describe("GET /api/agents — provenansi campuran", () => {
     expect(body.itemSources).toEqual({ cache: 2 });
   });
 
-  it("firstParty null hanya berarti overlay tidak dipasang", async () => {
+  it("a null firstParty only means the overlay is not installed", async () => {
     const app = createApp({
       service: fakeService({ list: async () => makePage({ firstParty: undefined }) }),
     });
@@ -253,11 +253,11 @@ describe("GET /api/agents — provenansi campuran", () => {
     expect("firstParty" in body).toBe(true);
   });
 
-  it("overlay yang rusak diteruskan dengan alasannya, tidak dibulatkan jadi null", async () => {
+  it("a broken overlay is forwarded with its reason, not rounded off to null", async () => {
     const broken = {
       count: 0,
       healthy: false,
-      reason: "FuguRegistry tidak terbaca: RPC timeout",
+      reason: "FuguRegistry unreadable: RPC timeout",
       ageSeconds: null,
     };
     const app = createApp({
@@ -268,7 +268,7 @@ describe("GET /api/agents — provenansi campuran", () => {
     expect(body.firstParty).toEqual(broken);
   });
 
-  it("jalur gabungan mensensus irisan yang benar-benar dilayani", async () => {
+  it("the merged path censuses the slice actually served", async () => {
     const app = createApp({
       service: fakeService({
         list: async (category) =>
@@ -293,7 +293,7 @@ describe("GET /api/agents — provenansi campuran", () => {
     expect(counted).toBe(3);
   });
 
-  it("jalur gabungan melipat overlay secara pesimistis", async () => {
+  it("the merged path folds the overlay pessimistically", async () => {
     const app = createApp({
       service: fakeService({
         list: async (category) =>
@@ -319,7 +319,7 @@ describe("GET /api/agents — provenansi campuran", () => {
    * reported as `1` by each of the four categories, so summing showed 4. Hence
    * the fold is `max`.
    */
-  it("jalur gabungan melipat unreadableMetadata dengan max, tidak menjumlahkannya", async () => {
+  it("the merged path folds unreadableMetadata with max, not by summing", async () => {
     const app = createApp({
       service: fakeService({
         list: async (category) =>
@@ -342,7 +342,7 @@ describe("GET /api/agents — provenansi campuran", () => {
     expect(body.firstParty.unreadableMetadata).toBe(2);
   });
 
-  it("jalur gabungan tidak mengarang unreadableMetadata bila tak dilaporkan", async () => {
+  it("the merged path does not invent unreadableMetadata when none was reported", async () => {
     const app = createApp({
       service: fakeService({
         list: async () =>
@@ -357,7 +357,7 @@ describe("GET /api/agents — provenansi campuran", () => {
     expect("unreadableMetadata" in body.firstParty).toBe(false);
   });
 
-  it("jalur gabungan melaporkan null bila tak satu pun kategori punya overlay", async () => {
+  it("the merged path reports null when no category has an overlay", async () => {
     const app = createApp({
       service: fakeService({ list: async () => makePage({ items: [], firstParty: undefined }) }),
     });
@@ -502,7 +502,7 @@ describe("onchainExecution — three states, and the third is not false", () => 
   });
 });
 
-describe("GET /api/agents — parameter cacat", () => {
+describe("GET /api/agents — a malformed parameter", () => {
   const app = createApp({ service: fakeService() });
 
   it.each([
@@ -516,9 +516,9 @@ describe("GET /api/agents — parameter cacat", () => {
     ["offset=abc", "offset"],
     ["offset=10001", "offset"],
     ["offset=9007199254740991", "offset"],
-    ["category=BUKANKATEGORI", "category"],
+    ["category=NOTACATEGORY", "category"],
     ["category=grid", "category"],
-  ])("menolak %s dengan 400 dan menyebut field-nya", async (query, field) => {
+  ])("rejects %s with a 400 that names the field", async (query, field) => {
     const res = await get(app, `/api/agents?${query}`);
     expect(res.status).toBe(400);
     const body = await json(res);
@@ -528,12 +528,12 @@ describe("GET /api/agents — parameter cacat", () => {
     expect(body.message.length).toBeGreaterThan(0);
   });
 
-  it("menyebutkan kategori yang sah saat kategori ditolak", async () => {
+  it("names the valid categories when a category is rejected", async () => {
     const body = await json(await get(app, "/api/agents?category=NOPE"));
     expect(body.allowed).toEqual([...CATEGORIES]);
   });
 
-  it("parameter kosong berarti tidak diisi, bukan cacat", async () => {
+  it("an empty parameter means unset, not malformed", async () => {
     const service = fakeService();
     const local = createApp({ service });
     const res = await get(local, "/api/agents?category=&limit=&offset=");
@@ -541,7 +541,7 @@ describe("GET /api/agents — parameter cacat", () => {
     expect(service.listCalls).toHaveLength(CATEGORIES.length);
   });
 
-  it("tidak memanggil layanan sama sekali saat parameter cacat", async () => {
+  it("does not call the service at all when a parameter is malformed", async () => {
     const service = fakeService();
     const local = createApp({ service });
     await get(local, "/api/agents?limit=abc");
@@ -549,12 +549,12 @@ describe("GET /api/agents — parameter cacat", () => {
   });
 });
 
-describe("GET /api/agents — upstream tumbang", () => {
-  it("layanan yang melempar tetap menghasilkan 200 dengan amplop jujur", async () => {
+describe("GET /api/agents — upstream down", () => {
+  it("a throwing service still produces a 200 with an honest envelope", async () => {
     const app = createApp({
       service: fakeService({
         list: async () => {
-          throw new Error("Postgres mati");
+          throw new Error("Postgres down");
         },
       }),
     });
@@ -564,27 +564,27 @@ describe("GET /api/agents — upstream tumbang", () => {
     const body = await json(res);
     expect(body.items).toEqual([]);
     expect(body.healthy).toBe(false);
-    expect(body.reason).toContain("Postgres mati");
+    expect(body.reason).toContain("Postgres down");
     expect(body.source).toBe("seed");
   });
 
-  it("tidak pernah membocorkan API key di reason", async () => {
+  it("never leaks the API key into reason", async () => {
     const app = createApp({
       service: fakeService({
         list: async () => {
-          throw new Error("GET https://api.8004scan.io/v1/agents?api_key=sk-RAHASIA-123 gagal");
+          throw new Error("GET https://api.8004scan.io/v1/agents?api_key=sk-SECRET-123 failed");
         },
       }),
     });
     const body = await json(await get(app, "/api/agents?category=GRID"));
 
-    expect(JSON.stringify(body)).not.toContain("sk-RAHASIA-123");
+    expect(JSON.stringify(body)).not.toContain("sk-SECRET-123");
     expect(body.reason).toContain("[redacted]");
   });
 });
 
 describe("GET /api/agents/:id", () => {
-  it("mengembalikan agent terserialisasi dengan source dan ageSeconds", async () => {
+  it("returns a serialized agent with source and ageSeconds", async () => {
     const app = createApp({ service: fakeService() });
     const res = await get(app, "/api/agents/97:41");
 
@@ -599,8 +599,8 @@ describe("GET /api/agents/:id", () => {
   it.each([
     ["true", true, true],
     ["false", false, false],
-    ["tidak diketahui", undefined, null],
-  ] as const)("detail meneruskan onchainExecution %s", async (_label, promoted, expected) => {
+    ["unknown", undefined, null],
+  ] as const)("the detail path forwards onchainExecution %s", async (_label, promoted, expected) => {
     const app = createApp({
       service: fakeService({
         detail: async () =>
@@ -617,7 +617,7 @@ describe("GET /api/agents/:id", () => {
     expect("onchainExecution" in body.agent).toBe(true);
   });
 
-  it("meneruskan firstParty pada detail", async () => {
+  it("forwards firstParty on the detail path", async () => {
     const overlay = { count: 1, healthy: true, reason: null, ageSeconds: 8 };
     const app = createApp({
       service: fakeService({ detail: async () => makeDetail({ firstParty: overlay }) }),
@@ -629,7 +629,7 @@ describe("GET /api/agents/:id", () => {
     expect(body.agent.fuguListing.priceUsd8PerPeriod).toBe("12345678");
   });
 
-  it("firstParty null pada detail berarti overlay tidak dipasang", async () => {
+  it("a null firstParty on the detail path means the overlay is not installed", async () => {
     const app = createApp({
       service: fakeService({ detail: async () => makeDetail({ firstParty: undefined }) }),
     });
@@ -639,14 +639,14 @@ describe("GET /api/agents/:id", () => {
     expect("firstParty" in body).toBe(true);
   });
 
-  it("meneruskan id yang ter-encode apa adanya", async () => {
+  it("forwards a percent-encoded id verbatim", async () => {
     const service = fakeService();
     const app = createApp({ service });
     await get(app, "/api/agents/97%3Aseed-fugugrid");
     expect(service.detailCalls).toEqual(["97:seed-fugugrid"]);
   });
 
-  it("404 bila SETIAP tingkat menjawab dan tetap tidak menemukannya", async () => {
+  it("404 when EVERY level answered and still did not find it", async () => {
     const app = createApp({
       service: fakeService({
         detail: async () =>
@@ -654,11 +654,11 @@ describe("GET /api/agents/:id", () => {
             agent: null,
             source: "seed",
             healthy: true,
-            reason: "agent 97:99 tidak ada di seed terkurasi",
+            reason: "agent 97:99 is not in the curated seed",
             ageSeconds: null,
             degraded: true,
-            // Keempat tingkat benar-benar dimintai jawaban; semuanya menjawab
-            // "tidak ada". Barulah "tidak ada" boleh diucapkan.
+            // All four levels were genuinely asked; all of them answered
+            // "not there". Only then may "does not exist" be said.
             trail: [
               { source: "scan8004", outcome: "empty", reason: null, items: 0 },
               { source: "cache", outcome: "empty", reason: null, items: 0 },
@@ -674,25 +674,25 @@ describe("GET /api/agents/:id", () => {
     const body = await json(res);
     expect(body.agent).toBeNull();
     expect(body.source).toBe("seed");
-    expect(body.reason).toContain("tidak ada");
+    expect(body.reason).toContain("not in");
   });
 
   /**
-   * Inti temuan C1. `service/agents.ts` tingkat 4 meng-hardcode `healthy: true`
-   * dan `service/seed.ts` selalu membalas `agent: null` untuk id yang bukan
-   * agent kurasi — jadi amplop di bawah ini adalah persis yang dihasilkan
-   * wiring produksi ketika 8004scan mati, `DATABASE_URL` kosong, dan on-chain
-   * tidak memuat agent itu. Membalas 404 di situ berarti marketplace menghapus
-   * agent yang nyata tepat saat sumber primernya tumbang.
+   * The heart of finding C1. Level 4 in `service/agents.ts` hardcodes
+   * `healthy: true` and `service/seed.ts` always answers `agent: null` for an id
+   * that is not a curated agent — so the envelope below is exactly what the
+   * production wiring produces when 8004scan is down, `DATABASE_URL` is empty,
+   * and the on-chain read does not hold that agent. Answering 404 there means the
+   * marketplace erases a real agent right as its primary source goes down.
    *
-   * Ketiga kasus di bawah gagal bila syarat `!isUncertain(trail)` dicabut.
+   * All three cases below fail if the `!isUncertain(trail)` condition is removed.
    */
   it.each([
-    ["threw", "8004scan mati"],
-    ["unhealthy", "8004scan membalas 500 DATABASE_ERROR"],
-    ["unavailable", "cache tidak dipasang"],
+    ["threw", "8004scan down"],
+    ["unhealthy", "8004scan answered 500 DATABASE_ERROR"],
+    ["unavailable", "cache not installed"],
   ] as const)(
-    "200 — bukan 404 — bila ada tingkat ber-outcome %s, walau healthy: true",
+    "200 — not 404 — when some level has outcome %s, even with healthy: true",
     async (outcome, reason) => {
       const app = createApp({
         service: fakeService({
@@ -700,9 +700,9 @@ describe("GET /api/agents/:id", () => {
             makeDetail({
               agent: null,
               source: "seed",
-              // Persis yang dilaporkan service hari ini: seed selalu sehat.
+              // Exactly what the service reports today: the seed is always healthy.
               healthy: true,
-              reason: "agent 97:41 tidak ada di seed terkurasi",
+              reason: "agent 97:41 is not in the curated seed",
               ageSeconds: null,
               degraded: true,
               trail: [
@@ -717,19 +717,19 @@ describe("GET /api/agents/:id", () => {
       expect(res.status).toBe(200);
       const body = await json(res);
       expect(body.agent).toBeNull();
-      // Jejaknya ikut, supaya klien bisa membedakan sendiri kalau ia mau.
+      // The trail travels along, so a client can tell the difference itself if it wants.
       expect(body.trail.some((a: { outcome: string }) => a.outcome === outcome)).toBe(true);
     },
   );
 
-  it("200 — bukan 404 — bila layanan sendiri melaporkan tidak sehat", async () => {
+  it("200 — not 404 — when the service itself reports unhealthy", async () => {
     const app = createApp({
       service: fakeService({
         detail: async () =>
           makeDetail({
             agent: null,
             healthy: false,
-            reason: "keempat tingkat gagal",
+            reason: "all four levels failed",
             trail: [{ source: "seed", outcome: "empty", reason: null, items: 0 }],
           }),
       }),
@@ -742,7 +742,7 @@ describe("GET /api/agents/:id", () => {
     expect(body.healthy).toBe(false);
   });
 
-  it("layanan yang melempar tidak menjadi 5xx", async () => {
+  it("a throwing service does not become a 5xx", async () => {
     const app = createApp({
       service: fakeService({
         detail: async () => {
@@ -759,7 +759,7 @@ describe("GET /api/agents/:id", () => {
     expect(body.reason).toContain("RPC timeout");
   });
 
-  it("id kosong tidak menjatuhkan layanan", async () => {
+  it("an empty id does not take the service down", async () => {
     const app = createApp({ service: fakeService() });
     const res = await get(app, "/api/agents/%20");
     expect(res.status).toBe(400);
@@ -768,7 +768,7 @@ describe("GET /api/agents/:id", () => {
 });
 
 describe("GET /api/categories", () => {
-  it("melaporkan jumlah untuk keempat kategori", async () => {
+  it("reports counts for all four categories", async () => {
     const counts: Record<string, number> = {
       REBALANCING: 3,
       GRID: 5,
@@ -793,7 +793,7 @@ describe("GET /api/categories", () => {
     expect(body.total).toBe(10);
   });
 
-  it("setiap baris membawa source dan ageSeconds-nya sendiri", async () => {
+  it("each row carries its own source and ageSeconds", async () => {
     const app = createApp({
       service: fakeService({
         list: async () => makePage({ source: "seed", ageSeconds: 86_400, degraded: true }),
@@ -806,11 +806,11 @@ describe("GET /api/categories", () => {
     expect(body.degraded).toBe(true);
   });
 
-  it("satu kategori yang gagal tidak menghapus tiga lainnya", async () => {
+  it("one failing category does not erase the other three", async () => {
     const app = createApp({
       service: fakeService({
         list: async (category) => {
-          if (category === "YIELD") throw new Error("upstream mati");
+          if (category === "YIELD") throw new Error("upstream down");
           return makePage({ items: [], total: 1 });
         },
       }),
@@ -828,10 +828,10 @@ describe("GET /api/categories", () => {
   });
 });
 
-describe("rute tak dikenal", () => {
-  it("404 berbentuk JSON, bukan HTML", async () => {
+describe("an unknown route", () => {
+  it("the 404 is JSON-shaped, not HTML", async () => {
     const app = createApp({ service: fakeService({ health: async () => makeHealth() }) });
-    const res = await get(app, "/api/tidak-ada");
+    const res = await get(app, "/api/does-not-exist");
 
     expect(res.status).toBe(404);
     expect(res.headers.get("content-type")).toContain("application/json");

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { loadConfig } from "../config.js";
 
 describe("loadConfig", () => {
-  it("mengembalikan alamat kontrak testnet terverifikasi sebagai satu sumber kebenaran", () => {
+  it("returns the verified testnet contract addresses as one source of truth", () => {
     const config = loadConfig({});
 
     expect(config.chainId).toBe(97);
@@ -20,7 +20,7 @@ describe("loadConfig", () => {
     );
   });
 
-  it("memakai RPC override wajib, bukan default SDK yang diblokir dari Indonesia", () => {
+  it("uses the mandatory RPC override, not the SDK default that is blocked from Indonesia", () => {
     const config = loadConfig({});
 
     expect(config.rpcUrl).toBe(
@@ -28,28 +28,28 @@ describe("loadConfig", () => {
     );
   });
 
-  it("mengizinkan override RPC_URL lewat env", () => {
+  it("allows RPC_URL to be overridden through the environment", () => {
     const config = loadConfig({ RPC_URL: "https://custom-rpc.example/97" });
 
     expect(config.rpcUrl).toBe("https://custom-rpc.example/97");
   });
 
-  it("bekerja tanpa SCAN8004_API_KEY (tier anonim)", () => {
+  it("works without SCAN8004_API_KEY (the anonymous tier)", () => {
     const config = loadConfig({});
 
     expect(config.scan8004.apiKey).toBeUndefined();
     expect(config.scan8004.baseUrl).toBe("https://api.8004scan.io/api/v1");
   });
 
-  it("mengisi API key dari env bila tersedia, tanpa membocorkannya ke default lain", () => {
-    const config = loadConfig({ SCAN8004_API_KEY: "rahasia-123" });
+  it("fills the API key from the environment when present, without leaking it into other defaults", () => {
+    const config = loadConfig({ SCAN8004_API_KEY: "secret-123" });
 
-    expect(config.scan8004.apiKey).toBe("rahasia-123");
+    expect(config.scan8004.apiKey).toBe("secret-123");
   });
 
-  it("tidak pernah menaruh API key di representasi string/JSON config", () => {
-    const config = loadConfig({ SCAN8004_API_KEY: "rahasia-123" });
+  it("never puts the API key into the config's string/JSON representation", () => {
+    const config = loadConfig({ SCAN8004_API_KEY: "secret-123" });
 
-    expect(JSON.stringify(config)).not.toContain("rahasia-123");
+    expect(JSON.stringify(config)).not.toContain("secret-123");
   });
 });

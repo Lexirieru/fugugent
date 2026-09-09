@@ -1,203 +1,206 @@
 /**
- * Bentuk data bersama seluruh backend Fugugent — **satu sumber kebenaran**.
+ * The data shapes shared across the whole Fugugent backend — **one source of
+ * truth**.
  *
- * `AgentRecord` adalah bentuk yang dipakai bersama oleh:
- * - **Task 2 (sumber)** — 8004scan dan pembacaan on-chain keduanya dinormalkan ke sini.
- * - **Task 3 (cache DB)** — `id` + `chainId`/`tokenId` adalah identitas stabilnya,
- *   `fetchedAt` adalah umur datanya.
+ * `AgentRecord` is the shape shared by:
+ * - **Task 2 (sources)** — 8004scan and the on-chain read are both normalized to it.
+ * - **Task 3 (DB cache)** — `id` + `chainId`/`tokenId` are its stable identity,
+ *   `fetchedAt` is the age of its data.
  * - **Task 4 (classifier)** — `name`, `description`, `tags`, `categories`,
- *   `skills`/`domains` (OASF), dan `supportedProtocols` adalah masukannya;
- *   `classification` adalah keluarannya.
- * - **Task 6 (tampilan)** — sisanya adalah apa yang dilihat pengguna.
+ *   `skills`/`domains` (OASF), and `supportedProtocols` are its inputs;
+ *   `classification` is its output.
+ * - **Task 6 (presentation)** — the rest is what the user sees.
  *
- * ## Aturan yang melekat pada tipe ini
+ * ## Rules baked into these types
  *
- * 1. **Semua nilai on-chain bertipe `bigint`** (`FuguListing`). Tidak pernah `number`
- *    untuk uang. Konsekuensinya `AgentRecord` **tidak** JSON-serializable apa adanya —
- *    lapisan yang menulis ke DB atau ke HTTP wajib mengubah bigint menjadi string
- *    desimal secara eksplisit.
- * 2. `tokenId` adalah **string desimal**, bukan `number`. `uint256` tidak muat di
- *    `number`, dan 8004scan sendiri mengembalikannya sebagai string.
- * 3. Field yang tidak diketahui bernilai `null`, bukan dihilangkan. Pembaca tidak
- *    perlu membedakan "tidak ada" dari "belum diisi".
- * 4. `source` dan `fetchedAt` **selalu** terisi. Setiap record tahu dari mana ia
- *    berasal dan kapan diambil — itulah yang membuat klaim ketahanan bisa diperiksa,
- *    bukan sekadar diucapkan.
+ * 1. **Every on-chain value is a `bigint`** (`FuguListing`). Never a `number`
+ *    for money. The consequence is that `AgentRecord` is **not**
+ *    JSON-serializable as-is — the layer writing to the DB or to HTTP must turn
+ *    bigints into decimal strings explicitly.
+ * 2. `tokenId` is a **decimal string**, not a `number`. A `uint256` does not fit
+ *    in a `number`, and 8004scan itself returns it as a string.
+ * 3. Unknown fields are `null`, not omitted. A reader should not have to
+ *    distinguish "absent" from "not filled in".
+ * 4. `source` and `fetchedAt` are **always** populated. Every record knows where
+ *    it came from and when it was fetched — that is what makes the resilience
+ *    claims checkable rather than merely asserted.
  */
 
-/** Empat kategori produk Fugugent. Urutannya SAMA dengan enum `Category` di Solidity. */
+/** The four Fugugent product categories. The order is THE SAME as the `Category` enum in Solidity. */
 export const CATEGORIES = ["REBALANCING", "GRID", "YIELD", "HEALTH_FACTOR"] as const;
 
 export type Category = (typeof CATEGORIES)[number];
 
 /**
- * Peta indeks enum on-chain -> kategori.
+ * Maps the on-chain enum index -> category.
  * `contracts/src/types/FuguTypes.sol`: `REBALANCING=0, GRID=1, YIELD=2, HEALTH_FACTOR=3`.
- * Jangan pernah mengurutkan ulang `CATEGORIES` tanpa mengubah kontraknya.
+ * Never reorder `CATEGORIES` without changing the contract.
  */
 export function categoryFromOnchainIndex(index: number): Category | null {
   return CATEGORIES[index] ?? null;
 }
 
 /**
- * Asal sebuah record. Ini yang ditampilkan ke pengguna (dan juri) supaya jelas
- * apakah angka yang dilihat datang dari upstream, dari cache basi, atau dari
- * jaring pengaman on-chain.
+ * Where a record came from. This is what is shown to the user (and the judges)
+ * so it is clear whether the numbers they see come from upstream, from a stale
+ * cache, or from the on-chain safety net.
  */
 export type AgentSource = "scan8004" | "cache" | "onchain" | "seed";
 
-/** Tier sertifikasi publisher di 8004scan. */
+/** Publisher certification tier on 8004scan. */
 export type PublisherTier = "OFFICIAL" | "VERIFIED" | "COMMUNITY";
 
-/** Alamat EVM dalam bentuk checksummed/lowercase `0x...`. */
+/** An EVM address in checksummed/lowercase `0x...` form. */
 export type Address = `0x${string}`;
 
-/** Sinyal reputasi. Semua nullable: agent baru belum punya satu pun. */
+/** Reputation signals. All nullable: a brand-new agent has none of them yet. */
 export interface AgentReputation {
-  /** Skor gabungan 8004scan v5, 0–100. */
+  /** 8004scan v5 composite score, 0–100. */
   totalScore: number | null;
-  /** Skor health-check 8004scan, 0–100. */
+  /** 8004scan health-check score, 0–100. */
   healthScore: number | null;
   totalFeedbacks: number;
-  /** Rata-rata skor feedback, 0–100. */
+  /** Average feedback score, 0–100. */
   averageScore: number | null;
   starCount: number;
 }
 
 /**
- * Listing first-party di `FuguRegistry`. `null` pada agent yang hanya ada di
- * 8004scan dan belum pernah didaftarkan ke marketplace kita.
+ * A first-party listing in `FuguRegistry`. `null` for agents that exist only on
+ * 8004scan and have never been registered on our marketplace.
  *
- * **Setiap nilai numeriknya on-chain, karena itu `bigint`.**
+ * **Every numeric value here is on-chain, hence `bigint`.**
  */
 export interface FuguListing {
-  /** Id listing di registry kita. Dimulai dari 1 — 0 berarti tidak ada. */
+  /** The listing id in our registry. Starts at 1 — 0 means none. */
   listingId: bigint;
-  /** Identitas ERC-8004 yang diklaim listing ini. */
+  /** The ERC-8004 identity this listing claims. */
   erc8004AgentId: bigint;
-  /** Pemilik listing — **penerima uang** langganan. */
+  /** The listing owner — the subscription **payee**. */
   owner: Address;
-  /** Wallet operasional agent. **Tidak pernah menerima pembayaran**, murni metadata. */
+  /** The agent's operational wallet. **Never receives payment**, purely metadata. */
   agentWallet: Address;
   category: Category;
-  /** Harga per periode dalam USD 8 desimal (mis. `1_500_000_000n` = $15). */
+  /** Price per period in USD with 8 decimals (e.g. `1_500_000_000n` = $15). */
   priceUsd8PerPeriod: bigint;
   periodSeconds: number;
   active: boolean;
-  /** Ditandai kurator terpercaya. UI sebaiknya menonjolkan yang `true`. */
+  /** Flagged by a trusted curator. The UI should highlight the `true` ones. */
   curated: boolean;
   metadataURI: string;
 }
 
-/** Keluaran classifier (Task 4). `null` bila kepercayaan di bawah ambang. */
+/** Classifier output (Task 4). `null` when confidence is below the threshold. */
 export interface AgentClassification {
   category: Category | null;
   /** 0–1. */
   confidence: number;
-  /** Alasan yang bisa dibaca manusia — ditampilkan agar klasifikasi bisa diaudit. */
+  /** A human-readable reason — surfaced so the classification can be audited. */
   reason: string;
 }
 
 /**
- * Satu agent, dinormalkan dari sumber mana pun.
+ * One agent, normalized from whichever source.
  *
- * Kunci stabilnya adalah `id` = `` `${chainId}:${tokenId}` ``. Jangan memakai
- * `agentId` 8004scan sebagai kunci utama — ia memuat alamat registry yang bisa
- * berbeda antar deployment, dan tidak ada pada record hasil pembacaan on-chain.
+ * Its stable key is `id` = `` `${chainId}:${tokenId}` ``. Do not use the
+ * 8004scan `agentId` as the primary key — it embeds a registry address that can
+ * differ between deployments, and it is absent on records produced by the
+ * on-chain read.
  */
 export interface AgentRecord {
-  // --- identitas stabil (dipakai cache DB Task 3 dan URL detail Task 6) ---
-  /** `` `${chainId}:${tokenId}` ``. Kunci primer di semua lapisan. */
+  // --- stable identity (used by the Task 3 DB cache and the Task 6 detail URL) ---
+  /** `` `${chainId}:${tokenId}` ``. The primary key in every layer. */
   id: string;
   chainId: number;
-  /** Desimal, string. `uint256` tidak muat di `number`. */
+  /** Decimal, as a string. A `uint256` does not fit in a `number`. */
   tokenId: string;
-  /** Alamat registry asal record ini (ERC-8004 atau FuguRegistry). */
+  /** The registry address this record came from (ERC-8004 or FuguRegistry). */
   registryAddress: Address | null;
-  /** Id komposit 8004scan `"56:0x8004…:49637"`, bila record berasal dari sana. */
+  /** The 8004scan composite id `"56:0x8004…:49637"`, when the record came from there. */
   agentId: string | null;
 
-  // --- masukan classifier (Task 4) + tampilan (Task 6) ---
+  // --- classifier inputs (Task 4) + presentation (Task 6) ---
   name: string;
   description: string;
   imageUrl: string | null;
-  /** Mis. `"prediction"`, `"trading"` — dari registration file ERC-8004. */
+  /** E.g. `"prediction"`, `"trading"` — from the ERC-8004 registration file. */
   agentType: string | null;
   tags: string[];
-  /** Kategori bebas dari upstream. **Bukan** `Category` kita — jangan tertukar. */
+  /** Free-form categories from upstream. **Not** our `Category` — do not confuse them. */
   categories: string[];
-  /** OASF skill. Salah satu masukan utama lapis kedua classifier. */
+  /** OASF skills. One of the main inputs to the classifier's second layer. */
   skills: string[];
-  /** OASF domain. */
+  /** OASF domains. */
   domains: string[];
-  /** Mis. `["MCP", "A2A", "Web"]`. */
+  /** E.g. `["MCP", "A2A", "Web"]`. */
   supportedProtocols: string[];
 
-  // --- kepemilikan ---
+  // --- ownership ---
   ownerAddress: Address | null;
   ownerUsername: string | null;
   ownerPublisherTier: PublisherTier | null;
   agentWallet: Address | null;
 
-  // --- sinyal kepercayaan (badge di kartu agent) ---
+  // --- trust signals (badges on the agent card) ---
   isActive: boolean;
   isVerified: boolean;
   isEndpointVerified: boolean;
   x402Supported: boolean;
   reputation: AgentReputation;
 
-  // --- hasil klasifikasi; `null` sampai Task 4 mengisinya ---
+  // --- classification result; `null` until Task 4 fills it in ---
   classification: AgentClassification | null;
 
-  // --- listing first-party; `null` bila agent belum ada di FuguRegistry ---
+  // --- first-party listing; `null` when the agent is not in FuguRegistry yet ---
   fuguListing: FuguListing | null;
 
-  // --- provenance: dari mana dan kapan ---
+  // --- provenance: from where and when ---
   source: AgentSource;
-  /** ISO 8601 UTC. Umur data dihitung dari sini. */
+  /** ISO 8601 UTC. Data age is computed from this. */
   fetchedAt: string;
-  /** ISO 8601 dari upstream, bila ada. */
+  /** ISO 8601 from upstream, when present. */
   createdAt: string | null;
   updatedAt: string | null;
-  /** Skor kemiripan, hanya terisi pada hasil `semanticSearch`. */
+  /** Similarity score, populated only on `semanticSearch` results. */
   similarityScore: number | null;
   /**
-   * Payload mentah upstream, untuk debugging dan lapis LLM classifier.
-   * Lapisan cache boleh membuangnya — jangan ada yang bergantung padanya.
+   * The raw upstream payload, for debugging and the classifier's LLM layer.
+   * The cache layer may drop it — nothing may depend on it.
    */
   raw?: unknown;
 }
 
 /**
- * Satu halaman hasil dari sebuah sumber. **Tidak pernah melempar** ke pemanggil:
- * kegagalan diwakili oleh `healthy: false` + `reason`, bukan exception.
+ * One page of results from a source. **Never throws** to the caller: a failure
+ * is represented by `healthy: false` + `reason`, not by an exception.
  */
 export interface AgentListPage {
   items: AgentRecord[];
-  /** Total di upstream (bukan panjang `items`). */
+  /** The total upstream (not the length of `items`). */
   total: number;
   limit: number;
   offset: number;
   source: AgentSource;
   /**
-   * `false` bila sumber gagal ATAU membalas bentuk yang tidak dikenali.
-   * Daftar kosong yang sah tetap `healthy: true`, begitu juga jawaban
-   * "tidak ditemukan" — agent yang memang tidak ada bukan tanda upstream sakit.
+   * `false` when the source failed OR answered with a shape we do not recognize.
+   * A legitimately empty list is still `healthy: true`, and so is a
+   * "not found" answer — an agent that genuinely does not exist is not a sign
+   * of a sick upstream.
    */
   healthy: boolean;
   /**
-   * Keterangan keadaan sumber. Tidak pernah memuat kredensial.
+   * A description of the source's state. Never contains credentials.
    *
-   * Boleh terisi meski `healthy: true` — mis. `readFuguListings` yang melewati
-   * satu listing yang revert, atau detail yang tidak ditemukan. `healthy` adalah
-   * penentu; `reason` hanya menjelaskan.
+   * May be populated even when `healthy: true` — e.g. `readFuguListings`
+   * skipping a single reverting listing, or a detail that was not found.
+   * `healthy` is the verdict; `reason` only explains.
    */
   reason: string | null;
-  /** ISO 8601 UTC — kapan halaman ini diambil. */
+  /** ISO 8601 UTC — when this page was fetched. */
   fetchedAt: string;
 }
 
-/** Hasil pengambilan satu agent. Sama seperti `AgentListPage`: tidak pernah melempar. */
+/** The result of fetching a single agent. Like `AgentListPage`: never throws. */
 export interface AgentDetailResult {
   agent: AgentRecord | null;
   source: AgentSource;
@@ -206,7 +209,7 @@ export interface AgentDetailResult {
   fetchedAt: string;
 }
 
-/** Status satu sumber data, untuk `/api/health` (Task 6) dan tabel `source_health` (Task 3). */
+/** The status of one data source, for `/api/health` (Task 6) and the `source_health` table (Task 3). */
 export interface SourceHealth {
   source: AgentSource;
   healthy: boolean;
@@ -214,12 +217,12 @@ export interface SourceHealth {
   checkedAt: string;
 }
 
-/** Kunci stabil sebuah agent. Dipakai konsisten di seluruh lapisan. */
+/** An agent's stable key. Used consistently across every layer. */
 export function makeAgentKey(chainId: number, tokenId: string): string {
   return `${chainId}:${tokenId}`;
 }
 
-/** Halaman kosong yang menandai sumber tidak sehat. */
+/** An empty page marking the source as unhealthy. */
 export function unhealthyPage(
   source: AgentSource,
   reason: string,

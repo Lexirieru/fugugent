@@ -1,28 +1,30 @@
 /**
- * Skema cache Postgres — **tingkat kedua dari empat tingkat fallback**
- * (8004scan → cache Postgres → baca on-chain → seed terkurasi).
+ * The Postgres cache schema — **the second of four fallback levels**
+ * (8004scan → Postgres cache → on-chain read → curated seed).
  *
- * Tiga tabel:
+ * Three tables:
  *
- * - `agents` — satu baris per agent, kunci primer `id` = `` `${chainId}:${tokenId}` ``
- *   (lihat `makeAgentKey` di `src/types.ts`). Setiap baris membawa `fetched_at`
- *   supaya pembaca selalu tahu **umur** datanya dan bisa mengatakannya apa adanya
- *   kepada pengguna alih-alih berpura-pura segar.
- * - `agent_categories` — hasil classifier (Task 4) untuk empat kategori Fugu.
- *   Terpisah dari `agents` supaya klasifikasi bisa ditulis ulang tanpa menyentuh
- *   data upstream, dan supaya filter kategori tetap terindeks.
- * - `source_health` — riwayat status tiap sumber data, dasar `/api/health`.
+ * - `agents` — one row per agent, primary key `id` = `` `${chainId}:${tokenId}` ``
+ *   (see `makeAgentKey` in `src/types.ts`). Every row carries `fetched_at` so a
+ *   reader always knows the **age** of its data and can state it plainly to the
+ *   user instead of pretending it is fresh.
+ * - `agent_categories` — classifier output (Task 4) for the four Fugu
+ *   categories. Kept apart from `agents` so a classification can be rewritten
+ *   without touching upstream data, and so the category filter stays indexed.
+ * - `source_health` — the status history of each data source, the basis of
+ *   `/api/health`.
  *
- * ## Aturan yang melekat pada skema ini
+ * ## Rules baked into this schema
  *
- * 1. **Uang selalu `numeric(78, 0)`**, tidak pernah `bigint`/`double precision`.
- *    `uint256` butuh 78 digit desimal; `numeric` menyimpannya persis, dan driver
- *    mengembalikannya sebagai string yang kita ubah ke `bigint` di `serialize.ts`.
- *    Tidak ada jalur di mana nilai uang menyentuh `number` JavaScript.
- * 2. Daftar string (tags, skills, …) disimpan `jsonb` — bentuknya persis seperti
- *    yang datang dari upstream, tanpa tabel penghubung yang tidak dipakai siapa pun.
- * 3. `fetched_at` `timestamptz not null`. Ini kolom yang membuat klaim "data
- *    berumur N detik" bisa dibuktikan, bukan sekadar diucapkan.
+ * 1. **Money is always `numeric(78, 0)`**, never `bigint`/`double precision`.
+ *    A `uint256` needs 78 decimal digits; `numeric` stores it exactly, and the
+ *    driver returns it as a string that we turn into a `bigint` in
+ *    `serialize.ts`. There is no path where a money value touches a JavaScript
+ *    `number`.
+ * 2. String lists (tags, skills, …) are stored as `jsonb` — in exactly the
+ *    shape they arrive in from upstream, with no join table nobody uses.
+ * 3. `fetched_at` is `timestamptz not null`. This is the column that makes the
+ *    claim "the data is N seconds old" provable rather than merely asserted.
  */
 import {
   boolean,
@@ -38,13 +40,13 @@ import {
 } from "drizzle-orm/pg-core";
 import type { AgentSource, Category, PublisherTier } from "../types.js";
 
-/** Presisi `numeric` untuk seluruh nilai uang/id on-chain: cukup untuk `uint256`. */
+/** `numeric` precision for every money value / on-chain id: enough for a `uint256`. */
 export const MONEY_PRECISION = 78;
 
 export const agents = pgTable(
   "agents",
   {
-    /** `` `${chainId}:${tokenId}` `` — lihat `makeAgentKey`. */
+    /** `` `${chainId}:${tokenId}` `` — see `makeAgentKey`. */
     id: text("id").primaryKey(),
     chainId: integer("chain_id").notNull(),
     tokenId: text("token_id").notNull(),
@@ -81,7 +83,7 @@ export const agents = pgTable(
     classificationConfidence: doublePrecision("classification_confidence"),
     classificationReason: text("classification_reason"),
 
-    // --- listing FuguRegistry; semua nilai uang numeric(78,0) ---
+    // --- FuguRegistry listing; every money value is numeric(78,0) ---
     fuguListingId: numeric("fugu_listing_id", { precision: MONEY_PRECISION, scale: 0 }),
     fuguErc8004AgentId: numeric("fugu_erc8004_agent_id", { precision: MONEY_PRECISION, scale: 0 }),
     fuguOwner: text("fugu_owner"),
@@ -96,11 +98,11 @@ export const agents = pgTable(
     fuguCurated: boolean("fugu_curated"),
     fuguMetadataUri: text("fugu_metadata_uri"),
 
-    /** Asal record saat ditulis (bukan saat dibaca — pembacaan selalu `"cache"`). */
+    /** Where the record came from when written (not when read — reads are always `"cache"`). */
     source: text("source").$type<AgentSource>().notNull(),
-    /** Kapan record diambil dari sumbernya. Dasar perhitungan umur data. */
+    /** When the record was fetched from its source. The basis for computing data age. */
     fetchedAt: timestamp("fetched_at", { withTimezone: true, mode: "date" }).notNull(),
-    /** ISO 8601 upstream apa adanya — `text` supaya presisi mikrodetik tidak hilang. */
+    /** The upstream ISO 8601 verbatim — `text` so microsecond precision is not lost. */
     upstreamCreatedAt: text("upstream_created_at"),
     upstreamUpdatedAt: text("upstream_updated_at"),
   },
@@ -115,17 +117,18 @@ export const agentCategories = pgTable(
   "agent_categories",
   {
     /**
-     * **Berisi `agents.id` (`` `${chainId}:${tokenId}` ``), BUKAN `agents.agent_id`.**
-     * Dinamai `agent_key` justru supaya tidak tertukar: `agents.agent_id` menyimpan
-     * id komposit 8004scan (`"56:0x8004…:49637"`) yang bentuknya sama sekali berbeda.
-     * Join yang benar selalu `agent_categories.agent_key = agents.id`.
+     * **Holds `agents.id` (`` `${chainId}:${tokenId}` ``), NOT `agents.agent_id`.**
+     * It is named `agent_key` precisely so the two are not confused:
+     * `agents.agent_id` stores the 8004scan composite id
+     * (`"56:0x8004…:49637"`), whose shape is entirely different. The correct
+     * join is always `agent_categories.agent_key = agents.id`.
      */
     agentKey: text("agent_key")
       .notNull()
       .references(() => agents.id, { onDelete: "cascade" }),
-    /** Salah satu dari empat `Category` Fugu. */
+    /** One of the four Fugu `Category` values. */
     category: text("category").$type<Category>().notNull(),
-    /** 0–1, dari classifier. */
+    /** 0–1, from the classifier. */
     confidence: doublePrecision("confidence").notNull(),
     reason: text("reason"),
     assignedAt: timestamp("assigned_at", { withTimezone: true, mode: "date" }).notNull(),
@@ -154,18 +157,19 @@ export type AgentCategoryRow = typeof agentCategories.$inferSelect;
 export type SourceHealthRow = typeof sourceHealth.$inferSelect;
 
 /**
- * DDL yang setara dengan definisi di atas, dipisah per pernyataan.
+ * The DDL equivalent of the definitions above, split per statement.
  *
- * Ditulis tangan dan bukan hasil `drizzle-kit` supaya `ensureSchema()` bisa
- * dijalankan langsung oleh test dan oleh boot API tanpa langkah migrasi
- * terpisah. Semuanya `IF NOT EXISTS` sehingga aman dipanggil berulang.
+ * Hand-written rather than generated by `drizzle-kit` so that `ensureSchema()`
+ * can be run directly by the tests and by the API boot with no separate
+ * migration step. Everything is `IF NOT EXISTS`, so it is safe to call
+ * repeatedly.
  *
- * **Batas jaring pengamannya:** kalau **nama kolom** di sini menyimpang dari
- * definisi Drizzle di atas, test repo langsung merah karena kueri menyebut
- * kolom yang tidak ada. **Constraint tidak dijaga begitu** — karena itu FK
- * `agent_categories.agent_key -> agents(id)` sekarang dideklarasikan di kedua
- * tempat, dan siapa pun yang menambah constraint harus melakukan hal yang sama
- * sampai proyek ini beralih ke `drizzle-kit`.
+ * **The limit of that safety net:** if a **column name** here drifts from the
+ * Drizzle definition above, the repo tests go red immediately because a query
+ * names a column that does not exist. **Constraints are not guarded that way**
+ * — which is why the FK `agent_categories.agent_key -> agents(id)` is now
+ * declared in both places, and anyone adding a constraint must do the same
+ * until this project moves to `drizzle-kit`.
  */
 export const SCHEMA_STATEMENTS: readonly string[] = [
   `create table if not exists agents (

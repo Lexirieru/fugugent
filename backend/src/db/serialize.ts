@@ -1,21 +1,21 @@
 /**
- * **Satu-satunya tempat** `AgentRecord` berubah bentuk.
+ * **The only place** an `AgentRecord` changes shape.
  *
- * `AgentRecord.fuguListing` memuat `bigint` (`priceUsd8PerPeriod`, `listingId`,
- * `erc8004AgentId`), jadi `AgentRecord` **tidak JSON-serializable apa adanya** —
- * `JSON.stringify` melempar `TypeError` begitu bertemu `bigint`. Diam-diam
- * menambal itu (lewat `toJSON` di prototipe `BigInt`, atau replacer yang
- * mengubahnya jadi `Number`) adalah cacat: yang pertama membuat kesalahan
- * menjadi tak terlihat, yang kedua menghancurkan presisi uang.
+ * `AgentRecord.fuguListing` holds `bigint`s (`priceUsd8PerPeriod`, `listingId`,
+ * `erc8004AgentId`), so an `AgentRecord` is **not JSON-serializable as-is** —
+ * `JSON.stringify` throws a `TypeError` the moment it meets a `bigint`.
+ * Silently patching that over (via a `toJSON` on `BigInt`'s prototype, or a
+ * replacer that turns it into a `Number`) is a defect: the first makes the
+ * mistake invisible, the second destroys money precision.
  *
- * Karena itu konversinya eksplisit dan terpusat di sini:
+ * So the conversion is explicit and centralized here:
  *
- * - `serializeAgentRecord` / `deserializeAgentRecord` — bentuk kawat HTTP.
- * - `toAgentRow` / `fromAgentRow` — bentuk baris Postgres.
+ * - `serializeAgentRecord` / `deserializeAgentRecord` — the HTTP wire shape.
+ * - `toAgentRow` / `fromAgentRow` — the Postgres row shape.
  *
- * Keduanya memakai primitif yang sama, `encodeMoney` / `decodeMoney`, sehingga
- * hanya ada satu aturan uang di seluruh backend: **string desimal di luar,
- * `bigint` di dalam, `number` tidak pernah.**
+ * Both use the same primitives, `encodeMoney` / `decodeMoney`, so there is only
+ * one money rule across the whole backend: **decimal strings on the outside,
+ * `bigint` on the inside, `number` never.**
  */
 import {
   CATEGORIES,
@@ -28,52 +28,52 @@ import {
 } from "../types.js";
 import { MONEY_PRECISION, type AgentRow } from "./schema.js";
 
-/** Hanya digit desimal, boleh diawali `-`. Tidak ada `1e9`, tidak ada `15.5`. */
+/** Decimal digits only, optionally prefixed with `-`. No `1e9`, no `15.5`. */
 const DECIMAL_INTEGER = /^-?\d+$/;
 
-/** `tokenId` adalah `uint256` desimal. `"1.5"` dan `"1e+21"` bukan token id. */
+/** A `tokenId` is a decimal `uint256`. `"1.5"` and `"1e+21"` are not token ids. */
 const DECIMAL_UNSIGNED = /^\d+$/;
 
-/** `bigint` → string desimal. Tidak pernah menghasilkan notasi ilmiah. */
+/** `bigint` → decimal string. Never produces scientific notation. */
 export function encodeMoney(value: bigint): string {
   return value.toString(10);
 }
 
-/** `bigint` → string desimal, meneruskan `null`. */
+/** `bigint` → decimal string, passing `null` through. */
 export function encodeMoneyOrNull(value: bigint | null): string | null {
   return value === null ? null : encodeMoney(value);
 }
 
 /**
- * String desimal (atau `bigint`) → `bigint`.
+ * A decimal string (or a `bigint`) → `bigint`.
  *
- * Melempar pada `number`: bila nilainya sudah sampai sini sebagai `number`,
- * presisinya mungkin sudah hilang jauh sebelum kita bisa memeriksanya —
- * melanjutkan berarti menyebarkan angka uang yang salah.
+ * Throws on a `number`: if the value arrived here as a `number`, its precision
+ * may already have been lost long before we could check it — continuing means
+ * spreading a wrong money figure.
  */
 export function decodeMoney(value: string | bigint): bigint {
   if (typeof value === "bigint") return value;
   if (typeof value === "number") {
     throw new TypeError(
-      "nilai uang datang sebagai number — presisi sudah hilang; kirim string desimal atau bigint",
+      "money value arrived as a number — precision is already lost; pass a decimal string or a bigint",
     );
   }
   if (typeof value !== "string" || !DECIMAL_INTEGER.test(value)) {
-    throw new TypeError(`nilai uang bukan bilangan bulat desimal: ${JSON.stringify(value)}`);
+    throw new TypeError(`money value is not a decimal integer: ${JSON.stringify(value)}`);
   }
   return BigInt(value);
 }
 
-/** Seperti `decodeMoney`, tetapi `null` tetap `null`. */
+/** Like `decodeMoney`, but `null` stays `null`. */
 export function decodeMoneyOrNull(value: string | bigint | null | undefined): bigint | null {
   return value === null || value === undefined ? null : decodeMoney(value);
 }
 
 // ---------------------------------------------------------------------------
-// Bentuk kawat (HTTP / JSON)
+// The wire shape (HTTP / JSON)
 // ---------------------------------------------------------------------------
 
-/** `FuguListing` dengan setiap `bigint` diganti string desimal. */
+/** A `FuguListing` with every `bigint` replaced by a decimal string. */
 export interface FuguListingJson
   extends Omit<FuguListing, "listingId" | "erc8004AgentId" | "priceUsd8PerPeriod"> {
   listingId: string;
@@ -82,10 +82,10 @@ export interface FuguListingJson
 }
 
 /**
- * `AgentRecord` yang aman untuk `JSON.stringify`.
+ * An `AgentRecord` that is safe for `JSON.stringify`.
  *
- * `raw` sengaja dibuang: payload mentah upstream tidak pernah ikut ke kawat
- * maupun ke cache (lihat catatan di `src/types.ts`).
+ * `raw` is deliberately dropped: the raw upstream payload never travels to the
+ * wire nor into the cache (see the note in `src/types.ts`).
  */
 export interface AgentRecordJson extends Omit<AgentRecord, "fuguListing" | "raw"> {
   fuguListing: FuguListingJson | null;
@@ -109,7 +109,7 @@ export function deserializeFuguListing(json: FuguListingJson): FuguListing {
   };
 }
 
-/** `AgentRecord` → bentuk yang boleh masuk `JSON.stringify`. */
+/** `AgentRecord` → the shape that may go into `JSON.stringify`. */
 export function serializeAgentRecord(record: AgentRecord): AgentRecordJson {
   const { raw: _raw, fuguListing, ...rest } = record;
   return {
@@ -118,7 +118,7 @@ export function serializeAgentRecord(record: AgentRecord): AgentRecordJson {
   };
 }
 
-/** Kebalikan `serializeAgentRecord`. Nilai uang kembali persis sama. */
+/** The inverse of `serializeAgentRecord`. Money values come back exactly the same. */
 export function deserializeAgentRecord(json: AgentRecordJson): AgentRecord {
   const { fuguListing, ...rest } = json;
   return {
@@ -128,21 +128,21 @@ export function deserializeAgentRecord(json: AgentRecordJson): AgentRecord {
 }
 
 // ---------------------------------------------------------------------------
-// Bentuk baris Postgres
+// The Postgres row shape
 // ---------------------------------------------------------------------------
 
 /**
- * Seperti `encodeMoney`, tetapi menolak nilai yang tidak muat di
- * `numeric(78, 0)`. Tanpa ini Postgres yang menolaknya — di tengah transaksi,
- * setelah seluruh batch terlanjur dirakit — dan satu record cacat menjatuhkan
- * 19 record sehat bersamanya.
+ * Like `encodeMoney`, but rejects values that do not fit in
+ * `numeric(78, 0)`. Without this Postgres is the one that rejects it — mid
+ * transaction, after the whole batch has already been assembled — and one
+ * malformed record takes 19 healthy records down with it.
  */
 function encodeMoneyForColumn(value: bigint, field: string): string {
   const encoded = encodeMoney(value);
   const digits = encoded.startsWith("-") ? encoded.length - 1 : encoded.length;
   if (digits > MONEY_PRECISION) {
     throw new RangeError(
-      `${field} tidak muat di numeric(${MONEY_PRECISION}, 0): ${digits} digit`,
+      `${field} does not fit in numeric(${MONEY_PRECISION}, 0): ${digits} digits`,
     );
   }
   return encoded;
@@ -150,27 +150,28 @@ function encodeMoneyForColumn(value: bigint, field: string): string {
 
 function toDate(iso: string): Date {
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) throw new TypeError(`fetchedAt bukan ISO 8601: ${iso}`);
+  if (Number.isNaN(date.getTime())) throw new TypeError(`fetchedAt is not ISO 8601: ${iso}`);
   return date;
 }
 
 /**
- * `AgentRecord` → baris `agents`.
+ * `AgentRecord` → an `agents` row.
  *
- * `id` selalu dihitung ulang dari `chainId`/`tokenId` (`makeAgentKey`) supaya
- * kunci primer cache tidak pernah bergantung pada `id` yang salah dari upstream.
+ * `id` is always recomputed from `chainId`/`tokenId` (`makeAgentKey`) so the
+ * cache's primary key never depends on a wrong `id` coming from upstream.
  *
- * Catatan presisi: `fetchedAt` disimpan sebagai `timestamptz` — presisi
- * milidetik, sama seperti `Date.prototype.toISOString()` yang menghasilkannya.
- * `createdAt`/`updatedAt` dari upstream disimpan sebagai `text` apa adanya
- * karena 8004scan mengirim mikrodetik (`…:11.096927Z`) yang akan terpangkas
- * kalau dilewatkan `Date`.
+ * A note on precision: `fetchedAt` is stored as `timestamptz` — millisecond
+ * precision, the same as the `Date.prototype.toISOString()` that produces it.
+ * The upstream `createdAt`/`updatedAt` are stored as `text` verbatim because
+ * 8004scan sends microseconds (`…:11.096927Z`) that would be truncated if
+ * passed through `Date`.
  */
 export function toAgentRow(record: AgentRecord): AgentRow {
   if (!DECIMAL_UNSIGNED.test(record.tokenId)) {
-    // Nilai ini menjadi kunci primer cache dan potongan URL detail. `1e21` yang
-    // lolos jadi `"97:1e+21"` adalah agent yang tidak akan pernah bisa dicari lagi.
-    throw new TypeError(`tokenId bukan bilangan bulat desimal: ${JSON.stringify(record.tokenId)}`);
+    // This value becomes the cache's primary key and a segment of the detail
+    // URL. A `1e21` that slips through as `"97:1e+21"` is an agent that can
+    // never be looked up again.
+    throw new TypeError(`tokenId is not a decimal integer: ${JSON.stringify(record.tokenId)}`);
   }
   const listing = record.fuguListing;
   return {
@@ -237,13 +238,14 @@ function isCategory(value: string | null): value is Category {
 }
 
 /**
- * Listing dari baris — atau `null` bila barisnya tidak memuat listing yang utuh.
+ * The listing from a row — or `null` when the row does not hold a complete
+ * listing.
  *
- * Sengaja **tidak** mengarang nilai bawaan. Baris setengah terisi (mungkin dari
- * migrasi atau tulisan manual) dulu menghasilkan `owner: "0x"` — alamat yang
- * tidak sah — dan `category: "REBALANCING"` — kategori sungguhan yang akan
- * ditampilkan ke pengguna seolah-olah itu fakta. Lebih baik mengaku tidak punya
- * listing, sama seperti normalizer yang melewati item tanpa identitas.
+ * It deliberately does **not** invent defaults. A half-filled row (perhaps from
+ * a migration or a manual write) used to produce `owner: "0x"` — an invalid
+ * address — and `category: "REBALANCING"` — a real category that would be shown
+ * to the user as though it were a fact. Better to admit there is no listing,
+ * just like the normalizer skipping an item with no identity.
  */
 function listingFromRow(row: AgentRow): FuguListing | null {
   if (
@@ -275,8 +277,8 @@ function listingFromRow(row: AgentRow): FuguListing | null {
 function classificationFromRow(row: AgentRow): AgentClassification | null {
   if (row.classificationCategory === null && row.classificationConfidence === null) return null;
   return {
-    // Kategori yang tidak dikenal (skema lebih tua, tulisan manual) dilaporkan
-    // `null` — "belum terklasifikasi" — bukan diteruskan sebagai kategori palsu.
+    // An unknown category (an older schema, a manual write) is reported as
+    // `null` — "not classified yet" — not passed on as a fake category.
     category: isCategory(row.classificationCategory) ? row.classificationCategory : null,
     confidence: row.classificationConfidence ?? 0,
     reason: row.classificationReason ?? "",
@@ -284,11 +286,11 @@ function classificationFromRow(row: AgentRow): AgentClassification | null {
 }
 
 /**
- * Baris `agents` → `AgentRecord`.
+ * An `agents` row → `AgentRecord`.
  *
- * `similarityScore` selalu `null`: skor kemiripan hanya bermakna pada hasil
- * `semanticSearch` dan sengaja tidak di-cache — angka itu milik satu kueri,
- * bukan milik agent-nya.
+ * `similarityScore` is always `null`: a similarity score is only meaningful on
+ * `semanticSearch` results and is deliberately not cached — that number belongs
+ * to one query, not to the agent.
  */
 export function fromAgentRow(row: AgentRow): AgentRecord {
   return {

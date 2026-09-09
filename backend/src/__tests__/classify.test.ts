@@ -1,25 +1,25 @@
 /**
- * Test classifier empat kategori (Task 4).
+ * Tests for the four-category classifier (Task 4).
  *
- * ## Dari mana contoh-contohnya
+ * ## Where the examples come from
  *
- * Hampir semua `name`/`description` di berkas ini **disalin apa adanya dari
- * 8004scan produksi** (panggilan live 8 Sep 2026, `GET /api/v1/agents`,
- * `GET /api/v1/agents/search/semantic`, `?search=…&search_type=text`, dengan
- * header `User-Agent` browser). Itu disengaja: classifier yang lulus melawan
- * kalimat karangan sendiri tidak membuktikan apa pun. Yang menentukan mutu
- * classifier ini adalah apakah ia benar pada kalimat yang benar-benar ditulis
- * pendaftar agent — termasuk kalimat yang berantakan.
+ * Nearly every `name`/`description` in this file is **copied verbatim from
+ * production 8004scan** (live calls 8 Sep 2026, `GET /api/v1/agents`,
+ * `GET /api/v1/agents/search/semantic`, `?search=…&search_type=text`, with a
+ * browser `User-Agent` header). That is deliberate: a classifier that passes
+ * against sentences we wrote ourselves proves nothing. What decides the quality
+ * of this classifier is whether it is right on the sentences agent registrants
+ * actually wrote — including the messy ones.
  *
- * Negatif per kategori juga diambil dari agent sungguhan, dan sengaja dipilih
- * yang **paling menjebak** — bukan teks acak:
+ * The negatives per category are also taken from real agents, and deliberately
+ * chosen to be **the most treacherous** ones — not random text:
  *
- * | Kategori | Negatifnya | Kenapa menjebak |
+ * | Category | Its negative | Why it is treacherous |
  * |---|---|---|
- * | GRID | `Grid-hub` | namanya "Grid", tapi ia layanan pembayaran x402 |
- * | YIELD | agent panen pertanian | "yield" = hasil panen, bukan imbal hasil |
- * | REBALANCING | `smart-money-yield-agent` | tertulis "Rebalances daily", tapi ia agent YIELD |
- * | HEALTH_FACTOR | `yieldflow` | menyebut "liquidity", bukan "liquidation" |
+ * | GRID | `Grid-hub` | its name is "Grid", but it is an x402 payment service |
+ * | YIELD | an agricultural harvest agent | "yield" = a harvest, not a return |
+ * | REBALANCING | `smart-money-yield-agent` | it says "Rebalances daily", but it is a YIELD agent |
+ * | HEALTH_FACTOR | `yieldflow` | it mentions "liquidity", not "liquidation" |
  */
 
 import { describe, expect, it } from "vitest";
@@ -27,7 +27,7 @@ import { describe, expect, it } from "vitest";
 import { CLASSIFIER_THRESHOLDS, classify } from "../classify.js";
 import type { AgentRecord } from "../types.js";
 
-/** Bangun `AgentRecord` minimal; hanya field masukan classifier yang penting. */
+/** Build a minimal `AgentRecord`; only the classifier's input fields matter. */
 function agent(patch: Partial<AgentRecord>): AgentRecord {
   return {
     id: "56:1",
@@ -75,7 +75,7 @@ function agent(patch: Partial<AgentRecord>): AgentRecord {
 // ---------------------------------------------------------------------------
 
 describe("classify — GRID", () => {
-  it("mengenali agent grid trading eksplisit (LingoAI Grid Trading Agent, live)", () => {
+  it("recognizes an explicit grid trading agent (LingoAI Grid Trading Agent, live)", () => {
     const result = classify(
       agent({
         name: "LingoAI Grid Trading Agent",
@@ -88,7 +88,7 @@ describe("classify — GRID", () => {
     expect(result.reason).toMatch(/grid trading/i);
   });
 
-  it("mengenali grid market making tanpa frasa 'grid trading' (Grid Agent 1 by 4LPHA, live)", () => {
+  it("recognizes grid market making without the phrase 'grid trading' (Grid Agent 1 by 4LPHA, live)", () => {
     const result = classify(
       agent({
         name: "Grid Agent 1 by 4LPHA",
@@ -100,7 +100,7 @@ describe("classify — GRID", () => {
     expect(result.confidence).toBeGreaterThanOrEqual(0.55);
   });
 
-  it("mengenali grid dari penanda kategori eksplisit (smart-money-grid-trading-agent, live)", () => {
+  it("recognizes grid from an explicit category marker (smart-money-grid-trading-agent, live)", () => {
     const result = classify(
       agent({
         name: "smart-money-grid-trading-agent",
@@ -112,7 +112,7 @@ describe("classify — GRID", () => {
     expect(result.confidence).toBeGreaterThanOrEqual(0.8);
   });
 
-  it("mengenali grid dari geometri harga walau kata 'trading' tak muncul (PancakeSwap Grid Trader, live)", () => {
+  it("recognizes grid from price geometry even when the word 'trading' never appears (PancakeSwap Grid Trader, live)", () => {
     const result = classify(
       agent({
         name: "PancakeSwap Grid Trader",
@@ -123,7 +123,7 @@ describe("classify — GRID", () => {
     expect(result.category).toBe("GRID");
   });
 
-  it("NEGATIF: 'Grid-hub' hanyalah nama layanan pembayaran x402, bukan grid trading (live)", () => {
+  it("NEGATIVE: 'Grid-hub' is merely the name of an x402 payment service, not grid trading (live)", () => {
     const result = classify(
       agent({
         name: "Grid-hub",
@@ -134,7 +134,7 @@ describe("classify — GRID", () => {
     expect(result.category).toBeNull();
   });
 
-  it("NEGATIF: 'grid' dalam arti tata letak UI tidak boleh menjadi GRID", () => {
+  it("NEGATIVE: a 'grid' meaning a UI layout must not become GRID", () => {
     const result = classify(
       agent({
         name: "Layout Assistant",
@@ -151,7 +151,7 @@ describe("classify — GRID", () => {
 // ---------------------------------------------------------------------------
 
 describe("classify — REBALANCING", () => {
-  it("mengenali rebalancer portofolio bertarget (DriftHarbor_271, live)", () => {
+  it("recognizes a target-driven portfolio rebalancer (DriftHarbor_271, live)", () => {
     const result = classify(
       agent({
         name: "DriftHarbor_271",
@@ -163,7 +163,7 @@ describe("classify — REBALANCING", () => {
     expect(result.confidence).toBeGreaterThanOrEqual(0.8);
   });
 
-  it("mengenali deskripsi sangat pendek 'Automated portfolio rebalancing' (babycaisubagent, live)", () => {
+  it("recognizes the very short description 'Automated portfolio rebalancing' (babycaisubagent, live)", () => {
     const result = classify(
       agent({
         name: "babycaisubagent66_quickassistant6584",
@@ -174,7 +174,7 @@ describe("classify — REBALANCING", () => {
     expect(result.confidence).toBeGreaterThanOrEqual(0.55);
   });
 
-  it("mengenali rebalancer alokasi target (Portfolio Rebalancer, live)", () => {
+  it("recognizes a target-allocation rebalancer (Portfolio Rebalancer, live)", () => {
     const result = classify(
       agent({
         name: "Portfolio Rebalancer",
@@ -185,7 +185,7 @@ describe("classify — REBALANCING", () => {
     expect(result.category).toBe("REBALANCING");
   });
 
-  it("mengenali rebalancing rentang LP terkonsentrasi sebagai REBALANCING, bukan YIELD", () => {
+  it("recognizes concentrated LP range rebalancing as REBALANCING, not YIELD", () => {
     const result = classify(
       agent({
         name: "CL Range Manager",
@@ -196,7 +196,7 @@ describe("classify — REBALANCING", () => {
     expect(result.category).toBe("REBALANCING");
   });
 
-  it("mengenali rebalancing bobot equal-weight tanpa kata 'portfolio rebalancing'", () => {
+  it("recognizes equal-weight rebalancing without the words 'portfolio rebalancing'", () => {
     const result = classify(
       agent({
         name: "Equal Weight Allocator",
@@ -207,7 +207,7 @@ describe("classify — REBALANCING", () => {
     expect(result.category).toBe("REBALANCING");
   });
 
-  it("NEGATIF: agent YIELD yang kebetulan menulis 'Rebalances daily' tetap YIELD (smart-money-yield-agent, live)", () => {
+  it("NEGATIVE: a YIELD agent that happens to write 'Rebalances daily' stays YIELD (smart-money-yield-agent, live)", () => {
     const result = classify(
       agent({
         name: "smart-money-yield-agent",
@@ -224,7 +224,7 @@ describe("classify — REBALANCING", () => {
 // ---------------------------------------------------------------------------
 
 describe("classify — YIELD", () => {
-  it("mengenali agent yield farming (YieldPilot, live)", () => {
+  it("recognizes a yield farming agent (YieldPilot, live)", () => {
     const result = classify(
       agent({
         name: "YieldPilot",
@@ -236,7 +236,7 @@ describe("classify — YIELD", () => {
     expect(result.confidence).toBeGreaterThanOrEqual(0.8);
   });
 
-  it("mengenali yield optimiser berbasis APY (LingoAI Yield Optimiser, live)", () => {
+  it("recognizes an APY-driven yield optimiser (LingoAI Yield Optimiser, live)", () => {
     const result = classify(
       agent({
         name: "LingoAI Yield Optimiser",
@@ -247,7 +247,7 @@ describe("classify — YIELD", () => {
     expect(result.category).toBe("YIELD");
   });
 
-  it("mengenali agregator APY lintas protokol (yieldflow, live)", () => {
+  it("recognizes a cross-protocol APY aggregator (yieldflow, live)", () => {
     const result = classify(
       agent({
         name: "yieldflow",
@@ -258,7 +258,7 @@ describe("classify — YIELD", () => {
     expect(result.category).toBe("YIELD");
   });
 
-  it("mengenali auto-compounding staking (Staking Optimizer, live)", () => {
+  it("recognizes auto-compounding staking (Staking Optimizer, live)", () => {
     const result = classify(
       agent({
         name: "Staking Optimizer",
@@ -269,14 +269,14 @@ describe("classify — YIELD", () => {
     expect(result.category).toBe("YIELD");
   });
 
-  it("BIAYA RECALL YANG DISENGAJA: deskripsi yield yang terlalu tipis tetap null (Yieldlane, live)", () => {
+  it("A DELIBERATE RECALL COST: a yield description that is too thin stays null (Yieldlane, live)", () => {
     // "Yield agent that compares idle capital vs PancakeSwap-style LP yield."
-    // Ini memang agent YIELD sungguhan, dan classifier MELEWATKANNYA (0.53 vs
-    // ambang 0.55). Itu dicatat di sini sebagai perilaku yang disengaja, bukan
-    // bug yang belum ketahuan: menurunkan ambang agar kalimat setipis ini lolos
-    // juga akan meloloskan agent analitik mana pun yang menyebut "yield" dua kali.
-    // Bila suatu hari keputusan ini dibalik, test inilah yang harus diubah —
-    // secara sadar, bukan diam-diam.
+    // This genuinely is a real YIELD agent, and the classifier MISSES IT (0.53 vs
+    // the 0.55 threshold). That is recorded here as deliberate behaviour, not an
+    // undiscovered bug: lowering the threshold so a sentence this thin passes
+    // would also let through any analytics agent that says "yield" twice. If this
+    // decision is ever reversed, this is the test that has to change —
+    // consciously, not quietly.
     const result = classify(
       agent({
         name: "Yieldlane",
@@ -289,7 +289,7 @@ describe("classify — YIELD", () => {
     expect(result.confidence).toBeLessThan(0.55);
   });
 
-  it("NEGATIF: 'yield' hasil panen pertanian tidak boleh menjadi YIELD", () => {
+  it("NEGATIVE: an agricultural crop 'yield' must not become YIELD", () => {
     const result = classify(
       agent({
         name: "Crop Yield Forecaster",
@@ -301,7 +301,7 @@ describe("classify — YIELD", () => {
     expect(result.category).toBeNull();
   });
 
-  it("NEGATIF: 'bond yield' pasar tradisional tidak boleh menjadi YIELD", () => {
+  it("NEGATIVE: a traditional-markets 'bond yield' must not become YIELD", () => {
     const result = classify(
       agent({
         name: "Macro Desk",
@@ -318,7 +318,7 @@ describe("classify — YIELD", () => {
 // ---------------------------------------------------------------------------
 
 describe("classify — HEALTH_FACTOR", () => {
-  it("mengenali monitor health factor Venus (Venus Health Factor Monitor, live)", () => {
+  it("recognizes a Venus health factor monitor (Venus Health Factor Monitor, live)", () => {
     const result = classify(
       agent({
         name: "Venus Health Factor Monitor",
@@ -330,7 +330,7 @@ describe("classify — HEALTH_FACTOR", () => {
     expect(result.confidence).toBeGreaterThanOrEqual(0.8);
   });
 
-  it("mengenali proteksi likuidasi (bnb-lending-guardian.agent, live)", () => {
+  it("recognizes liquidation protection (bnb-lending-guardian.agent, live)", () => {
     const result = classify(
       agent({
         name: "bnb-lending-guardian.agent",
@@ -341,7 +341,7 @@ describe("classify — HEALTH_FACTOR", () => {
     expect(result.category).toBe("HEALTH_FACTOR");
   });
 
-  it("mengenali agent pelunasan utang tanpa frasa 'health factor' penuh di nama (Lending Agent 4 by 4LPHA, live)", () => {
+  it("recognizes a debt-repaying agent without the full phrase 'health factor' in its name (Lending Agent 4 by 4LPHA, live)", () => {
     const result = classify(
       agent({
         name: "Lending Agent 4 by 4LPHA",
@@ -352,7 +352,7 @@ describe("classify — HEALTH_FACTOR", () => {
     expect(result.category).toBe("HEALTH_FACTOR");
   });
 
-  it("mengenali kedekatan likuidasi tanpa frasa 'health factor' sama sekali (Assay Health, live)", () => {
+  it("recognizes proximity to liquidation with no 'health factor' phrase at all (Assay Health, live)", () => {
     const result = classify(
       agent({
         name: "Assay Health",
@@ -363,7 +363,7 @@ describe("classify — HEALTH_FACTOR", () => {
     expect(result.category).toBe("HEALTH_FACTOR");
   });
 
-  it("NEGATIF: 'liquidity' bukan 'liquidation' — agent LP tidak boleh menjadi HEALTH_FACTOR", () => {
+  it("NEGATIVE: 'liquidity' is not 'liquidation' — an LP agent must not become HEALTH_FACTOR", () => {
     const result = classify(
       agent({
         name: "Liquidity Scout",
@@ -374,7 +374,7 @@ describe("classify — HEALTH_FACTOR", () => {
     expect(result.category).not.toBe("HEALTH_FACTOR");
   });
 
-  it("NEGATIF: agent kesehatan medis tidak boleh menjadi HEALTH_FACTOR", () => {
+  it("NEGATIVE: a medical health agent must not become HEALTH_FACTOR", () => {
     const result = classify(
       agent({
         name: "Health Companion",
@@ -388,18 +388,18 @@ describe("classify — HEALTH_FACTOR", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Ambang: agent tak jelas menghasilkan null
+// The threshold: an unclear agent yields null
 // ---------------------------------------------------------------------------
 
-describe("classify — ambang kepercayaan", () => {
-  it("agent kosong menghasilkan null dengan confidence 0", () => {
+describe("classify — the confidence threshold", () => {
+  it("an empty agent yields null with confidence 0", () => {
     const result = classify(agent({}));
     expect(result.category).toBeNull();
     expect(result.confidence).toBe(0);
     expect(result.reason.length).toBeGreaterThan(0);
   });
 
-  it("agent generik tanpa kaitan DeFi menghasilkan null (SummaryBot, live)", () => {
+  it("a generic agent with no DeFi connection yields null (SummaryBot, live)", () => {
     const result = classify(
       agent({
         name: "SummaryBot",
@@ -410,7 +410,7 @@ describe("classify — ambang kepercayaan", () => {
     expect(result.category).toBeNull();
   });
 
-  it("agent trading generik tanpa strategi spesifik menghasilkan null (Autonomous Trader Bot, live)", () => {
+  it("a generic trading agent with no specific strategy yields null (Autonomous Trader Bot, live)", () => {
     const result = classify(
       agent({
         name: "Autonomous Trader Bot",
@@ -421,31 +421,33 @@ describe("classify — ambang kepercayaan", () => {
     expect(result.category).toBeNull();
   });
 
-  it("satu kata kunci tingkat SEDANG saja tidak cukup melewati ambang", () => {
-    // "liquidation" sendirian bernilai 0.6 → keyakinan 0.375, di bawah 0.55.
-    // Ini bukan kebetulan: ambang sengaja dipasang di atas plafon satu isyarat sedang.
+  it("a single MODERATE-tier keyword alone is not enough to pass the threshold", () => {
+    // "liquidation" alone is worth 0.6 → confidence 0.375, below 0.55.
+    // That is no coincidence: the threshold is deliberately set above the ceiling
+    // of a single moderate cue.
     const result = classify(
       agent({ name: "Watcher", description: "Sends an alert on any liquidation event it sees." }),
     );
     expect(result.category).toBeNull();
   });
 
-  it("satu kata kunci tingkat LEMAH saja jelas tidak cukup", () => {
+  it("a single WEAK-tier keyword alone is clearly not enough", () => {
     const result = classify(agent({ name: "Vault Watcher", description: "Watches a vault." }));
     expect(result.category).toBeNull();
   });
 
-  it("MENOLAK MENEBAK pada kasus nyata tersulit: Narrow Band Allocator (live)", () => {
-    // Agent ini sesungguhnya REBALANCING (alokasi equal-weight, mengoreksi sisi
-    // under-weight). Tapi deskripsinya menyebut "health factor" — di anak kalimat
-    // penjelas tentang alasan ia TIDAK menarik dana. Classifier kata kunci tidak
-    // bisa membedakan penyebutan itu dari fungsi utamanya.
+  it("REFUSES TO GUESS on the hardest real case: Narrow Band Allocator (live)", () => {
+    // This agent really is REBALANCING (equal-weight allocation, correcting the
+    // under-weight side). But its description mentions "health factor" — in an
+    // explanatory clause about why it does NOT withdraw funds. A keyword
+    // classifier cannot tell that mention apart from its main function.
     //
-    // Yang benar di sini bukan menebak REBALANCING (kebetulan benar) dan bukan
-    // menjawab HEALTH_FACTOR (salah, dan versi awal classifier ini menjawab itu
-    // dengan keyakinan 0.94 — ditemukan hanya karena keluarannya diperiksa atas
-    // 167 agent 8004scan sungguhan, bukan atas test buatan sendiri). Yang benar
-    // adalah `null`: dua kategori sama-sama punya bukti nyata di teks yang sama.
+    // The right answer here is neither guessing REBALANCING (accidentally
+    // correct) nor answering HEALTH_FACTOR (wrong, and an early version of this
+    // classifier answered exactly that with confidence 0.94 — found only because
+    // its output was checked over 167 real 8004scan agents, not over tests we
+    // wrote ourselves). The right answer is `null`: two categories both have real
+    // evidence in the same text.
     const result = classify(
       agent({
         name: "Narrow Band Allocator",
@@ -456,7 +458,7 @@ describe("classify — ambang kepercayaan", () => {
     expect(result.category).toBeNull();
   });
 
-  it("bukti kuat yang seimbang di dua kategori menghasilkan null, bukan tebakan", () => {
+  it("strong evidence balanced across two categories yields null, not a guess", () => {
     const result = classify(
       agent({
         name: "Omni DeFi Suite",
@@ -465,25 +467,26 @@ describe("classify — ambang kepercayaan", () => {
       }),
     );
     expect(result.category).toBeNull();
-    expect(result.reason).toMatch(/pesaing|bersaing|seimbang/i);
+    expect(result.reason).toMatch(/rival|competing|balanced/i);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Plafon yang mengunci ambang
+// The ceilings that pin down the threshold
 // ---------------------------------------------------------------------------
 
 /**
- * Ambang 0.55 diklaim sah karena terkurung dua plafon. Klaim seperti itu hanya
- * berguna kalau angkanya benar-benar keluar dari kode — versi pertama komentar
- * `MIN_CONFIDENCE` menyebut plafon imbang 0.375 padahal nilainya 0.35, dan tidak
- * ada test yang bisa menangkapnya. Ketiga plafon dikunci di sini supaya komentar
- * dan perilaku tidak bisa menyimpang lagi tanpa ada yang berteriak.
+ * The 0.55 threshold is claimed valid because it is bracketed by two ceilings. A
+ * claim like that is only useful if the numbers genuinely come out of the code —
+ * the first version of the `MIN_CONFIDENCE` comment stated the tie ceiling as
+ * 0.375 when its value is 0.35, and no test could catch it. All three ceilings
+ * are locked down here so the comment and the behaviour cannot drift apart again
+ * without someone shouting.
  */
-describe("classify — plafon yang mengunci ambang", () => {
+describe("classify — the ceilings that pin down the threshold", () => {
   const { MIN_CONFIDENCE, SEPARATION_FLOOR } = CLASSIFIER_THRESHOLDS;
 
-  it("PLAFON BAWAH 0.375: satu isyarat SEDANG tanpa saingan, dan ambang ada di atasnya", () => {
+  it("LOWER CEILING 0.375: one MODERATE cue with no rival, and the threshold sits above it", () => {
     const result = classify(
       agent({ name: "Watcher", description: "Sends an alert on any liquidation event it sees." }),
     );
@@ -492,17 +495,17 @@ describe("classify — plafon yang mengunci ambang", () => {
     expect(MIN_CONFIDENCE).toBeGreaterThan(0.375);
   });
 
-  it("PLAFON ATAS 0.625: satu isyarat MENENTUKAN tanpa saingan, dan ambang ada di bawahnya", () => {
+  it("UPPER CEILING 0.625: one DECISIVE cue with no rival, and the threshold sits below it", () => {
     const result = classify(agent({ name: "Sentinel", description: "Monitors the health factor." }));
     expect(result.confidence).toBe(0.625);
     expect(result.category).toBe("HEALTH_FACTOR");
     expect(MIN_CONFIDENCE).toBeLessThan(0.625);
   });
 
-  it("PLAFON IMBANG 0.35: dua kategori tepat imbang dengan bukti jenuh berhenti persis di SEPARATION_FLOOR", () => {
-    // GRID 2.1 vs HEALTH_FACTOR 2.1 — keduanya di atas plafon bukti, jadi
-    // strength = 1 dan pemisahan = 0. Ini nilai TERTINGGI yang bisa dicapai
-    // sebuah hasil imbang sempurna, berapa pun banyaknya bukti.
+  it("TIE CEILING 0.35: two exactly tied categories with saturated evidence stop precisely at SEPARATION_FLOOR", () => {
+    // GRID 2.1 vs HEALTH_FACTOR 2.1 — both above the evidence cap, so
+    // strength = 1 and separation = 0. This is the HIGHEST value a perfect tie
+    // can reach, however much evidence there is.
     const result = classify(
       agent({
         name: "Tie",
@@ -515,88 +518,88 @@ describe("classify — plafon yang mengunci ambang", () => {
     expect(result.category).toBeNull();
   });
 
-  it("plafon imbang berada DI BAWAH plafon bawah, jadi ia bukan batas yang mengikat", () => {
-    // Inilah koreksi terhadap komentar versi pertama: hanya ada SATU batas bawah
-    // (0.375), bukan dua yang kebetulan sama.
+  it("the tie ceiling sits BELOW the lower ceiling, so it is not the binding bound", () => {
+    // This is the correction to the first version of the comment: there is only
+    // ONE lower bound (0.375), not two that happen to coincide.
     expect(SEPARATION_FLOOR).toBeLessThan(0.375);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Lapis kedua: OASF
+// The second layer: OASF
 // ---------------------------------------------------------------------------
 
-describe("classify — lapis kedua OASF", () => {
-  it("OASF kosong tidak mengubah apa pun (jalur paling umum di 8004scan)", () => {
+describe("classify — the second OASF layer", () => {
+  it("empty OASF changes nothing (the most common path on 8004scan)", () => {
     const base = {
       name: "Hevo Grid",
       description:
         "Grid trading strategy agent on BNB Smart Chain that analyzes market conditions and designs systematic buy-and-sell price grids",
     };
-    const tanpaOasf = classify(agent(base));
-    const denganOasfKosong = classify(agent({ ...base, skills: [], domains: [] }));
-    expect(tanpaOasf.confidence).toBe(denganOasfKosong.confidence);
-    expect(tanpaOasf.category).toBe("GRID");
+    const withoutOasf = classify(agent(base));
+    const withEmptyOasf = classify(agent({ ...base, skills: [], domains: [] }));
+    expect(withoutOasf.confidence).toBe(withEmptyOasf.confidence);
+    expect(withoutOasf.category).toBe("GRID");
   });
 
-  it("domain OASF DeFi menaikkan kepercayaan pada kasus di ambang", () => {
+  it("a DeFi OASF domain raises confidence on a threshold case", () => {
     const base = {
       name: "Range Trader",
       description:
         "Places buy orders at support and sell orders at resistance within a defined price range.",
     };
-    const polos = classify(agent(base));
-    const denganDefi = classify(
+    const plain = classify(agent(base));
+    const withDefi = classify(
       agent({ ...base, domains: ["technology/blockchain/defi", "finance/markets/crypto"] }),
     );
-    expect(denganDefi.confidence).toBeGreaterThan(polos.confidence);
-    expect(denganDefi.category).toBe("GRID");
-    expect(denganDefi.reason).toMatch(/OASF/i);
+    expect(withDefi.confidence).toBeGreaterThan(plain.confidence);
+    expect(withDefi.category).toBe("GRID");
+    expect(withDefi.reason).toMatch(/OASF/i);
   });
 
-  it("domain OASF di luar keuangan menekan klasifikasi walau kata kuncinya cocok", () => {
+  it("a non-finance OASF domain pushes the classification down even when the keywords match", () => {
     const base = {
       name: "Harvest Planner",
       description: "Yield farming schedule optimiser for rotating crops across seasons.",
     };
-    const polos = classify(agent(base));
-    const denganPertanian = classify(
+    const plain = classify(agent(base));
+    const withAgriculture = classify(
       agent({ ...base, domains: ["agriculture/crop_management"], skills: ["agriculture/planning"] }),
     );
-    expect(denganPertanian.confidence).toBeLessThan(polos.confidence);
-    expect(denganPertanian.category).toBeNull();
+    expect(withAgriculture.confidence).toBeLessThan(plain.confidence);
+    expect(withAgriculture.category).toBeNull();
   });
 
-  it("KEPUTUSAN SADAR: domain OASF tak berkaitan MENEKAN tapi tidak pernah memveto", () => {
-    // Agent HEALTH_FACTOR yang benar dan lolos hanya dengan satu frasa menentukan
-    // (0.625) tidak boleh dibatalkan hanya karena taksonomi upstream memuat satu
-    // token seperti "logistics" atau "education". Domain-domain itu tidak membuat
-    // homonim apa pun dengan kosakata kita, dan OASF — menurut temuan kita
-    // sendiri — tidak sanggup memilih kategori; ia tidak pantas memegang veto.
+  it("A CONSCIOUS DECISION: an unrelated OASF domain PUSHES DOWN but never vetoes", () => {
+    // A correct HEALTH_FACTOR agent that passes on a single decisive phrase alone
+    // (0.625) must not be cancelled merely because the upstream taxonomy contains
+    // one token like "logistics" or "education". Those domains create no homonym
+    // with our vocabulary, and OASF — by our own findings — cannot pick a
+    // category; it does not deserve a veto.
     const base = { name: "Sentinel", description: "Monitors the health factor." };
-    const polos = classify(agent(base));
-    expect(polos.confidence).toBe(0.625);
+    const plain = classify(agent(base));
+    expect(plain.confidence).toBe(0.625);
 
     for (const domain of ["transportation/logistics", "education/online_learning", "media_and_entertainment/gaming"]) {
-      const hasil = classify(agent({ ...base, domains: [domain] }));
-      expect(hasil.confidence).toBeLessThan(polos.confidence);
-      expect(hasil.category).toBe("HEALTH_FACTOR");
-      expect(hasil.confidence).toBeGreaterThanOrEqual(CLASSIFIER_THRESHOLDS.MIN_CONFIDENCE);
+      const result = classify(agent({ ...base, domains: [domain] }));
+      expect(result.confidence).toBeLessThan(plain.confidence);
+      expect(result.category).toBe("HEALTH_FACTOR");
+      expect(result.confidence).toBeGreaterThanOrEqual(CLASSIFIER_THRESHOLDS.MIN_CONFIDENCE);
     }
   });
 
-  it("KEPUTUSAN SADAR: domain OASF yang berbenturan makna BOLEH memveto isyarat menentukan", () => {
-    // Kebalikannya, dan sengaja: tiga domain ini memproduksi persis homonim yang
-    // classifier ini dibangun untuk menahan — "crop yield", "health factor" medis,
-    // "power grid". Di sini veto memang yang diinginkan.
+  it("A CONSCIOUS DECISION: an OASF domain that collides in meaning MAY veto a decisive cue", () => {
+    // The opposite, and deliberately so: these three domains produce exactly the
+    // homonyms this classifier was built to withstand — "crop yield", a medical
+    // "health factor", "power grid". Here a veto is exactly what is wanted.
     const base = { name: "Sentinel", description: "Monitors the health factor." };
     for (const domain of ["agriculture/crop_management", "healthcare/medical_technology", "energy/utilities"]) {
-      const hasil = classify(agent({ ...base, domains: [domain] }));
-      expect(hasil.category).toBeNull();
+      const result = classify(agent({ ...base, domains: [domain] }));
+      expect(result.category).toBeNull();
     }
   });
 
-  it("satu sinyal DeFi membebaskan agent lintas bidang dari kedua penalti (GameFi)", () => {
+  it("a single DeFi signal frees a cross-domain agent from both penalties (GameFi)", () => {
     const result = classify(
       agent({
         name: "Sentinel",
@@ -608,7 +611,7 @@ describe("classify — lapis kedua OASF", () => {
     expect(result.confidence).toBeGreaterThan(0.625);
   });
 
-  it("OASF tidak pernah bisa mengklasifikasi sendiri tanpa kata kunci apa pun", () => {
+  it("OASF can never classify on its own without any keyword", () => {
     const result = classify(
       agent({
         name: "Nameless",
@@ -626,8 +629,8 @@ describe("classify — lapis kedua OASF", () => {
 // tags / categories upstream
 // ---------------------------------------------------------------------------
 
-describe("classify — tags dan categories upstream", () => {
-  it("label kategori upstream yang cocok adalah bukti terkuat", () => {
+describe("classify — upstream tags and categories", () => {
+  it("a matching upstream category label is the strongest evidence", () => {
     const result = classify(
       agent({ name: "Agent 42", description: "An agent.", categories: ["yield"] }),
     );
@@ -635,14 +638,14 @@ describe("classify — tags dan categories upstream", () => {
     expect(result.confidence).toBeGreaterThanOrEqual(0.55);
   });
 
-  it("tag 'health-factor' memetakan ke HEALTH_FACTOR", () => {
+  it("the 'health-factor' tag maps to HEALTH_FACTOR", () => {
     const result = classify(
       agent({ name: "Agent 43", description: "An agent.", tags: ["health-factor", "bsc"] }),
     );
     expect(result.category).toBe("HEALTH_FACTOR");
   });
 
-  it("tag generik seperti 'defi' atau 'trading' tidak mengklasifikasi apa pun", () => {
+  it("generic tags like 'defi' or 'trading' classify nothing", () => {
     const result = classify(
       agent({ name: "Agent 44", description: "An agent.", tags: ["defi", "trading", "bnb"] }),
     );
@@ -651,11 +654,11 @@ describe("classify — tags dan categories upstream", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Kemurnian dan bentuk keluaran
+// Purity and the output shape
 // ---------------------------------------------------------------------------
 
-describe("classify — kemurnian dan kontrak keluaran", () => {
-  it("deterministik: masukan sama menghasilkan keluaran identik", () => {
+describe("classify — purity and the output contract", () => {
+  it("deterministic: the same input yields an identical output", () => {
     const a = agent({
       name: "GridPilot",
       description: "Low-cost automated grid execution on BSC Testnet using controlled parameters.",
@@ -663,15 +666,15 @@ describe("classify — kemurnian dan kontrak keluaran", () => {
     expect(classify(a)).toEqual(classify(a));
   });
 
-  it("tidak mengubah record masukan", () => {
+  it("does not mutate the input record", () => {
     const a = agent({ name: "YieldPilot", description: "Automated yield farming agent." });
-    const salinan = structuredClone(a);
+    const copy = structuredClone(a);
     classify(a);
-    expect(a).toEqual(salinan);
+    expect(a).toEqual(copy);
   });
 
-  it("confidence selalu berada di rentang 0..1", () => {
-    const contoh = [
+  it("confidence always lies in the range 0..1", () => {
+    const samples = [
       agent({ name: "", description: "" }),
       agent({
         name: "smart-money-grid-trading-agent",
@@ -680,21 +683,21 @@ describe("classify — kemurnian dan kontrak keluaran", () => {
       }),
       agent({ name: "Grid-hub", description: "x402 service." }),
     ];
-    for (const c of contoh) {
+    for (const c of samples) {
       const r = classify(c);
       expect(r.confidence).toBeGreaterThanOrEqual(0);
       expect(r.confidence).toBeLessThanOrEqual(1);
     }
   });
 
-  it("reason selalu terisi, baik saat mengategorikan maupun saat menolak", () => {
+  it("reason is always populated, both when categorizing and when refusing", () => {
     expect(classify(agent({ name: "YieldPilot", description: "yield farming" })).reason).not.toBe("");
     expect(classify(agent({ name: "x", description: "y" })).reason).not.toBe("");
   });
 
-  it("menoleransi field yang hilang tanpa melempar", () => {
-    const rusak = { name: undefined, description: undefined, tags: undefined } as unknown as AgentRecord;
-    expect(() => classify(rusak)).not.toThrow();
-    expect(classify(rusak).category).toBeNull();
+  it("tolerates missing fields without throwing", () => {
+    const broken = { name: undefined, description: undefined, tags: undefined } as unknown as AgentRecord;
+    expect(() => classify(broken)).not.toThrow();
+    expect(classify(broken).category).toBeNull();
   });
 });

@@ -1,332 +1,339 @@
 /**
- * Classifier empat kategori marketplace Fugugent (Task 4).
+ * The four-category classifier for the Fugugent marketplace (Task 4).
  *
- * Menempatkan sebuah `AgentRecord` ke `REBALANCING` · `GRID` · `YIELD` ·
- * `HEALTH_FACTOR`, atau **menolak mengategorikan** (`category: null`).
+ * Places an `AgentRecord` into `REBALANCING` · `GRID` · `YIELD` ·
+ * `HEALTH_FACTOR`, or **refuses to categorize** (`category: null`).
  *
- * ## Sifat modul ini
+ * ## What this module is
  *
- * **Murni.** Tanpa network, tanpa `Date.now()`, tanpa `process.env`, tanpa
- * randomness, tanpa mutasi masukan. Keluarannya hanya fungsi dari isi record.
- * Itu bukan kerapian kosmetik: klasifikasi menentukan di kategori mana sebuah
- * agent muncul di marketplace, jadi ia harus bisa di-backtest atas snapshot
- * lama dan diperiksa dengan mata — bukan dijelaskan dengan "ya begitulah".
+ * **Pure.** No network, no `Date.now()`, no `process.env`, no randomness, no
+ * mutation of its input. Its output is a function of the record's contents
+ * alone. That is not cosmetic tidiness: the classification decides which
+ * category an agent appears under in the marketplace, so it must be
+ * backtestable against old snapshots and inspectable by eye — not explained
+ * away with "that's just how it came out".
  *
- * **Tidak ada LLM di sini.** Sesuai aturan proyek, keputusan yang mengubah apa
- * yang dilihat pengguna adalah kode deterministik.
+ * **There is no LLM here.** Per the project rules, a decision that changes what
+ * the user sees is deterministic code.
  *
- * ## Dua lapis
+ * ## Two layers
  *
- * 1. **Kata kunci** pada `name`, `description`, `tags`/`categories`/`agentType`.
- *    Ini yang benar-benar memilih kategori.
- * 2. **OASF** (`skills`/`domains`) — hanya **pengali**, tidak pernah pemilih.
+ * 1. **Keywords** on `name`, `description`, `tags`/`categories`/`agentType`.
+ *    This is what actually picks the category.
+ * 2. **OASF** (`skills`/`domains`) — only a **multiplier**, never a chooser.
  *
- * Kenapa lapis kedua dibatasi jadi pengali? Karena kosakata OASF diperiksa live
- * (8 Sep 2026, `GET /api/v1/stats/oasf/{skills,domains}`) dan **tidak memuat
- * satu pun istilah yang membedakan keempat kategori kita**. Yang ada hanya
- * taksonomi lebar seperti `finance/markets/crypto`, `technology/blockchain/defi`,
+ * Why is the second layer limited to being a multiplier? Because the OASF
+ * vocabulary was checked live (8 Sep 2026,
+ * `GET /api/v1/stats/oasf/{skills,domains}`) and it **contains not a single
+ * term that distinguishes our four categories**. All that exists is a broad
+ * taxonomy like `finance/markets/crypto`, `technology/blockchain/defi`,
  * `trust_and_safety/risk_management`, `analytical_skills/market_insights` —
- * dan, di sisi lain, `agriculture/crop_management` serta
- * `healthcare/medical_technology`. Tidak ada `grid_trading`, tidak ada
- * `yield_farming`, tidak ada `rebalancing`. Maka OASF hanya sanggup menjawab
- * "apakah ini benar agent DeFi?", bukan "DeFi yang mana?". Memaksanya memilih
- * kategori akan jadi ketepatan palsu.
+ * and, on the other side, `agriculture/crop_management` and
+ * `healthcare/medical_technology`. There is no `grid_trading`, no
+ * `yield_farming`, no `rebalancing`. So OASF can only answer "is this really a
+ * DeFi agent?", not "which kind of DeFi?". Forcing it to pick a category would
+ * be false precision.
  *
- * Lebih jauh: `oasf_skills`/`oasf_domains` **tidak ada** pada `GET /agents`
- * maupun `GET /agents/{chain_id}/{token_id}`; di OpenAPI 8004scan keduanya
- * hanya muncul pada skema `MCPAgentDetail`, bertipe `string[] | null`. Jadi
- * pada jalur data utama kita array itu kosong. Karena itu **OASF kosong wajib
- * netral** (pengali 1.0) — bukan penalti. Diuji eksplisit di
- * `classify.test.ts` ("OASF kosong tidak mengubah apa pun").
+ * Further: `oasf_skills`/`oasf_domains` are **absent** from `GET /agents` and
+ * from `GET /agents/{chain_id}/{token_id}`; in the 8004scan OpenAPI spec they
+ * appear only in the `MCPAgentDetail` schema, typed `string[] | null`. So on our
+ * main data path those arrays are empty. Therefore **empty OASF must be
+ * neutral** (multiplier 1.0) — not a penalty. Tested explicitly in
+ * `classify.test.ts` ("empty OASF changes nothing").
  *
- * ## Kenapa tidak sekadar "kata kunci → kategori"
+ * ## Why not just "keyword → category"
  *
- * Karena kata kuncinya sendiri berbohong. Tiga jebakan nyata yang ditemukan
- * pada data produksi 8004scan dan yang membentuk seluruh pembobotan di bawah:
+ * Because the keywords themselves lie. Real traps found in 8004scan production
+ * data, which shaped all of the weighting below:
  *
- * - **`grid`** — agent `Grid-hub` di 8004scan adalah layanan pembayaran x402;
- *   namanya saja yang "Grid". Ditambah "CSS grid", "energy grid", "data grid".
- *   Maka `grid` telanjang **lemah**; yang menentukan adalah `grid` yang
- *   bersanding dengan kata kerja perdagangan (`grid trading`, `grid orders`,
- *   `grid levels`, `grid market making`).
- * - **`yield`** — "crop yield" (pertanian) dan "bond yield curve" (makro)
- *   memakai kata yang sama persis. Maka `yield` telanjang **lemah**;
- *   `yield farming` / `yield optimizer` / `auto-compound` / `APY` yang kuat.
- * - **`rebalance`** — agent YIELD sungguhan (`smart-money-yield-agent`) menulis
- *   "Rebalances daily" di deskripsinya. Kalau `rebalance` telanjang bernilai
- *   tinggi, agent yield itu akan mendarat di kategori REBALANCING. Maka
- *   `rebalanc` telanjang **lemah**; `portfolio rebalancing`, `target allocation`,
- *   `concentrated liquidity` yang kuat.
- * - **`liquidation` vs `liquidity`** — mirip tapi berlawanan arti bagi kita.
- *   Semua pola memakai akar `liquidat`, yang **tidak pernah** cocok dengan
- *   "liquidity". Ini alasan tidak ada satu pun pola memakai akar `liquid`.
- * - **`compound`** — "auto-compounding" itu YIELD, "Compound protocol" itu
- *   lending. Karena itu `compound` telanjang **tidak dipakai sama sekali**;
- *   hanya `auto-compound` / `compounding rewards`.
- * - **`health`** — ada agent kesehatan medis. Tidak ada pola `health` telanjang;
- *   hanya frasa penuh `health factor`.
+ * - **`grid`** — the `Grid-hub` agent on 8004scan is an x402 payment service;
+ *   only its name is "Grid". Add to that "CSS grid", "energy grid", "data grid".
+ *   So a bare `grid` is **weak**; what is decisive is a `grid` standing next to
+ *   a trading verb (`grid trading`, `grid orders`, `grid levels`,
+ *   `grid market making`).
+ * - **`yield`** — "crop yield" (agriculture) and "bond yield curve" (macro) use
+ *   exactly the same word. So a bare `yield` is **weak**;
+ *   `yield farming` / `yield optimizer` / `auto-compound` / `APY` are the strong
+ *   ones.
+ * - **`rebalance`** — a genuine YIELD agent (`smart-money-yield-agent`) writes
+ *   "Rebalances daily" in its description. If a bare `rebalance` scored high,
+ *   that yield agent would land in the REBALANCING category. So a bare
+ *   `rebalanc` is **weak**; `portfolio rebalancing`, `target allocation`,
+ *   `concentrated liquidity` are the strong ones.
+ * - **`liquidation` vs `liquidity`** — similar words, opposite meaning for us.
+ *   Every pattern uses the stem `liquidat`, which **never** matches
+ *   "liquidity". This is why not a single pattern uses the stem `liquid`.
+ * - **`compound`** — "auto-compounding" is YIELD, "Compound protocol" is
+ *   lending. So a bare `compound` is **not used at all**; only
+ *   `auto-compound` / `compounding rewards`.
+ * - **`health`** — medical health agents exist. There is no bare `health`
+ *   pattern; only the full phrase `health factor`.
  *
- * ## Aritmetika kepercayaan
+ * ## The confidence arithmetic
  *
- * Setiap pola yang cocok menyumbang `bobot × pengali_field`, dihitung **sekali**
- * per pola (pola yang cocok di beberapa field mengambil pengali terbesar, bukan
- * dijumlah — kalau tidak, mengulang kata di judul dan deskripsi akan menaikkan
- * skor secara artifisial). Dari skor mentah tiap kategori:
+ * Each matching pattern contributes `weight × field_multiplier`, counted
+ * **once** per pattern (a pattern matching in several fields takes the largest
+ * multiplier rather than summing them — otherwise repeating a word in the title
+ * and the description would inflate the score artificially). From each
+ * category's raw score:
  *
  * ```
- * kekuatan  = min(tertinggi, PLAFON_BUKTI) / PLAFON_BUKTI   // seberapa banyak bukti
- * pemisahan = (tertinggi - runner_up) / tertinggi           // seberapa tak ambigu
- * keyakinan = kekuatan × (LANTAI + (1-LANTAI) × pemisahan) × pengali_OASF
+ * strength   = min(top, EVIDENCE_CAP) / EVIDENCE_CAP   // how much evidence
+ * separation = (top - runner_up) / top                 // how unambiguous
+ * confidence = strength × (FLOOR + (1-FLOOR) × separation) × OASF_multiplier
  * ```
  *
- * Dua faktor itu **dikalikan**, bukan dijumlah, supaya keduanya wajib:
- * bukti banyak tapi terbelah rata antar kategori tetap ditolak, dan satu isyarat
- * lemah yang kebetulan tanpa saingan juga tetap ditolak. Persis itulah yang
- * diminta: **lebih baik tidak mengategorikan daripada salah mengategorikan.**
+ * Those two factors are **multiplied**, not summed, so both are mandatory:
+ * plenty of evidence split evenly across categories is still rejected, and a
+ * single weak cue that happens to have no rival is still rejected. That is
+ * exactly what was asked for: **better not to categorize than to categorize
+ * wrongly.**
  *
- * Semua konstanta di bawah punya alasan dan akibat yang ditulis di tempatnya.
- * Angka ajaib tanpa penjelasan dihitung sebagai cacat di modul ini.
+ * Every constant below carries its reasoning and its consequence where it is
+ * defined. A magic number with no explanation counts as a defect in this module.
  */
 
 import { CATEGORIES, type AgentClassification, type AgentRecord, type Category } from "./types.js";
 
 // ---------------------------------------------------------------------------
-// Konstanta — tiap satu disertai alasan dan akibat bila salah
+// Constants — each with its reasoning and the consequence of getting it wrong
 // ---------------------------------------------------------------------------
 
 /**
- * Bobot per tingkat keyakinan sebuah pola.
+ * The weight per confidence tier of a pattern.
  *
- * - `DECISIVE` (1.0) — frasa yang dalam deskripsi agent praktis tidak punya arti
- *   lain. `health factor`, `grid trading`, `portfolio rebalancing`, `yield farming`.
- *   Satu saja sudah cukup mengategorikan (lihat `MIN_CONFIDENCE`).
- * - `STRONG` (0.6) — mengarah kuat tapi bisa dipinjam kategori lain.
- *   `liquidation`, `APY`, `collateral`, `rebalancer`. **Sengaja dibuat agar satu
- *   isyarat sedang saja TIDAK cukup**: 0.6/1.6 × 1.0 = 0.375 < 0.55.
- * - `WEAK` (0.25) — hanya pendukung. `venus`, `vault`, `grid` telanjang.
- *   Bahkan tiga isyarat lemah sekaligus (0.75 → 0.469) masih di bawah ambang;
- *   butuh empat, dan empat isyarat lemah yang searah memang sudah pantas.
+ * - `DECISIVE` (1.0) — a phrase that in an agent description has practically no
+ *   other meaning. `health factor`, `grid trading`, `portfolio rebalancing`,
+ *   `yield farming`. One alone is enough to categorize (see `MIN_CONFIDENCE`).
+ * - `STRONG` (0.6) — points strongly but can be borrowed by another category.
+ *   `liquidation`, `APY`, `collateral`, `rebalancer`. **Deliberately set so a
+ *   single moderate cue is NOT enough**: 0.6/1.6 × 1.0 = 0.375 < 0.55.
+ * - `WEAK` (0.25) — supporting only. `venus`, `vault`, a bare `grid`.
+ *   Even three weak cues at once (0.75 → 0.469) are still below the threshold;
+ *   it takes four, and four weak cues all pointing the same way have earned it.
  *
- * Bila `STRONG` dinaikkan ke 0.9, satu kata "liquidation" akan mengirim agent
- * analitik LP apa pun ke HEALTH_FACTOR. Bila `WEAK` dinaikkan ke 0.4, `Grid-hub`
- * (layanan pembayaran) akan masuk kategori GRID.
+ * If `STRONG` were raised to 0.9, the single word "liquidation" would send any
+ * LP analytics agent to HEALTH_FACTOR. If `WEAK` were raised to 0.4, `Grid-hub`
+ * (a payment service) would land in the GRID category.
  */
 const WEIGHT = { decisive: 1.0, strong: 0.6, weak: 0.25 } as const;
 
 type Tier = keyof typeof WEIGHT;
 
 /**
- * Pengali per field. Nama agent lebih padat sinyal daripada deskripsi — penulis
- * menamai agent menurut fungsinya, dan nama tidak punya ruang untuk basa-basi.
- * Label upstream (`tags`/`categories`/`agentType`) adalah data terkurasi, lebih
- * presisi daripada prosa bebas, tapi di bawah nama karena isinya sering generik
- * (`defi`, `trading`) dan kosakatanya tidak kita kendalikan.
+ * The per-field multiplier. An agent's name is denser in signal than its
+ * description — authors name an agent after what it does, and a name has no room
+ * for filler. Upstream labels (`tags`/`categories`/`agentType`) are curated data,
+ * more precise than free prose, but rank below the name because their contents
+ * are often generic (`defi`, `trading`) and we do not control their vocabulary.
  *
- * Bila `name` dinaikkan ke 2.0, satu kata di judul bisa mengalahkan seluruh isi
- * deskripsi — `Grid-hub` kembali jadi masalah.
+ * If `name` were raised to 2.0, one word in the title could outweigh the entire
+ * description — and `Grid-hub` becomes a problem again.
  */
 const FIELD_WEIGHT = { name: 1.3, description: 1.0, label: 1.2 } as const;
 
 type Field = keyof typeof FIELD_WEIGHT;
 
 /**
- * Skor mentah yang dianggap "bukti penuh". Di atas ini, tambahan bukti tidak lagi
- * menaikkan `kekuatan` — deskripsi panjang tidak boleh otomatis lebih meyakinkan
- * daripada deskripsi pendek yang tepat.
+ * The raw score treated as "full evidence". Above it, extra evidence no longer
+ * raises `strength` — a long description must not automatically be more
+ * convincing than a short, accurate one.
  *
- * Nilainya 1.6 = satu isyarat menentukan (1.0) + satu isyarat sedang (0.6).
- * Konsekuensi langsung yang dipakai untuk mengunci `MIN_CONFIDENCE`:
- * satu isyarat menentukan sendirian memberi kekuatan 1.0/1.6 = 0.625.
+ * Its value 1.6 = one decisive cue (1.0) + one moderate cue (0.6). The direct
+ * consequence used to pin down `MIN_CONFIDENCE`: one decisive cue on its own
+ * gives a strength of 1.0/1.6 = 0.625.
  */
 const EVIDENCE_CAP = 1.6;
 
 /**
- * Lantai faktor pemisahan. Kategori yang menang telak (`pemisahan` = 1) memakai
- * faktor penuh 1.0; yang menang tipis tetap dapat `LANTAI` supaya bukti kuat
- * tidak dihapus habis oleh saingan kecil.
+ * The floor of the separation factor. A category that wins outright
+ * (`separation` = 1) uses the full factor of 1.0; one that wins narrowly still
+ * gets `FLOOR` so that strong evidence is not wiped out entirely by a small
+ * rival.
  *
- * 0.35 dipilih dari satu perilaku yang diinginkan: agent yang mengaku melakukan
- * keempat hal sekaligus ("grid trading + yield farming + portfolio rebalancing +
- * health factor" — kasus nyata di marketplace mana pun) harus jatuh ke `null`.
- * Dengan 0.35 kasus itu berakhir di 0.43 (< 0.55, ditolak); dengan lantai 0.6 ia
- * berakhir di 0.63 dan akan **ditebak** sebagai YIELD hanya karena kata "vault"
- * kebetulan ikut muncul. Menebak di situ persis yang merusak kepercayaan.
+ * 0.35 was chosen from one desired behaviour: an agent claiming to do all four
+ * things at once ("grid trading + yield farming + portfolio rebalancing +
+ * health factor" — a real case in any marketplace) must fall to `null`. With
+ * 0.35 that case ends at 0.43 (< 0.55, rejected); with a floor of 0.6 it ends at
+ * 0.63 and would be **guessed** as YIELD purely because the word "vault"
+ * happened to appear too. Guessing there is exactly what destroys trust.
  */
 const SEPARATION_FLOOR = 0.35;
 
 /**
- * Ambang penerimaan. **Ini konstanta terpenting di berkas ini.**
+ * The acceptance threshold. **This is the most important constant in this file.**
  *
- * Ia tidak dipilih dari selera, melainkan dikurung oleh dua plafon yang dihitung
- * dari rumus di atas — dan ketiga angka di bawah ini **dikunci oleh test**
- * (`describe("classify — plafon yang mengunci ambang")`), supaya komentar ini
- * tidak bisa lagi menyimpang dari perilaku kode:
+ * It was not picked by taste; it is bracketed by two ceilings computed from the
+ * formula above — and the three numbers below are **locked by tests**
+ * (`describe("classify — the ceilings that pin down the threshold")`), so this
+ * comment can no longer drift away from the code's behaviour:
  *
- * | Skenario | Nilai | Perannya |
+ * | Scenario | Value | Its role |
  * |---|---|---|
- * | satu isyarat SEDANG, tanpa saingan | `0.6/1.6 × 1.0` = **0.375** | batas bawah — ambang harus DI ATAS ini |
- * | satu isyarat MENENTUKAN, tanpa saingan | `1.0/1.6 × 1.0` = **0.625** | batas atas — ambang harus DI BAWAH ini |
- * | dua kategori TEPAT imbang (`pemisahan` = 0) | `strength × SEPARATION_FLOOR` ≤ **0.35** | tidak mengikat (lihat di bawah) |
+ * | one MODERATE cue, no rival | `0.6/1.6 × 1.0` = **0.375** | the lower bound — the threshold must be ABOVE it |
+ * | one DECISIVE cue, no rival | `1.0/1.6 × 1.0` = **0.625** | the upper bound — the threshold must be BELOW it |
+ * | two categories EXACTLY tied (`separation` = 0) | `strength × SEPARATION_FLOOR` ≤ **0.35** | not binding (see below) |
  *
- * Jadi rentang yang sah adalah **(0.375, 0.625)**; 0.55 diambil di sisi
- * konservatifnya. Terjemahannya: **tiket masuk minimum adalah tepat satu frasa
- * yang tak bisa berarti lain.**
+ * So the valid range is **(0.375, 0.625)**; 0.55 is taken on its conservative
+ * side. Translated: **the minimum ticket of entry is exactly one phrase that
+ * cannot mean anything else.**
  *
- * Catatan koreksi (temuan review): versi pertama komentar ini mengklaim plafon
- * imbang juga 0.375 dan menyajikannya sebagai batas bawah kedua. Itu salah — dan
- * salahnya bukan sekadar aritmetika, melainkan cara berargumen: angkanya disalin
- * dari plafon pertama, bukan diturunkan dari rumus. Nilai sebenarnya adalah
- * `SEPARATION_FLOOR` = 0.35 (dicapai persis saat bukti jenuh; pada kasus nyata
- * "Omni DeFi Suite" hasilnya 0.3281 karena `strength` < 1). Karena 0.35 < 0.375,
- * plafon imbang **tidak pernah menjadi batas yang mengikat** — ia sudah otomatis
- * terpenuhi oleh batas bawah yang sesungguhnya. Hanya ada SATU batas bawah, bukan
- * dua yang kebetulan sama.
+ * A correction note (a review finding): the first version of this comment
+ * claimed the tie ceiling was also 0.375 and presented it as a second lower
+ * bound. That was wrong — and the mistake was not merely arithmetic but a way of
+ * arguing: the number was copied from the first ceiling rather than derived from
+ * the formula. The real value is `SEPARATION_FLOOR` = 0.35 (reached exactly when
+ * the evidence saturates; on the real "Omni DeFi Suite" case it comes out at
+ * 0.3281 because `strength` < 1). Since 0.35 < 0.375, the tie ceiling is **never
+ * the binding bound** — it is already satisfied automatically by the real lower
+ * bound. There is only ONE lower bound, not two that happen to coincide.
  *
- * Akibat bila salah: pada 0.40 satu kata "liquidation" akan mengirim agent
- * analitik LP mana pun ke Health Factor — pengguna melihat agent yang salah
- * tempat. Pada 0.70 agent seperti `Assay Health` (0.69) — yang jelas-jelas
- * HEALTH_FACTOR — hilang dari marketplace. Keduanya diuji.
+ * The consequence of getting it wrong: at 0.40 the single word "liquidation"
+ * would send any LP analytics agent to Health Factor — the user sees an agent in
+ * the wrong place. At 0.70 an agent like `Assay Health` (0.69) — plainly
+ * HEALTH_FACTOR — disappears from the marketplace. Both are tested.
  */
 const MIN_CONFIDENCE = 0.55;
 
 /**
- * Pengali saat OASF menegaskan konteks DeFi/keuangan.
+ * The multiplier when OASF confirms a DeFi/finance context.
  *
- * 1.15 sengaja kecil dan punya dua batas keras yang bisa diperiksa:
- * - ia **tidak bisa** menciptakan klasifikasi dari nol (0 × 1.15 = 0);
- * - ia **tidak bisa** meloloskan kasus bertarung imbang (0.43 × 1.15 = 0.49 < 0.55).
- * Yang bisa ia lakukan hanyalah menolong kasus yang sudah nyaris lolos
- * (0.50 → 0.575). Itulah peran yang jujur untuk sinyal yang, sesuai temuan live
- * di atas, tidak sanggup membedakan kategori.
+ * 1.15 is deliberately small and has two hard, checkable bounds:
+ * - it **cannot** create a classification out of nothing (0 × 1.15 = 0);
+ * - it **cannot** let an evenly contested case through (0.43 × 1.15 = 0.49 < 0.55).
+ * All it can do is help a case that was already almost through
+ * (0.50 → 0.575). That is the honest role for a signal which, per the live
+ * findings above, cannot distinguish the categories.
  */
 const OASF_DEFI_BONUS = 1.15;
 
 /**
- * Pengali saat OASF menunjuk domain yang **berbenturan makna** dengan kosakata
- * kategori kita — bukan sekadar domain lain, melainkan domain yang memproduksi
- * persis homonim yang classifier ini dibangun untuk menahan:
+ * The multiplier when OASF points at a domain that **collides in meaning** with
+ * our category vocabulary — not merely another domain, but a domain that
+ * produces exactly the homonyms this classifier was built to withstand:
  *
- * | Domain OASF | Homonim yang ia buat |
+ * | OASF domain | The homonym it creates |
  * |---|---|
- * | `agriculture` / `crop` | "crop **yield**" — hasil panen, bukan imbal hasil |
- * | `healthcare` / `medical` | "**health** factor" dalam arti kesehatan |
- * | `energy` / `utilities` | "power **grid**" — jaringan listrik, bukan grid trading |
+ * | `agriculture` / `crop` | "crop **yield**" — a harvest, not a return |
+ * | `healthcare` / `medical` | "**health** factor" in the medical sense |
+ * | `energy` / `utilities` | "power **grid**" — an electrical grid, not grid trading |
  *
- * 0.5 dipilih supaya cukup **membatalkan satu isyarat menentukan**
- * (0.625 × 0.5 = 0.31 < 0.55). Itu memang yang diinginkan: agent yang
- * mendaftarkan dirinya di `agriculture/crop_management` dan menulis "yield"
- * sedang bicara hasil panen — seberapa pun meyakinkan kata kuncinya. Bila
- * dilonggarkan ke 0.8, agent panen itu lolos ke kategori Yield.
+ * 0.5 was chosen so it is enough to **cancel a single decisive cue**
+ * (0.625 × 0.5 = 0.31 < 0.55). That is exactly what is wanted: an agent that
+ * registers itself under `agriculture/crop_management` and writes "yield" is
+ * talking about a harvest — however convincing its keywords. Loosened to 0.8,
+ * that harvest agent slips into the Yield category.
  */
 const OASF_CONTRADICTING_PENALTY = 0.5;
 
 /**
- * Pengali saat OASF hanya menunjuk domain yang **tidak berkaitan** (logistik,
- * hukum, pendidikan, game, hiburan) tanpa satu pun sinyal keuangan/blockchain.
+ * The multiplier when OASF points only at **unrelated** domains (logistics,
+ * legal, education, gaming, entertainment) with not a single finance/blockchain
+ * signal.
  *
- * Dipisahkan dari kasus di atas setelah temuan review: karena {@link MIN_CONFIDENCE}
- * sengaja dipasang tepat di atas "satu isyarat menentukan sendirian" (0.625),
- * pengali 0.5 akan **membatalkan agent yang benar** hanya karena taksonomi
- * upstream kebetulan memuat satu token seperti `education` atau `logistics`.
- * Itu keliru dua kali: (a) domain-domain ini tidak membuat homonim apa pun
- * dengan kosakata kita, dan (b) bertentangan dengan temuan kita sendiri bahwa
- * OASF "tidak sanggup memilih kategori" — sinyal selemah itu tidak pantas
- * memegang hak veto. Agent GameFi yang melakukan yield farming sungguhan adalah
- * kasus nyata, bukan hipotetis.
+ * Split off from the case above after a review finding: because
+ * {@link MIN_CONFIDENCE} sits deliberately just above "one decisive cue on its
+ * own" (0.625), a multiplier of 0.5 would **cancel a correct agent** merely
+ * because the upstream taxonomy happened to contain one token like `education`
+ * or `logistics`. That is wrong twice over: (a) these domains create no homonym
+ * with our vocabulary, and (b) it contradicts our own finding that OASF "cannot
+ * pick a category" — a signal that weak does not deserve a veto. A GameFi agent
+ * that genuinely does yield farming is a real case, not a hypothetical.
  *
- * 0.9 bukan angka bulat sembarangan: ia adalah nilai bulat terbesar yang
- * **tidak sanggup membatalkan satu isyarat menentukan sendirian**. Syaratnya
- * pengali > 0.55/0.625 = 0.88; 0.9 memenuhinya dengan margin tipis
- * (0.625 × 0.9 = 0.5625 ≥ 0.55, tetap lolos). Yang bisa ia lakukan hanyalah
- * menekan kasus yang sudah di ambang — persis peran yang jujur untuk isyarat
- * lemah. Bila diturunkan ke 0.85, hak veto itu kembali secara diam-diam.
+ * 0.9 is not an arbitrary round number: it is the largest round value that
+ * **cannot cancel a single decisive cue on its own**. The requirement is a
+ * multiplier > 0.55/0.625 = 0.88; 0.9 meets it with a thin margin
+ * (0.625 × 0.9 = 0.5625 ≥ 0.55, still through). All it can do is push down a
+ * case that was already at the threshold — exactly the honest role for a weak
+ * cue. Lowered to 0.85, that veto silently returns.
  */
 const OASF_UNRELATED_PENALTY = 0.9;
 
 // ---------------------------------------------------------------------------
-// Tabel pola
+// The pattern tables
 // ---------------------------------------------------------------------------
 
 interface Rule {
-  /** Label yang muncul apa adanya di `reason`, supaya keputusan bisa dibaca. */
+  /** The label that appears verbatim in `reason`, so the decision can be read. */
   readonly label: string;
   readonly tier: Tier;
   readonly pattern: RegExp;
 }
 
-/** Semua pola case-insensitive; teks sudah di-lowercase sebelum diuji. */
+/** Every pattern is case-insensitive; the text is lowercased before being tested. */
 const RULES: Readonly<Record<Category, readonly Rule[]>> = {
   /**
-   * REBALANCING mencakup dua hal yang di Fugugent dianggap satu kategori:
-   * rebalancing alokasi portofolio, dan rebalancing rentang posisi LP
-   * terkonsentrasi (PancakeSwap v3). Keduanya "mengembalikan posisi ke target".
+   * REBALANCING covers two things that Fugugent treats as one category:
+   * rebalancing a portfolio's allocation, and rebalancing the range of a
+   * concentrated LP position (PancakeSwap v3). Both "return a position to its
+   * target".
    */
   REBALANCING: [
     { label: "portfolio rebalancing", tier: "decisive", pattern: /\bportfolio\s+rebalanc|\brebalanc\w*\s+(?:the\s+)?portfolio\b/ },
     { label: "target allocation", tier: "decisive", pattern: /\btarget\s+(?:asset\s+)?allocations?\b|\basset\s+allocations?\b/ },
     { label: "concentrated liquidity", tier: "decisive", pattern: /\bconcentrated\s+liquidity\b/ },
-    { label: "rebalance rentang/posisi LP", tier: "decisive", pattern: /\brebalanc\w*\s+(?:the\s+)?(?:lp|range|position)\b|\blp\s+range\s+rebalanc/ },
-    { label: "penanda [category:rebalancing]", tier: "decisive", pattern: /\[\s*category:\s*rebalanc[a-z-]*\s*\]/ },
+    { label: "rebalance LP range/position", tier: "decisive", pattern: /\brebalanc\w*\s+(?:the\s+)?(?:lp|range|position)\b|\blp\s+range\s+rebalanc/ },
+    { label: "[category:rebalancing] marker", tier: "decisive", pattern: /\[\s*category:\s*rebalanc[a-z-]*\s*\]/ },
     { label: "rebalancer", tier: "strong", pattern: /\brebalancers?\b/ },
-    // "drift" di deskripsi agent DeFi hampir selalu berarti simpangan alokasi.
-    // Batas kata mencegahnya cocok pada nama seperti "DriftHarbor".
-    { label: "drift alokasi", tier: "strong", pattern: /\bdrifts?\b|\bdrifting\b/ },
+    // "drift" in a DeFi agent description almost always means allocation
+    // drift. The word boundary keeps it from matching names like "DriftHarbor".
+    { label: "allocation drift", tier: "strong", pattern: /\bdrifts?\b|\bdrifting\b/ },
     { label: "out of range / reposition", tier: "strong", pattern: /\bout\s+of\s+range\b|\brepositions?\b|\brepositioning\b/ },
-    // Kosakata bobot alokasi. Ditambahkan setelah pemeriksaan atas 167 agent
-    // 8004scan sungguhan: `Narrow Band Allocator` ("equal-weight allocation …
-    // tops up the under-weight side") tidak punya SATU PUN isyarat REBALANCING
-    // tanpa aturan ini, sehingga ia kalah dari HEALTH_FACTOR — yang hanya menang
-    // karena deskripsinya menyebut "health factor" di anak kalimat penjelas
-    // ("… can push a borrowing account's health factor below one"). Bukan
-    // HEALTH_FACTOR yang dilemahkan, melainkan REBALANCING yang dilengkapi:
-    // melemahkan frasa yang benar demi satu kasus adalah cara membuat classifier
-    // yang rapuh.
-    { label: "bobot alokasi (equal/under/over-weight)", tier: "strong", pattern: /\bequal[\s-]?weight\w*\b|\bunder[\s-]?weight\w*\b|\bover[\s-]?weight\w*\b|\bportfolio\s+weights?\b/ },
-    // Telanjang dan lemah — agent YIELD nyata pun menulis "Rebalances daily".
-    { label: "rebalance (telanjang)", tier: "weak", pattern: /\brebalanc/ },
+    // Allocation-weight vocabulary. Added after inspecting 167 real 8004scan
+    // agents: `Narrow Band Allocator` ("equal-weight allocation … tops up the
+    // under-weight side") had NOT ONE REBALANCING cue without this rule, so it
+    // lost to HEALTH_FACTOR — which only won because its description mentions
+    // "health factor" in an explanatory clause ("… can push a borrowing
+    // account's health factor below one"). HEALTH_FACTOR was not weakened;
+    // REBALANCING was completed: weakening a correct phrase for the sake of one
+    // case is how a classifier becomes brittle.
+    { label: "allocation weight (equal/under/over-weight)", tier: "strong", pattern: /\bequal[\s-]?weight\w*\b|\bunder[\s-]?weight\w*\b|\bover[\s-]?weight\w*\b|\bportfolio\s+weights?\b/ },
+    // Bare and weak — even a real YIELD agent writes "Rebalances daily".
+    { label: "rebalance (bare)", tier: "weak", pattern: /\brebalanc/ },
     { label: "reallocation", tier: "weak", pattern: /\breallocat/ },
-    { label: "posisi LP", tier: "weak", pattern: /\blp\s+positions?\b|\bliquidity\s+positions?\b/ },
-    { label: "portfolio (telanjang)", tier: "weak", pattern: /\bportfolios?\b/ },
-    { label: "allocation (telanjang)", tier: "weak", pattern: /\ballocat\w*\b/ },
+    { label: "LP position", tier: "weak", pattern: /\blp\s+positions?\b|\bliquidity\s+positions?\b/ },
+    { label: "portfolio (bare)", tier: "weak", pattern: /\bportfolios?\b/ },
+    { label: "allocation (bare)", tier: "weak", pattern: /\ballocat\w*\b/ },
   ],
 
   /**
-   * GRID adalah kategori paling rawan salah tangkap: kata "grid" jauh lebih
-   * sering berarti tata letak, jaringan listrik, atau sekadar bagian dari nama
-   * merek daripada strategi grid trading.
+   * GRID is the category most prone to false positives: the word "grid" far more
+   * often means a layout, an electrical network, or simply part of a brand name
+   * than a grid trading strategy.
    */
   GRID: [
-    // Inti kategori ini: `grid` yang bersanding dengan kata kerja perdagangan.
+    // The core of this category: a `grid` standing next to a trading verb.
     { label: "grid trading/bot/order/level", tier: "decisive", pattern: /\bgrid[\s-]?(?:trad(?:e|er|es|ing)|bot|strateg|order|level|execution|plan|market[\s-]?making)/ },
-    { label: "penanda [category:grid]", tier: "decisive", pattern: /\[\s*category:\s*grid[a-z-]*\s*\]/ },
+    { label: "[category:grid] marker", tier: "decisive", pattern: /\[\s*category:\s*grid[a-z-]*\s*\]/ },
     { label: "range trading/order", tier: "strong", pattern: /\brange[\s-]?(?:trad(?:e|er|es|ing)|orders?)\b/ },
-    { label: "grid harga (geometric/price grid)", tier: "strong", pattern: /\b(?:geometric|price|trading|systematic)\s+grids?\b/ },
+    { label: "price grid (geometric/price grid)", tier: "strong", pattern: /\b(?:geometric|price|trading|systematic)\s+grids?\b/ },
     { label: "buy low / sell high", tier: "strong", pattern: /\bbuys?\s+low\b[^.]{0,20}\bsells?\s+high\b/ },
-    // Sengaja lemah. Ini yang menahan `Grid-hub` (layanan x402) dan "CSS grid".
-    { label: "grid (telanjang)", tier: "weak", pattern: /\bgrid\b/ },
+    // Deliberately weak. This is what holds back `Grid-hub` (an x402 service)
+    // and "CSS grid".
+    { label: "grid (bare)", tier: "weak", pattern: /\bgrid\b/ },
     { label: "price range / price band", tier: "weak", pattern: /\bprice\s+(?:range|band)\b/ },
-    // Cocok hanya bila kedua sisi order hadir — sepihak saja bukan grid.
+    // Matches only when both order sides are present — one side alone is not a grid.
     { label: "buy order + sell order", tier: "weak", pattern: /\bbuy\s+and\s+sell\s+orders?\b|\bbuy\s+orders?\b(?=[\s\S]*\bsell\s+orders?\b)|\bsell\s+orders?\b(?=[\s\S]*\bbuy\s+orders?\b)/ },
   ],
 
   /**
-   * YIELD: mencari imbal hasil tertinggi dan menggabungkannya. Kata "yield"
-   * sendirian tidak berarti apa-apa (panen, obligasi), jadi seluruh kekuatan
-   * kategori ini bertumpu pada frasa majemuk dan pada APY/APR.
+   * YIELD: hunting the highest return and compounding it. The word "yield" alone
+   * means nothing (harvests, bonds), so all of this category's strength rests on
+   * compound phrases and on APY/APR.
    */
   YIELD: [
     { label: "yield farming", tier: "decisive", pattern: /\byield\s+farm/ },
     { label: "yield optimizer/aggregator/routing", tier: "decisive", pattern: /\byield\s+(?:optimi|aggregat|rout|strateg|generat|harvest|pulse)/ },
-    // Hanya bentuk majemuk. `compound` telanjang tidak pernah dipakai:
-    // ia sama saja menunjuk protokol lending Compound.
+    // Compound forms only. A bare `compound` is never used: it points equally
+    // at the Compound lending protocol.
     { label: "auto-compound", tier: "decisive", pattern: /\bauto[\s-]?compound\w*\b|\bcompounding\s+(?:rewards?|yields?|returns?)\b/ },
-    { label: "penanda [category:yield]", tier: "decisive", pattern: /\[\s*category:\s*yield[a-z-]*\s*\]/ },
+    { label: "[category:yield] marker", tier: "decisive", pattern: /\[\s*category:\s*yield[a-z-]*\s*\]/ },
     { label: "APY/APR", tier: "strong", pattern: /\bap[yr]s?\b/ },
-    { label: "imbal hasil tertinggi", tier: "strong", pattern: /\bhighest[\s-]?(?:earning|yielding)\b|\bbest\s+(?:apy|apr|yield)\b/ },
-    // `yield` yang menempel pada sumber imbal hasil sudah jauh lebih spesifik
-    // daripada `yield` lepas — "crop yield" dan "bond yield" tidak berbentuk begini.
+    { label: "highest return", tier: "strong", pattern: /\bhighest[\s-]?(?:earning|yielding)\b|\bbest\s+(?:apy|apr|yield)\b/ },
+    // A `yield` attached to the source of the return is far more specific than a
+    // loose `yield` — "crop yield" and "bond yield" do not take this form.
     { label: "LP/pool/lending yield", tier: "strong", pattern: /\b(?:lp|pool|lending|staking|farming)\s+yields?\b/ },
-    { label: "yield (telanjang)", tier: "weak", pattern: /\byields?\b/ },
+    { label: "yield (bare)", tier: "weak", pattern: /\byields?\b/ },
     { label: "vault", tier: "weak", pattern: /\bvaults?\b/ },
     { label: "staking", tier: "weak", pattern: /\bstaking\b|\bstakes?\b/ },
     { label: "liquidity pool / TVL", tier: "weak", pattern: /\bliquidity\s+pools?\b|\btotal\s+value\s+locked\b|\btvl\b/ },
@@ -334,33 +341,34 @@ const RULES: Readonly<Record<Category, readonly Rule[]>> = {
   ],
 
   /**
-   * HEALTH_FACTOR: menjaga posisi pinjam agar tidak dilikuidasi. Kategori paling
-   * bersih kosakatanya — asal `liquidat` tidak pernah tertukar dengan `liquidity`,
-   * dan `health` tidak pernah dipakai telanjang (ada agent kesehatan medis).
+   * HEALTH_FACTOR: keeping a borrowing position from being liquidated. The
+   * cleanest vocabulary of the four — as long as `liquidat` is never confused
+   * with `liquidity`, and `health` is never used bare (medical health agents
+   * exist).
    */
   HEALTH_FACTOR: [
     { label: "health factor", tier: "decisive", pattern: /\bhealth[\s-]?factors?\b/ },
     { label: "liquidation threshold/risk/protection", tier: "decisive", pattern: /\bliquidation\s+(?:threshold|risk|price|protection|prevention)s?\b|\bavoid(?:ing)?\s+liquidation\b|\bliquidation\s+protection\b/ },
     { label: "collateral ratio / LTV", tier: "decisive", pattern: /\bcollateral(?:isation|ization)?\s+ratios?\b|\bloan[\s-]to[\s-]value\b|\bltv\b/ },
-    { label: "posisi pinjam", tier: "decisive", pattern: /\bborrow(?:ing)?\s+positions?\b|\bdebt\s+positions?\b/ },
-    { label: "penanda [category:health-factor]", tier: "decisive", pattern: /\[\s*category:\s*(?:health[a-z-]*|lending|liquidation)\s*\]/ },
-    // Akar `liquidat`, BUKAN `liquid` — "liquidity" tidak boleh cocok.
+    { label: "borrowing position", tier: "decisive", pattern: /\bborrow(?:ing)?\s+positions?\b|\bdebt\s+positions?\b/ },
+    { label: "[category:health-factor] marker", tier: "decisive", pattern: /\[\s*category:\s*(?:health[a-z-]*|lending|liquidation)\s*\]/ },
+    // The stem `liquidat`, NOT `liquid` — "liquidity" must not match.
     { label: "liquidation", tier: "strong", pattern: /\bliquidat/ },
     { label: "collateral", tier: "strong", pattern: /\bcollateral/ },
     { label: "lending/loan position", tier: "strong", pattern: /\blending\s+positions?\b|\bloan\s+positions?\b/ },
-    { label: "melunasi utang", tier: "strong", pattern: /\brepay\w*\s+(?:its\s+)?(?:the\s+)?(?:debt|loan|borrow)/ },
-    { label: "protokol lending (venus/aave/…)", tier: "weak", pattern: /\bvenus\b|\baave\b|\bmorpho\b|\bcomptroller\b/ },
+    { label: "repay debt", tier: "strong", pattern: /\brepay\w*\s+(?:its\s+)?(?:the\s+)?(?:debt|loan|borrow)/ },
+    { label: "lending protocol (venus/aave/…)", tier: "weak", pattern: /\bvenus\b|\baave\b|\bmorpho\b|\bcomptroller\b/ },
     { label: "borrow / debt", tier: "weak", pattern: /\bborrow\w*\b|\bdebts?\b/ },
     { label: "lending / loan", tier: "weak", pattern: /\blending\b|\bloans?\b/ },
   ],
 };
 
 /**
- * Alias label upstream → kategori kita. Dicocokkan **per token utuh** pada
- * `tags`/`categories`/`agentType`, tidak sebagai substring: `tags: ["trading"]`
- * tidak boleh menyeret agent ke GRID, dan `["defi"]` tidak boleh berarti apa pun.
- * Label terkurasi adalah bukti terstruktur terkuat yang tersedia, karena itu
- * bobotnya menentukan.
+ * Upstream label aliases → our categories. Matched **per whole token** on
+ * `tags`/`categories`/`agentType`, not as a substring: `tags: ["trading"]` must
+ * not drag an agent into GRID, and `["defi"]` must not mean anything. A curated
+ * label is the strongest structured evidence available, hence its decisive
+ * weight.
  */
 const LABEL_ALIASES: Readonly<Record<string, Category>> = {
   rebalancing: "REBALANCING",
@@ -379,27 +387,28 @@ const LABEL_ALIASES: Readonly<Record<string, Category>> = {
 };
 
 /**
- * OASF menegaskan konteks keuangan/blockchain. Diambil dari kosakata yang
- * benar-benar terpakai di 8004scan: `finance/markets/crypto`,
+ * OASF confirming a finance/blockchain context. Taken from the vocabulary
+ * actually in use on 8004scan: `finance/markets/crypto`,
  * `technology/blockchain/defi`, `trust_and_safety/risk_management`,
  * `analytical_skills/market_insights`, `finance_and_business/investment_services`.
  */
 const OASF_DEFI = /blockchain|crypto|defi|decentralized[_\s-]?finance|finance|investment|trading|market|risk[_\s-]?management|smart[_\s-]?contract/;
 
 /**
- * Domain OASF yang berbenturan makna dengan kosakata kategori kita. Hanya
- * berlaku bila tidak ada satu pun sinyal DeFi — agent lintas bidang tidak dihukum.
+ * OASF domains that collide in meaning with our category vocabulary. Applies
+ * only when there is not a single DeFi signal — a cross-domain agent is not
+ * penalized.
  */
 const OASF_CONTRADICTING = /agricultur|crop|farming_practice|horticultur|healthcare|medical|clinical|patient|energy|utilit|electric|power_grid/;
 
 /**
- * Domain OASF yang sekadar tidak berkaitan: tidak membuat homonim dengan
- * kosakata kita, jadi hanya menekan tipis dan tidak pernah memveto.
+ * OASF domains that are merely unrelated: they create no homonym with our
+ * vocabulary, so they only push down slightly and never veto.
  */
 const OASF_UNRELATED = /gaming|entertainment|media|legal|logistics|transportation|manufactur|robotics|education|hospitality|agriculture_business|sports|travel/;
 
 // ---------------------------------------------------------------------------
-// Pembantu
+// Helpers
 // ---------------------------------------------------------------------------
 
 function text(value: unknown): string {
@@ -437,9 +446,9 @@ interface Score {
   readonly hits: readonly Hit[];
 }
 
-/** Ringkas bukti sebuah kategori jadi satu frasa yang bisa dibaca. */
+/** Condenses a category's evidence into one readable phrase. */
 function describeHits(hits: readonly Hit[]): string {
-  const TIER_ID: Record<Tier, string> = { decisive: "menentukan", strong: "sedang", weak: "lemah" };
+  const TIER_ID: Record<Tier, string> = { decisive: "decisive", strong: "moderate", weak: "weak" };
   return hits
     .slice()
     .sort((a, b) => b.weight - a.weight)
@@ -448,20 +457,20 @@ function describeHits(hits: readonly Hit[]): string {
 }
 
 // ---------------------------------------------------------------------------
-// API publik
+// The public API
 // ---------------------------------------------------------------------------
 
 /**
- * Tempatkan sebuah agent di salah satu dari empat kategori, atau tolak.
+ * Places an agent in one of the four categories, or refuses.
  *
- * Tidak pernah melempar dan tidak pernah mengubah `agent`: record yang cacat
- * (field hilang, tipe salah dari upstream) diperlakukan sebagai field kosong,
- * karena satu record aneh tidak boleh menjatuhkan seluruh proses indexing.
+ * Never throws and never mutates `agent`: a malformed record (missing fields,
+ * wrong types from upstream) is treated as having empty fields, because one odd
+ * record must not take the whole indexing run down.
  *
- * @returns `category: null` bila kepercayaan di bawah {@link MIN_CONFIDENCE}.
- *          `reason` selalu terisi — juga saat menolak, karena "kenapa agent ini
- *          tidak muncul di mana-mana?" sama perlu dijawabnya dengan "kenapa
- *          agent ini masuk Grid?".
+ * @returns `category: null` when confidence is below {@link MIN_CONFIDENCE}.
+ *          `reason` is always populated — including on a refusal, because "why
+ *          does this agent appear nowhere?" deserves an answer just as much as
+ *          "why did this agent land in Grid?".
  */
 export function classify(agent: AgentRecord): AgentClassification {
   const fields: Record<Field, string> = {
@@ -472,29 +481,30 @@ export function classify(agent: AgentRecord): AgentClassification {
       .join(" "),
   };
 
-  // --- Lapis 1a: alias label upstream terkurasi -----------------------------
+  // --- Layer 1a: curated upstream label aliases -----------------------------
   const labelTokens = [...tokens(agent?.tags), ...tokens(agent?.categories)];
   const aliasHits = new Map<Category, Hit>();
   for (const token of labelTokens) {
     const category = LABEL_ALIASES[token];
     if (category !== undefined && !aliasHits.has(category)) {
       aliasHits.set(category, {
-        label: `label upstream "${token}"`,
+        label: `upstream label "${token}"`,
         tier: "decisive",
         weight: WEIGHT.decisive * FIELD_WEIGHT.label,
       });
     }
   }
 
-  // --- Lapis 1b: kata kunci pada nama/deskripsi/label -----------------------
+  // --- Layer 1b: keywords on name/description/label -------------------------
   const scores: Score[] = CATEGORIES.map((category) => {
     const hits: Hit[] = [];
     const alias = aliasHits.get(category);
     if (alias !== undefined) hits.push(alias);
 
     for (const rule of RULES[category]) {
-      // Satu pola dihitung SEKALI, dengan pengali field terbesar tempat ia cocok.
-      // Menjumlah tiap kemunculan akan membuat pengulangan kata jadi taktik skor.
+      // One pattern counts ONCE, with the largest field multiplier where it
+      // matched. Summing every occurrence would turn word repetition into a
+      // scoring tactic.
       let best = 0;
       for (const field of ["name", "description", "label"] as const) {
         if (fields[field] !== "" && rule.pattern.test(fields[field])) {
@@ -516,32 +526,32 @@ export function classify(agent: AgentRecord): AgentClassification {
       category: null,
       confidence: 0,
       reason:
-        "tidak dikategorikan: tidak ada satu pun kata kunci kategori yang cocok pada nama, deskripsi, tag, atau kategori upstream",
+        "not categorized: not a single category keyword matched the name, description, tags, or upstream categories",
     };
   }
 
-  // `kekuatan` memakai skor yang diplafon (bukti secukupnya sudah cukup);
-  // `pemisahan` memakai skor mentah, supaya dominasi yang nyata tetap terbaca
-  // walau kedua kategori sama-sama sudah melewati plafon.
+  // `strength` uses the capped score (enough evidence is enough);
+  // `separation` uses the raw score, so real dominance is still visible even
+  // when both categories have passed the cap.
   const strength = Math.min(top.raw, EVIDENCE_CAP) / EVIDENCE_CAP;
   const separation = (top.raw - runnerUp.raw) / top.raw;
 
-  // --- Lapis 2: OASF sebagai pengali, tidak pernah sebagai pemilih ----------
+  // --- Layer 2: OASF as a multiplier, never as a chooser --------------------
   const oasf = `${listText(agent?.skills)} ${listText(agent?.domains)}`.trim();
   let oasfMultiplier = 1;
   let oasfNote = "";
   if (oasf !== "") {
     if (OASF_DEFI.test(oasf)) {
-      // Diperiksa lebih dulu: satu sinyal keuangan/blockchain sudah cukup untuk
-      // membebaskan agent lintas bidang (mis. GameFi) dari kedua penalti.
+      // Checked first: a single finance/blockchain signal is enough to free a
+      // cross-domain agent (e.g. GameFi) from both penalties.
       oasfMultiplier = OASF_DEFI_BONUS;
-      oasfNote = `; OASF menegaskan konteks DeFi/keuangan (x${OASF_DEFI_BONUS})`;
+      oasfNote = `; OASF confirms a DeFi/finance context (x${OASF_DEFI_BONUS})`;
     } else if (OASF_CONTRADICTING.test(oasf)) {
       oasfMultiplier = OASF_CONTRADICTING_PENALTY;
-      oasfNote = `; OASF menunjuk domain yang berbenturan makna dengan kosakata kategori (x${OASF_CONTRADICTING_PENALTY})`;
+      oasfNote = `; OASF points at a domain that collides in meaning with the category vocabulary (x${OASF_CONTRADICTING_PENALTY})`;
     } else if (OASF_UNRELATED.test(oasf)) {
       oasfMultiplier = OASF_UNRELATED_PENALTY;
-      oasfNote = `; OASF menunjuk domain tak berkaitan (x${OASF_UNRELATED_PENALTY}, tidak pernah memveto)`;
+      oasfNote = `; OASF points at unrelated domains (x${OASF_UNRELATED_PENALTY}, never a veto)`;
     }
   }
 
@@ -557,16 +567,16 @@ export function classify(agent: AgentRecord): AgentClassification {
 
   const rivalNote =
     runnerUp.raw > 0
-      ? `pesaing terdekat ${runnerUp.category} ${round(runnerUp.raw)}`
-      : "tidak ada kategori pesaing";
+      ? `closest rival ${runnerUp.category} ${round(runnerUp.raw)}`
+      : "no rival category";
 
   if (confidence < MIN_CONFIDENCE) {
     return {
       category: null,
       confidence,
       reason:
-        `tidak dikategorikan: bukti terkuat ${top.category} ${round(top.raw)} — ${describeHits(top.hits)}; ` +
-        `${rivalNote}${oasfNote}; keyakinan ${confidence} di bawah ambang ${MIN_CONFIDENCE}`,
+        `not categorized: strongest evidence ${top.category} ${round(top.raw)} — ${describeHits(top.hits)}; ` +
+        `${rivalNote}${oasfNote}; confidence ${confidence} below the threshold ${MIN_CONFIDENCE}`,
     };
   }
 
@@ -574,15 +584,15 @@ export function classify(agent: AgentRecord): AgentClassification {
     category: top.category,
     confidence,
     reason:
-      `${top.category}: cocok ${describeHits(top.hits)}; bukti ${round(top.raw)}/${EVIDENCE_CAP}, ` +
-      `${rivalNote}${oasfNote}; keyakinan ${confidence} (ambang ${MIN_CONFIDENCE})`,
+      `${top.category}: matched ${describeHits(top.hits)}; evidence ${round(top.raw)}/${EVIDENCE_CAP}, ` +
+      `${rivalNote}${oasfNote}; confidence ${confidence} (threshold ${MIN_CONFIDENCE})`,
   };
 }
 
 /**
- * Konstanta ambang, diekspor supaya pemanggil (dan test) merujuk angka yang sama
- * alih-alih menyalinnya. Menyalin ambang ke tempat lain adalah cara paling umum
- * ia jadi tidak konsisten.
+ * The threshold constants, exported so callers (and tests) reference the same
+ * numbers instead of copying them. Copying a threshold elsewhere is the most
+ * common way it becomes inconsistent.
  */
 export const CLASSIFIER_THRESHOLDS = {
   MIN_CONFIDENCE,

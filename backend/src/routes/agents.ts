@@ -1,29 +1,29 @@
 /**
- * Rute HTTP agent: `/api/agents`, `/api/agents/:id`, `/api/categories`.
+ * The agent HTTP routes: `/api/agents`, `/api/agents/:id`, `/api/categories`.
  *
- * Lapisan ini **tidak** punya logika data sendiri. Seluruh fallback berjenjang
- * ada di `src/service/agents.ts`; di sini hanya tiga hal yang terjadi, dan
- * ketiganya adalah janji kepada klien:
+ * This layer has **no** data logic of its own. The whole tiered fallback lives in
+ * `src/service/agents.ts`; only three things happen here, and all three are
+ * promises to the client:
  *
- * 1. **Serialisasi lewat satu pintu.** `AgentRecord` memuat `bigint`
- *    (`fuguListing.priceUsd8PerPeriod`, `listingId`, `erc8004AgentId`) sehingga
- *    `JSON.stringify` atasnya **melempar**. Konversinya selalu
- *    {@link serializeAgentRecord}, tidak pernah replacer lokal: uang menyeberang
- *    sebagai string desimal basis 8 (`"12345678"` = $0,12), tidak pernah `number`.
+ * 1. **Serialization through one door.** An `AgentRecord` holds `bigint`s
+ *    (`fuguListing.priceUsd8PerPeriod`, `listingId`, `erc8004AgentId`), so
+ *    `JSON.stringify` over it **throws**. The conversion is always
+ *    {@link serializeAgentRecord}, never a local replacer: money crosses as a
+ *    base-8 decimal string (`"12345678"` = $0.12), never as a `number`.
  *
- * 2. **Provenance ikut di setiap respons.** `source`, `ageSeconds`, `stale`,
- *    `degraded`, dan `trail` diteruskan apa adanya supaya UI bisa berkata
- *    "data berumur N detik dari cache" alih-alih menampilkan angka tanpa asal.
+ * 2. **Provenance travels in every response.** `source`, `ageSeconds`, `stale`,
+ *    `degraded`, and `trail` are passed through verbatim so the UI can say
+ *    "N-second-old data from the cache" instead of showing a number with no
+ *    origin.
  *
- * 3. **Tidak pernah 5xx karena upstream.** Layanan berjanji tidak melempar;
- *    handler di sini tetap memasang `try/catch` sendiri dan mengubah kegagalan
- *    apa pun menjadi amplop `healthy: false` berisi alasan yang sudah disunting
- *    dari kredensial. 500 saat 8004scan mati adalah kegagalan yang persis
- *    ingin kita hindari — juri akan mematikannya dan melihat apa yang terjadi.
+ * 3. **Never a 5xx because of upstream.** The service promises not to throw; the
+ *    handlers here still install their own `try/catch` and turn any failure into
+ *    a `healthy: false` envelope carrying a reason already redacted of
+ *    credentials. A 500 when 8004scan is down is exactly the failure we want to
+ *    avoid — the judges will take it down and see what happens.
  *
- * Parameter yang cacat adalah pengecualiannya: `limit=abc` dijawab 400 dengan
- * field yang salah disebutkan (lihat `query.ts`), bukan diam-diam dijadikan
- * nilai bawaan.
+ * A malformed parameter is the exception: `limit=abc` is answered with a 400 that
+ * names the offending field (see `query.ts`), not silently turned into a default.
  */
 import { Hono, type Context } from "hono";
 import { DEFAULT_MAX_AGE_SECONDS } from "../db/repo.js";
@@ -45,19 +45,19 @@ import { parseAgentId, parseCategory, parseLimit, parseOffset, QueryError } from
 
 export interface AgentRoutesDeps {
   service: AgentService;
-  /** Disuntikkan supaya `fetchedAt` amplop kegagalan deterministik di test. */
+  /** Injected so the failure envelope's `fetchedAt` is deterministic in tests. */
   now?: () => Date;
 }
 
 /**
- * Berapa banyak yang dibaca per kategori saat menghitung `/api/categories`.
- * Sengaja bukan 1: tingkat pertama menyaring hasilnya lewat classifier, jadi
- * membaca satu item saja akan sering menghasilkan nol dan menjatuhkan hitungan
- * ke tingkat berikutnya tanpa sebab.
+ * How many items are read per category when counting `/api/categories`.
+ * Deliberately not 1: the first level filters its results through the classifier,
+ * so reading a single item would often yield zero and drop the count to the next
+ * level for no reason.
  */
 export const CATEGORY_COUNT_LIMIT = MAX_PAGE_LIMIT;
 
-/** Urutan fallback. Dipakai untuk memilih sumber paling terdegradasi saat menggabung. */
+/** The fallback order. Used to pick the most degraded source when merging. */
 const SOURCE_ORDER: readonly AgentSource[] = ["scan8004", "cache", "onchain", "seed"];
 
 function worstSource(sources: readonly AgentSource[]): AgentSource {
@@ -69,11 +69,12 @@ function worstSource(sources: readonly AgentSource[]): AgentSource {
 }
 
 /**
- * Tingkat fallback yang **tidak sempat menjawab** — bukan yang menjawab "tidak ada".
+ * Fallback levels that **never got to answer** — as opposed to ones that answered
+ * "not there".
  *
- * `empty` sengaja TIDAK termasuk: sumber sehat yang berkata "tidak ketemu"
- * adalah jawaban, bukan ketidaktahuan. Ketiga sisanya berarti ada tempat yang
- * belum bisa kita tanyai.
+ * `empty` is deliberately NOT included: a healthy source saying "not found" is an
+ * answer, not ignorance. The other three mean there is a place we have not been
+ * able to ask.
  */
 export const UNCERTAIN_OUTCOMES: readonly FallbackOutcome[] = [
   "threw",
@@ -81,7 +82,7 @@ export const UNCERTAIN_OUTCOMES: readonly FallbackOutcome[] = [
   "unavailable",
 ];
 
-/** `true` bila ada tingkat yang tidak bisa dimintai jawaban. */
+/** `true` when some level could not be asked for an answer. */
 export function isUncertain(trail: readonly FallbackAttempt[]): boolean {
   return trail.some((attempt) => UNCERTAIN_OUTCOMES.includes(attempt.outcome));
 }
@@ -115,17 +116,17 @@ export function toWireRecord(record: AgentRecord): AgentRecordWire {
   };
 }
 
-/** Pesan kegagalan yang aman untuk klien — disunting, tanpa stack trace. */
+/** A failure message safe for the client — redacted, with no stack trace. */
 function describe(err: unknown): string {
   if (err instanceof Error) {
     const firstLine = err.message.split("\n")[0] ?? err.message;
     return redact(`${err.name}: ${firstLine}`);
   }
-  return redact(`kegagalan tak dikenal: ${String(err)}`);
+  return redact(`unknown failure: ${String(err)}`);
 }
 
 // ---------------------------------------------------------------------------
-// Bentuk kawat
+// The wire shapes
 // ---------------------------------------------------------------------------
 
 /**
@@ -164,13 +165,13 @@ export interface AgentRecordWire extends AgentRecordJson {
   listingMetadata: ListingMetadata | null;
 }
 
-/** Amplop daftar. Sama dengan `AgentServicePage`, `items` sudah terserialisasi. */
+/** The list envelope. The same as `AgentServicePage`, with `items` already serialized. */
 export interface AgentListResponse {
   items: AgentRecordWire[];
   total: number;
   limit: number;
   offset: number;
-  /** `null` berarti permintaan mencakup keempat kategori. */
+  /** `null` means the request covered all four categories. */
   category: Category | null;
   source: AgentSource;
   healthy: boolean;
@@ -202,7 +203,7 @@ export interface AgentListResponse {
    * `trail`.
    */
   firstParty: FirstPartyReport | null;
-  /** Umur item tertua, detik. `null` bila kosong. */
+  /** The age of the oldest item, in seconds. `null` when empty. */
   ageSeconds: number | null;
   stale: boolean;
   degraded: boolean;
@@ -290,11 +291,11 @@ function toDetailResponse(detail: AgentServiceDetail): AgentDetailResponse {
 }
 
 /**
- * Amplop untuk kegagalan yang tidak terduga.
+ * The envelope for an unexpected failure.
  *
- * `source: "seed"` dan `degraded: true` bukan hiasan: bila kita sampai di sini,
- * tidak satu pun tingkat menjawab, dan mengaku berada di dasar tangga fallback
- * lebih jujur daripada melaporkan sumber yang sebenarnya tidak memberi apa-apa.
+ * `source: "seed"` and `degraded: true` are not decoration: if we reach here, not
+ * one level answered, and admitting we are at the bottom of the fallback ladder
+ * is more honest than reporting a source that in fact gave us nothing.
  */
 function failedList(
   err: unknown,
@@ -324,18 +325,17 @@ function failedList(
 }
 
 // ---------------------------------------------------------------------------
-// Penggabungan lintas kategori
+// Cross-category merging
 // ---------------------------------------------------------------------------
 
 /**
- * `GET /api/agents` tanpa `category` berarti "semua kategori".
+ * `GET /api/agents` without a `category` means "all categories".
  *
- * Layanan hanya tahu cara menjawab per kategori (setiap kategori punya query
- * semantic sendiri), jadi penggabungannya dilakukan di sini — dan dilakukan
- * **secara jujur**: `source` yang dilaporkan adalah yang paling terdegradasi di
- * antara keempatnya, `ageSeconds` yang tertua, dan `healthy` hanya `true` bila
- * keempat kategori sehat. Melaporkan yang terbaik dari empat akan menyembunyikan
- * kategori yang sedang tidak terlayani.
+ * The service only knows how to answer per category (each category has its own
+ * semantic query), so the merge happens here — and it happens **honestly**: the
+ * reported `source` is the most degraded of the four, `ageSeconds` is the oldest,
+ * and `healthy` is `true` only when all four categories are healthy. Reporting
+ * the best of the four would hide a category that is currently unserved.
  */
 function mergePages(
   pages: readonly AgentServicePage[],
@@ -368,15 +368,16 @@ function mergePages(
     itemSources: censusOf(served),
     firstParty: mergeFirstParty(pages, served),
     /**
-     * Jumlah item **berbeda yang benar-benar bisa dijangkau lewat paging ini**,
-     * bukan jumlah `total` keempat kategori.
+     * The number of **distinct items actually reachable through this paging**,
+     * not the sum of the four categories' `total`s.
      *
-     * Tiap kategori dibaca paling banyak {@link MAX_PAGE_LIMIT} item, jadi
-     * jendela gabungan ini punya batas keras. Melaporkan jumlah keempat `total`
-     * (yang bisa ribuan) akan menjanjikan halaman yang tidak pernah ada:
-     * klien membangun pagination dari angka itu, lalu menerima halaman kosong
-     * ber-`healthy: true` begitu melewati jendelanya. Angka per kategori tetap
-     * bisa diperiksa lewat `/api/categories` dan lewat `trail`.
+     * Each category is read to at most {@link MAX_PAGE_LIMIT} items, so this
+     * merged window has a hard bound. Reporting the sum of the four `total`s
+     * (which can run into the thousands) would promise pages that never existed:
+     * the client builds its pagination from that number and then receives an
+     * empty page with `healthy: true` as soon as it walks past the window. The
+     * per-category numbers remain inspectable through `/api/categories` and
+     * through `trail`.
      */
     total: merged.length,
     limit,
@@ -442,7 +443,7 @@ function mergeFirstParty(
 }
 
 // ---------------------------------------------------------------------------
-// Rute
+// Routes
 // ---------------------------------------------------------------------------
 
 export function createAgentRoutes(deps: AgentRoutesDeps): Hono {
@@ -450,8 +451,8 @@ export function createAgentRoutes(deps: AgentRoutesDeps): Hono {
   const now = deps.now ?? (() => new Date());
 
   app.get("/agents", async (c) => {
-    // Validasi lebih dulu, sebelum menyentuh layanan: permintaan cacat tidak
-    // pantas membebani upstream, dan jawabannya tidak bergantung pada data.
+    // Validate first, before touching the service: a malformed request does not
+    // deserve to burden upstream, and its answer does not depend on data.
     let category: Category | null;
     let limit: number;
     let offset: number;
@@ -470,9 +471,9 @@ export function createAgentRoutes(deps: AgentRoutesDeps): Hono {
         return c.json(toListResponse(page, category));
       }
 
-      // Tiap kategori harus dibaca sampai `offset + limit` supaya paging global
-      // di atas gabungannya benar; dibatasi supaya satu permintaan tidak pernah
-      // meminta lebih dari yang layanan izinkan.
+      // Each category must be read up to `offset + limit` so that global paging
+      // over the merge is correct; bounded so one request never asks for more
+      // than the service allows.
       const perCategory = Math.min(offset + limit, MAX_PAGE_LIMIT);
       const pages = await Promise.all(
         CATEGORIES.map((cat) =>
@@ -498,8 +499,8 @@ export function createAgentRoutes(deps: AgentRoutesDeps): Hono {
     try {
       detail = toDetailResponse(await deps.service.getAgentDetail(id));
     } catch (err) {
-      // Kita tidak tahu apakah agent ini ada — karena itu 200 dengan
-      // `healthy: false`, bukan 404 yang mengklaim ia tidak ada.
+      // We do not know whether this agent exists — hence a 200 with
+      // `healthy: false`, not a 404 claiming it does not.
       return c.json({
         agent: null,
         source: "seed" as AgentSource,
@@ -515,19 +516,19 @@ export function createAgentRoutes(deps: AgentRoutesDeps): Hono {
       } satisfies AgentDetailResponse);
     }
 
-    // 404 hanya bila kita benar-benar tahu jawabannya. `healthy` saja TIDAK
-    // cukup untuk menyimpulkan itu: tingkat 4 (seed) melaporkan `healthy: true`
-    // untuk id apa pun yang bukan salah satu agent kurasi, tanpa melihat apa
-    // yang terjadi di tingkat 1–3. Jadi `{agent: null, healthy: true}` juga
-    // dihasilkan oleh keadaan "8004scan mati, cache tidak dipasang, on-chain
-    // tidak memuatnya" — keadaan di mana agent-nya sangat mungkin ADA.
+    // A 404 only when we genuinely know the answer. `healthy` alone is NOT
+    // enough to conclude that: level 4 (the seed) reports `healthy: true` for any
+    // id that is not one of the curated agents, without looking at what happened
+    // at levels 1–3. So `{agent: null, healthy: true}` is also produced by the
+    // state "8004scan down, cache not installed, on-chain does not hold it" — a
+    // state in which the agent very likely DOES exist.
     //
-    // Membalas 404 di situ berarti marketplace menghapus agent yang nyata
-    // persis ketika sumber primernya tumbang. Karena itu `trail` yang memutus:
-    // satu saja tingkat yang `threw`, `unhealthy`, atau `unavailable` berarti
-    // ada tempat yang belum sempat kita tanyai, dan "tidak tahu" bukan
-    // "tidak ada". `unavailable` ikut dihitung: cache yang tidak dipasang
-    // adalah tempat memastikan yang tidak kita punya.
+    // Answering 404 there means the marketplace erases a real agent at exactly
+    // the moment its primary source goes down. So `trail` is what decides: a
+    // single level that `threw`, was `unhealthy`, or was `unavailable` means
+    // there is a place we never got to ask, and "don't know" is not
+    // "doesn't exist". `unavailable` counts too: a cache that is not installed is
+    // a place to check that we do not have.
     if (detail.agent === null && detail.healthy && !isUncertain(detail.trail)) {
       return c.json(detail, 404);
     }
@@ -555,8 +556,8 @@ export function createAgentRoutes(deps: AgentRoutesDeps): Hono {
             reason: page.reason === null ? null : redact(page.reason),
           };
         } catch (err) {
-          // Satu kategori yang gagal tidak boleh menghapus tiga lainnya —
-          // marketplace dengan tiga tab tetap jauh lebih berguna daripada 500.
+          // One failing category must not erase the other three — a marketplace
+          // with three tabs is still far more useful than a 500.
           return {
             category,
             count: 0,
@@ -592,7 +593,7 @@ export function createAgentRoutes(deps: AgentRoutesDeps): Hono {
   return app;
 }
 
-/** 400 yang menyebut field, pesan, dan (bila enum) nilai yang sah. */
+/** A 400 that names the field, the message, and (for an enum) the valid values. */
 function queryErrorResponse(c: Context, err: unknown) {
   if (err instanceof QueryError) {
     return c.json(

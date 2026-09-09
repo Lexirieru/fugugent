@@ -1,8 +1,8 @@
 /**
- * Perkakas bersama untuk test lapisan HTTP.
+ * Shared helpers for the HTTP layer tests.
  *
- * Seluruhnya sintetis dan disuntikkan: tidak ada test di folder ini yang
- * menyentuh jaringan, Postgres, atau RPC sungguhan.
+ * Entirely synthetic and injected: no test in this folder touches a real
+ * network, Postgres, or RPC.
  */
 import type {
   AgentService,
@@ -17,8 +17,8 @@ import type { AgentRecord, AgentSource, Category } from "../../types.js";
 export const FIXED_NOW = "2026-09-08T12:00:00.000Z";
 
 /**
- * Satu `AgentRecord` lengkap — **dengan `fuguListing` berisi `bigint`**.
- * Justru bagian itu yang harus dibuktikan tidak pernah bocor mentah ke kawat.
+ * One complete `AgentRecord` — **with a `fuguListing` holding `bigint`s**.
+ * That is precisely the part that must be proven never to leak raw onto the wire.
  */
 export function makeRecord(overrides: Partial<ListedAgentRecord> = {}): ListedAgentRecord {
   return {
@@ -55,14 +55,14 @@ export function makeRecord(overrides: Partial<ListedAgentRecord> = {}): ListedAg
       starCount: 0,
     },
 
-    classification: { category: "GRID", confidence: 0.9, reason: "kata kunci grid" },
+    classification: { category: "GRID", confidence: 0.9, reason: "grid keyword" },
     fuguListing: {
       listingId: 1n,
       erc8004AgentId: 41n,
       owner: "0x2AA59d5cf540c8f1b1CE4C667C2e745475d4EAd9",
       agentWallet: "0x2AA59d5cf540c8f1b1CE4C667C2e745475d4EAd9",
       category: "GRID",
-      // 12345678 basis 8 desimal = $0,12 — nilai yang tidak boleh pernah lewat `number`.
+      // 12345678 in 8-decimal base = $0.12 — a value that must never pass through a `number`.
       priceUsd8PerPeriod: 12_345_678n,
       periodSeconds: 604_800,
       active: true,
@@ -166,7 +166,7 @@ export function fakeService(options: FakeServiceOptions = {}): FakeService {
   };
 }
 
-/** Halaman kosong-tapi-sehat untuk kategori yang memang tidak berisi apa-apa. */
+/** An empty-but-healthy page for a category that genuinely holds nothing. */
 export function emptyPageFor(source: AgentSource = "seed"): AgentServicePage {
   return makePage({
     items: [],

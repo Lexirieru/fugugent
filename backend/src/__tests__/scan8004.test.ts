@@ -11,7 +11,7 @@ interface Recorded {
   opts?: HttpGetOptions;
 }
 
-/** Klien HTTP palsu — test TIDAK PERNAH menyentuh jaringan sungguhan. */
+/** A fake HTTP client — the tests NEVER touch a real network. */
 function fakeHttp(
   handler: (url: string, opts?: HttpGetOptions) => unknown | Promise<unknown>,
 ): { http: HttpClient; calls: Recorded[] } {
@@ -40,11 +40,11 @@ function configWithoutKey() {
 }
 
 function configWithKey() {
-  return loadConfig({ RPC_URL: "https://rpc.test", SCAN8004_API_KEY: "kunci-rahasia-123" });
+  return loadConfig({ RPC_URL: "https://rpc.test", SCAN8004_API_KEY: "secret-key-123" });
 }
 
 describe("createScan8004Source.listAgents", () => {
-  it("mengirim filter spam is_registered, min_score, dan has_a2a sebagai query sungguhan", async () => {
+  it("sends the is_registered, min_score, and has_a2a spam filters as real query parameters", async () => {
     const { http, calls } = fakeHttp(() => ({ items: [agentItem], total: 1 }));
     const source = createScan8004Source({ http, config: configWithoutKey(), now });
 
@@ -58,7 +58,7 @@ describe("createScan8004Source.listAgents", () => {
     expect(url.pathname).toBe("/api/v1/agents");
   });
 
-  it("memakai chainId dari config dan pagination yang diminta", async () => {
+  it("uses the chainId from the config and the requested pagination", async () => {
     const { http, calls } = fakeHttp(() => ({ items: [], total: 0 }));
     const source = createScan8004Source({ http, config: configWithoutKey(), now });
 
@@ -70,7 +70,7 @@ describe("createScan8004Source.listAgents", () => {
     expect(url.searchParams.get("offset")).toBe("100");
   });
 
-  it("filter yang dioper pemanggil menimpa default, termasuk mematikan filter dengan undefined", async () => {
+  it("caller-supplied filters override the defaults, including turning one off with undefined", async () => {
     const { http, calls } = fakeHttp(() => ({ items: [], total: 0 }));
     const source = createScan8004Source({ http, config: configWithoutKey(), now });
 
@@ -85,7 +85,7 @@ describe("createScan8004Source.listAgents", () => {
     expect(url.searchParams.get("owner_publisher_tier")).toBe("OFFICIAL");
   });
 
-  it("mengulang parameter oasf_skill dan oasf_domain (logika OR upstream)", async () => {
+  it("repeats the oasf_skill and oasf_domain parameters (upstream OR logic)", async () => {
     const { http, calls } = fakeHttp(() => ({ items: [], total: 0 }));
     const source = createScan8004Source({ http, config: configWithoutKey(), now });
 
@@ -98,19 +98,19 @@ describe("createScan8004Source.listAgents", () => {
     expect(url.searchParams.getAll("oasf_domain")).toEqual(["finance"]);
   });
 
-  it("API key dikirim lewat header klien, tidak pernah muncul di URL maupun JSON opsi", async () => {
+  it("the API key is sent through the client header, never appearing in the URL nor in the options JSON", async () => {
     const { http, calls } = fakeHttp(() => ({ items: [], total: 0 }));
     const source = createScan8004Source({ http, config: configWithKey(), now });
 
     await source.listAgents();
 
     const { url, opts } = calls[0]!;
-    expect(url).not.toContain("kunci-rahasia-123");
-    expect(JSON.stringify(opts)).not.toContain("kunci-rahasia-123");
-    expect(opts?.apiKey).toBe("kunci-rahasia-123");
+    expect(url).not.toContain("secret-key-123");
+    expect(JSON.stringify(opts)).not.toContain("secret-key-123");
+    expect(opts?.apiKey).toBe("secret-key-123");
   });
 
-  it("tanpa API key, opsi tidak membawa apiKey sama sekali", async () => {
+  it("without an API key, the options carry no apiKey at all", async () => {
     const { http, calls } = fakeHttp(() => ({ items: [], total: 0 }));
     const source = createScan8004Source({ http, config: configWithoutKey(), now });
 
@@ -118,9 +118,9 @@ describe("createScan8004Source.listAgents", () => {
     expect(calls[0]!.opts?.apiKey).toBeUndefined();
   });
 
-  it("upstream gagal (500 DATABASE_ERROR) menghasilkan daftar kosong, bukan lemparan", async () => {
+  it("an upstream failure (500 DATABASE_ERROR) yields an empty list, not a throw", async () => {
     const { http } = fakeHttp(() => {
-      throw new UpstreamError("upstream membalas status 500", 500, 3);
+      throw new UpstreamError("upstream answered with status 500", 500, 3);
     });
     const source = createScan8004Source({ http, config: configWithKey(), now });
 
@@ -128,12 +128,12 @@ describe("createScan8004Source.listAgents", () => {
     expect(page.items).toEqual([]);
     expect(page.healthy).toBe(false);
     expect(page.reason).toContain("500");
-    expect(page.reason).not.toContain("kunci-rahasia-123");
+    expect(page.reason).not.toContain("secret-key-123");
     expect(page.source).toBe("scan8004");
     expect(page.fetchedAt).toBe(FETCHED_AT.toISOString());
   });
 
-  it("bentuk respons tak dikenal menghasilkan daftar kosong plus sumber tidak sehat", async () => {
+  it("an unknown response shape yields an empty list plus an unhealthy source", async () => {
     const { http } = fakeHttp(() => "<html>502 Bad Gateway</html>");
     const source = createScan8004Source({ http, config: configWithoutKey(), now });
 
@@ -144,7 +144,7 @@ describe("createScan8004Source.listAgents", () => {
 });
 
 describe("createScan8004Source.semanticSearch", () => {
-  it("mengirim q, semantic_weight, dan similarity_threshold sesuai spec", async () => {
+  it("sends q, semantic_weight, and similarity_threshold per the spec", async () => {
     const { http, calls } = fakeHttp(() => ({
       items: [{ ...agentItem, similarity_score: 0.8043 }],
       total: 1,
@@ -162,7 +162,7 @@ describe("createScan8004Source.semanticSearch", () => {
     expect(page.items[0]!.similarityScore).toBeCloseTo(0.8043);
   });
 
-  it("query kosong tidak memanggil upstream sama sekali", async () => {
+  it("an empty query does not call upstream at all", async () => {
     const { http, calls } = fakeHttp(() => ({ items: [] }));
     const source = createScan8004Source({ http, config: configWithoutKey(), now });
 
@@ -174,7 +174,7 @@ describe("createScan8004Source.semanticSearch", () => {
 });
 
 describe("createScan8004Source.getAgent", () => {
-  it("memakai path /agents/{chain_id}/{token_id}", async () => {
+  it("uses the /agents/{chain_id}/{token_id} path", async () => {
     const { http, calls } = fakeHttp(() => agentItem);
     const source = createScan8004Source({ http, config: configWithoutKey(), now });
 
@@ -184,24 +184,24 @@ describe("createScan8004Source.getAgent", () => {
     expect(res.healthy).toBe(true);
   });
 
-  it("404 menghasilkan agent null TANPA menandai sumber sakit", async () => {
-    // Regresi Minor 2.6: agent yang memang tidak ada berarti upstream MENJAWAB
-    // dengan benar. Menandainya tidak sehat mendorong seluruh sistem ke
-    // fallback padahal 8004scan baik-baik saja.
+  it("a 404 yields a null agent WITHOUT marking the source sick", async () => {
+    // Minor 2.6 regression: an agent that genuinely does not exist means upstream
+    // ANSWERED correctly. Marking it unhealthy pushes the whole system into the
+    // fallbacks while 8004scan is perfectly fine.
     const { http } = fakeHttp(() => {
-      throw new UpstreamError("upstream membalas status 404", 404, 1);
+      throw new UpstreamError("upstream answered with status 404", 404, 1);
     });
     const source = createScan8004Source({ http, config: configWithoutKey(), now });
 
     const res = await source.getAgent(97, 1675n);
     expect(res.agent).toBeNull();
     expect(res.healthy).toBe(true);
-    expect(res.reason).toContain("tidak ditemukan");
+    expect(res.reason).toContain("not found");
   });
 
-  it("500 tetap menandai sumber sakit", async () => {
+  it("a 500 still marks the source sick", async () => {
     const { http } = fakeHttp(() => {
-      throw new UpstreamError("upstream membalas status 500", 500, 3);
+      throw new UpstreamError("upstream answered with status 500", 500, 3);
     });
     const source = createScan8004Source({ http, config: configWithoutKey(), now });
 

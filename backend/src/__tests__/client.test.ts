@@ -7,7 +7,7 @@ import {
   withApiKey,
 } from "../http/client.js";
 
-/** Bikin Response palsu tanpa menyentuh jaringan sungguhan. */
+/** Build a fake Response without touching a real network. */
 function fakeResponse(status: number, body: unknown = {}): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -16,7 +16,7 @@ function fakeResponse(status: number, body: unknown = {}): Response {
 }
 
 describe("createHttpClient", () => {
-  it("selalu mengirim header User-Agent browser pada setiap request", async () => {
+  it("always sends a browser User-Agent header on every request", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(fakeResponse(200, { ok: true }));
     const client = createHttpClient({ fetchImpl, now: () => 0 });
 
@@ -27,11 +27,11 @@ describe("createHttpClient", () => {
     const headers = new Headers(init.headers);
     const ua = headers.get("user-agent") ?? "";
     expect(ua.length).toBeGreaterThan(0);
-    // Wajib menyerupai UA browser sungguhan, bukan generic node-fetch/undici.
+    // It must resemble a real browser UA, not a generic node-fetch/undici one.
     expect(ua).toMatch(/Mozilla/i);
   });
 
-  it("me-retry pada 500 lalu berhasil pada percobaan berikutnya", async () => {
+  it("retries on a 500 and then succeeds on the next attempt", async () => {
     const fetchImpl = vi
       .fn()
       .mockResolvedValueOnce(fakeResponse(500, { error: "DATABASE_ERROR" }))
@@ -51,7 +51,7 @@ describe("createHttpClient", () => {
     expect(result.attempts).toBe(2);
   });
 
-  it("tidak me-retry pada 404 — langsung melempar UpstreamError setelah satu percobaan", async () => {
+  it("does not retry on a 404 — it throws an UpstreamError straight after one attempt", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(fakeResponse(404, { error: "not found" }));
     const client = createHttpClient({
       fetchImpl,
@@ -65,7 +65,7 @@ describe("createHttpClient", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it("me-retry pada 429 (rate limit)", async () => {
+  it("retries on a 429 (rate limit)", async () => {
     const fetchImpl = vi
       .fn()
       .mockResolvedValueOnce(fakeResponse(429, { error: "rate limited" }))
@@ -84,7 +84,7 @@ describe("createHttpClient", () => {
     expect(result.data.ok).toBe(true);
   });
 
-  it("me-retry pada kegagalan jaringan (fetch throw) lalu berhasil", async () => {
+  it("retries on a network failure (a throwing fetch) and then succeeds", async () => {
     const fetchImpl = vi
       .fn()
       .mockRejectedValueOnce(new TypeError("network error"))
@@ -103,7 +103,7 @@ describe("createHttpClient", () => {
     expect(result.data.ok).toBe(true);
   });
 
-  it("melempar UpstreamError setelah semua percobaan retry habis pada 5xx terus-menerus", async () => {
+  it("throws an UpstreamError once every retry attempt is spent on a persistent 5xx", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(fakeResponse(503, { error: "down" }));
     const client = createHttpClient({
       fetchImpl,
@@ -117,7 +117,7 @@ describe("createHttpClient", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(3);
   });
 
-  it("membuka circuit breaker setelah N kegagalan berturut-turut dan menolak cepat tanpa memanggil fetch", async () => {
+  it("opens the circuit breaker after N consecutive failures and rejects fast without calling fetch", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(fakeResponse(500, { error: "down" }));
     let currentTime = 0;
     const client = createHttpClient({
@@ -135,7 +135,7 @@ describe("createHttpClient", () => {
     );
     expect(fetchImpl).toHaveBeenCalledTimes(2);
 
-    // Breaker kini terbuka: percobaan ketiga wajib gagal cepat tanpa menyentuh fetchImpl.
+    // The breaker is now open: the third attempt must fail fast without touching fetchImpl.
     fetchImpl.mockClear();
     await expect(
       client.get("https://api.8004scan.io/api/v1/agents"),
@@ -143,7 +143,7 @@ describe("createHttpClient", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("mengizinkan satu percobaan pengintaian setelah cooldown breaker berlalu", async () => {
+  it("allows one probe attempt once the breaker cooldown has elapsed", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(fakeResponse(500, { error: "down" }));
     let currentTime = 0;
     const client = createHttpClient({
@@ -156,14 +156,14 @@ describe("createHttpClient", () => {
     await expect(client.get("https://api.8004scan.io/api/v1/agents")).rejects.toThrow();
     await expect(client.get("https://api.8004scan.io/api/v1/agents")).rejects.toThrow();
 
-    // Breaker terbuka; ini gagal cepat tanpa fetch.
+    // The breaker is open; this fails fast with no fetch.
     fetchImpl.mockClear();
     await expect(client.get("https://api.8004scan.io/api/v1/agents")).rejects.toMatchObject({
       status: 503,
     });
     expect(fetchImpl).not.toHaveBeenCalled();
 
-    // Waktu berlalu melewati cooldown → satu percobaan pengintaian diizinkan.
+    // Time moves past the cooldown → one probe attempt is allowed.
     currentTime = 10_001;
     fetchImpl.mockResolvedValueOnce(fakeResponse(200, { ok: true }));
     const result = await client.get<{ ok: boolean }>(
@@ -172,14 +172,14 @@ describe("createHttpClient", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(result.data.ok).toBe(true);
 
-    // Breaker sudah menutup lagi setelah percobaan pengintaian sukses.
+    // The breaker has closed again after the successful probe attempt.
     fetchImpl.mockClear();
     fetchImpl.mockResolvedValue(fakeResponse(200, { ok: true }));
     await client.get("https://api.8004scan.io/api/v1/agents");
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it("percobaan pengintaian yang gagal membuka kembali breaker untuk cooldown penuh berikutnya", async () => {
+  it("a failed probe attempt reopens the breaker for another full cooldown", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(fakeResponse(500, { error: "down" }));
     let currentTime = 0;
     const client = createHttpClient({
@@ -197,7 +197,7 @@ describe("createHttpClient", () => {
       status: 500,
     });
 
-    // Segera setelah percobaan pengintaian gagal, breaker terbuka lagi — gagal cepat.
+    // Immediately after the probe attempt fails, the breaker is open again — fail fast.
     fetchImpl.mockClear();
     await expect(
       client.get("https://api.8004scan.io/api/v1/agents"),
@@ -205,7 +205,7 @@ describe("createHttpClient", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("timeout menghasilkan UpstreamError, bukan error mentah dari fetch", async () => {
+  it("a timeout produces an UpstreamError, not a raw error from fetch", async () => {
     const fetchImpl = vi.fn().mockImplementation((_url: string, init: RequestInit) => {
       return new Promise((_resolve, reject) => {
         const signal = init.signal as AbortSignal | undefined;
@@ -228,30 +228,30 @@ describe("createHttpClient", () => {
     ).rejects.toBeInstanceOf(UpstreamError);
   }, 1000);
 
-  it("meneruskan API key lewat header X-API-Key bila diberikan, tidak pernah lewat URL", async () => {
+  it("passes the API key through the X-API-Key header when given, never through the URL", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(fakeResponse(200, { ok: true }));
     const client = createHttpClient({ fetchImpl, now: () => 0 });
 
     await client.get("https://api.8004scan.io/api/v1/agents", {
-      apiKey: "rahasia-abc",
+      apiKey: "secret-abc",
     });
 
     const [url, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
-    expect(url).not.toContain("rahasia-abc");
+    expect(url).not.toContain("secret-abc");
     const headers = new Headers(init.headers);
-    expect(headers.get("x-api-key")).toBe("rahasia-abc");
+    expect(headers.get("x-api-key")).toBe("secret-abc");
   });
 
-  it("withApiKey() membuat apiKey non-enumerable, tidak bocor lewat JSON.stringify/console.log", () => {
-    const opts = withApiKey("rahasia-xyz", { timeoutMs: 5000 });
+  it("withApiKey() makes apiKey non-enumerable, so it does not leak through JSON.stringify/console.log", () => {
+    const opts = withApiKey("secret-xyz", { timeoutMs: 5000 });
 
-    expect(opts.apiKey).toBe("rahasia-xyz");
+    expect(opts.apiKey).toBe("secret-xyz");
     expect(opts.timeoutMs).toBe(5000);
-    expect(JSON.stringify(opts)).not.toContain("rahasia-xyz");
+    expect(JSON.stringify(opts)).not.toContain("secret-xyz");
     expect(Object.keys(opts)).not.toContain("apiKey");
   });
 
-  it("userAgent kosong/whitespace tidak bisa mematikan header UA browser — jatuh balik ke default", async () => {
+  it("an empty/whitespace userAgent cannot switch off the browser UA header — it falls back to the default", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(fakeResponse(200, { ok: true }));
     const client = createHttpClient({ fetchImpl, now: () => 0, userAgent: "   " });
 
@@ -264,8 +264,8 @@ describe("createHttpClient", () => {
     expect(ua).toMatch(/Mozilla/i);
   });
 
-  it("body 2xx dengan JSON tidak valid diperlakukan sebagai kegagalan data, bukan kegagalan jaringan — tidak retry, tidak menghitung breaker", async () => {
-    const malformed = new Response("bukan json{{{", {
+  it("a 2xx body with invalid JSON is treated as a data failure, not a network failure — no retry, not counted toward the breaker", async () => {
+    const malformed = new Response("not json{{{", {
       status: 200,
       headers: { "content-type": "application/json" },
     });
@@ -280,12 +280,12 @@ describe("createHttpClient", () => {
     await expect(
       client.get("https://api.8004scan.io/api/v1/agents"),
     ).rejects.toMatchObject({ status: 200, attempts: 1 });
-    // Tidak retry: hanya satu percobaan fetch meski maxAttempts=3.
+    // No retry: only one fetch attempt even though maxAttempts=3.
     expect(fetchImpl).toHaveBeenCalledTimes(1);
 
-    // Tidak menghitung ke breaker: panggilan kedua yang juga gagal (masih di
-    // bawah failureThreshold=2 kalau body-invalid tidak dihitung) tetap
-    // menyentuh upstream, bukan ditolak cepat oleh breaker yang keburu terbuka.
+    // Not counted toward the breaker: a second call that also fails (still below
+    // failureThreshold=2 if an invalid body is not counted) still reaches
+    // upstream, rather than being rejected fast by a breaker that opened early.
     fetchImpl.mockClear();
     await expect(
       client.get("https://api.8004scan.io/api/v1/agents"),
@@ -293,38 +293,38 @@ describe("createHttpClient", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it("breaker menghitung kegagalan per panggilan get() logis (bukan per percobaan retry) — diuji dengan nilai default", async () => {
+  it("the breaker counts failures per logical get() call (not per retry attempt) — tested with the default values", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(fakeResponse(500, { error: "DATABASE_ERROR" }));
     let currentTime = 0;
     const client = createHttpClient({
       fetchImpl,
       now: () => currentTime,
-      // Jumlah percobaan sama seperti default (3); hanya delay yang dinolkan
-      // supaya test cepat — semantik yang diuji tidak bergantung pada delay.
+      // The same attempt count as the default (3); only the delay is zeroed so
+      // the test is fast — the semantics under test do not depend on the delay.
       retry: { maxAttempts: DEFAULT_RETRY.maxAttempts, baseDelayMs: 0 },
       breaker: { failureThreshold: DEFAULT_BREAKER.failureThreshold, cooldownMs: 10_000 },
     });
 
-    // Kalau breaker (keliru) menghitung per percobaan retry: failureThreshold=5
-    // akan tercapai setelah ~2 panggilan (2 x 3 percobaan = 6 >= 5). Buktikan
-    // itu TIDAK terjadi: (failureThreshold - 1) = 4 panggilan gagal dulu,
-    // breaker masih harus tertutup.
+    // If the breaker (wrongly) counted per retry attempt: failureThreshold=5
+    // would be reached after ~2 calls (2 x 3 attempts = 6 >= 5). Prove that does
+    // NOT happen: after (failureThreshold - 1) = 4 failed calls, the breaker must
+    // still be closed.
     for (let i = 0; i < DEFAULT_BREAKER.failureThreshold - 1; i++) {
       await expect(
         client.get("https://api.8004scan.io/api/v1/agents"),
       ).rejects.toBeInstanceOf(UpstreamError);
     }
 
-    // Panggilan ke-(failureThreshold) masih benar-benar mencoba upstream
-    // sebanyak maxAttempts kali — breaker belum terbuka.
+    // Call number (failureThreshold) still genuinely tries upstream maxAttempts
+    // times — the breaker is not open yet.
     fetchImpl.mockClear();
     await expect(
       client.get("https://api.8004scan.io/api/v1/agents"),
     ).rejects.toMatchObject({ status: 500 });
     expect(fetchImpl).toHaveBeenCalledTimes(DEFAULT_RETRY.maxAttempts);
 
-    // Baru sekarang (setelah tepat `failureThreshold` panggilan gagal)
-    // breaker terbuka: panggilan berikutnya gagal cepat tanpa fetch.
+    // Only now (after exactly `failureThreshold` failed calls) does the breaker
+    // open: the next call fails fast with no fetch.
     fetchImpl.mockClear();
     await expect(
       client.get("https://api.8004scan.io/api/v1/agents"),
@@ -332,7 +332,7 @@ describe("createHttpClient", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("mengizinkan TEPAT SATU percobaan pengintaian meski banyak get() dipanggil konkuren tepat saat cooldown lewat (single-flight)", async () => {
+  it("allows EXACTLY ONE probe attempt even when many get() calls arrive concurrently right as the cooldown elapses (single-flight)", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(fakeResponse(500, { error: "down" }));
     let currentTime = 0;
     const client = createHttpClient({
@@ -344,12 +344,12 @@ describe("createHttpClient", () => {
 
     await expect(client.get("https://api.8004scan.io/api/v1/agents")).rejects.toThrow();
     await expect(client.get("https://api.8004scan.io/api/v1/agents")).rejects.toThrow();
-    // Breaker kini terbuka.
+    // The breaker is now open.
 
-    currentTime = 10_001; // cooldown lewat
+    currentTime = 10_001; // the cooldown has elapsed
     fetchImpl.mockClear();
-    // Fetch si pengintai butuh waktu untuk resolve, supaya panggilan get()
-    // konkuren lain sungguh-sungguh tiba SAAT probe masih berjalan.
+    // The prober's fetch needs time to resolve, so the other concurrent get()
+    // calls genuinely arrive WHILE the probe is still running.
     fetchImpl.mockImplementation(
       () =>
         new Promise<Response>((resolve) => {
@@ -365,8 +365,8 @@ describe("createHttpClient", () => {
       client.get("https://api.8004scan.io/api/v1/agents"),
     ]);
 
-    // Tepat satu request sungguhan yang menyentuh upstream — inilah inti
-    // "izinkan satu percobaan pengintaian", diverifikasi di bawah konkurensi.
+    // Exactly one real request reaches upstream — this is the core of "allow one
+    // probe attempt", verified under concurrency.
     expect(fetchImpl).toHaveBeenCalledTimes(1);
 
     const fulfilled = results.filter((r) => r.status === "fulfilled");
@@ -374,10 +374,11 @@ describe("createHttpClient", () => {
       (r): r is PromiseRejectedResult => r.status === "rejected",
     );
 
-    // Si pengintai (satu-satunya yang benar-benar memanggil fetch) berhasil.
-    // Empat pemanggil lain yang tiba selagi probe berjalan ditolak cepat
-    // (bukan menunggu hasil probe) — lihat catatan desain di kepala file
-    // http/client.ts untuk alasan memilih tolak-cepat, bukan berbagi hasil.
+    // The prober (the only one that actually called fetch) succeeded. The four
+    // other callers that arrived while the probe was running are rejected fast
+    // (rather than waiting for the probe's result) — see the design note at the
+    // top of http/client.ts for why reject-fast was chosen over sharing the
+    // result.
     expect(fulfilled).toHaveLength(1);
     expect(rejected).toHaveLength(4);
     for (const r of rejected) {
@@ -385,7 +386,7 @@ describe("createHttpClient", () => {
       expect((r.reason as UpstreamError).status).toBe(503);
     }
 
-    // Breaker sudah menutup lagi (probe sukses) — panggilan berikutnya normal.
+    // The breaker has closed again (the probe succeeded) — the next call is normal.
     fetchImpl.mockClear();
     fetchImpl.mockResolvedValue(fakeResponse(200, { ok: true }));
     await client.get("https://api.8004scan.io/api/v1/agents");

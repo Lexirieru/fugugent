@@ -1,55 +1,55 @@
 /**
- * Cache agent — **tingkat kedua dari empat tingkat fallback**.
+ * The agent cache — **the second of four fallback levels**.
  *
- * Bila 8004scan tumbang, inilah yang menjawab. Karena itu ada tiga janji yang
- * dipegang berkas ini:
+ * When 8004scan is down, this is what answers. Hence the three promises this
+ * file keeps:
  *
- * 1. **Umur data selalu ikut terbawa.** Setiap pembacaan mengembalikan
- *    `ageSeconds`, `oldestFetchedAt`, dan `stale` supaya UI bisa jujur berkata
- *    "data berumur N detik" alih-alih berpura-pura segar. Ini janji produk,
- *    bukan detail teknis — data basi yang ditampilkan sebagai basi masih
- *    berguna; data basi yang menyamar sebagai segar adalah kebohongan.
- * 2. **Penulisan dari satu sumber tidak pernah menghapus apa yang hanya
- *    diketahui sumber lain.** Lihat "Aturan penggabungan" di bawah.
- * 3. **Jalur baca dan jalur pelaporan kesehatan tidak pernah melempar.**
- *    `getCachedAgents`, `getCachedAgent`, `recordSourceHealth`, dan
- *    `getLatestSourceHealth` mengembalikan bentuk yang menyatakan kegagalan.
- *    `/api/health` justru paling dibutuhkan ketika Postgres mati; endpoint itu
- *    tidak boleh ikut mati bersamanya.
+ * 1. **The age of the data always travels with it.** Every read returns
+ *    `ageSeconds`, `oldestFetchedAt`, and `stale` so the UI can honestly say
+ *    "this data is N seconds old" instead of pretending it is fresh. This is a
+ *    product promise, not a technical detail — stale data shown as stale is
+ *    still useful; stale data disguised as fresh is a lie.
+ * 2. **A write from one source never erases what only another source knows.**
+ *    See "Merge rules" below.
+ * 3. **The read path and the health-reporting path never throw.**
+ *    `getCachedAgents`, `getCachedAgent`, `recordSourceHealth`, and
+ *    `getLatestSourceHealth` return a shape that states the failure.
+ *    `/api/health` is needed most precisely when Postgres is down; that
+ *    endpoint must not go down with it.
  *
- *    **Satu-satunya pengecualian adalah `upsertAgents`, yang sengaja melempar**
- *    bila infrastrukturnya gagal. Penulisan yang gagal harus terlihat oleh
- *    scheduler; kalau ia mengembalikan 0 dengan tenang, cache membusuk tanpa
- *    ada yang tahu sampai juri membuka marketplace. Pemanggilnya wajib
- *    membungkus dengan `try` — Task 5/6, ini bagian kalian.
+ *    **The only exception is `upsertAgents`, which throws on purpose** when its
+ *    infrastructure fails. A failed write must be visible to the scheduler; if
+ *    it quietly returned 0, the cache would rot with nobody knowing until the
+ *    judges opened the marketplace. Its callers must wrap it in a `try` —
+ *    Task 5/6, this part is yours.
  *
- * Perhatikan bahwa **umur tidak pernah menjadi alasan menyembunyikan data**.
- * `maxAgeSeconds` hanya menyalakan penanda `stale`; barisnya tetap dikembalikan.
- * Marketplace kosong jauh lebih buruk daripada marketplace yang mengaku basi.
+ * Note that **age is never a reason to hide data**. `maxAgeSeconds` only lights
+ * up the `stale` flag; the rows are still returned. An empty marketplace is far
+ * worse than a marketplace that admits it is stale.
  *
- * ## Aturan penggabungan (kenapa `upsertAgents` tidak sekadar menimpa)
+ * ## Merge rules (why `upsertAgents` does not simply overwrite)
  *
- * Satu agent bisa ditulis oleh dua sumber yang tahu hal berbeda: `onchain` tahu
- * listing `FuguRegistry` (harga, `curated`) tapi namanya cuma `"Agent #49637"`;
- * `scan8004` tahu nama, deskripsi, tag, dan reputasi tapi tidak tahu apa-apa
- * tentang listing kita. Menimpa seluruh kolom membuat penyegaran yang **berhasil**
- * justru menghapus listing first-party kita sendiri — persis sebelum cache ini
- * dibutuhkan sebagai tingkat kedua. Tiga aturan mencegahnya:
+ * One agent can be written by two sources that know different things: `onchain`
+ * knows the `FuguRegistry` listing (price, `curated`) but its name is only
+ * `"Agent #49637"`; `scan8004` knows the name, description, tags, and
+ * reputation but knows nothing about our listing. Overwriting every column
+ * makes a **successful** refresh erase our own first-party listing — right
+ * before this cache is needed as the second level. Three rules prevent that:
  *
- * - **A. `null` berarti "tidak tahu", bukan "tidak ada".** Kolom opsional
- *   (`fugu_*`, `classification_*`, alamat, skor) memakai
+ * - **A. `null` means "don't know", not "doesn't exist".** Optional columns
+ *   (`fugu_*`, `classification_*`, addresses, scores) use
  *   `coalesce(excluded, agents)`.
- * - **B. Teks wajib yang kosong juga berarti "tidak tahu".** `name` dan
- *   `description` memakai `coalesce(nullif(excluded, ''), agents)`.
- * - **C. Sumber yang buta terhadap metadata deskriptif tidak menyentuhnya.**
- *   `onchain` tidak pernah menimpa nama/deskripsi/tag/skill/reputasi/badge milik
- *   baris yang sudah ada — nilainya hanya placeholder. Pada baris **baru** nilai
- *   itu tetap dipakai, karena saat itu memang cuma itu yang kita punya.
+ * - **B. An empty required text field also means "don't know".** `name` and
+ *   `description` use `coalesce(nullif(excluded, ''), agents)`.
+ * - **C. A source blind to descriptive metadata does not touch it.** `onchain`
+ *   never overwrites the name/description/tags/skills/reputation/badges of an
+ *   existing row — its values are only placeholders. On a **new** row those
+ *   values are still used, because at that point they are all we have.
  *
- * Konsekuensi yang harus disadari: dengan aturan A, `fuguListing` tidak bisa
- * dikosongkan lewat `upsertAgents`. Listing yang dicabut ditandai
- * `active: false` oleh `FuguRegistry` (bukan dihapus), jadi jalur itu tetap
- * benar; penghapusan sungguhan butuh `delete` eksplisit.
+ * A consequence to be aware of: under rule A, `fuguListing` cannot be cleared
+ * through `upsertAgents`. A withdrawn listing is marked `active: false` by
+ * `FuguRegistry` (not deleted), so that path stays correct; a real deletion
+ * requires an explicit `delete`.
  */
 import {
   and,
@@ -83,85 +83,85 @@ import {
 } from "./schema.js";
 import { fromAgentRow, toAgentRow } from "./serialize.js";
 
-/** Batas bawaan satu halaman. */
+/** The default page size. */
 export const DEFAULT_LIMIT = 20;
-/** Batas atas keras — melindungi Postgres dari kueri `limit=100000`. */
+/** A hard upper bound — it protects Postgres from a `limit=100000` query. */
 export const MAX_LIMIT = 100;
 /**
- * Ambang bawaan "basi", selaras dengan TTL daftar agent di rencana backend
- * (detail 60 dtk · leaderboard 5 mnt · trending 1 mnt · global 60 dtk).
+ * The default "stale" threshold, aligned with the agent list TTLs in the backend
+ * plan (detail 60 s · leaderboard 5 min · trending 1 min · global 60 s).
  */
 export const DEFAULT_MAX_AGE_SECONDS = 60;
 
 /**
- * Sumber yang **tidak** punya pendapat tentang metadata deskriptif.
+ * Sources that hold **no** opinion about descriptive metadata.
  *
- * `readFuguListings()` menyusun `name: "Agent #<tokenId>"`, `description: ""`,
- * `tags: []` — bukan karena agent-nya memang begitu, tapi karena kontrak tidak
- * menyimpannya. Menganggap itu sebagai pendapat berarti setiap penyegaran
- * on-chain mengganti nama sungguhan dengan placeholder.
+ * `readFuguListings()` builds `name: "Agent #<tokenId>"`, `description: ""`,
+ * `tags: []` — not because the agent really is like that, but because the
+ * contract does not store it. Treating that as an opinion means every on-chain
+ * refresh replaces a real name with a placeholder.
  */
 export const SOURCES_BLIND_TO_DESCRIPTIVE_METADATA: readonly AgentSource[] = ["onchain"];
 
 export interface CachedAgentFilter {
   chainId?: number;
-  /** Salah satu dari empat kategori Fugu — disaring lewat `agent_categories`. */
+  /** One of the four Fugu categories — filtered through `agent_categories`. */
   category?: Category;
-  /** Ambang kepercayaan classifier, 0–1. Hanya berarti bersama `category`. */
+  /** The classifier confidence threshold, 0–1. Only meaningful together with `category`. */
   minConfidence?: number;
-  /** Cocokkan pada nama atau deskripsi, tanpa peduli huruf besar-kecil. */
+  /** Matched against the name or the description, case-insensitively. */
   search?: string;
   onlyActive?: boolean;
-  /** Hanya agent yang punya listing di `FuguRegistry`. */
+  /** Only agents that have a listing in `FuguRegistry`. */
   onlyListed?: boolean;
-  /** Hanya listing yang ditandai kurator. */
+  /** Only listings flagged by a curator. */
   onlyCurated?: boolean;
   minTotalScore?: number;
   limit?: number;
   offset?: number;
-  /** Di atas ini halaman ditandai `stale`. **Tidak** menyaring apa pun. */
+  /** Above this the page is flagged `stale`. It filters **nothing**. */
   maxAgeSeconds?: number;
   orderBy?: "score" | "fetchedAt" | "name";
 }
 
-/** `AgentListPage` plus umur datanya. Selalu `source: "cache"`. */
+/** An `AgentListPage` plus the age of its data. Always `source: "cache"`. */
 export interface CachedAgentPage extends AgentListPage {
-  /** Umur record **tertua** di halaman ini, detik. `null` bila halaman kosong. */
+  /** The age of the **oldest** record on this page, in seconds. `null` when the page is empty. */
   ageSeconds: number | null;
-  /** Umur record termuda di halaman ini, detik. */
+  /** The age of the youngest record on this page, in seconds. */
   freshestAgeSeconds: number | null;
   oldestFetchedAt: string | null;
   newestFetchedAt: string | null;
-  /** `true` bila `ageSeconds` melewati `maxAgeSeconds`. Data tetap dikembalikan. */
+  /** `true` when `ageSeconds` exceeds `maxAgeSeconds`. The data is still returned. */
   stale: boolean;
-  /** Ambang yang dipakai, supaya pemanggil tidak perlu menebak. */
+  /** The threshold that was used, so the caller does not have to guess. */
   maxAgeSeconds: number;
 }
 
-/** `AgentDetailResult` plus umur datanya. */
+/** An `AgentDetailResult` plus the age of its data. */
 export interface CachedAgentResult extends AgentDetailResult {
   ageSeconds: number | null;
   stale: boolean;
   maxAgeSeconds: number;
 }
 
-/** Satu record yang tidak jadi ditulis, beserta alasannya. */
+/** One record that ended up not being written, with the reason. */
 export interface SkippedRecord {
-  /** `` `${chainId}:${tokenId}` `` bila masih bisa dihitung, selain itu `tokenId` mentah. */
+  /** `` `${chainId}:${tokenId}` `` when it can still be computed, otherwise the raw `tokenId`. */
   id: string;
   reason: string;
 }
 
 export interface UpsertOptions {
   /**
-   * Dipanggil untuk tiap record cacat yang dilewati. Sengaja callback dan bukan
-   * nilai balik supaya tanda tangan `upsertAgents` tetap `Promise<number>` bagi
-   * pemanggil yang tidak peduli.
+   * Called for each malformed record that is skipped. Deliberately a callback
+   * rather than a return value so the `upsertAgents` signature stays
+   * `Promise<number>` for callers that do not care.
    */
   onSkipped?: (skipped: SkippedRecord) => void;
 }
 
-/** Umur satu record dalam detik. Tidak pernah negatif walau jam bergeser. */
+/** The age of one record in seconds. Never negative even if the clock shifts. */
 export function agentAgeSeconds(record: AgentRecord, now: Date = new Date()): number {
   return ageOf(new Date(record.fetchedAt), now);
 }
@@ -179,45 +179,45 @@ function clampOffset(offset: number | undefined): number {
   return offset === undefined ? 0 : Math.max(0, Math.trunc(offset));
 }
 
-/** `%` dan `_` di kata kunci pengguna adalah literal, bukan wildcard. */
+/** `%` and `_` in a user's search term are literals, not wildcards. */
 function escapeLike(term: string): string {
   return term.replace(/[\\%_]/g, (char) => `\\${char}`);
 }
 
 // ---------------------------------------------------------------------------
-// Aturan penggabungan per kolom
+// Per-column merge rules
 // ---------------------------------------------------------------------------
 
 type MergeStrategy =
-  /** Penulis terakhir menang. Untuk kolom yang setiap sumber punya pendapatnya. */
+  /** Last writer wins. For columns every source has an opinion about. */
   | "overwrite"
-  /** Aturan A: `null` pada nilai baru berarti "tidak tahu" — nilai lama bertahan. */
+  /** Rule A: a `null` in the incoming value means "don't know" — the old value survives. */
   | "keepOldWhenNull"
-  /** Aturan B: string kosong pada nilai baru juga berarti "tidak tahu". */
+  /** Rule B: an empty string in the incoming value also means "don't know". */
   | "keepOldWhenEmptyText";
 
 interface MergeRule {
   strategy: MergeStrategy;
-  /** Aturan C: kolom ini tidak boleh disentuh sumber yang buta metadata deskriptif. */
+  /** Rule C: this column must not be touched by a source blind to descriptive metadata. */
   descriptive?: true;
 }
 
 /**
- * Aturan untuk **setiap** kolom `agents`.
+ * The rule for **every** `agents` column.
  *
- * Sengaja `Record<keyof AgentRow, …>`: menambah kolom tanpa memutuskan aturannya
- * membuat build gagal. Cacat yang ditemukan review lahir persis dari kolom baru
- * yang diam-diam ikut `excluded.*`.
+ * Deliberately a `Record<keyof AgentRow, …>`: adding a column without deciding
+ * its rule breaks the build. The defect a review once found was born from
+ * exactly that — a new column silently riding along on `excluded.*`.
  */
 const MERGE_RULES: Record<keyof AgentRow, MergeRule> = {
-  // identitas — sama persis di kedua sisi konflik
+  // identity — identical on both sides of a conflict
   id: { strategy: "overwrite" },
   chainId: { strategy: "overwrite" },
   tokenId: { strategy: "overwrite" },
   registryAddress: { strategy: "keepOldWhenNull" },
   agentId: { strategy: "keepOldWhenNull", descriptive: true },
 
-  // metadata deskriptif — hanya sumber yang benar-benar tahu yang boleh menulis
+  // descriptive metadata — only a source that genuinely knows may write it
   name: { strategy: "keepOldWhenEmptyText", descriptive: true },
   description: { strategy: "keepOldWhenEmptyText", descriptive: true },
   imageUrl: { strategy: "keepOldWhenNull", descriptive: true },
@@ -228,32 +228,32 @@ const MERGE_RULES: Record<keyof AgentRow, MergeRule> = {
   domains: { strategy: "overwrite", descriptive: true },
   supportedProtocols: { strategy: "overwrite", descriptive: true },
 
-  // kepemilikan — alamat diketahui kedua sumber, nama pengguna hanya upstream
+  // ownership — the address is known to both sources, the username only to upstream
   ownerAddress: { strategy: "keepOldWhenNull" },
   ownerUsername: { strategy: "keepOldWhenNull", descriptive: true },
   ownerPublisherTier: { strategy: "keepOldWhenNull", descriptive: true },
   agentWallet: { strategy: "keepOldWhenNull" },
 
-  // status — `false` adalah pendapat yang sah, jadi ditimpa…
+  // status — `false` is a legitimate opinion, so it is overwritten…
   isActive: { strategy: "overwrite" },
-  // …kecuali badge kepercayaan, yang tidak diketahui pembaca on-chain
+  // …except the trust badges, which the on-chain reader knows nothing about
   isVerified: { strategy: "overwrite", descriptive: true },
   isEndpointVerified: { strategy: "overwrite", descriptive: true },
   x402Supported: { strategy: "overwrite", descriptive: true },
 
-  // reputasi — seluruhnya milik 8004scan
+  // reputation — entirely 8004scan's
   reputationTotalScore: { strategy: "keepOldWhenNull", descriptive: true },
   reputationHealthScore: { strategy: "keepOldWhenNull", descriptive: true },
   reputationTotalFeedbacks: { strategy: "overwrite", descriptive: true },
   reputationAverageScore: { strategy: "keepOldWhenNull", descriptive: true },
   reputationStarCount: { strategy: "overwrite", descriptive: true },
 
-  // klasifikasi (Task 4) — penulis tanpa klasifikasi tidak menghapus yang lama
+  // classification (Task 4) — a writer with no classification does not erase the old one
   classificationCategory: { strategy: "keepOldWhenNull" },
   classificationConfidence: { strategy: "keepOldWhenNull" },
   classificationReason: { strategy: "keepOldWhenNull" },
 
-  // listing first-party — hanya diketahui pembacaan on-chain
+  // the first-party listing — known only to the on-chain read
   fuguListingId: { strategy: "keepOldWhenNull" },
   fuguErc8004AgentId: { strategy: "keepOldWhenNull" },
   fuguOwner: { strategy: "keepOldWhenNull" },
@@ -265,7 +265,7 @@ const MERGE_RULES: Record<keyof AgentRow, MergeRule> = {
   fuguCurated: { strategy: "keepOldWhenNull" },
   fuguMetadataUri: { strategy: "keepOldWhenNull" },
 
-  // provenance — mencatat penulis terakhir, bukan asal tiap kolom
+  // provenance — records the last writer, not the origin of each column
   source: { strategy: "overwrite" },
   fetchedAt: { strategy: "overwrite" },
   upstreamCreatedAt: { strategy: "keepOldWhenNull", descriptive: true },
@@ -276,7 +276,7 @@ const BLIND_SOURCE_LIST = SOURCES_BLIND_TO_DESCRIPTIVE_METADATA.map(
   (source) => `'${source}'`,
 ).join(", ");
 
-/** Ekspresi `SET` untuk satu kolom pada `ON CONFLICT DO UPDATE`. */
+/** The `SET` expression for one column in `ON CONFLICT DO UPDATE`. */
 function mergeExpression(columnName: string, rule: MergeRule): string {
   const target = `agents."${columnName}"`;
   const incoming = `excluded."${columnName}"`;
@@ -304,31 +304,31 @@ function buildMergeSet(): PgUpdateSetSource<typeof agents> {
 }
 
 // ---------------------------------------------------------------------------
-// Tulis
+// Writes
 // ---------------------------------------------------------------------------
 
 /**
- * Menulis (atau memperbarui) sekumpulan agent ke cache.
+ * Writes (or updates) a set of agents into the cache.
  *
- * **Idempoten**: kunci primernya `id` = `` `${chainId}:${tokenId}` ``, dan
- * konfliknya digabungkan menurut `MERGE_RULES`. Memanggilnya dua kali dengan
- * data yang sama menghasilkan tepat baris yang sama — bukan duplikat, dan tanpa
- * kehilangan apa pun yang ditulis sumber lain (lihat "Aturan penggabungan").
+ * **Idempotent**: the primary key is `id` = `` `${chainId}:${tokenId}` ``, and
+ * conflicts are merged according to `MERGE_RULES`. Calling it twice with the
+ * same data produces exactly the same rows — no duplicates, and without losing
+ * anything another source wrote (see "Merge rules").
  *
- * Klasifikasi ditulis ke `agent_categories`; barisnya dihapus **hanya** untuk id
- * yang membawa klasifikasi baru, sehingga penyegaran dari sumber yang tidak
- * mengklasifikasi apa pun tidak menghapus kategori yang sudah ada.
+ * Classifications are written into `agent_categories`; their rows are deleted
+ * **only** for the ids that carry a new classification, so a refresh from a
+ * source that classifies nothing does not erase existing categories.
  *
- * **Record cacat dilewati, bukan menjatuhkan batch.** `fetchedAt` tidak sah,
- * `tokenId` bukan desimal, atau nilai uang yang tidak muat `numeric(78,0)` hanya
- * membuang record itu sendiri — 19 record sehat lainnya tetap tersimpan. Ini
- * disiplin yang sama dengan normalizer Task 2, dan lapisan yang berjanji "jangan
- * pernah kosong" tidak punya alasan memegang disiplin yang lebih longgar.
+ * **Malformed records are skipped, they do not take the batch down.** An invalid
+ * `fetchedAt`, a non-decimal `tokenId`, or a money value that does not fit
+ * `numeric(78,0)` discards only that record — the other 19 healthy records are
+ * still stored. This is the same discipline as the Task 2 normalizer, and a
+ * layer that promises "never empty" has no reason to hold a looser one.
  *
- * **Melempar** bila infrastrukturnya gagal (Postgres mati, skema hilang) — satu-
- * satunya fungsi di berkas ini yang begitu, dan disengaja: lihat catatan kepala.
+ * **Throws** when its infrastructure fails (Postgres down, schema missing) — the
+ * only function in this file that does, and deliberately so: see the header note.
  *
- * @returns jumlah agent unik yang benar-benar ditulis.
+ * @returns the number of unique agents actually written.
  */
 export async function upsertAgents(
   db: FuguDb,
@@ -350,14 +350,14 @@ export async function upsertAgents(
   }
   if (entries.length === 0) return 0;
 
-  // Postgres menolak dua baris dengan id sama dalam satu pernyataan
-  // `ON CONFLICT DO UPDATE` ("cannot affect row a second time"). Membuang yang
-  // duplikat ("yang terakhir menang") akan menghidupkan kembali cacat yang sama:
-  // satu batch berisi record on-chain **dan** record 8004scan untuk agent yang
-  // sama akan kehilangan salah satunya. Karena itu batch dipecah menjadi
-  // beberapa putaran ber-id unik, dijalankan berurutan di dalam satu transaksi —
-  // sehingga aturan penggabungan di `MERGE_RULES` yang menyatukannya, bukan
-  // logika kedua yang harus dijaga tetap sejalan.
+  // Postgres rejects two rows with the same id in a single
+  // `ON CONFLICT DO UPDATE` statement ("cannot affect row a second time").
+  // Dropping the duplicate ("last one wins") would resurrect the very same
+  // defect: a batch containing both an on-chain record **and** an 8004scan
+  // record for the same agent would lose one of them. So the batch is split
+  // into several rounds with unique ids, run in sequence inside one transaction
+  // — so that the merge rules in `MERGE_RULES` are what unify them, rather than
+  // a second piece of logic that has to be kept in step.
   const rounds: AgentRow[][] = [];
   const seenPerRound: Set<string>[] = [];
   for (const { row } of entries) {
@@ -371,8 +371,8 @@ export async function upsertAgents(
     seenPerRound[index]!.add(row.id);
   }
 
-  // Klasifikasi terakhir yang benar-benar punya pendapat untuk tiap id — sejajar
-  // dengan `coalesce(excluded, agents)` pada kolom `classification_*`.
+  // The last classification that genuinely holds an opinion for each id — in
+  // step with `coalesce(excluded, agents)` on the `classification_*` columns.
   const categoryByKey = new Map<string, typeof agentCategories.$inferInsert>();
   for (const { record, row } of entries) {
     const classification = record.classification;
@@ -408,13 +408,12 @@ export async function upsertAgents(
 }
 
 /**
- * Mencatat status satu sumber data. Riwayat disimpan, bukan ditimpa.
+ * Records the status of one data source. History is kept, not overwritten.
  *
- * Tidak pernah melempar: ini sering dipanggil **dari** jalur penanganan
- * kegagalan, dan kegagalan mencatat kegagalan tidak boleh menimpa kegagalan
- * aslinya.
+ * Never throws: this is often called **from** the failure-handling path, and a
+ * failure to record a failure must not paper over the original failure.
  *
- * @returns `true` bila benar-benar tercatat.
+ * @returns `true` when it really was recorded.
  */
 export async function recordSourceHealth(db: FuguDb, health: SourceHealth): Promise<boolean> {
   try {
@@ -431,12 +430,11 @@ export async function recordSourceHealth(db: FuguDb, health: SourceHealth): Prom
 }
 
 /**
- * Status terakhir tiap sumber — dasar `/api/health`.
+ * The latest status of each source — the basis of `/api/health`.
  *
- * Tidak pernah melempar. Bila cache-nya sendiri yang tidak bisa dibaca, ia
- * melaporkan hal itu sebagai satu entri `source: "cache", healthy: false` —
- * jawaban yang jauh lebih berguna daripada HTTP 500 tanpa penjelasan, tepat
- * ketika pengguna sedang bertanya "apa yang sedang tumbang?".
+ * Never throws. If the cache itself cannot be read, it reports that as a single
+ * `source: "cache", healthy: false` entry — a far more useful answer than an
+ * unexplained HTTP 500, precisely when the user is asking "what is down?".
  */
 export async function getLatestSourceHealth(
   db: FuguDb,
@@ -467,7 +465,7 @@ export async function getLatestSourceHealth(
 }
 
 // ---------------------------------------------------------------------------
-// Baca
+// Reads
 // ---------------------------------------------------------------------------
 
 function buildWhere(db: FuguDb, filter: CachedAgentFilter): SQL | undefined {
@@ -512,17 +510,17 @@ function buildOrderBy(orderBy: CachedAgentFilter["orderBy"]): SQL[] {
     case "name":
       return [asc(agents.name), asc(agents.id)];
     default:
-      // Skor tertinggi dulu; agent tanpa skor turun ke bawah, bukan naik ke atas.
+      // Highest score first; agents with no score sink to the bottom, not float to the top.
       return [sql`${agents.reputationTotalScore} desc nulls last`, asc(agents.id)];
   }
 }
 
 /**
- * Membaca agent dari cache beserta **umur datanya**.
+ * Reads agents from the cache together with **the age of their data**.
  *
- * Tidak pernah melempar: kegagalan Postgres menghasilkan halaman kosong dengan
- * `healthy: false` + `reason`, supaya pemanggil bisa turun ke tingkat fallback
- * berikutnya (baca on-chain, lalu seed terkurasi) tanpa menangkap exception.
+ * Never throws: a Postgres failure produces an empty page with
+ * `healthy: false` + `reason`, so the caller can drop to the next fallback level
+ * (the on-chain read, then the curated seed) without catching an exception.
  */
 export async function getCachedAgents(
   db: FuguDb,
@@ -592,7 +590,7 @@ export async function getCachedAgents(
   }
 }
 
-/** Satu agent dari cache, beserta umur datanya. Tidak pernah melempar. */
+/** A single agent from the cache, with the age of its data. Never throws. */
 export async function getCachedAgent(
   db: FuguDb,
   id: string,
@@ -627,8 +625,8 @@ export async function getCachedAgent(
   }
 }
 
-/** Pesan kegagalan yang aman ditampilkan — tidak pernah memuat kredensial. */
+/** A failure message safe to display — it never contains credentials. */
 function describeError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
-  return `cache Postgres gagal: ${message.replace(/postgres(ql)?:\/\/[^\s]*/gi, "[redacted]")}`;
+  return `Postgres cache failed: ${message.replace(/postgres(ql)?:\/\/[^\s]*/gi, "[redacted]")}`;
 }

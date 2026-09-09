@@ -1,39 +1,40 @@
 # backend — Fugugent
 
-Hono + Postgres (Drizzle) + Redis + BullMQ. TypeScript. Melayani `api.fugugent.xyz`.
+Hono + Postgres (Drizzle) + Redis + BullMQ. TypeScript. Serves `api.fugugent.xyz`.
 
-## Empat tanggung jawab
+## Four responsibilities
 
-1. **BFF / proxy 8004scan** — frontend tidak pernah memanggil 8004scan langsung.
-2. **Indexer ERC-8004 + kontrak Fugu** — `eth_getLogs`, jaring pengaman bila API tumbang.
-3. **Classifier 4 kategori** — semantic search + pre-filter + keyword + LLM, hasil di-cache.
-4. **Scheduler BullMQ** — yang tidak dipunyai BNB Agent Studio; memicu keempat agent.
+1. **8004scan BFF / proxy** — the frontend never calls 8004scan directly.
+2. **ERC-8004 + Fugu contract indexer** — `eth_getLogs`, a safety net when the API is down.
+3. **4-category classifier** — semantic search + pre-filter + keywords + LLM, results cached.
+4. **BullMQ scheduler** — what BNB Agent Studio does not have; it triggers all four agents.
 
-## Aturan ketahanan (ini kriteria juri, bukan nice-to-have)
+## Resilience rules (these are the judging criteria, not nice-to-haves)
 
-- **`User-Agent` browser wajib** pada setiap panggilan 8004scan. Tanpa itu API membalas
-  HTTP 500, bukan 429. Terverifikasi live.
-- **Retry exponential backoff 3–5× + circuit breaker.** Upstream terbukti membalas
-  `500 DATABASE_ERROR` intermiten — 4 dari 5 percobaan gagal saat riset.
-- **Fallback berjenjang:** API → cache Postgres → baca on-chain → seed terkurasi.
-  Marketplace tidak boleh pernah kosong saat juri membukanya.
-- **Cache TTL:** detail agent 60s · leaderboard 5m · trending 1m · global 60s.
-- **Wajib filter spam.** Dari 309k agent BSC mayoritas bulk registration. Gunakan
-  `is_registered=true`, `min_score`, `has_a2a=true`, `owner_publisher_tier`.
+- **A browser `User-Agent` is mandatory** on every 8004scan call. Without it the API
+  answers HTTP 500, not 429. Verified live.
+- **Exponential backoff retry 3–5x + a circuit breaker.** The upstream is proven to answer
+  `500 DATABASE_ERROR` intermittently — 4 out of 5 attempts failed during the research.
+- **Tiered fallback:** API → Postgres cache → on-chain read → curated seed.
+  The marketplace must never be empty when the judges open it.
+- **Cache TTLs:** agent detail 60s · leaderboard 5m · trending 1m · global 60s.
+- **Spam filters are mandatory.** Of the 309k BSC agents the majority are bulk
+  registrations. Use `is_registered=true`, `min_score`, `has_a2a=true`,
+  `owner_publisher_tier`.
 
-## Sumber data
+## Data sources
 
 ```
-8004scan   https://api.8004scan.io/api/v1     (header X-API-Key + User-Agent browser)
+8004scan   https://api.8004scan.io/api/v1     (X-API-Key header + browser User-Agent)
 DefiLlama  https://yields.llama.fi/pools      (chain "BSC")
 RPC        https://data-seed-prebsc-1-s1.bnbchain.org:8545
 ```
 
-`pancakeswap-amm-v3` **tidak** tercakup DefiLlama untuk BSC — fee APR PancakeSwap v3
-harus dihitung sendiri dari event on-chain.
+`pancakeswap-amm-v3` is **not** covered by DefiLlama for BSC — the PancakeSwap v3 fee APR
+has to be computed ourselves from on-chain events.
 
-## Metrik yang dihitung sendiri (pembeda utama produk)
+## Metrics we compute ourselves (the product's main differentiator)
 
-Realized APR 7d/30d · time-in-range % · biaya per rebalance · fee vs profit · max
-drawdown · jarak ke likuidasi % · uptime agent · median latency · biaya rata-rata per run.
-**Setiap angka harus menyertakan tx hash yang bisa diklik.**
+Realized APR 7d/30d · time-in-range % · cost per rebalance · fees vs profit · max
+drawdown · distance to liquidation % · agent uptime · median latency · average cost per run.
+**Every number must come with a clickable tx hash.**

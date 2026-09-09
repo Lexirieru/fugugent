@@ -1,57 +1,57 @@
 /**
- * Layanan agent — **fallback berjenjang empat tingkat**.
+ * The agent service — **the four-level tiered fallback**.
  *
- * Ini lapisan yang membuat kegagalan upstream tidak terlihat oleh pengguna
- * *tanpa berbohong tentangnya*. 8004scan terbukti membalas `500 DATABASE_ERROR`
- * secara intermiten — 4 dari 5 percobaan gagal saat riset. Tanpa berkas ini,
- * marketplace kosong pada empat dari lima kali juri membukanya.
+ * This is the layer that keeps upstream failures invisible to the user *without
+ * lying about them*. 8004scan is proven to answer `500 DATABASE_ERROR`
+ * intermittently — 4 out of 5 attempts failed during the research. Without this
+ * file, the marketplace is empty four out of five times the judges open it.
  *
- * ## Urutan yang mengikat
+ * ## The binding order
  *
  * ```
- * 1. 8004scan            → source: "scan8004"   (segar)
- * 2. cache Postgres      → source: "cache"      (ditandai stale)
- * 3. FuguRegistry on-chain → source: "onchain"  (first-party, tanpa pihak ketiga)
- * 4. seed terkurasi      → source: "seed"       (umur sebenarnya ikut dilaporkan)
+ * 1. 8004scan              → source: "scan8004"  (fresh)
+ * 2. Postgres cache        → source: "cache"     (flagged stale)
+ * 3. on-chain FuguRegistry → source: "onchain"   (first-party, no third party)
+ * 4. curated seed          → source: "seed"      (its real age is reported too)
  * ```
  *
- * Sebuah tingkat diturunkan bila ia **tidak sehat**, **kosong**, **melempar**,
- * atau **tidak dipasang**. Keempat sebab itu punya `outcome` sendiri di
- * {@link FallbackAttempt} sehingga bisa dibedakan saat memeriksa, bukan
- * dilebur jadi "gagal".
+ * A level is dropped when it is **unhealthy**, **empty**, **throws**, or is
+ * **not installed**. All four causes have their own `outcome` in
+ * {@link FallbackAttempt} so they can be told apart while inspecting, rather
+ * than being melted into "failed".
  *
- * ## Dua janji
+ * ## Two promises
  *
- * 1. **Tidak pernah melempar ke pemanggil.** Sumber-sumber di `src/sources/`
- *    dan `src/db/repo.ts` sudah berjanji begitu — dan berkas ini tetap
- *    membungkus setiap panggilan dengan `try/catch`. Janji orang lain bukan
- *    alasan untuk tidak memasang jaring sendiri: yang kita lindungi adalah
- *    halaman marketplace, bukan kerapian lapisan. Diuji per tingkat.
- * 2. **Setiap hasil membawa `source` dan `ageSeconds`.** UI — dan juri — selalu
- *    tahu angka yang dilihat berasal dari mana dan seberapa tua. `degraded` dan
- *    `trail` melengkapinya: `trail` mencatat tiap tingkat yang ditempuh beserta
- *    alasannya, sehingga klaim ketahanan bisa diperiksa alih-alih dipercaya.
+ * 1. **Never throws to the caller.** The sources in `src/sources/` and
+ *    `src/db/repo.ts` already promise that — and this file still wraps every
+ *    call in a `try/catch`. Somebody else's promise is not a reason to skip your
+ *    own net: what we are protecting is the marketplace page, not the tidiness
+ *    of a layer. Tested per level.
+ * 2. **Every result carries `source` and `ageSeconds`.** The UI — and the judges
+ *    — always know where a number came from and how old it is. `degraded` and
+ *    `trail` complete the picture: `trail` records every level attempted along
+ *    with its reason, so the resilience claims can be checked rather than
+ *    trusted.
  *
- * ## Kenapa `DEFAULT_SPAM_FILTERS` yang mengosongkan chain 97 bukan bug
+ * ## Why `DEFAULT_SPAM_FILTERS` emptying chain 97 is not a bug
  *
- * Filter anti-spam bawaan (`is_registered`, `min_score: 10`, `has_a2a`) sangat
- * mungkin menyisakan **nol** agent di testnet. Itu jawaban yang sah dari
- * upstream yang sehat, dan justru alasan tingkat 3 dan 4 ada. Melonggarkan
- * filter untuk "memperbaiki"-nya berarti menukar marketplace kosong dengan
- * marketplace penuh `"Agent #340784"`; yang kedua lebih buruk. Kasus ini
- * punya test sendiri.
+ * The default anti-spam filters (`is_registered`, `min_score: 10`, `has_a2a`)
+ * may well leave **zero** agents on testnet. That is a valid answer from a
+ * healthy upstream, and it is precisely why levels 3 and 4 exist. Loosening the
+ * filters to "fix" it would trade an empty marketplace for a marketplace full of
+ * `"Agent #340784"`; the second is worse. This case has its own test.
  *
- * ## Aturan lain
+ * ## Other rules
  *
- * - **Uang tetap `bigint`.** Tidak ada satu pun konversi ke `number` di sini;
- *   `fuguListing` diteruskan apa adanya. USD berbasis 8 desimal.
- * - **Semua sumber disuntikkan.** Tidak ada test yang menyentuh jaringan atau
- *   Postgres sungguhan.
- * - **Kredensial tidak pernah muncul di keluaran.** Pesan kegagalan dari
- *   sumber mana pun disunting ({@link redact}) sebelum masuk `reason`/`trail`.
- * - **Seed tidak pernah ditulis ke cache.** Kalau ditulis, pembacaan berikutnya
- *   akan melapor `source: "cache"` untuk baris yang sebenarnya seed, dan
- *   provenance yang menjadi seluruh nilai lapisan ini hilang.
+ * - **Money stays a `bigint`.** There is not a single conversion to `number`
+ *   here; `fuguListing` is passed through verbatim. USD is 8-decimal based.
+ * - **Every source is injected.** No test touches a real network or a real
+ *   Postgres.
+ * - **Credentials never appear in the output.** Failure messages from any source
+ *   are redacted ({@link redact}) before entering `reason`/`trail`.
+ * - **The seed is never written to the cache.** If it were, the next read would
+ *   report `source: "cache"` for rows that are actually seed, and the provenance
+ *   that is this layer's entire value would be lost.
  */
 
 import { classify } from "../classify.js";
@@ -89,42 +89,42 @@ import {
 import { createSeedSource, type SeedSource } from "./seed.js";
 
 // ---------------------------------------------------------------------------
-// Bentuk keluaran
+// The output shapes
 // ---------------------------------------------------------------------------
 
-/** Bagaimana satu tingkat fallback berakhir. Empat sebab turun, dibedakan. */
+/** How one fallback level ended. Four causes for dropping, kept distinct. */
 export type FallbackOutcome =
-  /** Menjawab dengan isi. Tingkat berikutnya tidak disentuh. */
+  /** Answered with content. The next level is not touched. */
   | "ok"
-  /** Sehat, tapi tidak ada isinya (mis. filter anti-spam mengosongkan chain 97). */
+  /** Healthy, but with no content (e.g. the anti-spam filters emptying chain 97). */
   | "empty"
-  /** Sumber melapor `healthy: false` — upstream mati, breaker terbuka, bentuk asing. */
+  /** The source reported `healthy: false` — upstream down, breaker open, foreign shape. */
   | "unhealthy"
-  /** Sumber melempar exception walau berjanji tidak. Jaring pengaman kita sendiri. */
+  /** The source threw an exception despite promising not to. Our own safety net. */
   | "threw"
-  /** Tingkat itu tidak dipasang pada instance ini (mis. backend tanpa Postgres). */
+  /** That level is not installed on this instance (e.g. a backend without Postgres). */
   | "unavailable";
 
-/** Satu baris jejak: tingkat apa dicoba, bagaimana hasilnya, kenapa. */
+/** One trail row: which level was tried, how it went, and why. */
 export interface FallbackAttempt {
   source: AgentSource;
   outcome: FallbackOutcome;
-  /** Sudah disunting dari kredensial dan dipotong. `null` bila tidak ada alasan. */
+  /** Already redacted of credentials and truncated. `null` when there is no reason. */
   reason: string | null;
-  /** Jumlah item yang tingkat ini berikan. */
+  /** How many items this level provided. */
   items: number;
   /**
-   * Hanya pada tingkat 8004scan: total yang **upstream** laporkan untuk query
-   * semantic-nya. Ia BUKAN total kategori — classifier di sisi kita yang
-   * membuat kategori — dan karena itu sengaja tidak pernah menjadi `total`
-   * halaman. Disimpan di jejak supaya tetap bisa diperiksa saat menyelidiki
-   * kenapa sebuah kategori tampak sepi, tanpa pernah bisa menjanjikan halaman
-   * yang tidak ada kepada pengguna.
+   * Only on the 8004scan level: the total **upstream** reported for its semantic
+   * query. It is NOT a category total — the classifier on our side is what
+   * creates the categories — and so it deliberately never becomes the page's
+   * `total`. Kept in the trail so it stays inspectable when investigating why a
+   * category looks sparse, without ever being able to promise the user a page
+   * that does not exist.
    */
   upstreamTotal?: number;
 }
 
-/** Halaman agent lengkap dengan provenance-nya. */
+/** A page of agents complete with its provenance. */
 export interface AgentServicePage extends AgentListPage {
   /**
    * Records may carry what their `FuguRegistry` listing declared — a real name
@@ -133,16 +133,16 @@ export interface AgentServicePage extends AgentListPage {
    */
   items: ListedAgentRecord[];
   /**
-   * Jumlah agent kategori ini yang **benar-benar bisa dipertanggungjawabkan** —
-   * bukan total upstream.
+   * The number of agents in this category we can **genuinely account for** — not
+   * the upstream total.
    *
-   * Pada tingkat 8004scan, total yang dikembalikan upstream adalah total hasil
-   * **query semantic**, bukan total kategori: kategori dibuat oleh classifier
-   * di sisi kita. Melaporkannya di sini akan menjanjikan "4.812 agent Grid"
-   * sementara halaman ketiga sudah kosong — dan juri cukup menekan "next page"
-   * untuk menemukannya. Angka upstream tetap terbawa di
-   * {@link FallbackAttempt.upstreamTotal} pada `trail`, tempat ia jadi bahan
-   * penyelidikan alih-alih janji.
+   * At the 8004scan level, the total upstream returns is the total of the
+   * **semantic query**, not of the category: the categories are created by the
+   * classifier on our side. Reporting it here would promise "4,812 Grid agents"
+   * while the third page is already empty — and the judges need only press
+   * "next page" to find that out. The upstream number still travels in
+   * {@link FallbackAttempt.upstreamTotal} on `trail`, where it is material for
+   * an investigation rather than a promise.
    */
   total: number;
   /**
@@ -169,11 +169,11 @@ export interface AgentServicePage extends AgentListPage {
    * the page and whether the overlay could be read at all.
    */
   firstParty?: FirstPartyReport;
-  /** Umur item **tertua** di halaman ini, detik. `null` bila kosong. */
+  /** The age of the **oldest** item on this page, in seconds. `null` when empty. */
   ageSeconds: number | null;
-  /** `true` bila data tidak bisa dipastikan segar (cache, seed, atau lewat TTL). */
+  /** `true` when the data cannot be confirmed fresh (cache, seed, or past its TTL). */
   stale: boolean;
-  /** `true` bila bukan dari 8004scan — marketplace sedang berjalan dengan jaring pengaman. */
+  /** `true` when not from 8004scan — the marketplace is running on the safety net. */
   degraded: boolean;
   maxAgeSeconds: number;
   trail: FallbackAttempt[];
@@ -206,7 +206,7 @@ export interface FirstPartyReport {
   unreadableMetadata?: number;
 }
 
-/** Satu agent lengkap dengan provenance-nya. */
+/** A single agent complete with its provenance. */
 export interface AgentServiceDetail extends AgentDetailResult {
   /** See {@link AgentServicePage.items} — may carry listing metadata. */
   agent: ListedAgentRecord | null;
@@ -220,82 +220,84 @@ export interface AgentServiceDetail extends AgentDetailResult {
 }
 
 /**
- * Ringkasan kesehatan untuk `/api/health` — jujur ke juri, bukan selalu hijau.
+ * The health summary for `/api/health` — honest with the judges, not always
+ * green.
  *
- * `healthy` dan `degraded` sengaja dua boolean terpisah, karena tiga keadaan
- * yang perlu dibedakan tidak muat di satu:
+ * `healthy` and `degraded` are deliberately two separate booleans, because the
+ * three states that need distinguishing do not fit in one:
  *
- * | `healthy` | `degraded` | Artinya |
+ * | `healthy` | `degraded` | Meaning |
  * |---|---|---|
- * | `true`  | `false` | melayani langsung dari 8004scan |
- * | `true`  | `true`  | 8004scan tumbang, masih ada sumber data sungguhan (cache / on-chain) |
- * | `false` | `true`  | **tidak ada sumber sungguhan yang menjawab** — yang tersisa hanya seed |
+ * | `true`  | `false` | serving directly from 8004scan |
+ * | `true`  | `true`  | 8004scan is down, a real data source remains (cache / on-chain) |
+ * | `false` | `true`  | **no real source is answering** — only the seed is left |
  */
 export interface ServiceHealth {
   /**
-   * Ada bukti bahwa minimal satu **sumber data sungguhan** — 8004scan, cache
-   * Postgres, atau pembacaan on-chain — bekerja saat ini.
+   * There is evidence that at least one **real data source** — 8004scan, the
+   * Postgres cache, or the on-chain read — is working right now.
    *
-   * **Seed tidak dihitung.** Seed adalah berkas di dalam bundel; ia tidak bisa
-   * mati, jadi memasukkannya membuat field ini konstan `true` dan menghapus
-   * seluruh guna `/api/health`: juri akan mematikan 8004scan dan melihat lampu
-   * tetap hijau, yang terbaca sebagai menutupi. Seed tetap muncul di `sources`
-   * (berguna: jaring pengamannya utuh), hanya tidak ikut menentukan nilai ini.
+   * **The seed does not count.** The seed is a file inside the bundle; it cannot
+   * die, so including it would make this field a constant `true` and destroy the
+   * entire point of `/api/health`: the judges would take 8004scan down and see
+   * the light stay green, which reads as a cover-up. The seed still appears in
+   * `sources` (usefully: its safety net is intact), it just does not get to
+   * determine this value.
    *
-   * Tanpa observasi apa pun — misalnya sesaat setelah boot — nilainya `false`.
-   * Tidak adanya bukti sehat bukan bukti sehat; monitor yang membunyikan alarm
-   * pada keadaan belum-diketahui berperilaku benar.
+   * With no observations at all — for instance just after boot — the value is
+   * `false`. The absence of evidence of health is not evidence of health; a
+   * monitor that raises the alarm in the not-yet-known state is behaving
+   * correctly.
    */
   healthy: boolean;
-  /** 8004scan diketahui tidak sehat — marketplace berjalan dari jaring pengaman. */
+  /** 8004scan is known to be unhealthy — the marketplace is running from the safety net. */
   degraded: boolean;
-  /** Tiap baris membawa umur observasinya; lihat {@link ObservedSourceHealth}. */
+  /** Each row carries the age of its observation; see {@link ObservedSourceHealth}. */
   sources: ObservedSourceHealth[];
   checkedAt: string;
 }
 
 /**
- * Sumber data sungguhan — yang bisa benar-benar tumbang, dan karena itu yang
- * menentukan `ServiceHealth.healthy`. Seed sengaja tidak termasuk.
+ * The real data sources — the ones that can genuinely go down, and therefore the
+ * ones that determine `ServiceHealth.healthy`. The seed is deliberately excluded.
  */
 export const LIVE_SOURCES: readonly AgentSource[] = ["scan8004", "cache", "onchain"];
 
 /**
- * Satu observasi kesehatan, **beserta umurnya**.
+ * One health observation, **together with its age**.
  *
- * Field umur sengaja opsional agar `SourceHealth` polos tetap bisa dipakai di
- * mana pun `ServiceHealth` dibentuk (mis. fixture rute). Layanan ini selalu
- * mengisi keduanya, dan `reason` juga mengeja umurnya dalam kalimat — supaya
- * pembaca yang mengabaikan field opsional pun tidak bisa salah membaca.
+ * The age fields are deliberately optional so a plain `SourceHealth` can still
+ * be used anywhere `ServiceHealth` is constructed (e.g. a route fixture). This
+ * service always fills in both, and `reason` also spells the age out in a
+ * sentence — so even a reader who ignores the optional fields cannot misread it.
  */
 export interface ObservedSourceHealth extends SourceHealth {
-  /** Umur observasi dalam detik saat `/api/health` dipanggil. */
+  /** The observation's age in seconds at the moment `/api/health` was called. */
   ageSeconds?: number | null;
-  /** `true` bila observasinya melewati {@link DEFAULT_HEALTH_TTL_SECONDS}. */
+  /** `true` when the observation is past {@link DEFAULT_HEALTH_TTL_SECONDS}. */
   stale?: boolean;
 }
 
 /**
- * Berapa lama sebuah observasi kesehatan masih boleh dipercaya.
+ * How long a health observation may still be trusted.
  *
- * 30 detik: cukup panjang agar halaman yang ramai tidak terus-menerus
- * melaporkan "belum diperiksa", cukup pendek agar jendela antara sebuah sumber
- * mati dan `/api/health` mengakuinya tidak pernah selebar satu tarikan napas
- * juri. 8004scan dan pembacaan on-chain sengaja TIDAK diprobe di endpoint ini —
- * probe jaringan di jalur `/api/health` adalah cara paling pasti membuat
- * endpoint kesehatan ikut menggantung saat upstream menggantung. Untuk keduanya
- * kita memakai kedaluwarsa; untuk cache kita punya probe gratis.
+ * 30 seconds: long enough that a busy page does not constantly report "not
+ * checked yet", short enough that the window between a source dying and
+ * `/api/health` admitting it is never as wide as one breath of a judge's
+ * attention. 8004scan and the on-chain read are deliberately NOT probed on this
+ * endpoint — a network probe on the `/api/health` path is the surest way to make
+ * the health endpoint hang along with a hanging upstream. For those two we use
+ * expiry; for the cache we have a free probe.
  */
 export const DEFAULT_HEALTH_TTL_SECONDS = 30;
 
 /**
- * Beri umur pada sebuah observasi, dan **cabut klaim sehatnya bila kedaluwarsa**.
+ * Give an observation its age, and **withdraw its health claim once expired**.
  *
- * Observasi basi yang tetap berkata "sehat" adalah bentuk kebohongan yang paling
- * halus di endpoint ini: ia benar pada saat dicatat dan salah pada saat dibaca.
- * Yang dilaporkan setelah kedaluwarsa bukan "rusak" melainkan "belum diperiksa
- * ulang" — dan status terakhir yang diketahui tetap disebutkan, supaya tidak ada
- * informasi yang hilang.
+ * A stale observation still saying "healthy" is the subtlest form of lying on
+ * this endpoint: it was true when it was recorded and false when it is read.
+ * What is reported after expiry is not "broken" but "not re-checked yet" — and
+ * the last known status is still named, so no information is lost.
  */
 export function observe(
   health: SourceHealth,
@@ -309,15 +311,15 @@ export function observe(
   const ageSeconds = Math.max(0, Math.floor((at.getTime() - parsed) / 1000));
   if (ageSeconds <= ttlSeconds) return { ...health, ageSeconds, stale: false };
 
-  const last = health.healthy ? "sehat" : "tidak sehat";
+  const last = health.healthy ? "healthy" : "unhealthy";
   return {
     source: health.source,
-    // Kedaluwarsa tidak boleh mengklaim sehat. Tidak adanya pemeriksaan baru
-    // bukan bukti bahwa sumbernya masih hidup.
+    // An expired observation must not claim health. The absence of a fresh check
+    // is not evidence that the source is still alive.
     healthy: false,
     reason:
-      `observasi berumur ${ageSeconds} dtk, melewati ambang ${ttlSeconds} dtk — ` +
-      `belum diperiksa ulang (status terakhir: ${last}` +
+      `observation is ${ageSeconds} s old, past the ${ttlSeconds} s threshold — ` +
+      `not re-checked yet (last known status: ${last}` +
       `${health.reason ? `, ${health.reason}` : ""})`,
     checkedAt: health.checkedAt,
     ageSeconds,
@@ -326,49 +328,49 @@ export function observe(
 }
 
 // ---------------------------------------------------------------------------
-// Port
+// Ports
 // ---------------------------------------------------------------------------
 
-/** Halaman cache: `AgentListPage` plus umur. Dipenuhi `CachedAgentPage` dari repo. */
+/** A cache page: `AgentListPage` plus age. Satisfied by the repo's `CachedAgentPage`. */
 export interface CachedPage extends AgentListPage {
   ageSeconds: number | null;
   stale: boolean;
 }
 
-/** Detail cache: `AgentDetailResult` plus umur. */
+/** A cache detail: `AgentDetailResult` plus age. */
 export interface CachedDetail extends AgentDetailResult {
   ageSeconds: number | null;
 }
 
 /**
- * Cache sebagai port, bukan sebagai `FuguDb` langsung.
+ * The cache as a port, rather than as a `FuguDb` directly.
  *
- * Alasannya bukan kerapian: seluruh test tingkat 2 berjalan tanpa Postgres,
- * dan backend yang belum punya database tetap bisa menyalakan layanan ini
- * dengan tingkat 2 berstatus `unavailable` alih-alih gagal boot.
+ * The reason is not tidiness: every level-2 test runs without Postgres, and a
+ * backend that has no database yet can still start this service with level 2
+ * marked `unavailable` instead of failing to boot.
  */
 export interface AgentCachePort {
   getAgents(filter: CachedAgentFilter, now: Date): Promise<CachedPage>;
   getAgent(id: string, now: Date): Promise<CachedDetail>;
-  /** Tulis-balik hasil segar. Kegagalannya tidak pernah menjatuhkan permintaan. */
+  /** Write-back of fresh results. Its failure never takes a request down. */
   saveAgents(records: AgentRecord[]): Promise<number>;
   recordHealth(health: SourceHealth): Promise<void>;
   latestHealth(): Promise<SourceHealth[]>;
 }
 
-/** Adapter tipis dari `src/db/repo.ts`. Semua logika ada di repo, bukan di sini. */
+/** A thin adapter over `src/db/repo.ts`. All the logic lives in the repo, not here. */
 export function createDbAgentCache(db: FuguDb): AgentCachePort {
   return {
     getAgents: (filter, now) => getCachedAgents(db, filter, now),
     getAgent: (id, now) => getCachedAgent(db, id, now),
-    // `upsertAgents` sengaja MELEMPAR bila infrastrukturnya gagal (lihat repo.ts):
-    // penulisan yang gagal harus terlihat. Yang membungkusnya adalah `writeThrough`
-    // di bawah, supaya kegagalan menyimpan salinan tidak pernah mengubah apa yang
-    // sudah diterima pemanggil.
+    // `upsertAgents` deliberately THROWS when its infrastructure fails (see
+    // repo.ts): a failed write must be visible. What wraps it is `writeThrough`
+    // below, so a failure to store a copy never changes what the caller has
+    // already received.
     saveAgents: (records) => upsertAgents(db, records),
-    // `recordSourceHealth` mengembalikan `boolean` (berhasil atau tidak) dan tidak
-    // melempar. Port ini tidak peduli: mencatat kesehatan adalah efek samping,
-    // bukan bagian dari jawaban yang dilayani.
+    // `recordSourceHealth` returns a `boolean` (whether it succeeded) and does
+    // not throw. This port does not care: recording health is a side effect, not
+    // part of the answer being served.
     recordHealth: async (health) => {
       await recordSourceHealth(db, health);
     },
@@ -377,17 +379,17 @@ export function createDbAgentCache(db: FuguDb): AgentCachePort {
 }
 
 // ---------------------------------------------------------------------------
-// Konstanta
+// Constants
 // ---------------------------------------------------------------------------
 
 /**
- * Query semantic per kategori (spec §6.1).
+ * The per-category semantic query (spec §6.1).
  *
- * Ditulis dalam bahasa Inggris karena korpus 8004scan berbahasa Inggris, dan
- * memakai frasa yang membedakan — bukan kata telanjang seperti `grid` atau
- * `yield`, yang di data nyata jauh lebih sering berarti hal lain (lihat catatan
- * jebakan di `classify.ts`). Hasilnya tetap disaring ulang oleh classifier
- * deterministik: semantic search menyempitkan populasi, classifier yang memutus.
+ * Written in English because the 8004scan corpus is English, and using
+ * discriminating phrases — not bare words like `grid` or `yield`, which in real
+ * data far more often mean something else (see the trap notes in `classify.ts`).
+ * The results are still re-filtered by the deterministic classifier: semantic
+ * search narrows the population, the classifier decides.
  */
 export const CATEGORY_SEMANTIC_QUERIES: Readonly<Record<Category, string>> = {
   REBALANCING:
@@ -401,57 +403,56 @@ export const CATEGORY_SEMANTIC_QUERIES: Readonly<Record<Category, string>> = {
 };
 
 /**
- * Anggaran waktu untuk tingkat 1–3 pada satu permintaan.
+ * The time budget for levels 1–3 on one request.
  *
- * Ini menjawab temuan compose: `/api/agents` memakan **31 detik** saat upstream
- * menggantung (timeout 10 dtk x 3 percobaan x 4 kategori). Produk yang menjual
- * "marketplace tidak pernah kosong" tidak boleh berarti "tidak pernah kosong,
- * setelah tiga puluh satu detik" — juri menutup tab sebelum buktinya muncul.
+ * This answers the compose finding: `/api/agents` took **31 seconds** while
+ * upstream was hanging (10 s timeout x 3 attempts x 4 categories). A product
+ * that sells "the marketplace is never empty" must not mean "never empty, after
+ * thirty-one seconds" — the judges close the tab before the proof arrives.
  *
- * 6 detik dipilih dengan dua batas: **di atas** balasan 8004scan yang sehat
- * walau lambat (upstream yang bekerja tidak boleh ditinggalkan), dan **di bawah**
- * satu timeout percobaan klien HTTP (10 dtk), sehingga rantai retry tidak pernah
- * sempat dibayar oleh pengguna. Yang menunggu bukan lagi pengguna melainkan
- * jaring pengaman, yang sudah siap.
+ * 6 seconds was chosen between two bounds: **above** a healthy but slow 8004scan
+ * response (a working upstream must not be abandoned), and **below** a single
+ * HTTP client attempt timeout (10 s), so the retry chain is never paid for by
+ * the user. What waits is no longer the user but the safety net, which is
+ * already standing by.
  *
- * Anggaran ini berlaku **hanya untuk tingkat 1**. Anggaran bersama untuk keempat
- * tingkat sempat dicoba dan salah arah: tingkat 1 yang menggantung menghabiskan
- * seluruh jatah, lalu cache dan on-chain ditolak sebelum sempat menjawab — jaring
- * pengaman kelaparan justru pada saat ia paling dibutuhkan. Tingkat 2 dan 3 punya
- * anggarannya sendiri, jauh lebih kecil karena keduanya lokal.
+ * This budget applies to **level 1 only**. A shared budget across all four
+ * levels was tried and pointed the wrong way: a hanging level 1 consumed the
+ * whole allowance, then the cache and the on-chain read were refused before they
+ * could answer — the safety net starved at the very moment it was needed most.
+ * Levels 2 and 3 have their own budget, far smaller because both are local.
  *
- * Catatan jujur: permintaan yang ditinggalkan **tidak dibatalkan** — sumber di
- * `src/sources/` tidak menerima `AbortSignal`. Ia tetap berjalan di latar dan
- * kegagalannya nanti justru berguna: ia memberi makan circuit breaker klien HTTP.
+ * An honest note: an abandoned request is **not cancelled** — the sources in
+ * `src/sources/` do not accept an `AbortSignal`. It keeps running in the
+ * background, and its eventual failure is actually useful: it feeds the HTTP
+ * client's circuit breaker.
  */
 export const DEFAULT_BUDGET_MS = 6_000;
 
 /**
- * Berapa lama tingkat 1 dilewati setelah ia gagal sekali.
+ * How long level 1 is skipped after it fails once.
  *
- * Tanpa ini, satu tampilan halaman marketplace (empat kategori) membayar
- * anggaran waktu **empat kali**. Circuit breaker klien HTTP tidak menolong di
- * sini: ambangnya 5 panggilan `get()` gagal berturut-turut, sementara satu
- * render hanya melakukan empat — ia baru membuka setelah pengguna terlanjur
- * menunggu. Breaker klien itu melindungi *upstream* dari kita; gerbang di sini
- * melindungi *pengguna* dari menunggu, dan hanya lapisan ini yang tahu bahwa
- * jawaban pengganti sudah tersedia. Karena itu ambangnya satu kegagalan, bukan
- * lima: begitu kita tahu ada jaring, mencoba lagi tiga kali hanya membakar waktu
- * orang lain.
+ * Without this, one marketplace page view (four categories) pays the time budget
+ * **four times**. The HTTP client's circuit breaker does not help here: its
+ * threshold is 5 consecutive failed `get()` calls, while a single render makes
+ * only four — it opens only after the user has already waited. That client
+ * breaker protects *upstream* from us; the gate here protects *the user* from
+ * waiting, and only this layer knows that a substitute answer is already
+ * available. Hence a threshold of one failure, not five: once we know there is a
+ * net, trying three more times only burns someone else's time.
  *
- * Setelah cooldown lewat, **satu** permintaan berikutnya boleh mengintai
- * upstream lagi (half-open), sama seperti pola klien HTTP.
+ * Once the cooldown elapses, **one** subsequent request may probe upstream again
+ * (half-open), the same pattern as the HTTP client.
  */
 export const DEFAULT_UPSTREAM_COOLDOWN_MS = 30_000;
 
 /**
- * Anggaran waktu untuk tingkat 2 (Postgres) dan tingkat 3 (RPC), masing-masing.
+ * The time budget for level 2 (Postgres) and level 3 (RPC), each.
  *
- * Jauh lebih kecil daripada anggaran upstream karena keduanya seharusnya
- * menjawab dalam milidetik: Postgres satu kueri terindeks, RPC beberapa
- * `eth_call`. Kalau salah satunya butuh lebih dari 2 detik, ia sedang bermasalah
- * dan menunggunya lebih lama tidak akan mengubah itu — sementara tingkat di
- * bawahnya siap menjawab seketika.
+ * Far smaller than the upstream budget because both should answer in
+ * milliseconds: Postgres one indexed query, RPC a handful of `eth_call`s. If
+ * either needs more than 2 seconds it is in trouble, and waiting longer will not
+ * change that — while the level below it is ready to answer instantly.
  */
 export const DEFAULT_LOCAL_BUDGET_MS = 2_000;
 
@@ -469,17 +470,17 @@ export const DEFAULT_FIRST_PARTY_TTL_MS = 15_000;
 
 export const DEFAULT_PAGE_LIMIT = 20;
 export const MAX_PAGE_LIMIT = 100;
-/** Panjang maksimum sebuah `reason`. Log bukan tempat menumpuk stack trace viem. */
+/** The maximum length of a `reason`. Logs are not a place to pile up viem stack traces. */
 export const MAX_REASON_LENGTH = 400;
 
 // ---------------------------------------------------------------------------
-// Penyuntingan kredensial
+// Credential redaction
 // ---------------------------------------------------------------------------
 
 /**
- * Pola kredensial yang pernah benar-benar bocor lewat pesan error klien HTTP:
- * URL yang membawa `api_key=`, dan header `Authorization: Bearer …` yang ikut
- * dicetak beberapa pustaka saat request gagal.
+ * Credential patterns that have genuinely leaked through HTTP client error
+ * messages: URLs carrying `api_key=`, and the `Authorization: Bearer …` header
+ * that some libraries print along with a failed request.
  */
 const SECRET_PATTERNS: readonly [RegExp, string][] = [
   [/((?:x-)?api[-_]?key)["']?\s*[=:]\s*["']?[^\s&"',;)]+/gi, "$1=[redacted]"],
@@ -487,31 +488,31 @@ const SECRET_PATTERNS: readonly [RegExp, string][] = [
   [/\btoken["']?\s*[=:]\s*["']?[^\s&"',;)]+/gi, "token=[redacted]"],
 ];
 
-/** Sunting kredensial lalu potong. Dipakai untuk SETIAP `reason` yang kita keluarkan. */
+/** Redact credentials, then truncate. Used for EVERY `reason` we emit. */
 export function redact(message: string): string {
   let out = message;
   for (const [pattern, replacement] of SECRET_PATTERNS) out = out.replace(pattern, replacement);
   return out.length > MAX_REASON_LENGTH ? `${out.slice(0, MAX_REASON_LENGTH - 3)}...` : out;
 }
 
-/** Ditolak karena anggaran waktu permintaan habis, bukan karena sumbernya menjawab salah. */
+/** Rejected because the request's time budget ran out, not because the source answered wrongly. */
 export class BudgetExceeded extends Error {
   readonly waitedMs: number;
   constructor(source: AgentSource, waitedMs: number) {
-    super(`${source} melewati anggaran waktu ${waitedMs} ms`);
+    super(`${source} exceeded its ${waitedMs} ms time budget`);
     this.name = "BudgetExceeded";
     this.waitedMs = waitedMs;
   }
 }
 
 /**
- * Jalankan sebuah tingkat dengan batas waktu.
+ * Run a level under a deadline.
  *
- * Bila batasnya lewat, yang dikembalikan adalah penolakan — **bukan pembatalan**:
- * `work` tetap berjalan di latar karena sumber di `src/sources/` tidak menerima
- * `AbortSignal`. Itu disengaja dan tidak disembunyikan: yang ingin kita bebaskan
- * adalah pengguna dari menunggu, dan kegagalan permintaan latar itu nanti justru
- * memberi makan circuit breaker klien HTTP.
+ * When the deadline passes, what is returned is a rejection — **not a
+ * cancellation**: `work` keeps running in the background because the sources in
+ * `src/sources/` do not accept an `AbortSignal`. That is deliberate and not
+ * hidden: what we want to free is the user from waiting, and the eventual failure
+ * of that background request actually feeds the HTTP client's circuit breaker.
  */
 function withDeadline<T>(work: Promise<T>, ms: number, source: AgentSource): Promise<T> {
   if (ms <= 0) return Promise.reject(new BudgetExceeded(source, 0));
@@ -519,44 +520,44 @@ function withDeadline<T>(work: Promise<T>, ms: number, source: AgentSource): Pro
   const expiry = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new BudgetExceeded(source, ms)), ms);
   });
-  // `work` yang menolak setelah race selesai tidak boleh jadi unhandled rejection.
+  // A `work` that rejects after the race has settled must not become an unhandled rejection.
   work.catch(() => undefined);
   return Promise.race([work, expiry]).finally(() => {
     if (timer !== undefined) clearTimeout(timer);
   }) as Promise<T>;
 }
 
-/** Pesan kegagalan yang aman untuk `reason` — juga saat yang dilempar bukan `Error`. */
+/** A failure message safe for `reason` — including when what was thrown is not an `Error`. */
 function describeThrow(err: unknown): string {
   if (err instanceof Error) {
     const firstLine = err.message.split("\n")[0] ?? err.message;
     return redact(`${err.name}: ${firstLine}`);
   }
-  return redact(`kegagalan tak dikenal: ${String(err)}`);
+  return redact(`unknown failure: ${String(err)}`);
 }
 
 // ---------------------------------------------------------------------------
-// Layanan
+// The service
 // ---------------------------------------------------------------------------
 
 export interface GetAgentsOptions {
   limit?: number;
   offset?: number;
-  /** Di atas ini hasil ditandai `stale`. Tidak pernah menyaring apa pun. */
+  /** Above this the result is flagged `stale`. It never filters anything. */
   maxAgeSeconds?: number;
 }
 
 export interface AgentServiceDeps {
   scan8004: Scan8004Source;
-  /** Tingkat 2. Tanpa ini tingkat 2 berstatus `unavailable`, bukan gagal. */
+  /** Level 2. Without it level 2 is marked `unavailable`, not failed. */
   cache?: AgentCachePort;
-  /** Tingkat 3. Tanpa ini tingkat 3 berstatus `unavailable`. */
+  /** Level 3. Without it level 3 is marked `unavailable`. */
   onchain?: OnchainSource;
-  /** Tingkat 4. Bawaannya seed terkurasi bawaan repo. */
+  /** Level 4. Defaults to the repo's built-in curated seed. */
   seed?: SeedSource;
   chainId?: number;
   now?: () => Date;
-  /** Berapa banyak listing on-chain dibaca sekaligus sebelum disaring per kategori. */
+  /** How many on-chain listings are read at once before being filtered per category. */
   onchainScanLimit?: number;
   /** How long a `FuguRegistry` read is held before refreshing. */
   firstPartyTtlMs?: number;
@@ -566,15 +567,15 @@ export interface AgentServiceDeps {
    * always be visible.
    */
   firstPartyOverlay?: boolean;
-  /** Tulis hasil tiap tingkat ke tabel `source_health`. Bawaan `true`. */
+  /** Write each level's outcome to the `source_health` table. Defaults to `true`. */
   persistHealth?: boolean;
-  /** Umur maksimum observasi kesehatan yang masih boleh mengklaim sehat. */
+  /** The maximum age at which a health observation may still claim health. */
   healthTtlSeconds?: number;
-  /** Anggaran waktu tingkat 1 (upstream). Seed tidak pernah dibatasi. */
+  /** The level-1 (upstream) time budget. The seed is never bounded. */
   budgetMs?: number;
-  /** Anggaran waktu tingkat 2 dan 3, masing-masing. */
+  /** The time budget for levels 2 and 3, each. */
   localBudgetMs?: number;
-  /** Lama tingkat 1 dilewati setelah gagal. */
+  /** How long level 1 is skipped after a failure. */
   upstreamCooldownMs?: number;
 }
 
@@ -594,7 +595,7 @@ function clampOffset(offset: number | undefined): number {
   return Math.max(Math.trunc(offset), 0);
 }
 
-/** `fetchedAt` item tertua. Dipakai sebagai `fetchedAt` halaman supaya ia tidak berbohong. */
+/** The oldest item's `fetchedAt`. Used as the page's `fetchedAt` so it does not lie. */
 function oldestFetchedAt(items: readonly AgentRecord[]): string | null {
   let oldest: string | null = null;
   let oldestMs = Number.POSITIVE_INFINITY;
@@ -608,7 +609,7 @@ function oldestFetchedAt(items: readonly AgentRecord[]): string | null {
   return oldest;
 }
 
-/** Umur item tertua di sebuah daftar. Satu aturan untuk keempat tingkat. */
+/** The age of the oldest item in a list. One rule for all four levels. */
 function oldestAgeSeconds(items: readonly AgentRecord[], now: Date): number | null {
   if (items.length === 0) return null;
   let oldest = 0;
@@ -621,12 +622,11 @@ function oldestAgeSeconds(items: readonly AgentRecord[], now: Date): number | nu
 }
 
 /**
- * `stale` berarti "tidak bisa dipastikan segar", bukan sekadar "tua".
+ * `stale` means "cannot be confirmed fresh", not merely "old".
  *
- * Cache selalu stale saat dipakai di sini, karena kita hanya sampai ke cache
- * setelah upstream gagal menjawab — datanya, seberapa pun baru, tidak
- * terkonfirmasi. `ageSeconds` yang menyatakan seberapa jauh; `stale` menyatakan
- * bahwa ia tidak diverifikasi.
+ * The cache is always stale when used here, because we only reach the cache after
+ * upstream has failed to answer — its data, however new, is unconfirmed.
+ * `ageSeconds` states how far; `stale` states that it is unverified.
  */
 function isStale(source: AgentSource, ageSeconds: number | null, maxAgeSeconds: number): boolean {
   if (source === "cache") return true;
@@ -645,9 +645,10 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
   const upstreamCooldownMs = deps.upstreamCooldownMs ?? DEFAULT_UPSTREAM_COOLDOWN_MS;
 
   /**
-   * Sampai kapan tingkat 1 dilewati. `0` berarti tidak sedang dilewati.
-   * State ini hidup di instance layanan, jadi ia dibagi oleh keempat kategori
-   * dalam satu render halaman — itulah yang membuat 31 detik jadi satu anggaran.
+   * Until when level 1 is skipped. `0` means it is not being skipped.
+   * This state lives on the service instance, so it is shared by all four
+   * categories in one page render — that is what turns 31 seconds into one
+   * budget.
    */
   let upstreamBlockedUntil = 0;
 
@@ -794,18 +795,19 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
   }
 
   /**
-   * Buka atau tutup gerbang tingkat 1 berdasarkan hasilnya.
+   * Open or close the level-1 gate based on its outcome.
    *
-   * `empty` dihitung sebagai **berhasil**: upstream menjawab, kebetulan tidak
-   * ada isinya (kasus `DEFAULT_SPAM_FILTERS` di chain 97). Memperlakukannya
-   * sebagai kegagalan akan menutup gerbang terhadap sumber yang sebenarnya
-   * bekerja — dan di testnet, di mana kosong adalah jawaban yang lazim, itu
-   * berarti marketplace praktis berhenti bertanya pada 8004scan sama sekali.
+   * `empty` counts as a **success**: upstream answered, it just happened to have
+   * no content (the `DEFAULT_SPAM_FILTERS` case on chain 97). Treating it as a
+   * failure would close the gate against a source that is in fact working — and
+   * on testnet, where empty is the usual answer, that would mean the marketplace
+   * practically stops asking 8004scan at all.
    *
-   * Catatan jujur soal cabang pertama: saat kode ini berjalan, gerbangnya sudah
-   * pasti terbuka (kalau tertutup, tingkat 1 dilewati dan fungsi ini tidak
-   * dipanggil), jadi menyetel ulang ke `0` merapikan state tanpa mengubah
-   * perilaku yang bisa diamati. Yang benar-benar menggigit adalah cabang kedua.
+   * An honest note about the first branch: by the time this code runs the gate is
+   * necessarily open (if it were closed, level 1 would be skipped and this
+   * function would not be called), so resetting to `0` tidies the state without
+   * changing any observable behaviour. The branch that really bites is the
+   * second.
    */
   function gateUpstream(outcome: FallbackOutcome, at: Date): void {
     if (outcome === "ok" || outcome === "empty") {
@@ -816,8 +818,8 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
   }
 
   /**
-   * Status terakhir tiap sumber **di proses ini**. Selalu lebih baru daripada
-   * riwayat di tabel `source_health`, karena itu ia yang menang saat keduanya ada.
+   * The latest status of each source **in this process**. Always newer than the
+   * history in the `source_health` table, which is why it wins when both exist.
    */
   const lastSeen = new Map<AgentSource, SourceHealth>();
 
@@ -832,30 +834,30 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
     const previous = lastSeen.get(attempt.source);
     lastSeen.set(attempt.source, health);
     if (!persistHealth || deps.cache === undefined) return;
-    // Hanya **perubahan** status yang ditulis. Satu tampilan halaman saat
-    // upstream tumbang menempuh empat tingkat; menulis keempatnya tiap
-    // permintaan mengubah `source_health` jadi log akses. Yang berguna bagi
-    // `/api/health` dan bagi juri adalah kapan sebuah sumber berpindah keadaan,
-    // dan itu yang disimpan. Status terkini tetap ada di memori proses ini.
+    // Only status **changes** are written. One page view while upstream is down
+    // walks all four levels; writing all four on every request would turn
+    // `source_health` into an access log. What is useful to `/api/health` and to
+    // the judges is when a source changed state, and that is what is stored. The
+    // current status still lives in this process's memory.
     if (previous !== undefined && previous.healthy === health.healthy) return;
-    // Best-effort: gagal mencatat kesehatan tidak boleh menjatuhkan permintaan
-    // yang sedang dilayani. Ironinya akan sempurna.
+    // Best-effort: failing to record health must not take down the request being
+    // served. The irony would be perfect.
     void deps.cache.recordHealth(health).catch(() => undefined);
   }
 
-  /** Tulis-balik hasil segar ke cache. Best-effort, tidak pernah melempar. */
+  /** Write fresh results back to the cache. Best-effort, never throws. */
   async function writeThrough(records: AgentRecord[]): Promise<void> {
     if (deps.cache === undefined || records.length === 0) return;
     try {
       await deps.cache.saveAgents(records);
     } catch {
-      // Sengaja diam: data sudah di tangan pemanggil, kegagalan menyimpan
-      // salinannya tidak boleh mengubah apa yang ia terima.
+      // Deliberately silent: the data is already in the caller's hands, and a
+      // failure to store a copy must not change what it received.
     }
   }
 
   // -------------------------------------------------------------------------
-  // Daftar per kategori
+  // The per-category list
   // -------------------------------------------------------------------------
 
   async function getAgentsByCategory(
@@ -879,19 +881,19 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       return attempt;
     }
 
-    /** `step` untuk tingkat 1, yang sekalian membuka/menutup gerbang upstream. */
+    /** `step` for level 1, which also opens/closes the upstream gate. */
     function stepUpstream(attempt: FallbackAttempt): void {
       step(attempt);
       gateUpstream(attempt.outcome, at);
     }
 
-    /** Bedakan "anggaran waktu habis" dari "sumbernya menjawab salah". */
+    /** Tell "the time budget ran out" apart from "the source answered wrongly". */
     function failure(source: AgentSource, err: unknown): FallbackAttempt {
       return err instanceof BudgetExceeded
         ? {
             source,
             outcome: "unhealthy",
-            reason: `melewati anggaran waktu ${err.waitedMs} ms — turun ke tingkat berikutnya`,
+            reason: `exceeded its ${err.waitedMs} ms time budget — dropping to the next level`,
             items: 0,
           }
         : { source, outcome: "threw", reason: describeThrow(err), items: 0 };
@@ -930,12 +932,12 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
         source,
         healthy,
         reason,
-        // `fetchedAt` menunjuk kapan DATANYA diambil, bukan kapan jawaban ini
-        // disusun. Menyetelnya ke `now` untuk hasil seed akan membuat satu objek
-        // membawa dua pernyataan yang bertentangan: "baru diambil" berdampingan
-        // dengan `ageSeconds` ratusan ribu detik. Konsumen yang membaca
-        // `fetchedAt` saja tetap mendapat angka yang benar, dan invariant
-        // `ageSeconds === now - fetchedAt` berlaku di keempat tingkat.
+        // `fetchedAt` names when the DATA was fetched, not when this answer was
+        // assembled. Setting it to `now` for a seed result would make one object
+        // carry two contradictory statements: "just fetched" sitting next to an
+        // `ageSeconds` of hundreds of thousands of seconds. A consumer that reads
+        // only `fetchedAt` still gets the right number, and the invariant
+        // `ageSeconds === now - fetchedAt` holds across all four levels.
         fetchedAt: oldestFetchedAt(served) ?? fetchedAt,
         ageSeconds,
         stale: isStale(source, ageSeconds, maxAgeSeconds),
@@ -945,17 +947,17 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       };
     }
 
-    // --- Tingkat 1: 8004scan -------------------------------------------------
+    // --- Level 1: 8004scan ---------------------------------------------------
     if (at.getTime() < upstreamBlockedUntil) {
-      // Gerbang tingkat layanan: 8004scan baru saja gagal, dan jaring pengaman
-      // sudah siap. Mencoba lagi hanya membakar waktu pengguna — inilah yang
-      // mengubah 4 x anggaran (satu per kategori) jadi satu anggaran per render.
+      // The service-level gate: 8004scan just failed, and the safety net is
+      // ready. Trying again only burns the user's time — this is what turns
+      // 4 x the budget (one per category) into one budget per render.
       step({
         source: "scan8004",
         outcome: "unhealthy",
         reason:
-          `dilewati: 8004scan gagal barusan, gerbang tertutup ` +
-          `${Math.ceil((upstreamBlockedUntil - at.getTime()) / 1000)} dtk lagi`,
+          `skipped: 8004scan just failed, gate closed for another ` +
+          `${Math.ceil((upstreamBlockedUntil - at.getTime()) / 1000)} s`,
         items: 0,
       });
     } else
@@ -974,12 +976,12 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
         stepUpstream({
           source: "scan8004",
           outcome: "unhealthy",
-          reason: redact(page.reason ?? "8004scan tidak sehat tanpa alasan"),
+          reason: redact(page.reason ?? "8004scan unhealthy with no reason given"),
           items: 0,
         });
       } else {
-        // Semantic search menyempitkan populasi; classifier deterministik yang
-        // memutuskan kategori. Upstream tidak punya keempat kategori kita.
+        // Semantic search narrows the population; the deterministic classifier
+        // decides the category. Upstream does not have our four categories.
         const classified = page.items.map((item) =>
           item.classification === null ? { ...item, classification: classify(item) } : item,
         );
@@ -988,8 +990,9 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
         );
 
         if (matching.length === 0) {
-          // Termasuk kasus `DEFAULT_SPAM_FILTERS` mengosongkan chain 97:
-          // jawaban sah dari upstream sehat, dan justru sebab tingkat 3 & 4 ada.
+          // Including the case of `DEFAULT_SPAM_FILTERS` emptying chain 97: a
+          // valid answer from a healthy upstream, and the very reason levels 3
+          // and 4 exist.
           stepUpstream({
             source: "scan8004",
             outcome: "empty",
@@ -1006,24 +1009,24 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
             upstreamTotal: page.total,
           });
           await writeThrough(matching);
-          // `page.total` adalah total hasil **query semantic**, BUKAN total
-          // kategori — upstream tidak punya keempat kategori kita, classifier
-          // di baris atas yang membuatnya. Melaporkannya sebagai `total` berarti
-          // menjanjikan "4.812 agent Grid" sementara halaman ketiga sudah kosong;
-          // juri cukup menekan "next page" untuk menemukannya. Yang kita punya
-          // adalah item yang benar-benar lolos, dan itu yang dilaporkan.
-          // Angka upstream tetap dibawa, terpisah dan bernama apa adanya.
+          // `page.total` is the total of the **semantic query**, NOT a category
+          // total — upstream does not have our four categories, the classifier a
+          // few lines above created them. Reporting it as `total` would promise
+          // "4,812 Grid agents" while the third page is already empty; the judges
+          // need only press "next page" to find that out. What we have is the
+          // items that genuinely passed, and that is what is reported. The
+          // upstream number still travels along, separately and plainly named.
           return finish("scan8004", matching, matching.length, true, null);
         }
       }
     } catch (err) {
-      // Sumbernya berjanji tidak melempar. Kita tetap tidak bertaruh pada janji itu.
+      // The source promises not to throw. We still do not bet on that promise.
       stepUpstream(failure("scan8004", err));
     }
 
-    // --- Tingkat 2: cache Postgres ------------------------------------------
+    // --- Level 2: the Postgres cache -----------------------------------------
     if (deps.cache === undefined) {
-      step({ source: "cache", outcome: "unavailable", reason: "cache tidak dipasang", items: 0 });
+      step({ source: "cache", outcome: "unavailable", reason: "cache not installed", items: 0 });
     } else {
       try {
         const filter: CachedAgentFilter = { chainId, category, limit, offset, maxAgeSeconds };
@@ -1032,7 +1035,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
           step({
             source: "cache",
             outcome: "unhealthy",
-            reason: redact(page.reason ?? "cache tidak sehat tanpa alasan"),
+            reason: redact(page.reason ?? "cache unhealthy with no reason given"),
             items: 0,
           });
         } else if (page.items.length === 0) {
@@ -1046,17 +1049,17 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       }
     }
 
-    // --- Tingkat 3: FuguRegistry on-chain -----------------------------------
+    // --- Level 3: the on-chain FuguRegistry ----------------------------------
     if (deps.onchain === undefined) {
-      step({ source: "onchain", outcome: "unavailable", reason: "on-chain tidak dipasang", items: 0 });
+      step({ source: "onchain", outcome: "unavailable", reason: "on-chain not installed", items: 0 });
     } else {
       try {
-        // Kategori tersimpan di dalam listing, bukan di parameter kontrak, jadi
-        // penyaringan dan paging dilakukan di sini atas hasil bacaan. Jendela
-        // bacanya melebar mengikuti `offset` pemanggil: jendela tetap 100 akan
-        // membuat halaman 6 marketplace jatuh ke seed sementara halaman 1
-        // dilayani on-chain — provenance-nya tetap jujur, tapi sumbernya
-        // melompat tanpa sebab yang bisa dijelaskan ke pengguna.
+        // The category is stored inside the listing, not in a contract
+        // parameter, so filtering and paging happen here over what was read. The
+        // read window widens with the caller's `offset`: a fixed window of 100
+        // would make marketplace page 6 fall to the seed while page 1 is served
+        // on-chain — the provenance would still be honest, but the source would
+        // jump for a reason that cannot be explained to the user.
         const page = await withDeadline(
           deps.onchain.readFuguListings({
             limit: Math.min(Math.max(onchainScanLimit, offset + limit), ONCHAIN_MAX_LIMIT),
@@ -1069,7 +1072,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
           step({
             source: "onchain",
             outcome: "unhealthy",
-            reason: redact(page.reason ?? "pembacaan on-chain tidak sehat tanpa alasan"),
+            reason: redact(page.reason ?? "on-chain read unhealthy with no reason given"),
             items: 0,
           });
         } else {
@@ -1100,20 +1103,20 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       }
     }
 
-    // --- Tingkat 4: seed terkurasi ------------------------------------------
-    // TIDAK dibatasi anggaran waktu: ini jaring terakhir, dan membiarkannya
-    // kehabisan waktu berarti marketplace kosong — hal yang seluruh berkas ini
-    // ada untuk mencegah. Ia juga tidak menyentuh jaringan maupun disk.
+    // --- Level 4: the curated seed -------------------------------------------
+    // NOT bounded by a time budget: this is the last net, and letting it run out
+    // of time means an empty marketplace — the very thing this whole file exists
+    // to prevent. It touches neither the network nor the disk.
     try {
       const page = await seed.listAgents(category, { limit, offset });
-      // Halaman kosong wajib membawa penjelasannya di `reason`, bukan hanya di
-      // `trail`: itu tempat yang paling wajar dilihat, dan "kosong tanpa sebab"
-      // tidak bisa dibedakan dari kegagalan diam-diam.
+      // An empty page must carry its explanation in `reason`, not only in
+      // `trail`: that is the most natural place to look, and "empty for no
+      // reason" cannot be told apart from a silent failure.
       const emptyReason =
         page.items.length > 0
           ? null
           : (page.reason ??
-            `seed terkurasi tidak punya agent kategori ${category} pada offset ${offset}`);
+            `the curated seed has no ${category} agent at offset ${offset}`);
       step({
         source: "seed",
         outcome: page.items.length === 0 ? "empty" : "ok",
@@ -1121,32 +1124,31 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
         items: page.items.length,
       });
 
-      // **Halaman kosong dari seed tidak selalu berarti "memang tidak ada".**
-      // Bila ada tingkat di atas yang mati, yang kita punya bukan jawaban
-      // melainkan ketidaktahuan, dan mengakunya sehat membuat pemanggil
-      // memperlakukan "kosong" sebagai fakta. Halaman yang BERISI tetap sehat:
-      // kita benar-benar menyajikan data terkurasi, dan `source: "seed"` +
-      // `degraded: true` sudah mengatakan dari mana.
+      // **An empty page from the seed does not always mean "it really is not
+      // there".** If a level above is down, what we have is not an answer but
+      // ignorance, and claiming health there makes the caller treat "empty" as a
+      // fact. A page WITH content stays healthy: we really are serving curated
+      // data, and `source: "seed"` + `degraded: true` already says where from.
       const failed = page.items.length === 0 ? upperTierFailed(trail) : undefined;
       const incomplete =
         failed === undefined
           ? emptyReason
-          : `kosong tapi TIDAK dapat dipastikan: ${failed.source} ${failed.outcome}` +
+          : `empty but NOT confirmable: ${failed.source} ${failed.outcome}` +
             `${failed.reason ? ` (${failed.reason})` : ""}`;
 
-      // Seed TIDAK ditulis ke cache — lihat catatan di kepala berkas.
+      // The seed is NOT written to the cache — see the note in the file header.
       return finish("seed", page.items, page.total, failed === undefined, incomplete);
     } catch (err) {
       step({ source: "seed", outcome: "threw", reason: describeThrow(err), items: 0 });
     }
 
-    // Keempat tingkat gagal. Tetap tidak melempar: halaman kosong yang mengaku
-    // kosong, dengan seluruh sebabnya terbaca di `reason` dan `trail`.
+    // All four levels failed. Still no throw: an empty page that admits it is
+    // empty, with every cause readable in `reason` and `trail`.
     return finish("seed", [], 0, false, summarize(trail));
   }
 
   // -------------------------------------------------------------------------
-  // Detail satu agent
+  // A single agent's detail
   // -------------------------------------------------------------------------
 
   async function getAgentDetail(id: string): Promise<AgentServiceDetail> {
@@ -1161,7 +1163,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       noteHealth(attempt, fetchedAt);
     }
 
-    /** `step` untuk tingkat 1, yang sekalian membuka/menutup gerbang upstream. */
+    /** `step` for level 1, which also opens/closes the upstream gate. */
     function stepUpstream(attempt: FallbackAttempt): void {
       step(attempt);
       gateUpstream(attempt.outcome, at);
@@ -1172,7 +1174,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
         ? {
             source,
             outcome: "unhealthy",
-            reason: `melewati anggaran waktu ${err.waitedMs} ms — turun ke tingkat berikutnya`,
+            reason: `exceeded its ${err.waitedMs} ms time budget — dropping to the next level`,
             items: 0,
           }
         : { source, outcome: "threw", reason: describeThrow(err), items: 0 };
@@ -1198,7 +1200,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
         healthy,
         reason,
         firstParty: firstPartyReport(resolved?.fuguListing == null ? 0 : 1, at),
-        // Sama seperti jalur daftar: `fetchedAt` menunjuk kapan DATANYA diambil.
+        // Same as the list path: `fetchedAt` names when the DATA was fetched.
         fetchedAt: resolved?.fetchedAt ?? fetchedAt,
         ageSeconds,
         stale: resolved === null ? false : isStale(source, ageSeconds, maxAgeSeconds),
@@ -1208,30 +1210,29 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       };
     }
 
-    // `id` = `${chainId}:${tokenId}`. Tingkat 1 dan 3 butuh keduanya; tingkat 2
-    // dan 4 mencari lewat `id` utuh, jadi id berbentuk asing tetap dilayani —
-    // tingkat yang tidak bisa dipakai ditandai `unavailable`, bukan melempar.
+    // `id` = `${chainId}:${tokenId}`. Levels 1 and 3 need both halves; levels 2
+    // and 4 look up by the whole `id`, so a foreign-shaped id is still served —
+    // the levels that cannot be used are marked `unavailable`, not thrown.
     const split = id.indexOf(":");
     const parsed =
       split > 0 && split < id.length - 1
         ? { chainId: Number(id.slice(0, split)), tokenId: id.slice(split + 1) }
         : null;
 
-    // **chainId datang dari pemanggil dan tidak boleh dipercaya.** Tanpa
-    // pemeriksaan ini, `GET /api/agents/1:12345` membuat backend menanyakan
-    // agent MAINNET ke 8004scan dan merendernya sebagai halaman detail
-    // Fugugent — melanggar bingkai "testnet only" (CLAUDE.md aturan 7) dan
-    // menjadikan chain sebagai parameter yang dikendalikan pemanggil.
-    // Ditolak, bukan diam-diam dilayani.
+    // **The chainId comes from the caller and must not be trusted.** Without
+    // this check, `GET /api/agents/1:12345` would make the backend ask 8004scan
+    // about a MAINNET agent and render it as a Fugugent detail page — breaking
+    // the "testnet only" frame (CLAUDE.md rule 7) and turning the chain into a
+    // caller-controlled parameter. Rejected, not silently served.
     const wrongChain =
       parsed !== null && Number.isFinite(parsed.chainId) && parsed.chainId !== chainId;
     const target =
       parsed !== null && Number.isFinite(parsed.chainId) && !wrongChain ? parsed : null;
     const targetReason = wrongChain
-      ? `id "${id}" menunjuk chain ${parsed?.chainId}, layanan ini hanya melayani chain ${chainId}`
-      : `id "${id}" tidak berbentuk chainId:tokenId`;
+      ? `id "${id}" points at chain ${parsed?.chainId}, this service only serves chain ${chainId}`
+      : `id "${id}" is not shaped chainId:tokenId`;
 
-    // --- Tingkat 1: 8004scan -------------------------------------------------
+    // --- Level 1: 8004scan ---------------------------------------------------
     if (target === null) {
       step({ source: "scan8004", outcome: "unavailable", reason: targetReason, items: 0 });
     } else if (at.getTime() < upstreamBlockedUntil) {
@@ -1239,8 +1240,8 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
         source: "scan8004",
         outcome: "unhealthy",
         reason:
-          `dilewati: 8004scan gagal barusan, gerbang tertutup ` +
-          `${Math.ceil((upstreamBlockedUntil - at.getTime()) / 1000)} dtk lagi`,
+          `skipped: 8004scan just failed, gate closed for another ` +
+          `${Math.ceil((upstreamBlockedUntil - at.getTime()) / 1000)} s`,
         items: 0,
       });
     } else {
@@ -1254,7 +1255,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
           stepUpstream({
             source: "scan8004",
             outcome: "unhealthy",
-            reason: redact(detail.reason ?? "8004scan tidak sehat tanpa alasan"),
+            reason: redact(detail.reason ?? "8004scan unhealthy with no reason given"),
             items: 0,
           });
         } else if (detail.agent === null) {
@@ -1273,9 +1274,9 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       }
     }
 
-    // --- Tingkat 2: cache Postgres ------------------------------------------
+    // --- Level 2: the Postgres cache -----------------------------------------
     if (deps.cache === undefined) {
-      step({ source: "cache", outcome: "unavailable", reason: "cache tidak dipasang", items: 0 });
+      step({ source: "cache", outcome: "unavailable", reason: "cache not installed", items: 0 });
     } else {
       try {
         const cached = await withDeadline(deps.cache.getAgent(id, at), localBudgetMs, "cache");
@@ -1283,7 +1284,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
           step({
             source: "cache",
             outcome: "unhealthy",
-            reason: redact(cached.reason ?? "cache tidak sehat tanpa alasan"),
+            reason: redact(cached.reason ?? "cache unhealthy with no reason given"),
             items: 0,
           });
         } else if (cached.agent === null) {
@@ -1297,20 +1298,20 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       }
     }
 
-    // --- Tingkat 3: FuguRegistry on-chain -----------------------------------
+    // --- Level 3: the on-chain FuguRegistry ----------------------------------
     if (deps.onchain === undefined || target === null) {
       step({
         source: "onchain",
         outcome: "unavailable",
-        reason: deps.onchain === undefined ? "on-chain tidak dipasang" : targetReason,
+        reason: deps.onchain === undefined ? "on-chain not installed" : targetReason,
         items: 0,
       });
     } else {
       try {
-        // `FuguRegistry` diindeks per `listingId`, bukan per `tokenId` ERC-8004,
-        // dan `OnchainSource` tidak mengekspos `listingByAgentId`. Karena itu
-        // listing dibaca lalu dicari di sini — jaring pengaman boleh sedikit
-        // lebih mahal, yang tidak boleh adalah ia tidak ada.
+        // `FuguRegistry` is indexed by `listingId`, not by ERC-8004 `tokenId`,
+        // and `OnchainSource` does not expose `listingByAgentId`. So the listings
+        // are read and searched here — a safety net may be slightly more
+        // expensive; what it must not be is absent.
         const page = await withDeadline(
           deps.onchain.readFuguListings({ limit: onchainScanLimit, offset: 0 }),
           localBudgetMs,
@@ -1320,13 +1321,13 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
           step({
             source: "onchain",
             outcome: "unhealthy",
-            reason: redact(page.reason ?? "pembacaan on-chain tidak sehat tanpa alasan"),
+            reason: redact(page.reason ?? "on-chain read unhealthy with no reason given"),
             items: 0,
           });
         } else {
-          // Dicocokkan lewat `id` utuh, yang memuat chainId. Mencocokkan
-          // `tokenId` telanjang akan mengabaikan chain — token 42 di chain 1
-          // dan di chain 97 adalah agent yang berbeda.
+          // Matched by the whole `id`, which embeds the chainId. Matching a bare
+          // `tokenId` would ignore the chain — token 42 on chain 1 and on chain
+          // 97 are different agents.
           // No attach step here on purpose: on the detail path `finish()` runs
           // `attachFirstParty` for whatever tier answered, so every tier is
           // covered by one call rather than each remembering to make its own.
@@ -1344,7 +1345,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       }
     }
 
-    // --- Tingkat 4: seed terkurasi ------------------------------------------
+    // --- Level 4: the curated seed -------------------------------------------
     try {
       const detail = await seed.getAgent(id);
       step({
@@ -1354,17 +1355,18 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
         items: detail.agent === null ? 0 : 1,
       });
 
-      // Inilah akar 404 palsu: `seed.getAgent` dengan benar melapor "tidak ada
-      // di seed" — seed memang tidak memuat agent itu, dan sumber seed sendiri
-      // sehat. Yang salah adalah menaikkan jawaban itu menjadi "tidak ditemukan"
-      // ketika 8004scan, cache, dan RPC sedang tumbang: agent yang dicari bisa
-      // saja ada di ketiganya. `healthy: false` di sini yang membuat pemanggil
-      // (rute detail Task 6) bisa membedakan "tidak ada" dari "tidak tahu".
+      // This is the root of the false 404: `seed.getAgent` correctly reports
+      // "not in the seed" — the seed genuinely does not hold that agent, and the
+      // seed source itself is healthy. What is wrong is promoting that answer to
+      // "not found" while 8004scan, the cache, and the RPC are all down: the
+      // agent being looked for might well exist in any of the three. The
+      // `healthy: false` here is what lets the caller (the Task 6 detail route)
+      // tell "does not exist" apart from "don't know".
       const failed = detail.agent === null ? upperTierFailed(trail) : undefined;
       const reason =
         failed === undefined
           ? (detail.agent === null ? detail.reason : null)
-          : `tidak dapat dipastikan ada atau tidak: ${failed.source} ${failed.outcome}` +
+          : `cannot be confirmed to exist or not: ${failed.source} ${failed.outcome}` +
             `${failed.reason ? ` (${failed.reason})` : ""}`;
 
       return finish("seed", detail.agent, failed === undefined, reason);
@@ -1376,7 +1378,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
   }
 
   // -------------------------------------------------------------------------
-  // Kesehatan
+  // Health
   // -------------------------------------------------------------------------
 
   async function getHealth(): Promise<ServiceHealth> {
@@ -1385,7 +1387,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
 
     const merged = new Map<AgentSource, SourceHealth>();
 
-    // 1. Riwayat DB — paling tua, jadi paling dulu.
+    // 1. The DB history — the oldest, so it goes first.
     let probe: SourceHealth | undefined;
     if (deps.cache !== undefined) {
       try {
@@ -1399,24 +1401,24 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
         });
       }
 
-      // 1b. **Probe Postgres yang sesungguhnya.**
+      // 1b. **A real Postgres probe.**
       //
-      //     Versi sebelumnya menyimpulkan "cache sehat" dari fakta bahwa
-      //     `latestHealth()` tidak melempar. Itu salah, dan salahnya mahal:
-      //     `getLatestSourceHealth` di `db/repo.ts` memang **tidak pernah
-      //     melempar** — sesuai kontraknya, ia mengembalikan baris sintetis
-      //     `{ source: "cache", healthy: false, reason }` saat Postgres tak
-      //     terjangkau. Jadi tidak-melempar bukan bukti apa pun, dan probe
-      //     optimistis itu justru MENIMPA jawaban jujur yang baru saja
-      //     diberikan repo. Hasilnya: Postgres mati 8 detik, `/api/health`
-      //     tetap berkata `cache: healthy, age: 0` — pembacaan segar yang salah,
-      //     lebih buruk daripada catatan basi.
+      //     An earlier version inferred "the cache is healthy" from the fact
+      //     that `latestHealth()` did not throw. That was wrong, and expensively
+      //     so: `getLatestSourceHealth` in `db/repo.ts` **never throws** — per
+      //     its contract, it returns a synthetic
+      //     `{ source: "cache", healthy: false, reason }` row when Postgres is
+      //     unreachable. So not-throwing is evidence of nothing, and that
+      //     optimistic probe actually OVERWROTE the honest answer the repo had
+      //     just given. The result: Postgres down for 8 seconds and
+      //     `/api/health` still saying `cache: healthy, age: 0` — a fresh
+      //     reading that is wrong, worse than a stale record.
       //
-      //     Sekarang probenya adalah kueri sungguhan yang **melaporkan
-      //     kesehatannya di dalam nilai balik** (`CachedPage.healthy`), bukan
-      //     lewat ada-tidaknya exception. `limit: 1` supaya semurah mungkin,
-      //     dan tetap berbatas waktu supaya endpoint kesehatan tidak ikut
-      //     menggantung bersama Postgres yang menggantung.
+      //     The probe is now a real query that **reports its health inside the
+      //     return value** (`CachedPage.healthy`), not through the presence or
+      //     absence of an exception. `limit: 1` to keep it as cheap as possible,
+      //     and still deadline-bounded so the health endpoint does not hang
+      //     along with a hanging Postgres.
       try {
         const page = await withDeadline(
           deps.cache.getAgents({ chainId, limit: 1, offset: 0 }, at),
@@ -1427,13 +1429,13 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
           ? {
               source: "cache",
               healthy: true,
-              reason: "probe: kueri cache berhasil",
+              reason: "probe: cache query succeeded",
               checkedAt,
             }
           : {
               source: "cache",
               healthy: false,
-              reason: redact(page.reason ?? "probe: kueri cache gagal tanpa alasan"),
+              reason: redact(page.reason ?? "probe: cache query failed with no reason given"),
               checkedAt,
             };
       } catch (err) {
@@ -1441,34 +1443,34 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       }
     }
 
-    // 2. Status dalam proses ini — lebih baru daripada riwayat DB.
+    // 2. The status in this process — newer than the DB history.
     for (const [source, health] of lastSeen) merged.set(source, health);
 
-    // 3. Probe barusan — lebih baru daripada ingatan.
+    // 3. The probe just taken — newer than memory.
     //
-    //    Urutan ini yang menutup jendela bohong: setelah Postgres dimatikan,
-    //    panggilan PERTAMA ke `/api/health` sudah jujur, tanpa perlu ditolong
-    //    permintaan lain yang kebetulan menabrak cache dan gagal.
+    //    This ordering is what closes the lying window: after Postgres is taken
+    //    down, the FIRST call to `/api/health` is already honest, without needing
+    //    help from some other request that happened to hit the cache and fail.
     if (probe !== undefined) merged.set("cache", probe);
 
-    // Seed tidak punya bagian yang bisa mati sendiri: ia berkas di dalam bundel
-    // yang sama dengan proses ini. Karena itu ia **tidak punya keadaan
-    // "belum diobservasi"**: kalau prosesnya hidup, seed-nya ada.
+    // The seed has no part that can die on its own: it is a file inside the same
+    // bundle as this process. So it **has no "not yet observed" state**: if the
+    // process is alive, its seed is there.
     //
-    // Yang diperbaiki di sini: baris `seed` yang tersimpan di `source_health`
-    // dari boot sebelumnya dulu ikut menua dan akhirnya dilaporkan
-    // `healthy: false` — membingungkan pembaca yang baru saja diberi tahu bahwa
-    // seed tak bisa mati. Baris DB untuk seed karena itu diabaikan; hanya
-    // observasi dari PROSES INI (mis. seed yang benar-benar melempar) yang
-    // dipertahankan. Seed tetap TIDAK ikut menentukan `healthy` — lihat
-    // catatan di `ServiceHealth.healthy`.
+    // What is fixed here: a `seed` row stored in `source_health` from an earlier
+    // boot used to age along with everything else and eventually be reported
+    // `healthy: false` — confusing a reader who was just told the seed cannot
+    // die. The DB row for the seed is therefore ignored; only observations from
+    // THIS PROCESS (e.g. a seed that genuinely threw) are kept. The seed still
+    // does NOT get to determine `healthy` — see the note on
+    // `ServiceHealth.healthy`.
     const observedSeed = lastSeen.get("seed");
     merged.set(
       "seed",
       observedSeed ?? {
         source: "seed",
         healthy: true,
-        reason: "seed terkurasi selalu tersedia",
+        reason: "the curated seed is always available",
         checkedAt,
       },
     );
@@ -1480,10 +1482,10 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       .map((health) => observe(health, at, healthTtlSeconds));
 
     return {
-      // Hanya sumber sungguhan yang boleh menyalakan lampu hijau — lihat
-      // catatan panjang di `ServiceHealth.healthy`. `observe()` sudah mencabut
-      // klaim sehat dari observasi yang kedaluwarsa, jadi baris ini tidak perlu
-      // tahu soal umur.
+      // Only a real source may light the green lamp — see the long note on
+      // `ServiceHealth.healthy`. `observe()` has already withdrawn the health
+      // claim of an expired observation, so this line need know nothing about
+      // age.
       healthy: sources.some(
         (health) => health.healthy && LIVE_SOURCES.includes(health.source),
       ),
@@ -1497,14 +1499,13 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
 }
 
 /**
- * Apakah ada tingkat di atas yang benar-benar **gagal**, bukan sekadar menjawab
- * kosong atau tidak dipasang.
+ * Whether a level above genuinely **failed**, as opposed to merely answering
+ * empty or not being installed.
  *
- * Pembedaan ini yang menentukan apakah "tidak ditemukan" boleh dipercaya.
- * Kalau ketiga tingkat di atas menjawab sehat dan memang kosong, maka kosong
- * adalah jawaban yang sah. Kalau salah satunya mati, kita **tidak tahu** —
- * dan mengaku tahu di situ persis yang membuat rute detail membalas 404 untuk
- * agent yang sebenarnya ada.
+ * This distinction decides whether "not found" may be trusted. If the three
+ * levels above answered healthily and were genuinely empty, then empty is a valid
+ * answer. If one of them is down, we **do not know** — and claiming to know there
+ * is exactly what made the detail route answer 404 for an agent that does exist.
  */
 function upperTierFailed(trail: readonly FallbackAttempt[]): FallbackAttempt | undefined {
   return trail.find(
@@ -1513,8 +1514,8 @@ function upperTierFailed(trail: readonly FallbackAttempt[]): FallbackAttempt | u
   );
 }
 
-/** Rangkum seluruh jejak jadi satu `reason` — dipakai hanya saat keempat tingkat gagal. */
+/** Summarize the whole trail into one `reason` — used only when all four levels failed. */
 function summarize(trail: readonly FallbackAttempt[]): string {
   const parts = trail.map((t) => `${t.source}=${t.outcome}${t.reason ? ` (${t.reason})` : ""}`);
-  return redact(`keempat tingkat fallback gagal: ${parts.join("; ")}`);
+  return redact(`all four fallback levels failed: ${parts.join("; ")}`);
 }

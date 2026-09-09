@@ -1,59 +1,60 @@
 /**
- * Klien HTTP tahan banting untuk memanggil sumber eksternal (8004scan, dGrid).
+ * A resilient HTTP client for calling external sources (8004scan, dGrid).
  *
- * Kenapa ini ada: upstream 8004scan terbukti (riset live) membalas HTTP 500
- * tanpa header User-Agent browser (bukan 429), dan membalas `500
- * DATABASE_ERROR` secara intermiten (4 dari 5 percobaan gagal saat riset).
- * dGrid membalas 403 tanpa User-Agent browser. Karena itu:
+ * Why this exists: the 8004scan upstream is proven (live research) to answer
+ * HTTP 500 without a browser User-Agent header (not 429), and to answer
+ * `500 DATABASE_ERROR` intermittently (4 out of 5 attempts failed during the
+ * research). dGrid answers 403 without a browser User-Agent. Hence:
  *
- * - Header User-Agent browser SELALU dikirim dan tidak bisa dikosongkan —
- *   `userAgent` boleh diganti dengan string browser lain (mis. rotasi UA),
- *   tapi string kosong/whitespace ditolak dan jatuh balik ke default.
- * - Retry dengan backoff pada 5xx, 429, dan kegagalan jaringan/timeout.
- * - TIDAK retry pada 4xx selain 429 (itu kesalahan klien, bukan upstream down).
- * - Body 2xx yang gagal di-parse sebagai JSON diperlakukan sebagai kegagalan
- *   data (upstream sebenarnya menjawab), BUKAN kegagalan jaringan — tidak
- *   retry, tidak menghitung ke breaker.
- * - Circuit breaker menghitung kegagalan per **panggilan `get()` logis**,
- *   bukan per percobaan retry internal. Dengan default (`maxAttempts=3`,
- *   `failureThreshold=5`) artinya butuh 5 panggilan yang masing-masing gagal
- *   total (bukan 5 percobaan mentah / ~1,7 panggilan) sebelum breaker
- *   membuka. Ini dipilih karena breaker melindungi terhadap "upstream
- *   sedang down", dan retry di dalam satu panggilan sudah menyerap
- *   kegagalan transien — menghitung retry mentah membuat breaker jauh
- *   lebih sensitif dari yang tersirat oleh angka `failureThreshold`.
- * - Setelah cooldown breaker lewat, TEPAT SATU percobaan pengintaian
- *   (half-open) boleh benar-benar menghubungi upstream pada satu waktu.
- *   Flag `probeInFlight` di-set secara sinkron sebelum `await` apa pun,
- *   supaya panggilan `get()` konkuren lain yang tiba di giliran sinkron
- *   yang sama (mis. lewat `Promise.all` tepat saat cooldown lewat) melihat
- *   flag ini dan ditolak cepat alih-alih ikut menembak upstream sekaligus.
- *   Pemanggil yang bukan si pengintai TIDAK menunggu hasil pengintaian —
- *   mereka ditolak cepat dengan `UpstreamError` (status 503) — karena
- *   mereka bisa saja meminta URL/opsi yang berbeda dari si pengintai, dan
- *   membagikan `data` dari satu URL ke pemanggil URL lain akan salah.
+ * - A browser User-Agent header is ALWAYS sent and cannot be blanked out —
+ *   `userAgent` may be replaced with another browser string (e.g. UA
+ *   rotation), but an empty/whitespace string is rejected and falls back to
+ *   the default.
+ * - Retry with backoff on 5xx, 429, and network/timeout failures.
+ * - NO retry on 4xx other than 429 (that is a client error, not upstream down).
+ * - A 2xx body that fails to parse as JSON is treated as a data failure
+ *   (upstream did in fact answer), NOT a network failure — no retry, not
+ *   counted toward the breaker.
+ * - The circuit breaker counts failures per **logical `get()` call**, not per
+ *   internal retry attempt. With the defaults (`maxAttempts=3`,
+ *   `failureThreshold=5`) that means it takes 5 calls that each fail
+ *   completely (not 5 raw attempts / ~1.7 calls) before the breaker opens.
+ *   This was chosen because the breaker protects against "upstream is
+ *   currently down", and the retries inside a single call already absorb
+ *   transient failures — counting raw retries would make the breaker far more
+ *   sensitive than the `failureThreshold` number implies.
+ * - Once the breaker cooldown has elapsed, EXACTLY ONE probe attempt
+ *   (half-open) may actually reach upstream at a time. The `probeInFlight`
+ *   flag is set synchronously before any `await`, so other concurrent `get()`
+ *   calls arriving in the same synchronous turn (e.g. via `Promise.all` right
+ *   as the cooldown elapses) see this flag and are rejected fast instead of
+ *   all firing at upstream together. Callers that are not the prober do NOT
+ *   wait for the probe's result — they are rejected fast with an
+ *   `UpstreamError` (status 503) — because they may be asking for a different
+ *   URL/options than the prober, and sharing one URL's `data` with a caller
+ *   for another URL would be wrong.
  *
- * `fetchImpl` dan `now` disuntikkan lewat opsi konstruktor supaya test tidak
- * pernah menyentuh jaringan sungguhan maupun jam dinding sungguhan.
+ * `fetchImpl` and `now` are injected through the constructor options so tests
+ * never touch a real network nor a real wall clock.
  */
 
-/** UA browser sungguhan. Tanpa ini 8004scan membalas 500, dGrid membalas 403. */
+/** A real browser UA. Without it 8004scan answers 500 and dGrid answers 403. */
 export const DEFAULT_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
 export const DEFAULT_TIMEOUT_MS = 10_000;
 
 export interface RetryOptions {
-  /** Total percobaan termasuk yang pertama (bukan jumlah retry tambahan). */
+  /** Total attempts including the first one (not the number of extra retries). */
   maxAttempts: number;
-  /** Delay dasar (ms) sebelum retry; exponential backoff dari nilai ini. */
+  /** Base delay (ms) before a retry; exponential backoff from this value. */
   baseDelayMs: number;
 }
 
 export interface BreakerOptions {
-  /** Jumlah panggilan `get()` gagal berturut-turut sebelum breaker membuka. */
+  /** Number of consecutive failed `get()` calls before the breaker opens. */
   failureThreshold: number;
-  /** Lama breaker tetap terbuka sebelum mengizinkan satu percobaan pengintaian. */
+  /** How long the breaker stays open before allowing a single probe attempt. */
   cooldownMs: number;
 }
 
@@ -61,11 +62,11 @@ export const DEFAULT_RETRY: RetryOptions = { maxAttempts: 3, baseDelayMs: 300 };
 export const DEFAULT_BREAKER: BreakerOptions = { failureThreshold: 5, cooldownMs: 30_000 };
 
 export interface HttpClientOptions {
-  /** `fetch` disuntikkan — wajib, supaya test tidak menyentuh jaringan sungguhan. */
+  /** `fetch` is injected — mandatory, so tests do not touch a real network. */
   fetchImpl: typeof fetch;
-  /** Jam disuntikkan — wajib, supaya test breaker/cooldown deterministik. */
+  /** The clock is injected — mandatory, so breaker/cooldown tests are deterministic. */
   now: () => number;
-  /** String kosong/whitespace ditolak dan jatuh balik ke `DEFAULT_USER_AGENT`. */
+  /** An empty/whitespace string is rejected and falls back to `DEFAULT_USER_AGENT`. */
   userAgent?: string;
   timeoutMs?: number;
   retry?: Partial<RetryOptions>;
@@ -75,10 +76,10 @@ export interface HttpClientOptions {
 export interface HttpGetOptions {
   headers?: Record<string, string>;
   /**
-   * Dikirim lewat header `X-API-Key`, tidak pernah lewat query string/URL.
-   * JANGAN teruskan lewat literal `{ apiKey: rahasia }` di kode yang mungkin
-   * me-log opsi ini sebelum memanggil `get()` — pakai `withApiKey()` supaya
-   * key tetap non-enumerable (tidak ikut ke `JSON.stringify`/`console.log`).
+   * Sent through the `X-API-Key` header, never through the query string/URL.
+   * DO NOT pass it via a `{ apiKey: secret }` literal in code that might log
+   * these options before calling `get()` — use `withApiKey()` so the key stays
+   * non-enumerable (it does not travel into `JSON.stringify`/`console.log`).
    */
   apiKey?: string;
   timeoutMs?: number;
@@ -90,7 +91,7 @@ export interface HttpResult<T> {
   attempts: number;
 }
 
-/** Error upstream/jaringan. Selalu membawa `status` dan jumlah `attempts` yang ditempuh. */
+/** An upstream/network error. Always carries `status` and the number of `attempts` made. */
 export class UpstreamError extends Error {
   readonly status: number;
   readonly attempts: number;
@@ -103,9 +104,9 @@ export class UpstreamError extends Error {
   }
 }
 
-/** Status HTTP synthetic untuk kegagalan yang tidak punya status HTTP asli (network/timeout). */
+/** A synthetic HTTP status for failures that have no real HTTP status (network/timeout). */
 const NETWORK_ERROR_STATUS = 0;
-/** Status yang dipakai saat breaker menolak cepat tanpa memanggil upstream sama sekali. */
+/** The status used when the breaker rejects fast without calling upstream at all. */
 const BREAKER_OPEN_STATUS = 503;
 
 function isRetryableStatus(status: number): boolean {
@@ -122,12 +123,12 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Bikin fragmen `HttpGetOptions` dengan `apiKey` non-enumerable, konsisten
- * dengan pola yang dipakai `loadConfig()` di `config.ts`. Pakai ini alih-alih
- * `{ apiKey }` literal setiap kali mengoper API key ke `client.get()`, supaya
- * `console.log(opts)` / `JSON.stringify(opts)` di lapisan pemanggil tidak
- * membocorkan key. `extra` (headers/timeoutMs tambahan) tetap enumerable
- * seperti biasa.
+ * Builds an `HttpGetOptions` fragment with a non-enumerable `apiKey`,
+ * consistent with the pattern `loadConfig()` uses in `config.ts`. Use this
+ * instead of an `{ apiKey }` literal every time an API key is passed to
+ * `client.get()`, so that `console.log(opts)` / `JSON.stringify(opts)` in the
+ * calling layer does not leak the key. `extra` (additional headers/timeoutMs)
+ * stays enumerable as usual.
  */
 export function withApiKey(
   apiKey: string,
@@ -157,12 +158,12 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
   const retryOptions: RetryOptions = { ...DEFAULT_RETRY, ...options.retry };
   const breakerOptions: BreakerOptions = { ...DEFAULT_BREAKER, ...options.breaker };
 
-  // State breaker per instance klien (bukan per-request).
+  // Breaker state per client instance (not per request).
   let consecutiveFailures = 0;
   let openUntil: number | null = null;
-  // Single-flight guard untuk percobaan pengintaian half-open. Di-set secara
-  // SINKRON (tidak ada await sebelum ini di jalur pengintaian) supaya
-  // panggilan get() konkuren lain melihatnya di giliran sinkron yang sama.
+  // Single-flight guard for the half-open probe attempt. Set SYNCHRONOUSLY
+  // (there is no await before it on the probe path) so other concurrent get()
+  // calls see it in the same synchronous turn.
   let probeInFlight = false;
 
   function buildHeaders(opts?: HttpGetOptions): Headers {
@@ -195,7 +196,7 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
     }
   }
 
-  /** Dipanggil TEPAT SEKALI per panggilan `get()` logis yang akhirnya gagal total. */
+  /** Called EXACTLY ONCE per logical `get()` call that ends up failing completely. */
   function registerCallFailure(): void {
     consecutiveFailures++;
     if (consecutiveFailures >= breakerOptions.failureThreshold) {
@@ -224,11 +225,11 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
           try {
             data = (await response.json()) as T;
           } catch (parseErr) {
-            // Upstream benar-benar menjawab (2xx) — ini kegagalan data, bukan
-            // kegagalan jaringan. Jangan retry, jangan hitung ke breaker.
-            const reason = parseErr instanceof Error ? parseErr.message : "body tidak valid";
+            // Upstream really did answer (2xx) — this is a data failure, not a
+            // network failure. Do not retry, do not count toward the breaker.
+            const reason = parseErr instanceof Error ? parseErr.message : "invalid body";
             throw new UpstreamError(
-              `upstream membalas ${response.status} dengan body JSON tidak valid: ${reason}`,
+              `upstream answered ${response.status} with an invalid JSON body: ${reason}`,
               response.status,
               attempt,
             );
@@ -238,17 +239,17 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
         }
 
         if (!isRetryableStatus(response.status)) {
-          // 4xx selain 429: kesalahan klien, bukan indikasi upstream tumbang.
-          // Tidak menghitung ke breaker, tidak retry.
+          // 4xx other than 429: a client error, not a sign that upstream is
+          // down. Not counted toward the breaker, not retried.
           throw new UpstreamError(
-            `upstream membalas status ${response.status}`,
+            `upstream answered with status ${response.status}`,
             response.status,
             attempt,
           );
         }
 
         lastError = new UpstreamError(
-          `upstream membalas status ${response.status}`,
+          `upstream answered with status ${response.status}`,
           response.status,
           attempt,
         );
@@ -265,8 +266,8 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
           throw err;
         }
 
-        // Kegagalan jaringan / timeout / abort.
-        const message = err instanceof Error ? err.message : "kegagalan jaringan";
+        // Network failure / timeout / abort.
+        const message = err instanceof Error ? err.message : "network failure";
         lastError = new UpstreamError(message, NETWORK_ERROR_STATUS, attempt);
 
         if (attempt < maxAttempts) {
@@ -279,8 +280,8 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
       }
     }
 
-    // Tidak tercapai — loop di atas selalu return atau throw.
-    throw lastError ?? new UpstreamError("kegagalan tak dikenal", NETWORK_ERROR_STATUS, maxAttempts);
+    // Unreachable — the loop above always returns or throws.
+    throw lastError ?? new UpstreamError("unknown failure", NETWORK_ERROR_STATUS, maxAttempts);
   }
 
   return {
@@ -290,18 +291,18 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
       if (openUntil !== null) {
         if (currentTime < openUntil) {
           throw new UpstreamError(
-            "circuit breaker terbuka — upstream sedang dianggap tumbang",
+            "circuit breaker open — upstream is currently considered down",
             BREAKER_OPEN_STATUS,
             0,
           );
         }
 
-        // Cooldown sudah lewat: hanya satu percobaan pengintaian yang boleh
-        // benar-benar jalan. Cek + set flag ini sinkron, tanpa await di
-        // antaranya, supaya pemanggil konkuren lain melihat flag yang sama.
+        // The cooldown has elapsed: only one probe attempt may actually run.
+        // The check + set of this flag is synchronous, with no await in
+        // between, so other concurrent callers see the same flag.
         if (probeInFlight) {
           throw new UpstreamError(
-            "circuit breaker sedang menjalankan satu percobaan pengintaian — coba lagi sebentar",
+            "circuit breaker is running a single probe attempt — try again shortly",
             BREAKER_OPEN_STATUS,
             0,
           );

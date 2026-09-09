@@ -1,27 +1,29 @@
 /**
- * Sumber data on-chain — **jaring pengaman marketplace**.
+ * The on-chain data source — **the marketplace's safety net**.
  *
- * Saat 8004scan tumbang (dan ia terbukti sering tumbang: `500 DATABASE_ERROR`
- * pada 4 dari 5 percobaan saat riset) dan cache Postgres masih kosong, inilah
- * yang membuat marketplace tetap punya isi. Datanya first-party: listing yang
- * benar-benar terdaftar di `FuguRegistry` milik kita sendiri, bukan salinan
- * dari pihak ketiga.
+ * When 8004scan is down (and it is proven to go down often: `500 DATABASE_ERROR`
+ * on 4 out of 5 attempts during the research) and the Postgres cache is still
+ * empty, this is what keeps the marketplace populated. Its data is first-party:
+ * listings genuinely registered in our own `FuguRegistry`, not a copy from a
+ * third party.
  *
- * ## Kontrak modul ini
+ * ## This module's contract
  *
- * Sama seperti sumber 8004scan: **tidak pernah melempar**. RPC yang mati atau
- * satu `getListing` yang revert menjadi `healthy: false` / listing yang dilewati,
- * bukan exception yang menjatuhkan permintaan.
+ * Same as the 8004scan source: **it never throws**. A dead RPC or a single
+ * reverting `getListing` becomes `healthy: false` / a skipped listing, not an
+ * exception that takes the request down.
  *
- * ## Aturan
+ * ## Rules
  *
- * - Alamat registry **selalu** dibaca dari `config.contracts.registry`. Tidak ada
- *   alamat yang di-hardcode di modul ini — satu sumber kebenaran ada di `config.ts`.
- * - Semua nilai uang tetap `bigint` sepanjang jalur. Tidak pernah `number`.
- * - Id listing di `FuguRegistry` **dimulai dari 1** (`listingId = ++_listingCount`);
- *   membaca id 0 selalu revert. Rentang yang dibaca karena itu `offset+1 .. offset+limit`.
- * - Klien viem disuntikkan lewat opsi — test memakai transport palsu dan tidak
- *   pernah menyentuh RPC sungguhan.
+ * - The registry address is **always** read from `config.contracts.registry`.
+ *   No address is hardcoded in this module — the single source of truth is in
+ *   `config.ts`.
+ * - Every money value stays a `bigint` the whole way through. Never a `number`.
+ * - Listing ids in `FuguRegistry` **start at 1** (`listingId = ++_listingCount`);
+ *   reading id 0 always reverts. The range read is therefore
+ *   `offset+1 .. offset+limit`.
+ * - The viem client is injected through the options — tests use a fake transport
+ *   and never touch a real RPC.
  */
 
 import type { Chain, Client, Transport } from "viem";
@@ -40,10 +42,10 @@ import {
 } from "../types.js";
 
 /**
- * ABI minimal `FuguRegistry` — hanya bagian baca yang dipakai backend.
- * Diturunkan dari `contracts/src/interfaces/IFuguRegistry.sol` dan
- * `contracts/src/types/FuguTypes.sol`. Urutan field tuple **wajib** sama persis
- * dengan struct `Listing` di Solidity.
+ * The minimal `FuguRegistry` ABI — only the read side the backend uses.
+ * Derived from `contracts/src/interfaces/IFuguRegistry.sol` and
+ * `contracts/src/types/FuguTypes.sol`. The tuple field order **must** match the
+ * Solidity `Listing` struct exactly.
  */
 export const FUGU_REGISTRY_ABI = [
   {
@@ -92,10 +94,10 @@ export const FUGU_REGISTRY_ABI = [
   },
 ] as const;
 
-/** Klien viem apa pun yang bisa melakukan `eth_call`. Disuntikkan, tidak dibuat di sini. */
+/** Any viem client that can perform an `eth_call`. Injected, not constructed here. */
 export type RegistryClient = Client<Transport, Chain | undefined>;
 
-/** Bentuk mentah struct `Listing` yang dikembalikan `getListing`. */
+/** The raw shape of the `Listing` struct returned by `getListing`. */
 interface RawListingTuple {
   erc8004AgentId: bigint;
   owner: Address;
@@ -108,11 +110,11 @@ interface RawListingTuple {
   metadataURI: string;
 }
 
-/** Bacaan on-chain default: ambil banyak sekaligus — ini jaring pengaman, bukan halaman UI. */
+/** The default on-chain read: fetch many at once — this is a safety net, not a UI page. */
 export const ONCHAIN_DEFAULT_LIMIT = 100;
-/** Batas keras supaya satu permintaan tidak pernah membanjiri RPC. */
+/** A hard limit so a single request never floods the RPC. */
 export const ONCHAIN_MAX_LIMIT = 500;
-/** Jumlah `eth_call` yang berjalan bersamaan. RPC publik BSC testnet gampang tersedak. */
+/** How many `eth_call`s run concurrently. The public BSC testnet RPC chokes easily. */
 export const ONCHAIN_BATCH_SIZE = 10;
 
 export interface ReadFuguListingsOptions {
@@ -128,18 +130,18 @@ export interface OnchainSource {
 export interface OnchainSourceOptions {
   client: RegistryClient;
   config: FugugentConfig;
-  /** Disuntikkan supaya `fetchedAt` deterministik di test. */
+  /** Injected so `fetchedAt` is deterministic in tests. */
   now?: () => Date;
   batchSize?: number;
 }
 
 function describeFailure(err: unknown): string {
   if (err instanceof Error) {
-    // Pesan viem bisa sangat panjang (berisi seluruh detail request); potong.
+    // viem messages can be very long (they carry the whole request detail); trim it.
     const firstLine = err.message.split("\n")[0] ?? err.message;
     return `${err.name}: ${firstLine}`;
   }
-  return "kegagalan tak dikenal saat membaca on-chain";
+  return "unknown failure while reading on-chain";
 }
 
 function chunk<T>(values: T[], size: number): T[][] {
@@ -149,11 +151,11 @@ function chunk<T>(values: T[], size: number): T[][] {
 }
 
 /**
- * Ubah satu `Listing` on-chain menjadi `AgentRecord`.
+ * Turns a single on-chain `Listing` into an `AgentRecord`.
  *
- * Kategori on-chain adalah kebenaran yang sudah ditandatangani pemilik listing —
- * karena itu langsung dipakai sebagai `classification` dengan kepercayaan penuh,
- * dan classifier (Task 4) tidak perlu menebak untuk listing yang punya ini.
+ * The on-chain category is truth already signed by the listing owner — so it is
+ * used directly as the `classification` with full confidence, and the classifier
+ * (Task 4) does not have to guess for listings that have one.
  */
 function toAgentRecord(
   listingId: bigint,
@@ -185,9 +187,9 @@ function toAgentRecord(
     registryAddress,
     agentId: null,
 
-    // Nama dan deskripsi hidup di `metadataURI` (IPFS/HTTPS), yang sengaja
-    // TIDAK diambil di sini — jaring pengaman harus bekerja tanpa jaringan
-    // tambahan yang bisa ikut tumbang. Task 5 boleh memperkayanya dari cache.
+    // The name and description live in `metadataURI` (IPFS/HTTPS), which is
+    // deliberately NOT fetched here — the safety net must work without an extra
+    // network that can go down too. Task 5 may enrich it from the cache.
     name: `Agent #${tokenId}`,
     description: "",
     imageUrl: null,
@@ -204,9 +206,9 @@ function toAgentRecord(
     agentWallet: listing.agentWallet,
 
     isActive: listing.active,
-    // `curated` diberikan kurator terpercaya lewat `setCurated`, dan kurator
-    // tidak boleh mengkurasi listing miliknya sendiri — itu sinyal verifikasi
-    // terkuat yang kita punya tanpa memanggil apa pun di luar rantai.
+    // `curated` is granted by a trusted curator through `setCurated`, and a
+    // curator may not curate their own listing — that is the strongest
+    // verification signal we have without calling anything off-chain.
     isVerified: listing.curated,
     isEndpointVerified: false,
     x402Supported: false,
@@ -221,7 +223,7 @@ function toAgentRecord(
     classification: {
       category,
       confidence: 1,
-      reason: "kategori on-chain dari FuguRegistry",
+      reason: "on-chain category from FuguRegistry",
     },
     fuguListing,
 
@@ -270,10 +272,10 @@ export function createOnchainSource(options: OnchainSourceOptions): OnchainSourc
         return unhealthyPage("onchain", describeFailure(err), fetchedAt, limit, offset);
       }
 
-      // `listingCount()` adalah `uint256`. Di atas 2^53 `Number()` melenceng
-      // diam-diam, jadi angkanya dijepit alih-alih dibiarkan berbohong pelan.
-      // Realistis tidak akan tercapai; ini menjaga agar kalau kontraknya suatu
-      // saat berubah, yang muncul adalah angka yang jelas mustahil.
+      // `listingCount()` is a `uint256`. Above 2^53 `Number()` drifts
+      // silently, so the number is clamped rather than left to lie quietly.
+      // Realistically unreachable; this ensures that if the contract ever
+      // changes, what surfaces is an obviously impossible number.
       const total =
         count > BigInt(Number.MAX_SAFE_INTEGER) ? Number.MAX_SAFE_INTEGER : Number(count);
       const base = {
@@ -284,7 +286,7 @@ export function createOnchainSource(options: OnchainSourceOptions): OnchainSourc
         fetchedAt,
       };
 
-      // Id listing dimulai dari 1 — `getListing(0)` selalu revert.
+      // Listing ids start at 1 — `getListing(0)` always reverts.
       const ids: bigint[] = [];
       for (let i = offset + 1; i <= Math.min(offset + limit, total); i++) {
         ids.push(BigInt(i));
@@ -297,15 +299,15 @@ export function createOnchainSource(options: OnchainSourceOptions): OnchainSourc
         const settled = await Promise.allSettled(group.map((id) => readListing(id)));
         settled.forEach((result, index) => {
           if (result.status !== "fulfilled") {
-            // Satu listing yang revert (mis. dihapus di versi kontrak berikutnya)
-            // tidak boleh menjatuhkan seluruh halaman.
+            // A single reverting listing (e.g. removed in a later contract
+            // version) must not take the whole page down.
             skipped++;
             return;
           }
           const category = categoryFromOnchainIndex(result.value.category);
           if (category === null) {
-            // Enum on-chain di luar 0–3: kontrak lebih baru dari backend ini.
-            // Lewati daripada menampilkan kategori yang salah.
+            // An on-chain enum outside 0–3: the contract is newer than this
+            // backend. Skip it rather than showing the wrong category.
             skipped++;
             return;
           }
@@ -326,7 +328,7 @@ export function createOnchainSource(options: OnchainSourceOptions): OnchainSourc
         ...base,
         items,
         healthy: true,
-        reason: skipped > 0 ? `${skipped} listing dilewati karena gagal dibaca` : null,
+        reason: skipped > 0 ? `${skipped} listing(s) skipped because they could not be read` : null,
       };
     },
 
@@ -343,7 +345,7 @@ export function createOnchainSource(options: OnchainSourceOptions): OnchainSourc
             ...base,
             agent: null,
             healthy: false,
-            reason: `kategori on-chain tak dikenal: ${listing.category}`,
+            reason: `unknown on-chain category: ${listing.category}`,
           };
         }
         return {

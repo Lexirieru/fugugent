@@ -1,21 +1,20 @@
 /**
- * Jembatan `node:http` di `src/index.ts`.
+ * The `node:http` bridge in `src/index.ts`.
  *
- * Ditulis tangan supaya tidak perlu menambah dependensi, dan justru karena itu
- * ia harus diuji terhadap server sungguhan alih-alih terhadap objek palsu:
- * yang bisa salah di sini adalah hal-hal yang hanya muncul di kawat — `Host`
- * cacat, header yang tidak boleh digabung, dan galat yang lolos ke jaring
- * terakhir.
+ * Hand-written to avoid adding a dependency, and precisely for that reason it
+ * must be tested against a real server rather than against a fake object: what
+ * can go wrong here only shows up on the wire — a malformed `Host`, a header
+ * that must not be joined, and an error escaping to the last-resort net.
  *
- * Servernya mendengarkan di `127.0.0.1:0` (port pinjaman), tidak menyentuh
- * jaringan luar, Postgres, maupun RPC.
+ * The server listens on `127.0.0.1:0` (a borrowed port) and touches no external
+ * network, no Postgres, and no RPC.
  */
 import { createServer, type Server } from "node:http";
 import { connect } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import { createRequestListener, describeFailure } from "../../index.js";
 
-const SECRET = "sk-RAHASIA-123";
+const SECRET = "sk-SECRET-123";
 
 let running: Server | null = null;
 
@@ -26,19 +25,19 @@ afterEach(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 
-/** Nyalakan server di port pinjaman dengan aplikasi Fetch tiruan. */
+/** Start a server on a borrowed port with a stand-in Fetch application. */
 async function serve(fetchImpl: (request: Request) => Response | Promise<Response>): Promise<number> {
   const server = createServer(createRequestListener({ fetch: fetchImpl }));
   running = server;
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
   const address = server.address();
-  if (address === null || typeof address === "string") throw new Error("port tidak diketahui");
+  if (address === null || typeof address === "string") throw new Error("unknown port");
   return address.port;
 }
 
 /**
- * Kirim permintaan HTTP mentah. Dibutuhkan karena `fetch` menolak menyusun
- * `Host` yang cacat — padahal justru itu yang harus diuji.
+ * Send a raw HTTP request. Needed because `fetch` refuses to build a malformed
+ * `Host` — which is exactly what has to be tested.
  */
 function rawRequest(port: number, lines: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -59,19 +58,19 @@ function rawRequest(port: number, lines: string[]): Promise<string> {
   });
 }
 
-describe("jembatan node:http", () => {
-  it("Host cacat dijawab 400, bukan 500", async () => {
-    const port = await serve(() => new Response("tidak boleh sampai sini"));
+describe("the node:http bridge", () => {
+  it("a malformed Host is answered with 400, not 500", async () => {
+    const port = await serve(() => new Response("must not reach here"));
     const raw = await rawRequest(port, ["GET / HTTP/1.1", "Host: bad host", "Connection: close"]);
 
-    // Ini kesalahan klien, bisa dipicu siapa saja tanpa autentikasi. 500 akan
-    // mengotori metrik 5xx dengan permintaan yang tidak pernah salah di sisi kita.
+    // This is a client error, triggerable by anyone without authentication. A 500
+    // would pollute the 5xx metrics with requests that were never wrong on our side.
     expect(raw).toContain("HTTP/1.1 400");
     expect(raw).not.toContain("HTTP/1.1 500");
     expect(raw).toContain("bad_request");
   });
 
-  it("permintaan biasa tetap lewat", async () => {
+  it("an ordinary request still gets through", async () => {
     const port = await serve((request) =>
       Response.json({ path: new URL(request.url).pathname, method: request.method }),
     );
@@ -81,7 +80,7 @@ describe("jembatan node:http", () => {
     expect(await res.json()).toEqual({ path: "/api/agents", method: "GET" });
   });
 
-  it("beberapa Set-Cookie tetap terpisah, tidak menyatu jadi satu", async () => {
+  it("multiple Set-Cookie headers stay separate, not merged into one", async () => {
     const port = await serve(() => {
       const headers = new Headers();
       headers.append("set-cookie", "a=1; Path=/");
@@ -90,12 +89,12 @@ describe("jembatan node:http", () => {
     });
     const res = await fetch(`http://127.0.0.1:${port}/`);
 
-    // Gagal bila `writeResponse` kembali menimpa `headers["set-cookie"]`
-    // di tiap iterasi `forEach` — dulu hanya nilai terakhir yang lolos.
+    // Fails if `writeResponse` goes back to overwriting `headers["set-cookie"]`
+    // on every `forEach` iteration — only the last value used to get through.
     expect(res.headers.getSetCookie()).toEqual(["a=1; Path=/", "b=2; Path=/"]);
   });
 
-  it("header biasa yang ganda tetap utuh", async () => {
+  it("an ordinary duplicated header stays intact", async () => {
     const port = await serve(() => {
       const headers = new Headers();
       headers.append("x-dup", "1");
@@ -107,21 +106,21 @@ describe("jembatan node:http", () => {
     expect(res.headers.get("x-dup")).toBe("1, 2");
   });
 
-  it("aplikasi yang melempar menjadi 500 JSON tanpa kredensial", async () => {
+  it("an application that throws becomes a JSON 500 with no credentials", async () => {
     const port = await serve(() => {
-      throw new Error(`GET https://api.8004scan.io/api/v1/agents?api_key=${SECRET} gagal`);
+      throw new Error(`GET https://api.8004scan.io/api/v1/agents?api_key=${SECRET} failed`);
     });
     const res = await fetch(`http://127.0.0.1:${port}/`);
     const raw = await res.text();
 
     expect(res.status).toBe(500);
-    // Gagal bila `describeFailure` di `index.ts` berhenti memanggil `redact`.
+    // Fails if `describeFailure` in `index.ts` stops calling `redact`.
     expect(raw).not.toContain(SECRET);
     expect(raw).toContain("[redacted]");
     expect(JSON.parse(raw).error).toBe("internal_error");
   });
 
-  it("badan kosong dan status 204 diteruskan apa adanya", async () => {
+  it("an empty body and a 204 status are passed through verbatim", async () => {
     const port = await serve(() => new Response(null, { status: 204 }));
     const res = await fetch(`http://127.0.0.1:${port}/`);
 
@@ -129,8 +128,8 @@ describe("jembatan node:http", () => {
     expect(await res.text()).toBe("");
   });
 
-  it("HEAD tidak membawa badan", async () => {
-    const port = await serve(() => Response.json({ ada: true }));
+  it("HEAD carries no body", async () => {
+    const port = await serve(() => Response.json({ present: true }));
     const res = await fetch(`http://127.0.0.1:${port}/`, { method: "HEAD" });
 
     expect(res.status).toBe(200);
@@ -139,9 +138,9 @@ describe("jembatan node:http", () => {
 });
 
 describe("describeFailure", () => {
-  it("menyunting api key dan memotong stack trace", () => {
+  it("redacts the api key and trims the stack trace", () => {
     const message = describeFailure(
-      new Error(`fetch gagal: https://api.8004scan.io?api_key=${SECRET}\n  at somewhere`),
+      new Error(`fetch failed: https://api.8004scan.io?api_key=${SECRET}\n  at somewhere`),
     );
 
     expect(message).not.toContain(SECRET);
@@ -149,7 +148,7 @@ describe("describeFailure", () => {
     expect(message).not.toContain("at somewhere");
   });
 
-  it("aman untuk nilai yang bukan Error", () => {
-    expect(describeFailure("gagal biasa")).toBe("gagal biasa");
+  it("is safe for a value that is not an Error", () => {
+    expect(describeFailure("an ordinary failure")).toBe("an ordinary failure");
   });
 });

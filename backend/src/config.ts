@@ -1,25 +1,25 @@
 /**
- * Satu sumber kebenaran untuk konfigurasi backend Fugugent:
- * alamat kontrak testnet terverifikasi, konstanta jaringan, base URL sumber
- * data eksternal, dan API key opsional.
+ * The single source of truth for the Fugugent backend configuration:
+ * verified testnet contract addresses, network constants, external data source
+ * base URLs, and optional API keys.
  *
- * PENTING: `loadConfig` menaruh setiap API key sebagai properti
- * non-enumerable. Ini bukan enkripsi — hanya jaring pengaman supaya
- * `JSON.stringify(config)` atau `console.log(config)` tidak pernah
- * membocorkan key ke log. Kode yang butuh key tetap mengaksesnya lewat
- * `config.scan8004.apiKey` secara langsung.
+ * IMPORTANT: `loadConfig` installs every API key as a non-enumerable property.
+ * This is not encryption — only a safety net so that
+ * `JSON.stringify(config)` or `console.log(config)` never leaks a key into the
+ * logs. Code that needs a key still reads it through
+ * `config.scan8004.apiKey` directly.
  */
 
-/** Chain ID BSC testnet — satu-satunya jaringan yang didukung proyek ini. */
+/** BSC testnet chain ID — the only network this project supports. */
 export const CHAIN_ID = 97;
 
-/** Default SDK memakai domain `binance.org` yang diblokir dari Indonesia. Wajib override. */
+/** The SDK default uses the `binance.org` domain, which is blocked from Indonesia. Must be overridden. */
 export const DEFAULT_RPC_URL = "https://data-seed-prebsc-1-s1.bnbchain.org:8545";
 
 export const DEFAULT_SCAN8004_BASE_URL = "https://api.8004scan.io/api/v1";
 export const DEFAULT_DGRID_BASE_URL = "https://api.dgrid.ai/v1";
 
-/** Alamat kontrak testnet terverifikasi (lihat docs/setup/ENVIRONMENT.md). */
+/** Verified testnet contract addresses (see docs/setup/ENVIRONMENT.md). */
 export const CONTRACT_ADDRESSES = {
   priceOracle: "0xB5f72a0ab0bA971c8C4F69D4A075cB7fd7859e65",
   registry: "0xb2f36070E6eae3353E8e755172B477DF213ae248",
@@ -27,7 +27,7 @@ export const CONTRACT_ADDRESSES = {
   reputation: "0x279B31B00F64C0ce85BCe2Bd7e377CdcAE58d400",
 } as const;
 
-/** Tier request/menit tanpa API key. Naik otomatis begitu key diisi. */
+/** Requests-per-minute tier without an API key. Rises automatically once a key is set. */
 export const ANONYMOUS_RATE_LIMIT_PER_MINUTE = 30;
 export const AUTHENTICATED_RATE_LIMIT_PER_MINUTE = 120;
 
@@ -35,7 +35,7 @@ export type ContractAddresses = typeof CONTRACT_ADDRESSES;
 
 export interface UpstreamSourceConfig {
   baseUrl: string;
-  /** `undefined` bila tidak diisi — tier anonim. Non-enumerable, lihat catatan di atas. */
+  /** `undefined` when unset — the anonymous tier. Non-enumerable, see the note above. */
   apiKey?: string;
   rateLimitPerMinute: number;
 }
@@ -55,7 +55,7 @@ function readEnv(env: EnvLike, key: string): string | undefined {
   return value === undefined || value === "" ? undefined : value;
 }
 
-/** Bikin objek sumber upstream dengan apiKey non-enumerable — tidak pernah muncul di JSON/log. */
+/** Builds an upstream source object with a non-enumerable apiKey — never shows up in JSON/logs. */
 function buildUpstreamConfig(baseUrl: string, apiKey: string | undefined): UpstreamSourceConfig {
   const config = {
     baseUrl,
@@ -75,8 +75,8 @@ function buildUpstreamConfig(baseUrl: string, apiKey: string | undefined): Upstr
 }
 
 /**
- * Muat konfigurasi dari environment (default `process.env`). Tidak pernah
- * melempar — setiap nilai punya default aman untuk testnet.
+ * Loads the configuration from the environment (`process.env` by default).
+ * Never throws — every value has a safe testnet default.
  */
 export function loadConfig(env: EnvLike = process.env): FugugentConfig {
   return {

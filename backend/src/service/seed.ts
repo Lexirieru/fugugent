@@ -1,57 +1,57 @@
 /**
- * Seed terkurasi — **tingkat keempat dan terakhir** dari fallback berjenjang.
+ * The curated seed — **the fourth and last level** of the tiered fallback.
  *
- * Ini yang menjawab ketika 8004scan tumbang, cache Postgres kosong, dan
- * `FuguRegistry` on-chain belum berisi listing apa pun. Tanpa berkas ini
- * marketplace bisa tampil kosong di depan juri; dengan berkas ini ia tampil
- * berisi — **dan mengaku apa adanya dari mana isinya**.
+ * This is what answers when 8004scan is down, the Postgres cache is empty, and
+ * the on-chain `FuguRegistry` holds no listings yet. Without this file the
+ * marketplace could appear empty in front of the judges; with it the marketplace
+ * has content — **and admits plainly where that content came from**.
  *
- * ## Aturan yang mengikat berkas ini
+ * ## Rules that bind this file
  *
- * 1. **Tidak ada agent fiktif.** Keempat agent di sini benar-benar ada: mereka
- *    di-scaffold dengan BNB Agent Studio di `ai/`, punya wallet admin Altana
- *    sendiri yang alamatnya tertulis di `ai/<agent>/app/agent/studio.toml`, dan
- *    session-nya terdaftar di Keystore Altana on-chain
+ * 1. **No fictional agents.** The four agents here really exist: they were
+ *    scaffolded with BNB Agent Studio under `ai/`, each has its own Altana admin
+ *    wallet whose address is written in `ai/<agent>/app/agent/studio.toml`, and
+ *    their sessions are registered in the on-chain Altana Keystore
  *    (`0x6b8361C29d05D498b1a12B54A37310f94171E94A`, `isValidKey` → `true`).
- *    Siapa pun bisa memverifikasinya tanpa API key:
+ *    Anyone can verify it without an API key:
  *
  *    ```bash
  *    cast call --rpc-url https://data-seed-prebsc-1-s1.bnbchain.org:8545 \
  *      0x6b8361C29d05D498b1a12B54A37310f94171E94A \
- *      'isValidKey(address,bytes32)(bool)' <WALLET_AGENT> <KEY_HASH>
+ *      'isValidKey(address,bytes32)(bool)' <AGENT_WALLET> <KEY_HASH>
  *    ```
  *
- * 2. **Tidak mengklaim apa yang belum terjadi.** Keempat agent belum punya
- *    `agentId` ERC-8004 (dihasilkan `bag erc8004 register`) dan belum punya
- *    listing di `FuguRegistry`. Karena itu `agentId`, `registryAddress`, dan
- *    `fuguListing` semuanya `null`; reputasi nol; `isVerified: false`.
- *    Menaruh harga karangan di sini akan menampilkan tombol langganan yang
- *    tidak bisa dibayar — kebohongan yang persis ingin kita hindari.
+ * 2. **It claims nothing that has not happened.** None of the four agents has an
+ *    ERC-8004 `agentId` yet (produced by `bag erc8004 register`) nor a listing in
+ *    `FuguRegistry`. So `agentId`, `registryAddress`, and `fuguListing` are all
+ *    `null`; reputation is zero; `isVerified: false`. Putting an invented price
+ *    here would render a subscribe button that cannot be paid — exactly the lie
+ *    we want to avoid.
  *
- * 3. **`tokenId` sengaja bukan angka desimal.** Ia berbentuk `seed-<nama>`,
- *    sehingga `id` = `97:seed-fugugrid` tidak bisa disalahartikan sebagai token
- *    ERC-8004 sungguhan oleh lapisan mana pun. Begitu `bag erc8004 register`
- *    berjalan, `tokenId` di sini diganti dengan angka aslinya dan seluruh
- *    lapisan lain tidak perlu berubah.
+ * 3. **`tokenId` is deliberately not a decimal number.** It has the form
+ *    `seed-<name>`, so `id` = `97:seed-fugugrid` cannot be mistaken for a real
+ *    ERC-8004 token by any layer. Once `bag erc8004 register` has run, the
+ *    `tokenId` here is replaced with the real number and no other layer needs to
+ *    change.
  *
- * 4. **`fetchedAt` = tanggal kurasi, bukan `now`.** Konsekuensinya
- *    `ageSeconds` yang dilihat pengguna adalah umur sebenarnya data ini —
- *    berhari-hari, bukan nol detik. Memalsukan `fetchedAt` menjadi `now` akan
- *    membuat data kurasi menyamar sebagai data segar.
+ * 4. **`fetchedAt` = the curation date, not `now`.** The consequence is that the
+ *    `ageSeconds` the user sees is the real age of this data — days, not zero
+ *    seconds. Faking `fetchedAt` as `now` would let curated data masquerade as
+ *    fresh data.
  *
- * 5. **Seed tidak pernah ditulis ke cache Postgres.** Kalau ditulis, pembacaan
- *    berikutnya akan melaporkan `source: "cache"` untuk baris yang sebenarnya
- *    berasal dari seed — dan provenance yang jadi seluruh nilai lapisan ini
- *    hilang. Aturan itu ditegakkan di `agents.ts`, diuji di sana.
+ * 5. **The seed is never written into the Postgres cache.** If it were, the next
+ *    read would report `source: "cache"` for rows that actually came from the
+ *    seed — and the provenance that is this layer's entire value would be lost.
+ *    That rule is enforced in `agents.ts`, and tested there.
  *
- * ## Deskripsi bukan teks pemasaran
+ * ## The descriptions are not marketing copy
  *
- * Deskripsi tiap agent ditulis dalam bahasa Inggris dan memakai istilah yang
- * benar-benar menjelaskan strateginya (`grid trading`, `portfolio rebalancing`,
- * `yield farming`, `health factor`). Itu bukan kebetulan: `seed.test.ts`
- * menjalankan `classify()` atas tiap record dan menuntut classifier setuju
- * dengan kategori kurasinya. Kalau deskripsi berubah jadi slogan kosong, test
- * itu merah — seed tidak boleh berisi kalimat yang tidak menjelaskan apa pun.
+ * Each agent's description is written in English and uses terms that genuinely
+ * explain its strategy (`grid trading`, `portfolio rebalancing`,
+ * `yield farming`, `health factor`). That is not a coincidence: `seed.test.ts`
+ * runs `classify()` over each record and demands that the classifier agree with
+ * its curated category. If a description turned into an empty slogan, that test
+ * goes red — the seed must not contain a sentence that explains nothing.
  */
 
 import type {
@@ -63,13 +63,13 @@ import type {
 } from "../types.js";
 import { makeAgentKey } from "../types.js";
 
-/** Chain tempat keempat agent ini hidup. Testnet BSC — satu-satunya yang didukung. */
+/** The chain these four agents live on. BSC testnet — the only one supported. */
 export const SEED_CHAIN_ID = 97;
 
 /**
- * Kapan seed ini terakhir diperiksa terhadap kenyataan (wallet, session,
- * `bag doctor` 14 PASS / 0 FAIL). Dipakai sebagai `fetchedAt` supaya umur data
- * yang ditampilkan ke pengguna adalah umur sebenarnya.
+ * When this seed was last checked against reality (wallets, sessions,
+ * `bag doctor` 14 PASS / 0 FAIL). Used as `fetchedAt` so the data age shown to
+ * the user is the real age.
  */
 export const CURATED_SEED_AT = "2026-09-08T00:00:00.000Z";
 
@@ -79,13 +79,13 @@ interface SeedSpec {
   category: Category;
   description: string;
   tags: string[];
-  /** Alamat wallet admin Altana — sumbernya `ai/<agent>/app/agent/studio.toml`. */
+  /** The Altana admin wallet address — sourced from `ai/<agent>/app/agent/studio.toml`. */
   agentWallet: Address;
 }
 
 /**
- * Keempat agent Fugugent. Kategori, protokol, dan wallet-nya disalin dari
- * `ai/CLAUDE.md` dan `ai/<agent>/app/agent/studio.toml` — bukan dikarang.
+ * The four Fugugent agents. Their category, protocols, and wallet are copied
+ * from `ai/CLAUDE.md` and `ai/<agent>/app/agent/studio.toml` — not invented.
  */
 const SEED_SPECS: readonly SeedSpec[] = [
   {
@@ -141,7 +141,7 @@ function toRecord(spec: SeedSpec): AgentRecord {
     id: makeAgentKey(SEED_CHAIN_ID, tokenId),
     chainId: SEED_CHAIN_ID,
     tokenId,
-    // Belum terdaftar di registry mana pun — lihat aturan 2 di kepala berkas.
+    // Not registered in any registry yet — see rule 2 in the file header.
     registryAddress: null,
     agentId: null,
 
@@ -151,11 +151,11 @@ function toRecord(spec: SeedSpec): AgentRecord {
     agentType: "trading",
     tags: [...spec.tags],
     categories: [],
-    // OASF hanya ada pada `MCPAgentDetail` di 8004scan; kita tidak punya
-    // padanannya untuk agent kita sendiri, jadi dikosongkan (netral bagi classifier).
+    // OASF only exists on `MCPAgentDetail` in 8004scan; we have no equivalent
+    // for our own agents, so it is left empty (neutral for the classifier).
     skills: [],
     domains: [],
-    // Benar-benar diekspos oleh keempat agent: `protocols = ["A2A","MCP"]` di studio.toml.
+    // Genuinely exposed by all four agents: `protocols = ["A2A","MCP"]` in studio.toml.
     supportedProtocols: ["A2A", "MCP"],
 
     ownerAddress: null,
@@ -163,10 +163,10 @@ function toRecord(spec: SeedSpec): AgentRecord {
     ownerPublisherTier: null,
     agentWallet: spec.agentWallet,
 
-    // Wallet + session terverifikasi on-chain dan `bag doctor` 14 PASS / 0 FAIL.
+    // Wallet + session verified on-chain and `bag doctor` 14 PASS / 0 FAIL.
     isActive: true,
-    // `isVerified` di produk ini berarti "dikurasi lewat FuguRegistry.setCurated".
-    // Belum terjadi, jadi false — walaupun agent ini milik kita sendiri.
+    // `isVerified` in this product means "curated via FuguRegistry.setCurated".
+    // That has not happened yet, so false — even though these agents are ours.
     isVerified: false,
     isEndpointVerified: false,
     x402Supported: false,
@@ -181,7 +181,7 @@ function toRecord(spec: SeedSpec): AgentRecord {
     classification: {
       category: spec.category,
       confidence: 1,
-      reason: "seed terkurasi Fugugent: kategori ditetapkan oleh pembuat agent, bukan ditebak",
+      reason: "Fugugent curated seed: the category was set by the agent's author, not guessed",
     },
     fuguListing: null,
 
@@ -194,14 +194,15 @@ function toRecord(spec: SeedSpec): AgentRecord {
 }
 
 /**
- * Salinan segar keempat record seed.
+ * A fresh copy of the four seed records.
  *
- * Selalu salinan dalam: pemanggil yang memutasi hasilnya (mis. classifier yang
- * menimpa `classification`, atau lapisan HTTP yang mengubah bigint jadi string)
- * tidak boleh merusak seed untuk permintaan berikutnya.
+ * Always a deep copy: a caller that mutates the result (e.g. a classifier
+ * overwriting `classification`, or the HTTP layer turning bigints into strings)
+ * must not corrupt the seed for the next request.
  *
- * `_now` diterima supaya tanda tangannya stabil bila kelak seed perlu bergantung
- * pada waktu; saat ini umur seed sepenuhnya ditentukan {@link CURATED_SEED_AT}.
+ * `_now` is accepted so the signature stays stable should the seed ever need to
+ * depend on time; today the seed's age is determined entirely by
+ * {@link CURATED_SEED_AT}.
  */
 export function seedAgents(_now: Date = new Date()): AgentRecord[] {
   return SEED_SPECS.map(toRecord);
@@ -213,10 +214,9 @@ export interface SeedListOptions {
 }
 
 /**
- * Bentuk sumber seed. Async dan sebentuk sumber lain, supaya `agents.ts`
- * memperlakukan keempat tingkat dengan cara yang persis sama — dan supaya test
- * bisa menyuntikkan seed yang **melempar**, yang harus tetap tidak menjatuhkan
- * pemanggil.
+ * The shape of the seed source. Async and shaped like the other sources, so
+ * `agents.ts` treats all four levels in exactly the same way — and so tests can
+ * inject a seed that **throws**, which must still not take the caller down.
  */
 export interface SeedSource {
   listAgents(category: Category, opts?: SeedListOptions): Promise<AgentListPage>;
@@ -224,7 +224,7 @@ export interface SeedSource {
 }
 
 export interface SeedSourceOptions {
-  /** Disuntikkan supaya `fetchedAt` halaman deterministik di test. */
+  /** Injected so the page's `fetchedAt` is deterministic in tests. */
   now?: () => Date;
 }
 
@@ -258,7 +258,7 @@ export function createSeedSource(options: SeedSourceOptions = {}): SeedSource {
         agent: hit,
         source: "seed",
         healthy: true,
-        reason: hit === null ? `agent ${id} tidak ada di seed terkurasi` : null,
+        reason: hit === null ? `agent ${id} is not in the curated seed` : null,
         fetchedAt,
       };
     },
