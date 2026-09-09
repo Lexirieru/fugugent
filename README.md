@@ -1,36 +1,50 @@
 <div align="center">
 
-# 🐡 Fugugent
+<img src="docs/brand/hellofugu-logo.webp" alt="HelloFugu" width="132" height="132">
 
-### A marketplace of DeFi agents on BNB Chain where the fish puffs up as the risk does.
+# HelloFugu
 
-Every agent is a cartoon pufferfish. Its **puff level** is not decoration — it is a real risk
-metric rendered as a shape. When the health factor of the position it guards falls, the fish
-gets rounder, spikier, and ringed in amber. Every number on a card comes from a contract call
-you can repeat yourself.
+### Buy an agent like you buy an app.
+
+A marketplace for agents on BNB Chain. Every agent is a cartoon pufferfish, and its **puff
+level** is not decoration: it is one real risk metric rendered as a shape. Every number on a
+page links to the transaction behind it, and where there is no record the page says so
+instead of filling the gap.
 
 <br>
 
 ![BNB Chain](https://img.shields.io/badge/BNB%20Chain-testnet%20%C2%B7%20chainId%2097-F0B90B?style=for-the-badge&logo=binance&logoColor=black)
-![Contracts](https://img.shields.io/badge/contracts-4%20UUPS%20%C2%B7%20verified-0072B2?style=for-the-badge)
-![Tests](https://img.shields.io/badge/tests-1%2C034%20passing-009E73?style=for-the-badge)
+![Contracts](https://img.shields.io/badge/contracts-5%20UUPS%20%C2%B7%20verified-0072B2?style=for-the-badge)
+![Tests](https://img.shields.io/badge/tests-2%2C302%20in%20CI-009E73?style=for-the-badge)
 ![Solidity](https://img.shields.io/badge/Solidity-0.8.30-363636?style=for-the-badge&logo=solidity&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
-![Status](https://img.shields.io/badge/status-testnet%20only-E69F00?style=for-the-badge)
+![Licence](https://img.shields.io/badge/licence-GPL--3.0--or--later-a8420a?style=for-the-badge)
 
 <br>
+
+### Live now
+
+| | |
+|---|---|
+| **Landing** | **[hellofugu.xyz](https://hellofugu.xyz)** |
+| **Marketplace** | **[app.hellofugu.xyz](https://app.hellofugu.xyz)** |
+| **API** | **[api.hellofugu.xyz/api/health](https://api.hellofugu.xyz/api/health)** |
+| **Agent endpoint** | **[agents.hellofugu.xyz/guardian/](https://agents.hellofugu.xyz/guardian/.well-known/agent-card.json)** |
+| **Demo video** | **[Google Drive](https://drive.google.com/drive/folders/1TiFCk9V-Peq8E0L0fdl5-0s1do9rxQDW?usp=sharing)** |
+| **Repo** | **[github.com/Lexirieru/fugugent](https://github.com/Lexirieru/fugugent)** |
 
 **[Contracts on BscScan](#-live-on-bnb-chain-testnet--verify-it-yourself)** ·
 **[Receipts](#-receipts-not-screenshots)** ·
 **[Run it locally](#-try-it-yourself)** ·
-**[Limitations](#-security--limitations)** ·
-**[Repo](https://github.com/Lexirieru/fugugent)**
+**[What is not built](#-security--limitations)**
 
 Built for the BNB Chain hackathon **"The Smart Money Era: Build the Era"**.
 
-> **There is no public deployment yet.** Everything below either runs on BSC testnet — where
-> anyone can read it without an account — or runs on your machine with `docker compose up -d`.
-> We would rather hand you a `cast call` than a screenshot.
+> **The honest headline: nine agents are listed, and exactly one of them has ever sent a
+> transaction.** That sentence is on the site, at the end of the demo video, and in
+> [`docs/STATUS.md`](docs/STATUS.md), which is the document to read if you want to know what
+> this project cannot do. Every link below opens a public explorer, so nothing here needs a
+> terminal or an account to check.
 
 </div>
 
@@ -56,7 +70,7 @@ measurement in June 2026 found agent positions near zero. The dashboard told one
 chain told another, and no visitor to that dashboard had any way to tell which was true.
 (Sources and the full landscape survey: [`docs/research/05-competitive-landscape.md`](docs/research/05-competitive-landscape.md).)
 
-That is the bar Fugugent sets for itself: **every number a card shows must be reachable by a
+That is the bar HelloFugu sets for itself: **every number a card shows must be reachable by a
 call anyone can make.** If we cannot link it to a transaction, an event log, or an `eth_call`,
 it does not go on the card.
 
@@ -80,8 +94,8 @@ it does not go on the card.
 Network: **BSC testnet, chainId 97** · RPC `https://data-seed-prebsc-1-s1.bnbchain.org:8545`
 · Explorer [testnet.bscscan.com](https://testnet.bscscan.com)
 
-All four are **UUPS upgradeable** and all four implementations are **verified on BscScan**, so
-the *Read as Proxy* / *Write as Proxy* tabs work.
+All five are **UUPS upgradeable** and every implementation is **verified on BscScan**, so the
+*Read as Proxy* and *Write as Proxy* tabs work in your browser.
 
 ### Product contracts
 
@@ -91,15 +105,11 @@ the *Read as Proxy* / *Write as Proxy* tabs work.
 | **FuguSubscription** | Escrow + time-streamed payment from renter to agent | [`0xfdb083371f44Cf53181350389D3217e51B431776`](https://testnet.bscscan.com/address/0xfdb083371f44Cf53181350389D3217e51B431776) | [`0x06bc0ba1dbc3b6fd22defe7a0cd9a6cd13c15e97`](https://testnet.bscscan.com/address/0x06bc0ba1dbc3b6fd22defe7a0cd9a6cd13c15e97) |
 | **FuguReputation** | Reviews, gated on the agent having actually been paid | [`0x279B31B00F64C0ce85BCe2Bd7e377CdcAE58d400`](https://testnet.bscscan.com/address/0x279B31B00F64C0ce85BCe2Bd7e377CdcAE58d400) | [`0x30c92ffadad24ca079227a92a33b78683d36fde6`](https://testnet.bscscan.com/address/0x30c92ffadad24ca079227a92a33b78683d36fde6) |
 | **FuguPriceOracle** | Chainlink-backed USD→token quoting, 8-decimal USD base | [`0xB5f72a0ab0bA971c8C4F69D4A075cB7fd7859e65`](https://testnet.bscscan.com/address/0xB5f72a0ab0bA971c8C4F69D4A075cB7fd7859e65) | [`0x864f888330821b6025b2FE670f30E01Ee8776449`](https://testnet.bscscan.com/address/0x864f888330821b6025b2FE670f30E01Ee8776449) |
+| **FuguAuditEscrow** | Two-sided escrow for the audited-skill marketplace: the developer's fee and the auditor's bond, held together | [`0x0354d2a4be40f118e4d1301915ee2ff54eec8a52`](https://testnet.bscscan.com/address/0x0354d2a4be40f118e4d1301915ee2ff54eec8a52) | [`0xf7a0e340455af3c476564d7af283d9be4d2cfabb`](https://testnet.bscscan.com/address/0xf7a0e340455af3c476564d7af283d9be4d2cfabb) |
 
-You do not have to trust the implementation column. Read the ERC-1967 slot yourself:
-
-```bash
-cast storage 0xb2f36070E6eae3353E8e755172B477DF213ae248 \
-  0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc \
-  --rpc-url https://data-seed-prebsc-1-s1.bnbchain.org:8545
-# 0x000000000000000000000000d68968cf68e9930a689e0fc9d648a898050a548a
-```
+You do not have to trust the implementation column. Open any proxy above on BscScan and use
+the **Contract → Read as Proxy** tab: BscScan resolves the implementation from the ERC-1967
+slot itself and shows you which contract the calls actually land in.
 
 ### Test rig — **not part of the product**
 
@@ -158,16 +168,19 @@ evidence**. Full history: [`docs/e2e/2026-09-08-e2e-testnet.md`](docs/e2e/2026-0
 | **Claim** | The repayment was signed by an Altana session key restricted to two functions — not by the deployer EOA. |
 | **Proof in the receipt** | The `Repay` event's `user` field is `0xbdc69c2d…` — the Guardian's **Altana wallet** — and the transaction's `from` is an Altana relay (`0x09f6ac70…`), not `0x56A2950d…`. `Repay.user` *is* `msg.sender` at the pool. |
 | **The session key is registered on chain** | keyHash `0x7a467115cdf6d03f85f0f059733843b43cbe291d9f4489e3bf27d45e5148b377`, grant tx [`0x15e67a21…`](https://testnet.bscscan.com/tx/0x15e67a21e5ec25f8459ac2e83798033ca9afe5a14b41143aeb28fe2a47b64b52) |
-| **Check it with one `eth_call`, no API key** | see below — returns `true` |
+| **Check it yourself, no account needed** | see below, it returns `true` |
 
-```bash
-cast call --rpc-url https://data-seed-prebsc-1-s1.bnbchain.org:8545 \
-  0x6b8361C29d05D498b1a12B54A37310f94171E94A \
-  'isValidKey(address,bytes32)(bool)' \
-  0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0 \
-  0x7a467115cdf6d03f85f0f059733843b43cbe291d9f4489e3bf27d45e5148b377
-# true
-```
+Open the Altana Keystore's [**Read Contract** tab](https://testnet.bscscan.com/address/0x6b8361C29d05D498b1a12B54A37310f94171E94A#readContract),
+find `isValidKey`, and paste these two values:
+
+| Field | Value |
+|---|---|
+| `account` | `0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0` |
+| `keyHash` | `0x7a467115cdf6d03f85f0f059733843b43cbe291d9f4489e3bf27d45e5148b377` |
+
+It answers `true`. The permission is registered on the chain, not asserted by us, and the
+marketplace shows the same call's result on
+[Fugu Guardian's page](https://app.hellofugu.xyz/agent/97:8004).
 
 The whole session allowlist is two entries, each binding a **contract and a selector**:
 
@@ -332,7 +345,7 @@ never waited for the model.
 
 ---
 
-## 🐟 The four agents
+## 🐟 The nine agents
 
 > ### The LLM explains decisions. It never makes them.
 >
@@ -342,12 +355,21 @@ never waited for the model.
 > for asynchronous explanation and for a research agent, and never on the critical path. If the
 > model is down, slow, or hallucinating, the position is still defended correctly.
 
-| Agent | Category | Colour | State today |
-|---|---|---|---|
-| 🛡️ **Fugu Guardian** | `HEALTH_FACTOR` | cobalt | decision engine + execution + monitoring loop — **proven on chain through a scoped session key** |
-| ⚖️ **Fugu Rebalancer** | `REBALANCING` | pink | decision engine + backtest — **not yet wired to execution** |
-| 📐 **Fugu Grid** | `GRID` | light blue | decision engine + backtest — **not yet wired to execution** |
-| 🌾 **Fugu Yield** | `YIELD` | green | decision engine + backtest — **not yet wired to execution** |
+Read the last column before anything else. **Exactly one of the nine has ever sent a
+transaction.** The other eight are listed, priced and hireable, and hiring one holds your
+payment and starts nothing that runs on its own.
+
+| Agent | Category | State today |
+|---|---|---|
+| 🛡️ **Fugu Guardian** | `HEALTH_FACTOR` | decision engine, execution and a monitoring loop. **The only one proven on chain, through a scoped session key** |
+| ⚖️ **Fugu Rebalancer** | `REBALANCING` | decision engine and backtest. Cannot act |
+| 📐 **Fugu Grid** | `GRID` | decision engine and backtest. Cannot act |
+| 🌾 **Fugu Yield** | `YIELD` | decision engine and backtest. Cannot act |
+| 🤝 **Fugu Broker** | `HIRING` | picks and prices a rental. Wallet holds nothing, no session granted |
+| 🔁 **Fugu Trader** | `COMMERCE` | both sides of a per-call purchase, signature checked end to end in tests. Nothing settled |
+| 🎛️ **Fugu Pilot** | `AUTONOMOUS` | knows which venues actually exist on this testnet, and refuses the ones that do not. Nothing sent |
+| ⏱️ **Fugu Meter** | `STREAMING` | counts usage and pays without per-payment approval. b402 not touched yet |
+| 🗓️ **Fugu Steward** | `TREASURY` | recurring payments, and scope separation between agents on one wallet |
 
 ### The threshold that decides each strategy
 
@@ -460,30 +482,27 @@ this gets liquidated.* At HF 1.14 that was **13.0%**.
 
 ### Reading the live marketplace state
 
-Every one of these is a plain `eth_call` against a verified proxy — no API key, no account.
-(Values shown are what they returned at the time of writing; they move as the registry is used.)
+You do not need a terminal for any of this. Every contract below is a verified proxy, so
+BscScan's **Contract → Read as Proxy** tab lets you call these functions in the browser and
+see the answer come back from the chain.
 
-```bash
-export RPC=https://data-seed-prebsc-1-s1.bnbchain.org:8545
-export REG=0xb2f36070E6eae3353E8e755172B477DF213ae248
-export SUB=0xfdb083371f44Cf53181350389D3217e51B431776
-export REP=0x279B31B00F64C0ce85BCe2Bd7e377CdcAE58d400
-export ORACLE=0xB5f72a0ab0bA971c8C4F69D4A075cB7fd7859e65
+| What to read | Where | What it answers |
+|---|---|---|
+| `listingCount()` | [FuguRegistry](https://testnet.bscscan.com/address/0xb2f36070E6eae3353E8e755172B477DF213ae248#readProxyContract) | how many agents are listed. **9** today |
+| `countByCategory(uint8)` | same | how many in one category. `3` is Health factor |
+| `subCount()` | [FuguSubscription](https://testnet.bscscan.com/address/0xfdb083371f44Cf53181350389D3217e51B431776#readProxyContract) | how many rentals have been paid for |
+| `getSub(uint256)` | same | one rental: who paid, how much is in escrow, how much has been claimed |
+| `reviewCount(uint256)` | [FuguReputation](https://testnet.bscscan.com/address/0x279B31B00F64C0ce85BCe2Bd7e377CdcAE58d400#readProxyContract) | reviews on a listing. Only a payer can leave one |
+| `priceUsd8(address)` | [FuguPriceOracle](https://testnet.bscscan.com/address/0xB5f72a0ab0bA971c8C4F69D4A075cB7fd7859e65#readProxyContract) | the live BNB price the hire panel quotes, in 8-decimal USD |
 
-cast call $REG 'listingCount()(uint256)'                --rpc-url $RPC   # 4
-cast call $REG 'countByCategory(uint8)(uint256)' 3      --rpc-url $RPC   # 1  (3 = HEALTH_FACTOR)
-cast call $SUB 'subCount()(uint256)'                    --rpc-url $RPC   # 1
-cast call $REP 'reviewCount(uint256)(uint256)' 1        --rpc-url $RPC   # 1
-cast call $REP 'averageScoreX100(uint256)(uint256)' 1   --rpc-url $RPC   # 500  = 5.00 stars
-cast call $ORACLE 'priceUsd8(address)(uint256)' \
-  0x0000000000000000000000000000000000000000             --rpc-url $RPC   # 75174925837 = $751.74 BNB/USD
-```
+The `Category` enum, in the order the contract stores it
+(`contracts/src/types/FuguTypes.sol`):
 
-`Category` enum order: `0 = REBALANCING`, `1 = GRID`, `2 = YIELD`, `3 = HEALTH_FACTOR`
-(`contracts/src/types/FuguTypes.sol`).
+`0 REBALANCING` · `1 GRID` · `2 YIELD` · `3 HEALTH_FACTOR` · `4 HIRING` · `5 COMMERCE` ·
+`6 AUTONOMOUS` · `7 STREAMING` · `8 TREASURY`
 
-Or use the **Read as Proxy** tab on BscScan for any of the four contracts — it works, because the
-implementations are verified and BscScan resolved the proxy.
+The marketplace reads exactly these functions and shows you the same numbers, so if a page
+and the chain ever disagree, the chain is right and the page has a bug.
 
 ---
 
@@ -501,7 +520,7 @@ cd fugugent
 `contracts/lib` uses git submodules for forge-std and both OpenZeppelin repos. If you already
 cloned without them: `git submodule update --init --recursive`.
 
-### 1. Run the contract tests — 131 of them, including fuzz
+### 1. Run the contract tests, including fuzz
 
 ```bash
 cd contracts && forge test
@@ -588,11 +607,50 @@ own, to:
 
 That sentence is the entire product thesis in one line of UI.
 
-### 7. Verify the chain claims without running anything
+### 7. Verify every chain claim without installing anything
 
-Every `cast` command in [Receipts](#-receipts-not-screenshots) and in the risk-parameters section
-above works from a cold terminal against the public RPC. Or open any address in the tables above on
-[testnet.bscscan.com](https://testnet.bscscan.com) and use **Read as Proxy**.
+Every address and every transaction hash in this document is a link to
+[testnet.bscscan.com](https://testnet.bscscan.com). Open one and you are reading the chain, not
+our copy of it. For the contracts, the **Contract → Read as Proxy** tab calls the functions
+live in your browser: no terminal, no node, no account.
+
+---
+
+## 🧪 On-chain audited marketplace: where agents buy verified skills
+
+An agent that installs a poisoned skill drains its own wallet. That is not hypothetical:
+CVE-2025-54136 is tool poisoning and CVE-2025-6514 is supply-chain remote code execution, both
+in the same class of tooling these agents run on.
+
+The usual answer is a badge. A badge is worth nothing, because nothing happens to whoever
+issued it when they are wrong.
+
+**So the auditor puts money on their verdict.** `FuguAuditEscrow` holds two sides at once: the
+skill developer locks the audit fee, the auditor locks an honesty bond, and the pot settles one
+of three ways.
+
+| Outcome | Who may trigger it | Where the money goes |
+|---|---|---|
+| Clean audit | the developer, or the arbiter | released to the auditor |
+| Verdict proven wrong | the arbiter | slashed to whoever proved it |
+| Still half funded | either side | cancelled back to both |
+
+**Who may move money is the part that matters.** The auditor can never release to itself: a
+payee that can pay itself is not an escrow. The developer *or* an arbiter can release, so an
+auditor's bond cannot be held hostage by a developer who simply goes quiet.
+
+Seven verdict states are read and never quietly promoted. `verified` is accepted only when the
+status is also `PASSED`, and a status we do not recognise reads as `INCONCLUSIVE` rather than as
+a pass. Each state carries four separate signals: a unique phrase, a unique glyph, a badge
+texture, and a full sentence about whether to install it. That is so the difference survives a
+grayscale screenshot, not only a colour one.
+
+Live at **[app.hellofugu.xyz/skills](https://app.hellofugu.xyz/skills)** and
+**[app.hellofugu.xyz/auditors](https://app.hellofugu.xyz/auditors)**.
+
+> **Honest limit.** The records on those pages are labelled examples, every one of them, and
+> the escrow has never held a real fee. What is real is the contract, its tests, and the fact
+> that the money paths were written before the marketing was.
 
 ---
 
@@ -643,9 +701,10 @@ stated plainly.
 **On the platform**
 
 - **Testnet only, chainId 97.** No private key that has ever touched mainnet is used anywhere.
-- **There is no public deployment.** The backend and agents are intended for a VPS and the
-  frontend for Vercel; neither has happened. The domain `hellofugu.xyz` has been purchased and
-  **nothing is deployed to it** — do not expect a site there.
+- **Deployed, but "deployed" is doing less work than it sounds.** Four hosts answer over TLS:
+  the landing page and the marketplace on Vercel, the backend and the agent endpoints through
+  nginx on a VPS. The backend serving means the catalogue and the health endpoints answer. It
+  does **not** mean an agent runs on a schedule: only `fuguguardian` is in the running stack.
 - No 8004scan API key yet — we are on the anonymous tier, 30 requests/minute. Calls to 8004scan
   **must** send a browser `User-Agent` or the API answers HTTP 500 (not 429), and they always go
   through the backend, never from the browser.
@@ -656,26 +715,29 @@ stated plainly.
 - CI now runs every suite on every push, and a deploy to the VPS follows a green run on `main`.
   Each job asserts its suite has not lost tests, so a `describe.skip` or a glob that stops
   matching shows up as a failure instead of a quieter green.
-- The test counts in the table below are **stale**. They were counted before the catalogue grew
-  from four categories to nine and before five more agents existed. The current baselines live in
-  `.github/workflows/ci.yml`, which is the file CI actually asserts against.
+- **Test counts are not written into this document any more.** They went stale three times in a
+  single day. The baselines CI asserts against live in `.github/workflows/ci.yml`, and each job
+  fails when its suite loses tests, so that file cannot drift the way a table here does.
 - Licensed **GPL-3.0-or-later**; see [Licence](#-licence).
 
 ---
 
 ## 🧰 Tech stack
 
-| Package | Stack | Tests | How to run |
-|---|---|---|---|
-| **`contracts/`** | Solidity **0.8.30** · Foundry (forge **1.7.1**) · OpenZeppelin **5.7.0** · UUPS proxies · ERC-7201 namespaced storage · Chainlink price feeds | **131** incl. fuzz | `cd contracts && forge test` |
-| **`ai/fuguguardian/`** | TypeScript · BNB Agent Studio (`@bnbagent/studio-cli`) · Altana SDK **0.7.1** · viem · vitest · dGrid (OpenAI-compatible) | **249** | `pnpm test` |
-| **`ai/fugurebalancer/`** | same | **88** | `pnpm test` |
-| **`ai/fugugrid/`** | same | **99** | `pnpm test` |
-| **`ai/fuguyield/`** | same | **93** | `pnpm test` |
-| **`backend/`** | Hono · Postgres + Drizzle · Redis · viem · vitest · Docker Compose | **374** (1 skipped) | `cd backend && pnpm test` |
-| **`frontend/`** | Next.js **16** · React **19** · Tailwind **v4** · bun | `bun run build` + `bun run lint` green | `bun --cwd frontend dev` |
-| **`landingpage/`** | Next.js 16 → being rebuilt on React + Vite + Tailwind v4 | `bun run build` + `bun run lint` green | `bun --cwd landingpage dev` |
-| | | **1,034 total** | |
+| Package | Stack | How to run |
+|---|---|---|
+| **`contracts/`** | Solidity **0.8.30** · Foundry (forge **1.7.1**) · OpenZeppelin **5.7.0** · UUPS proxies · ERC-7201 namespaced storage · Chainlink price feeds | `cd contracts && forge test` |
+| **`ai/fuguguardian/`** | TypeScript · BNB Agent Studio (`@bnbagent/studio-cli`) · Altana SDK **0.7.1** · viem · vitest · dGrid (OpenAI-compatible) | `pnpm test` |
+| **`ai/fugurebalancer/`**, **`ai/fugugrid/`**, **`ai/fuguyield/`** | same | `pnpm test` |
+| **`ai/fugubroker/`**, **`ai/fugutrader/`** | same, plus ERC-8183 and x402 | `pnpm test` |
+| **`ai/fugupilot/`**, **`ai/fugumeter/`**, **`ai/fugusteward/`** | same, without Studio scaffolding yet | `pnpm test` |
+| **`backend/`** | Hono · Postgres + Drizzle · Redis · viem · vitest · Docker Compose | `cd backend && pnpm test` |
+| **`frontend/`** | Next.js **16** · React **19** · Tailwind **v4** · wagmi + Reown · TanStack Query · bun | `bun --cwd frontend dev` |
+| **`landingpage/`** | React · Vite · Tailwind **v4** · bun | `bun --cwd landingpage dev` |
+| **`video/`** | Remotion · Chrome DevTools Protocol capture · ElevenLabs | `npm --prefix video run render` |
+
+Every suite runs in CI on every push, with a baseline that fails when a suite loses tests.
+The current totals are in `.github/workflows/ci.yml`.
 
 Redis is up in Compose but **no code uses it yet** — it is staged for the BullMQ scheduler so
 that work does not have to touch `docker-compose.yml` again.
@@ -706,19 +768,11 @@ that work does not have to touch `docker-compose.yml` again.
 
 ## 👥 Team
 
-<!--
-  PLACEHOLDER — to be filled in by the repository owner.
-  No verified team roster exists in this repository, so no names are invented here.
-  The only attribution that can be confirmed from the repository itself is the GitHub
-  account below. Replace this block with real names, roles, and links before submission.
--->
+Solo.
 
 | Name | Role | Links |
 |---|---|---|
-| *to be filled in* | *to be filled in* | [github.com/Lexirieru](https://github.com/Lexirieru) |
-
-> This table is a deliberate placeholder. This README does not invent contributor names, for the
-> same reason it does not invent metrics.
+| **Axel Urwawuska Atarubby** | Everything: contracts, agents, backend, both front ends, infrastructure | [GitHub](https://github.com/Lexirieru) · [X](https://x.com/lexirieru) · Telegram `@lexilexy` |
 
 ---
 
@@ -726,12 +780,14 @@ that work does not have to touch `docker-compose.yml` again.
 
 ### 🐡
 
-**Fugugent** — the fish puffs up as the risk does.
+**HelloFugu** — the fish puffs up as the risk does.
 
 Built on BNB Chain testnet for **The Smart Money Era: Build the Era**.
 
-Four verified contracts · 1,034 passing tests · one rescued position ·
+Five verified contracts · one rescued position · one rental settled into escrow ·
 one session key that was told no by a contract we do not control.
+
+**Nine agents listed. One has ever sent a transaction.**
 
 *Every claim on this page links to something you can check without asking us.*
 
