@@ -1,6 +1,6 @@
 # Fugugent — The Actual Status
 
-Updated 2026-09-08. This document deliberately states **what really exists and what does
+Updated 2026-09-09. This document deliberately states **what really exists and what does
 not**. There is one rule: **every claim that something exists must say how someone else can
 check it themselves** — a tx hash, a `cast` command, an endpoint, or a test command. Claims
 that cannot be checked are not written down, even if they sound true.
@@ -14,15 +14,25 @@ evidence was insufficient. That list is kept on purpose.
 
 | What is measured | Number | How to check |
 |---|---|---|
-| Contracts (Foundry) | **131** tests | `cd contracts && forge test` |
-| Fugu Guardian | **249** tests | `cd ai/fuguguardian/app/agent && corepack pnpm test` |
-| Fugu Rebalancer | **88** tests | `cd ai/fugurebalancer/app/agent && corepack pnpm test` |
-| Fugu Grid | **99** tests | `cd ai/fugugrid/app/agent && corepack pnpm test` |
-| Fugu Yield | **93** tests | `cd ai/fuguyield/app/agent && corepack pnpm test` |
-| Backend | **374** tests (1 skipped) | `cd backend && corepack pnpm test` |
-| **Total** | **1,034** tests | |
-| History | **89** commits on top of the initial commit, clean working tree | `git log --oneline \| wc -l` → 90 (including `87508a2` "Initial commit"); `git status --porcelain` → empty |
-| Landing + marketplace | build and lint green | `bun --cwd landingpage run build && bun --cwd landingpage run lint`; the same for `frontend` |
+| Contracts (Foundry) | **147** tests | `cd contracts && forge test` |
+| Fugu Guardian | **285** tests | `cd ai/fuguguardian/app/agent && corepack pnpm test` |
+| Fugu Rebalancer | **130** tests | `cd ai/fugurebalancer/app/agent && corepack pnpm test` |
+| Fugu Grid | **144** tests | `cd ai/fugugrid/app/agent && corepack pnpm test` |
+| Fugu Yield | **141** tests | `cd ai/fuguyield/app/agent && corepack pnpm test` |
+| Backend | **484** tests (1 skipped) | `cd backend && corepack pnpm test` |
+| **Total** | **1,331** tests | |
+| History | **136** commits on top of the initial commit, clean working tree | `git log --oneline \| wc -l` → 137 (including `87508a2` "Initial commit"); `git status --porcelain` → empty |
+| Landing + marketplace | build and lint green | `bun --cwd landingpage-fugugent run build && bun --cwd landingpage-fugugent run lint`; the same for `frontend` |
+
+Every number in that table was recounted on 2026-09-09 by running the command beside it, not
+carried over from a previous edit. The previous values (131 / 249 / 88 / 99 / 93 / 374 =
+1,034) are wrong everywhere they still appear outside this document.
+
+**The landing page is `landingpage-fugugent/`, not `landingpage/`.** `landingpage/` is a
+leftover Vite scaffold (`src/App.tsx` and nothing else) that is still committed; the Next.js 16
+landing page, the brand SVGs and the puff meter all live in `landingpage-fugugent/`. Earlier
+versions of this document pointed the build, lint and SVG-generation commands at the wrong
+directory.
 
 The one skipped backend test is the real Postgres path, which only runs when
 `FUGU_TEST_DATABASE_URL` is set (`skipIf`); without that variable the repositories are tested
@@ -41,7 +51,7 @@ through PGlite.
 | FuguSubscription | `0xfdb083371f44Cf53181350389D3217e51B431776` |
 | FuguReputation | `0x279B31B00F64C0ce85BCe2Bd7e377CdcAE58d400` |
 
-131 tests including a 256-run fuzz. **The marketplace lifecycle was run on the real network**:
+147 tests including a 256-run fuzz. **The marketplace lifecycle was run on the real network**:
 list an agent → rent → agent withdraws payment → review → second review rejected. The whole
 cycle cost 0.0015 tBNB. The tx hash for each step is in `docs/e2e/2026-09-08-e2e-testnet.md`.
 
@@ -72,11 +82,13 @@ and a `negotiate` request is answered with a **wallet-signed quote** (0.1 U, com
 hash-commits its `permissions`, so what is public is only the existence and validity of the
 key. What proves the contents of the permissions is the denial in A4.
 
-### A3. The Fugu Guardian strategy layer — 249 tests
+### A3. The Fugu Guardian strategy layer — 285 tests
 
-`cd ai/fuguguardian/app/agent && corepack pnpm test`. 245 of them run with no network at all;
-the remaining 4 (`chain.test.ts`, `testnet.test.ts`) do call an RPC and therefore partly assert
-the state of the testnet, not only the state of the code.
+`cd ai/fuguguardian/app/agent && corepack pnpm test`. 281 of them run with no network at all;
+the remaining 4 (`strategy/__tests__/chain.test.ts`, `strategy/__tests__/testnet.test.ts`) do
+call an RPC and therefore partly assert the state of the testnet, not only the state of the
+code. 36 of the 285 are the runtime tests described in A9; none of the original 249 were
+removed.
 
 What is in it: a pure health factor formula with rounding deliberately biased to the safe side;
 a deterministic decision engine that fails hard on malformed configuration; an adapter proven
@@ -85,7 +97,8 @@ loop (`guard.ts`); the execution path with a spend cap and cooldown (`execute.ts
 between USD8 units and token units (`units.ts`); the dGrid explanation layer that fails safe;
 and the repay signer through an Altana session key that refuses a session whose permissions are
 too loose before a single transaction is sent (`chain/session.ts`). Assembly happens in one
-place, `createGuardian()` in `src/strategy/`.
+place, `createGuardian()` in `src/strategy/`. What now calls it inside the served agent is
+`guardianRuntime.ts` — see A9.
 
 **A repay cannot be sent twice.** For network sends, "failed" does not mean "did not happen": a
 `waitForTransactionReceipt` that times out throws AFTER the transaction has landed. The budget,
@@ -153,8 +166,9 @@ and it must not be skipped.
 
 ### A5. The other three decision engines: Rebalancer, Grid, Yield
 
-All three have a pure decision engine + backtest + `format.ts`, with 88 / 99 / 93 tests and a
-clean `tsc --noEmit`. There is no network, no `Date.now()`, and no `process.env` anywhere on
+All three have a pure decision engine + backtest + `format.ts`, with 130 / 144 / 141 tests and
+a clean `tsc --noEmit` (the counts include the advisory-layer tests from A10; the engines
+themselves are unchanged). There is no network, no `Date.now()`, and no `process.env` anywhere on
 any decision path; the entire outside world arrives through arguments. Money values are in
 8-decimal base, tokens in 18 decimals (including USDT on BSC), percentages in bps.
 
@@ -192,7 +206,7 @@ most important part of the Yield strategy — is **not visible in any number**.
 
 ### A6. Backend — four fallback tiers, proven live
 
-`docker compose up` brings up three healthy containers; the API is on `:8787`. 374 tests
+`docker compose up` brings up three healthy containers; the API is on `:8787`. 484 tests
 (`cd backend && corepack pnpm test`).
 
 What was **verified directly in a live container**, not inferred from tests:
@@ -240,7 +254,7 @@ assumption: the OASF fields (`oasf_skills`/`oasf_domains`) are **absent** from b
 and the detail endpoint, and their vocabulary is entirely generic — OASF cannot pick a category,
 so it is used only as a multiplier.
 
-### A7. Marketplace (`frontend/`) and landing page (`landingpage/`)
+### A7. Marketplace (`frontend/`) and landing page (`landingpage-fugugent/`)
 
 Both build and lint green (`bun --cwd <dir> run build`, `… run lint`), with zero horizontal
 scroll measured via `scrollWidth` vs `clientWidth` from 320 to 1280 px.
@@ -260,16 +274,26 @@ median latency, run count, active hirers, equity charts, a live run feed, AUM/TV
 ratings (`totalFeedbacks = 0`), a leaderboard, and guessed puff levels — the three agents with
 no reading are drawn hollow and dashed with a "no live reading" chip, their identity still
 readable, only their risk channel missing. The landing page also carries no link to
-`app.fugugent.xyz`.
+`app.fugugent.xyz` (checked: no `href` to it anywhere in `page.tsx`).
+
+**Found while checking this, and not fixed here because this document may only touch itself:**
+the landing page's own honesty copy is now out of date in both directions.
+`landingpage-fugugent/src/app/page.tsx` still claims *"223 tests"*, and its `NOT_LIVE` list
+still says the strategy is not wired into the runtime, that the kill switch has no lever, that
+Rebalancer/Grid/Yield are "scaffolds with a session key", and that the contracts are not
+verified on BscScan. A9, A10 and B9 have overtaken all four. The page understates the project
+rather than overstating it, which is the safe direction, but a page whose selling point is
+accuracy cannot be inaccurate — it needs the same pass this document just had.
 
 ### A8. Visual identity
 
 `docs/brand/` holds the palette, the characters, the 5-step puff scale, and the rules that are
 **enforced in code**: body colour = agent identity and never changes because of risk; body
-shape + ring pattern = risk. 13 SVG files in `landingpage/public/brand/`, regenerated with:
+shape + ring pattern = risk. 13 SVG files in `landingpage-fugugent/public/brand/`, regenerated
+with:
 
 ```bash
-python3 docs/brand/generate-svg.py landingpage/public/brand
+python3 docs/brand/generate-svg.py landingpage-fugugent/public/brand
 ```
 
 Tested in **full grayscale at 48 px**: all four characters can still be matched to their names
@@ -279,36 +303,177 @@ page and the fish in the app are the same fish.
 
 **The images are not the output of a generative model.** See §C8.
 
+### A9. Guardian runs its own strategy inside the agent it serves, and the kill switch can be pulled from outside the process
+
+Two new files close what used to be B1 and B2. `guardianRuntime.ts` connects `createGuardian()`
+to `dualMain.ts` and `mcpMain.ts`; `guardianTools.ts` builds the tools once for both faces.
+`src/strategy/` was not rewritten — `createGuardian`, `guard.ts`, `execute.ts` and `decide.ts`
+are used exactly as they are, and the loop is `startGuardLoop` from `guard.ts`, not a second
+loop. The grep that used to find nothing now finds the imports:
+
+```bash
+grep -rn "strategy" ai/fuguguardian/app/agent/src/*.ts
+```
+
+It is opt-in (`FUGU_GUARDIAN_ENABLED=1`) so the other faces still boot on a machine that has no
+Guardian session file. With it off, the agent boots exactly as before.
+
+**What was run, not what is intended.** `FUGU_GUARDIAN_ENABLED=1 FUGU_GUARDIAN_INTERVAL_MS=15000
+bag dev`:
+
+- `guardian-runtime: monitoring loop started {"chainId":97,…}`, then
+  `A2A native + MCP tunneled serving on 127.0.0.1:9000`;
+- **five** cycles against the real BSC testnet position, 15–16 seconds apart, each one
+  `action: "NONE"`, `healthFactor: "8.49"`, `sent: false`. The consecutive timestamps are what
+  makes it a loop rather than a single call;
+- then `monitoring loop stopped`.
+
+**A broken configuration kills the process at boot, not at the first cycle.** Each of these was
+run for real and exited 1 before any loop existed: `FUGU_GUARDIAN_INTERVAL_MS=0`; a per-action
+cap above the per-day cap (*"the per-action cap would never bind"*); a mainnet RPC (*"reports
+chain id 56; Guardian only runs on 97"*); a missing session file. The mainnet refusal is the
+important shape — mainnet is refused **before** the loop exists.
+
+The four tools registered on both faces take **no parameters at all**: `guardian_position`,
+`guardian_execute_state`, `guardian_run_cycle`, `guardian_kill_switch`. The caller chooses
+*when* a deterministic evaluation happens, never what it decides, and no LLM enters the cycle
+(CLAUDE.md rule 1) — `explainDecision` is left at its default, `decision.reason` verbatim.
+
+**The kill switch was pulled from a separate process** — an MCP client over streamable HTTP to
+`http://127.0.0.1:9000/mcp`, not an in-process call and not a test harness:
+
+| Step | Answer |
+|---|---|
+| `guardian_run_cycle` before the kill | `"executeReason": "Action NONE requires no transaction execution."` |
+| `guardian_kill_switch` | `"killSwitchEngaged": true` |
+| `guardian_run_cycle` after the kill | `"executeReason": "Kill switch engaged: execution is stopped entirely."` |
+| the state file afterwards | `"killed": true` |
+
+`executeReason` moving from the "nothing to do" rule to the kill rule is the observable evidence
+that the lever reaches `executeDecision` and changes **which** rule refuses. Monitoring carried
+on afterwards and kept reading `healthFactor: "8.49"` — **the kill stops spending, not
+watching.** The latch is one-way: no tool and no code path in the runtime clears it, and it is
+re-asserted on every loop handle the runtime ever creates.
+
+Cycles are serialized on purpose. `Guardian.start()` and `Guardian.runOnce()` hold
+`ExecuteState` **separately**, so a tool cycle running beside the loop would read the same
+budget, the same cooldown and the same `pendingRepay: null` — and **both would send**, a double
+payment produced by the wiring alone. An out-of-band cycle is therefore REFUSED
+(`GuardianBusyError`) rather than queued, and the loop is stopped but never dropped while one
+runs, so `kill()` has no blind window.
+
+That demo deliberately ran against a scratch state file, so the real
+`.studio/guardian-state.json` still reads `killed: false` and the A4 evidence is not left
+blocked.
+
+**What this does NOT prove, and it is the limit that matters.** It does not prove the kill
+switch stops a real **send**. The live position sits at HF 8.49 ($150.00 collateral, $13.24
+debt), so the cycle after the kill would have answered `NONE` regardless. That a kill actually
+prevents a send is proven **only in unit tests** — an EMERGENCY position, a control run in
+which `sendCalls` is called once, and a killed run in which it is never called. The testnet
+price was deliberately **not** pushed down to manufacture an emergency: that spends real tBNB
+and mutates shared testnet state the A4 evidence depends on.
+→ The correct sentence is: *"a user can pull the kill switch from outside the process and the
+next cycle refuses on the kill rule"*, not *"the kill switch is proven to have stopped a repay
+that was about to go out"*.
+
+Two more things it does not prove: **no repay has ever been sent through the runtime on chain**
+(there is no new transaction hash — the session-key send path is unchanged and still rests on
+A4's `0x619cfbe3…`), and the **AgentCore deploy is unverified** — all of the above is a local
+`bag dev`, and `bag doctor` still warns about missing AWS credentials.
+
+One technical note from B1 survives as a resolved note rather than an open problem: this session
+still **cannot** be loaded through `ensureAltanaSessionLoaded()`/`getWallet()` from
+`@bnbagent/studio-runtime`, which rejects any session whose `permissions.calls` is not an exact
+copy of `defaultAgentPermissions()`. The runtime loads it directly via `deserializeSession` +
+`AltanaWalletProvider` in `src/altana.ts`, which is now shared by the runtime and the E2E script
+instead of being duplicated.
+
+### A10. Rebalancer, Grid and Yield can be called — and they answer with advice, not with actions
+
+All three used to hold a complete decision engine that **nothing imported**: `dualMain.ts`,
+`mcpMain.ts` and `tools.ts` were byte-for-byte the Agent Studio scaffold, so someone could rent
+them (B3) and get nothing callable. Each package gained one file, `src/advisory.ts`, sitting
+between an untrusted JSON payload and the engine. `src/strategy/` was not touched; it stays
+pure.
+
+| Agent | A2A skill = MCP tool = LLM tool |
+|---|---|
+| Rebalancer | `rebalance_advisory`, `rebalance_thresholds` |
+| Grid | `grid_advisory`, `grid_feasibility` |
+| Yield | `yield_advisory`, `yield_breakeven` |
+
+All three were started with `npx tsx src/dualMain.ts` and probed live over **both** faces: the
+A2A agent card at `GET /.well-known/agent-card.json`, and `tools/list` over the real
+StreamableHTTP `/mcp` endpoint rather than the in-memory test transport. Malformed input comes
+back classified — `AdvisoryInputError` for the wrong shape, the engine's own `PortfolioError` /
+`GridError` / `YieldError` for a well-formed but impossible one — instead of the commerce path's
+generic "seller operation failed; retry later". Grid's `state` and Yield's
+`consecutiveFavorable` are required and never defaulted: a guessed `lotsHeld: 0` would answer
+about a grid nobody runs.
+
+**Callable is not the same as capable. There is still no on-chain execution — see B3.** Every
+payload carries `onchainExecution: false`, `executionPerformed: false` and `advisoryOnly: true`;
+every tool and skill description opens with "ANALYSIS ONLY" and states "THIS TOOL DOES NOT
+TRADE" / "DOES NOT MOVE FUNDS" on the agent card, where a buyer reads it **before** paying.
+Field names are advice-shaped (`recommendedAction`, `suggestedTrades`, `valueThatWouldMove`,
+`nextStateIfActedOn`) and there is no `trades`, `fills`, `executedTrades` or `newPosition` key —
+asserted negatively. A regex sweep per package asserts that no payload, including the ones that
+recommend acting, matches `tx_hash`, `broadcast`, `submitted`, `executed`, `filled`, `withdrew`,
+`deposited` or "has been …".
+
+**The decision worth showing is each engine refusing to act.** All three came out of live runs
+over A2A or MCP:
+
+| Agent | Answer | The sentence it gave |
+|---|---|---|
+| Rebalancer | `BLOCKED_BY_COST` | "moving $10.00 would spend $0.31, which is 315 bps of the value moved — beyond the 50 bps budget." |
+| Grid | `profitable: false` | "narrowest spacing 28 bps, round trip costs 130 bps, requires 260 bps." |
+| Yield | `STAY` / `SPREAD_BELOW_BREAKEVEN` | "spread 200 bps, required 390 bps at a $16.00 migration cost over 30 days." |
+
+An agent that answers "no, this loses money" is the product working, not the product failing.
+The default cost models behind those numbers are still estimates and not measurements (C9); the
+payloads say so in their own `costModel.why` field rather than hiding it.
+
 ---
 
 ## B. What does NOT exist yet — do not claim it
 
-1. **The strategy is not wired into the agent *runtime*.** The decide → execute → on-chain
-   evidence chain is proven (A4), but what runs it is `createGuardian()` called by the E2E
-   script — **not** the A2A/MCP agent served by `bag dev`. `dualMain.ts`, `mcpMain.ts`, and
-   `tools.ts` still do not import `src/strategy/` at all (`grep -rn "strategy"
-   ai/fuguguardian/app/agent/src/*.ts` finds only a comment in `model.ts`), so the agent running
-   today still sends text as its deliverable. The entry point exists; the caller does not.
-   → The correct sentence is: *"Guardian is proven to raise a position's HF from 1.14 to 1.50
-   through an on-chain transaction signed by a bounded session key"*, not *"the agent we serve in
-   the marketplace already protects your position autonomously"*.
+1. ~~**The strategy is not wired into the agent *runtime*.**~~ **Resolved 2026-09-09** — see A9.
+   `dualMain.ts` and `mcpMain.ts` now reach `createGuardian()` through `guardianRuntime.ts` and
+   `guardianTools.ts`, the loop was watched running five real BSC testnet cycles, and a broken
+   configuration kills the process at boot with exit 1. The session-loading difference noted
+   here was resolved by loading the session directly in `src/altana.ts` rather than through
+   `ensureAltanaSessionLoaded()`.
+   What is still true and must not be dropped: **no repay has ever been sent through the
+   runtime.** The only on-chain repay Guardian has ever made is the one in A4, sent by
+   `scripts/e2e-guardian.ts`. The live loop has only ever answered `NONE`.
 
-   An honest technical note: this Guardian session **cannot** be loaded through
-   `ensureAltanaSessionLoaded()`/`getWallet()` from `@bnbagent/studio-runtime` — that path
-   rejects a session whose `permissions.calls` is not an exact copy of `defaultAgentPermissions()`
-   (ERC-8004 + ERC-8183). This session is loaded directly via `deserializeSession` +
-   `AltanaWalletProvider`. Wiring it up means resolving that difference.
+2. ~~**There is no kill switch lever a user can press.**~~ **Resolved 2026-09-09, with one limit
+   that has to be stated every time** — see A9. An MCP client in a **separate process** calls
+   `guardian_kill_switch` over `http://127.0.0.1:9000/mcp`, the next cycle refuses with
+   `"Kill switch engaged: execution is stopped entirely."`, `killed: true` is persisted, and the
+   monitoring loop keeps reading the position.
+   **The limit:** it is *not* proven that the kill stops a real **send**. The live position was
+   at HF 8.49, so that cycle would have decided `NONE` regardless — what the live run proves is
+   that the lever reaches `executeDecision` and changes which rule refuses. That a kill prevents
+   a send is proven **only in unit tests** (an EMERGENCY position, a control run that sends and
+   a killed run that does not). The testnet price was deliberately not manipulated to force the
+   real case.
+   Still absent: a **UI** lever. The marketplace has no kill switch button and no Revoke button;
+   what exists is an MCP/A2A tool, which is a lever for a client, not for a person in a browser.
 
-2. **There is no kill switch lever a user can press.** `GuardLoopHandle.kill()` takes effect
-   immediately, cannot be undone by the cycle in progress, and is persisted straight away — but
-   it is **a function call inside the process**. There is no UI button, no CLI command, and no
-   HTTP endpoint that calls it. The marketplace therefore also deliberately does not carry a
-   Revoke button or a kill switch lever.
-   → The correct sentence is: *"the kill switch has a runtime path and its state survives a
-   restart"*, not *"users can stop the agent at any time"*.
-
-3. **Rebalancer, Grid, and Yield are not wired to on-chain execution.** What exists is a pure
-   decision engine + backtest (A5). Not one transaction has ever been sent by any of the three.
+3. **Rebalancer, Grid, and Yield are not wired to on-chain execution. This is still open, and
+   only half of it moved.** They are now **callable**: `rebalance_advisory` /
+   `rebalance_thresholds`, `grid_advisory` / `grid_feasibility`, `yield_advisory` /
+   `yield_breakeven`, all six exercised live over A2A **and** MCP (A10). They **cannot act**.
+   Not one transaction has ever been sent by any of the three, and that is a deliberate boundary
+   rather than an unfinished edge: there is no mock DEX, and building one was not part of the
+   work. Every payload carries `onchainExecution: false` and `executionPerformed: false`, every
+   tool description opens with "ANALYSIS ONLY … DOES NOT TRADE", and a regex sweep per package
+   asserts no payload claims a transaction.
+   → The correct sentence is: *"they can be called and they give advice"*, not *"they manage a
+   portfolio"* and not *"they trade"*.
    As of 2026-09-09 all three **are registered in `FuguRegistry`** and can be rented
    (`listingCount() = 4`; every category holds exactly one listing). Their price is
    `5000000` = $0.05 per 120-second period, deliberately half of Guardian's, and their
@@ -319,12 +484,20 @@ page and the fish in the app are the same fish.
    [`0x326c3c90…`](https://testnet.bscscan.com/tx/0x326c3c909d8e55a9b07d7886b5ef314fd652f62299d1854c687dd0f65143eafb),
    Yield
    [`0xf67c457f…`](https://testnet.bscscan.com/tx/0xf67c457f4a678dbbf0a62f101b6518ff8c2c42b83bbd2e7fe21d9b9d91683aa3).
-   Being rentable is not the same as being able to act: they still send no transactions.
+   Being rentable, and now being callable, is still not the same as being able to act: they send
+   no transactions.
 
-4. **The marketplace has never been run against a live backend.** `createHttpSource` is written
-   out in full for all four endpoints, but the default is still `seedSource`; what has actually
-   been tested is the seed path and the dead-API path. There is not one run proving the frontend
-   displaying 110 real agents from `:8787`.
+4. **The marketplace has been pointed at a live backend once, by hand, and that run was not
+   recorded.** Narrowed on 2026-09-09, not closed. `createHttpSource` is written out in full for
+   all four endpoints and the default is still `seedSource` (`NEXT_PUBLIC_API_BASE_URL` unset →
+   seed, `frontend/src/lib/data/index.ts`). What is automatically tested is still only the seed
+   path and the dead-API path. One manual browser session against a live backend on `:8787` is
+   reported in `.superpowers/sdd/naming-fix-report.md` — the list page served the live catalogue
+   and the detail page fell back to seed — but **no artifact of that session exists in the
+   repo**; screenshot capture was blocked in that environment. A report of a run is not a run
+   anyone else can check, so the claim stays here rather than moving to §A.
+   → The correct sentence is: *"the HTTP source has been exercised once by hand"*, not *"the
+   marketplace runs on the live backend"*.
 
 5. **There is no risk endpoint.** `bloatLevel` and the per-agent raw metrics do not exist in
    `backend/src/types.ts`. Until they do, the marketplace HTTP path draws every fugu hollow —
@@ -361,10 +534,53 @@ page and the fish in the app are the same fish.
     `minConsecutiveFavorable = 3` (Yield) are tied to a scheduler cadence that is **not yet
     decided** — three observations per minute is three minutes; per day is three days.
 
-12. **There is no connect wallet button.** In-browser signing does not exist. The rental flow
-    gives `cast` commands that are exactly the calls that button would make — `quote()` to the
-    oracle first, a 1% slippage cap, then `subscribe(...)` — and they can be copied and produce
-    real transactions.
+12. **The hire flow has never actually been signed.** The claim that used to stand here —
+    *"there is no connect wallet button"* — is stale: `frontend/src/components/wallet/` now
+    holds a Reown AppKit connect control and a `hire-action.tsx` that reads the price from
+    `FuguRegistry`, refetches the quote, caps `maxAmount` at quote + 1%, sets a block-time
+    deadline and simulates before opening the wallet. The whole thing is gated on
+    `NEXT_PUBLIC_REOWN_PROJECT_ID`: without it `walletEnabled` is `false`, nothing is mounted,
+    and the panel falls back to the `cast` commands.
+    **What has never happened is a signature.** No wallet holding tBNB exists in this
+    development environment, so no hire has ever been signed from the browser — not once, in any
+    state. Everything about that path is code and simulation. The one real rent on chain (A1)
+    was sent with `cast` from the deployer key, not from the UI.
+    → The correct sentence is: *"the signing path is written and the wallet UI mounts when a
+    project id is present"*, not *"you can hire an agent from the marketplace"*.
+
+13. **Listing 1's on-chain `agentWallet` is the deployer EOA, not Guardian's Altana wallet.**
+    Check it with one call:
+
+    ```bash
+    cast call --rpc-url https://data-seed-prebsc-1-s1.bnbchain.org:8545 \
+      0xb2f36070E6eae3353E8e755172B477DF213ae248 \
+      'getListing(uint256)((uint256,address,address,uint8,uint128,uint32,bool,bool,string))' 1
+    # agentWallet = 0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E  (deployer EOA)
+    ```
+
+    The wallet that actually signs is `0xbdc69c2d…` (A2/A4). The listing's base64 metadata
+    declares that Altana wallet and states the disagreement in its own `limits` field, but the
+    struct field itself still holds the EOA, because `updateListing` cannot touch `agentWallet`
+    and `FuguRegistry` has no setter for it — only a **new** listing could fix it, which would
+    double the HEALTH_FACTOR category count. Anyone reading the chain alone will link Guardian's
+    activity to the wrong address. `contracts/test/UpdateGuardianMetadataScript.t.sol` asserts
+    the disagreement on purpose so it cannot be silently "fixed".
+
+14. **Listing 1's on-chain metadata now carries stale claims of its own.** Its `limits` string
+    still reads *"not yet wired into the A2A/MCP runtime the agent serves … and there is no
+    user-facing kill switch"* and its `verify` string still says *"249 tests"*. A9 replaced both.
+    Nobody has re-run `UpdateGuardianMetadata` since, so the chain is currently more pessimistic
+    than the repo — which is the safe direction to be wrong in, but it is still wrong.
+
+15. **There is no public deployment.** The backend and agents are meant for a VPS and the
+    frontend for Vercel; neither has happened, and nothing answers on any domain. A landing
+    domain has been purchased and **nothing is deployed to it** — do not expect a site there.
+    One thing that cannot be settled from inside this repo: the domain name itself. `README.md`
+    and the root `CLAUDE.md` say `hellofugu.xyz`; `docs/setup/ENVIRONMENT.md`, the rest of
+    `docs/`, and the shipped code (`landingpage-fugugent/src/app/layout.tsx`,
+    `frontend/src/app/layout.tsx`) all say `fugugent.xyz`. Which one is actually registered is
+    not verifiable here, and this document will not guess. Either way the answer to "is it
+    live?" is no.
 
 ---
 
@@ -434,9 +650,11 @@ relay as an error.
 
 The process can die after the record is saved but before the network call leaves. What is left
 behind is a pending record for a transaction that never existed, and Guardian holds back until
-an operator clears it. That failure direction is intentional. What does not exist yet is a
-long-running process living for days on top of this store — for that, the runtime has to be
-wired up first (B1).
+an operator clears it. That failure direction is intentional. What still does not exist is a
+long-running process living for days on top of this store: the runtime is wired up now (A9), but
+the longest observed run is five cycles over about 75 seconds, and none of them sent anything.
+Day-boundary rollover, a session expiring under a running loop, and a real pending repay
+surviving a restart have all only been exercised in tests.
 
 ### C8. The character images are produced as our own parametric SVGs
 
@@ -492,20 +710,32 @@ written or planned**, then withdrawn once the evidence was examined.
 | "The rebalancing band is better" | Contradicted by its own backtest on large swings, and the result was locked in as a `KEJUJURAN` test rather than hidden. |
 | "Grid beats hold" | Contradicted by its own backtest on a directional trend, also locked in as a `KEJUJURAN` test. |
 | "expectPartialRevert because of a forge limitation" | A reviewer tested it themselves and proved that a full match passes on the same forge — so that was a loosening disguised as a technical constraint. Replaced with a full match containing the exact HF value. |
-| "89 commits" | `git log --oneline \| wc -l` answers **90**; 89 is the number of commits on top of `87508a2` "Initial commit". The number written in §Numbers states both. |
+| "89 commits" | `git log --oneline \| wc -l` answers **90**; 89 is the number of commits on top of `87508a2` "Initial commit". The number written in §Numbers states both. That whole row is now stale in the other direction — it reads 136/137 as of this edit. |
+| "The kill switch works" (2026-09-09) | It can be pulled from outside the process and the next cycle refuses on the kill rule — but the position was at HF 8.49, so that cycle would have refused anyway. "It stops a send" was narrowed to a unit-test claim (A9, B2). |
+| "Rebalancer, Grid and Yield are wired up" (2026-09-09) | They are *callable*, not *capable*. B3 was rewritten rather than closed: six tools answer over A2A and MCP, and not one of them can send a transaction. |
+| "The marketplace runs against the live backend" | One manual browser session is reported, with no artifact left in the repo. A report of a run is not a run anyone else can check, so it stayed in §B (B4). |
+| "There is no connect wallet button" | Stale in the *other* direction: the button and the whole signing path now exist. The honest replacement is not "you can hire an agent" but "no hire has ever been signed, because no wallet here holds tBNB" (B12). |
+| "The landing page is `landingpage/`" | It is `landingpage-fugugent/`. `landingpage/` is a leftover Vite scaffold; the build, lint and SVG-generation commands in this document had been pointing at it. |
+| Guardian listing metadata: "no user-facing kill switch", "249 tests" | Still what the chain says. The repo moved and the on-chain string did not; recorded as B14 rather than quietly corrected here. |
 
 ---
 
 ## Next order of work
 
-1. Wire `createGuardian()` into the agent runtime that is served (`dualMain.ts`/`mcpMain.ts`/
-   `tools.ts`), and resolve the session-loading difference along the way (B1). Give `kill()` a
-   lever a user can press (B2).
-2. Connect the marketplace to a live backend and prove it with one recorded run (B4).
-3. The risk endpoint (`bloatLevel` + raw metrics) so the puffing fugu mechanic has data (B5).
-4. Scheduler + indexer, and set `breakoutConfirmObservations`/`minConsecutiveFavorable` together
+1. ~~Wire `createGuardian()` into the agent runtime that is served, and give `kill()` a lever a
+   user can press (B1, B2).~~ **Done 2026-09-09 (A9).** What is left from it: force the
+   EMERGENCY case on testnet so the kill switch is proven to stop a real send, and send one
+   repay **through the runtime** so A4's evidence stops being the only on-chain repay.
+2. Sign one hire from the browser (B12) — which first needs a funded tBNB wallet in this
+   environment, and a Reown project id.
+3. Connect the marketplace to a live backend and prove it with one **recorded** run (B4).
+4. The risk endpoint (`bloatLevel` + raw metrics) so the puffing fugu mechanic has data (B5).
+5. Scheduler + indexer, and set `breakoutConfirmObservations`/`minConsecutiveFavorable` together
    with their cadence (B11).
-5. Reconcile the read network and the execution network (C2), or state the mock clearly as a
+6. Reconcile the read network and the execution network (C2), or state the mock clearly as a
    product boundary.
-6. ~~Verify the contracts on BscScan (B9).~~ **Done 2026-09-09.**
-7. On-chain execution strategy for Rebalancer, Grid, and Yield (B3).
+7. ~~Verify the contracts on BscScan (B9).~~ **Done 2026-09-09.**
+8. On-chain execution for Rebalancer, Grid, and Yield (B3) — which means a mock DEX first, and
+   that decision has not been taken.
+9. Re-run `UpdateGuardianMetadata` so listing 1 stops advertising limits that no longer apply
+   (B14), and decide whether a new listing is worth it to fix `agentWallet` (B13).
