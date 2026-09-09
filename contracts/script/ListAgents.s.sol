@@ -7,9 +7,13 @@ import {FuguRegistry} from "../src/FuguRegistry.sol";
 import {Category, Listing} from "../src/types/FuguTypes.sol";
 
 /// @title ListAgents
-/// @notice Register the three Fugugent agents missing from `FuguRegistry` —
-///         Rebalancer (REBALANCING), Grid (GRID), Yield (YIELD) — so that all four
-///         marketplace categories are filled, not just HEALTH_FACTOR.
+/// @notice Registers every Fugugent agent that is missing from `FuguRegistry`, so that
+///         all nine marketplace categories hold exactly one listing.
+///
+///         Guardian (HEALTH_FACTOR) was registered during the 2026-09-08 end-to-end run
+///         and is not in this script's plan. The eight entries here are:
+///         Rebalancer, Grid, Yield (registered 2026-09-09) and Broker, Trader, Pilot,
+///         Meter, Steward (added when the catalog was widened to nine categories).
 ///
 /// @dev How to use it (ALWAYS simulate first, without `--broadcast`, and read the output):
 ///
@@ -18,6 +22,13 @@ import {Category, Listing} from "../src/types/FuguTypes.sol";
 ///      forge script script/ListAgents.s.sol:ListAgents --rpc-url "$BSC_TESTNET_RPC_URL"
 ///      forge script script/ListAgents.s.sol:ListAgents --rpc-url "$BSC_TESTNET_RPC_URL" --broadcast
 ///      ```
+///
+///      ## The registry must be upgraded BEFORE this script runs
+///
+///      The five categories added in 2026-09 do not exist in the implementation that was
+///      deployed before them. Sending `list(..., Category.HIRING, ...)` to that old
+///      implementation reverts while decoding the calldata, because 4 is out of range for
+///      a four-value enum. Run `script/Upgrade.s.sol` first.
 ///
 ///      ## Idempotent — unlike `DeployMocks.s.sol`
 ///
@@ -30,7 +41,7 @@ import {Category, Listing} from "../src/types/FuguTypes.sol";
 ///
 ///      Not one of our agent wallets holds an ERC-8004 IdentityRegistry token on BSC
 ///      testnet (`balanceOf` on `0x8004A818BFB912233c491871b3d84c89A494BD9e` = 0 for all
-///      four, as of 2026-09-09). The IDs 8005/8006/8007 continue from the `8004` already
+///      of them, as of 2026-09-09). The IDs 8005-8012 continue from the `8004` already
 ///      used by the Guardian listing: they are nothing but locally unique keys.
 ///      `FuguRegistry` does not verify ERC-8004 ownership (see its contract NatSpec), so
 ///      these IDs MUST NOT be read as proof of identity. That fact is written into each
@@ -47,10 +58,12 @@ import {Category, Listing} from "../src/types/FuguTypes.sol";
 ///        | sed -E 's/.*base64,//; s/"\)$//' | base64 -d
 ///      ```
 ///
-///      That metadata states the limits of these three agents itself: a decision engine
-///      plus a backtest, **not yet wired to on-chain execution**, and it has never sent a
-///      single transaction (`docs/STATUS.md` §B3). The marketplace must not claim more
-///      than that.
+///      That metadata states each agent's limits itself. `implemented` is `false` for an
+///      agent whose code does not exist in this repository yet, and `onchainExecution` is
+///      `false` for every agent except Guardian. `metadataURI` is the one field
+///      `updateListing` can still change afterwards, so a listing registered while its
+///      agent was still empty can be corrected the day the agent is real. `agentWallet`
+///      and `category` can NOT be changed after `list()` — get those right the first time.
 ///
 ///      `chainId` is hardcoded to 97 (BSC testnet). **Change it when using this for mainnet.**
 contract ListAgents is Script {
@@ -67,11 +80,11 @@ contract ListAgents is Script {
     /// @dev Subscription price on an 8-decimal basis: 5_000_000 = $0.05 per period.
     ///
     ///      Half of the Guardian listing ($0.10), and deliberately so: Guardian has
-    ///      demonstrably executed on-chain transactions, while these three agents are
-    ///      still only decision engines. The price gap states the same capability gap
-    ///      that is written in the metadata — it is not a number picked to look good.
-    ///      Zero is forbidden by the contract (`InvalidPrice`), and a price this small
-    ///      still makes escrow/claim/the 5% fee run with non-zero numbers.
+    ///      demonstrably executed on-chain transactions, while none of these eight has.
+    ///      The price gap states the same capability gap that is written in the metadata —
+    ///      it is not a number picked to look good. Zero is forbidden by the contract
+    ///      (`InvalidPrice`), and a price this small still makes escrow/claim/the 5% fee
+    ///      run with non-zero numbers.
     uint128 constant PRICE_USD8 = 5_000_000;
 
     /// @dev A 120-second period, the same as the Guardian listing already live.
@@ -83,36 +96,55 @@ contract ListAgents is Script {
     ///      is proportional to elapsed time. A 30-day period would mean the right to
     ///      review opens only after 15 days — the hire -> claim -> review cycle would
     ///      never finish in front of the judges. 120 seconds makes it finish in about 60
-    ///      seconds. It also makes all four cards comparable, since they use the same period.
+    ///      seconds. It also makes every card comparable, since they use the same period.
     uint32 constant PERIOD_SECONDS = 120;
 
-    /// @dev The 1 existing Guardian listing + the 3 this script registers.
-    uint256 constant EXPECTED_TOTAL_LISTINGS = 4;
+    /// @dev The 1 existing Guardian listing + the 8 this script registers.
+    uint256 constant EXPECTED_TOTAL_LISTINGS = 9;
 
     error WrongChain(uint256 expected, uint256 actual);
     error NoCode(string label, address addr);
     error ListingMismatch(uint256 listingId, string field);
     error UnexpectedListingCount(uint256 expected, uint256 actual);
     error UnexpectedCategoryCount(uint8 category, uint256 expected, uint256 actual);
+    error AgentWalletNotAssigned(string name);
+    error RegistryTooOldForNewCategories(address registry);
 
     struct AgentPlan {
         uint256 erc8004AgentId;
+        /// @dev The agent's operational wallet. **Immutable once `list()` has run** — no
+        ///      setter exists, and `updateListing` cannot reach it. A wrong address here
+        ///      is permanent for that listing, which is why `_listAll` refuses to register
+        ///      an entry whose wallet is still the zero address.
         address agentWallet;
         Category category;
         /// @dev Display name, the same one the marketplace uses.
         string name;
-        /// @dev The agent's directory at `ai/<slug>/app/agent` — used in the proof command.
+        /// @dev The agent's directory at `ai/<slug>/app/agent`.
         string slug;
-        /// @dev What the decision engine actually does, with thresholds that are derived
-        ///      (not guessed). Condensed from `docs/STATUS.md` §A5.
+        /// @dev What this agent does, in plain words. For an agent that is already built
+        ///      this describes the decision rules that exist; for one that is not, it
+        ///      describes only what the listing reserves, and `implemented` says so.
         string summary;
-        /// @dev The number of tests a reader can re-run.
+        /// @dev True only when the agent's code exists in this repository and its test
+        ///      suite runs. False means the listing reserves a category and a price and
+        ///      nothing else.
+        bool implemented;
+        /// @dev The number of tests a reader can re-run. "0" when `implemented` is false.
         string testCount;
     }
 
     function run() external {
         if (block.chainid != EXPECTED_CHAIN_ID) revert WrongChain(EXPECTED_CHAIN_ID, block.chainid);
         if (REGISTRY.code.length == 0) revert NoCode("REGISTRY", REGISTRY);
+
+        // The five new categories only decode against an upgraded implementation. Probe
+        // for the highest one before spending anything: on the pre-expansion code this
+        // static call reverts while decoding `uint8(8)` into a four-value enum, which is
+        // a far clearer failure than a reverted broadcast.
+        (bool newCategoriesKnown,) =
+            REGISTRY.staticcall(abi.encodeWithSignature("countByCategory(uint8)", uint8(Category.TREASURY)));
+        if (!newCategoriesKnown) revert RegistryTooOldForNewCategories(REGISTRY);
 
         uint256 pk = vm.envUint("PRIVATE_KEY");
         address lister = vm.addr(pk);
@@ -140,7 +172,7 @@ contract ListAgents is Script {
     ///      `FuguRegistry` (`test/ListAgentsScript.t.sol`) with no env vars, no broadcast,
     ///      and without spending tBNB to discover that two arguments were swapped.
     function _listAll(FuguRegistry registry) internal {
-        AgentPlan[3] memory plans = _plan();
+        AgentPlan[8] memory plans = _plan();
         for (uint256 i = 0; i < plans.length; ++i) {
             AgentPlan memory p = plans[i];
             uint256 existing = registry.listingByAgentId(p.erc8004AgentId);
@@ -148,6 +180,9 @@ contract ListAgents is Script {
                 console.log("skipped (already listed):", p.name, existing);
                 continue;
             }
+            // `agentWallet` can never be corrected later. Rather than write a zero address
+            // into a listing forever, refuse and let a human fill the plan in.
+            if (p.agentWallet == address(0)) revert AgentWalletNotAssigned(p.name);
             uint256 listingId = registry.list(
                 p.erc8004AgentId, p.agentWallet, p.category, PRICE_USD8, PERIOD_SECONDS, _metadata(p)
             );
@@ -159,7 +194,7 @@ contract ListAgents is Script {
     /// @dev This also runs during simulation (`forge script` without `--broadcast`), so a
     ///      mismatch aborts the whole run BEFORE a single tx is sent.
     function _verifyAll(FuguRegistry registry) internal view {
-        AgentPlan[3] memory plans = _plan();
+        AgentPlan[8] memory plans = _plan();
         for (uint256 i = 0; i < plans.length; ++i) {
             AgentPlan memory p = plans[i];
             uint256 listingId = registry.listingByAgentId(p.erc8004AgentId);
@@ -170,8 +205,8 @@ contract ListAgents is Script {
         uint256 total = registry.listingCount();
         if (total != EXPECTED_TOTAL_LISTINGS) revert UnexpectedListingCount(EXPECTED_TOTAL_LISTINGS, total);
 
-        // All four categories must hold exactly one listing: that is why this script exists.
-        for (uint8 c = 0; c <= uint8(Category.HEALTH_FACTOR); ++c) {
+        // All nine categories must hold exactly one listing: that is why this script exists.
+        for (uint8 c = 0; c <= uint8(Category.TREASURY); ++c) {
             uint256 n = registry.countByCategory(Category(c));
             if (n != 1) revert UnexpectedCategoryCount(c, 1, n);
         }
@@ -190,8 +225,9 @@ contract ListAgents is Script {
 
     /// @notice The registration plan. Wallets come from `ai/<slug>/app/agent/studio.toml`.
     /// @dev The categories MUST match the enum indices in `src/types/FuguTypes.sol`:
-    ///      0 REBALANCING, 1 GRID, 2 YIELD, 3 HEALTH_FACTOR (Guardian, already live).
-    function _plan() internal pure returns (AgentPlan[3] memory plans) {
+    ///      0 REBALANCING, 1 GRID, 2 YIELD, 3 HEALTH_FACTOR (Guardian, already live),
+    ///      4 HIRING, 5 COMMERCE, 6 AUTONOMOUS, 7 STREAMING, 8 TREASURY.
+    function _plan() internal pure virtual returns (AgentPlan[8] memory plans) {
         plans[0] = AgentPlan({
             erc8004AgentId: 8005,
             agentWallet: 0xb8f155D1278f0437b9De7c63911f2C0EDa485941,
@@ -199,6 +235,7 @@ contract ListAgents is Script {
             name: "Fugu Rebalancer",
             slug: "fugurebalancer",
             summary: "Drift-band rebalancer: a 500 bps band plus a 50 bps cost gate on turnover. The minimum economic turnover is derived from gas and budget (T >= gas * 10000 / (M - r)) and returns null when the budget makes rebalancing impossible, instead of quietly never trading.",
+            implemented: true,
             testCount: "88"
         });
         plans[1] = AgentPlan({
@@ -208,6 +245,7 @@ contract ListAgents is Script {
             name: "Fugu Grid",
             slug: "fugugrid",
             summary: "Grid trading on PancakeSwap v3: line spacing must be at least 2x the round-trip cost, measured at the upper bound where percentage spacing is tightest. Structurally mean-reverting, so its own backtest shows buy-and-hold beating it in a trending market.",
+            implemented: true,
             testCount: "99"
         });
         plans[2] = AgentPlan({
@@ -217,13 +255,79 @@ contract ListAgents is Script {
             name: "Fugu Yield",
             slug: "fuguyield",
             summary: "Pool migration gated by breakEvenSpreadBps = ceil(cost * 10000 * 365 / (principal * days)) times a 2.00x safety multiplier. The threshold rises as principal or horizon shrinks ($10,000 over 30 days needs 390 bps, $200 needs 1582 bps), so highest APY is not the answer.",
+            implemented: true,
             testCount: "93"
+        });
+
+        // --- the five capabilities added when the catalog was widened to nine ---
+        //
+        // These were registered while their code was still being written in `ai/`. Each
+        // summary describes what the listing reserves, and `implemented: false` says the
+        // code was not there yet. When an agent becomes real, replace its summary and flip
+        // the flag, then run `updateListing` — that is the one field still changeable.
+        //
+        // Their wallets were created ahead of the agents, with `cast wallet new`, because
+        // `agentWallet` cannot be corrected after `list()` and the agent directories held
+        // no wallet yet. Each key is in `contracts/.env` as
+        // `AGENT_WALLET_<NAME>_PRIVATE_KEY`; the agent that owns the directory adopts its
+        // address with `bag wallet new --private-key -` rather than generating a fresh one,
+        // which is what would make the chain and the repo disagree. Brand-new testnet EOAs,
+        // never used anywhere else, no balance, never signed anything.
+        plans[3] = AgentPlan({
+            erc8004AgentId: 8008,
+            agentWallet: 0x1E77279cf18Da89EEF1477F010D2e6B1E2A1E2c3,
+            category: Category.HIRING,
+            name: "Fugu Broker",
+            slug: "fugubroker",
+            summary: "Hires and pays other agents on your behalf. The money is held until the work is done, so nobody is paid in advance and nobody works for free.",
+            implemented: false,
+            testCount: "0"
+        });
+        plans[4] = AgentPlan({
+            erc8004AgentId: 8009,
+            agentWallet: 0x1B82F72346a8553a968fafD6AC07A21d4A88589f,
+            category: Category.COMMERCE,
+            name: "Fugu Trader",
+            slug: "fugutrader",
+            summary: "Buys one call at a time, paying per request for data or for a model answer. Neither side ever holds the other side's keys.",
+            implemented: false,
+            testCount: "0"
+        });
+        plans[5] = AgentPlan({
+            erc8004AgentId: 8010,
+            agentWallet: 0x79AFD7B81a1D7CA57270d53Cf9FC315Cd5698c8D,
+            category: Category.AUTONOMOUS,
+            name: "Fugu Pilot",
+            slug: "fugupilot",
+            summary: "Moves money between lending and trading venues inside limits that it cannot exceed. The limits are set once, in advance, and the agent is refused when it tries to go past them.",
+            implemented: false,
+            testCount: "0"
+        });
+        plans[6] = AgentPlan({
+            erc8004AgentId: 8011,
+            agentWallet: 0x95c3c77e3B7d3873BcF6b9F4b12f47775e7312c8,
+            category: Category.STREAMING,
+            name: "Fugu Meter",
+            slug: "fugumeter",
+            summary: "Pays by the call, by the second, or by the unit, without a person approving each one. The permission it uses expires on its own.",
+            implemented: false,
+            testCount: "0"
+        });
+        plans[7] = AgentPlan({
+            erc8004AgentId: 8012,
+            agentWallet: 0xB92Dd50E84560E719627AcE28b32060dbF0E7083,
+            category: Category.TREASURY,
+            name: "Fugu Steward",
+            slug: "fugusteward",
+            summary: "Runs payments that repeat on a schedule, and keeps a record of what it already paid so a restart does not pay twice.",
+            implemented: false,
+            testCount: "0"
         });
     }
 
     /// @notice The listing metadata as `data:application/json;base64,...`.
     /// @dev Its contents deliberately name what does NOT exist yet. `onchainExecution:
-    ///      false` and `limits` are the same sentences as `docs/STATUS.md` §B3 — the
+    ///      false` and `limits` are the same sentences as `docs/STATUS.md` — the
     ///      marketplace must not contradict our own honesty document.
     function _metadata(AgentPlan memory p) internal pure returns (string memory) {
         return string.concat("data:application/json;base64,", Base64.encode(bytes(_metadataJson(p))));
@@ -240,29 +344,57 @@ contract ListAgents is Script {
             '","agentWallet":"', vm.toString(p.agentWallet),
             '","summary":"', p.summary,
             '","onchainExecution":false',
-            ',"limits":"Deterministic decision engine and backtest only. This agent has never sent an on-chain transaction. Hiring it records payment in escrow and does not start an autonomous loop yet. See docs/STATUS.md section B3."',
-            ',"verify":"cd ai/', p.slug, '/app/agent && corepack pnpm test  # ', p.testCount, ' tests"',
-            ',"erc8004Identity":"placeholder id, locally unique in FuguRegistry only: no ERC-8004 IdentityRegistry token has been minted for this wallet at ', vm.toString(ERC8004_IDENTITY_REGISTRY),
+            ',"implemented":', p.implemented ? "true" : "false",
+            ',"limits":"', _limits(p),
+            '","verify":"', _verify(p),
+            '","erc8004Identity":"placeholder id, locally unique in FuguRegistry only: no ERC-8004 IdentityRegistry token has been minted for this wallet at ', vm.toString(ERC8004_IDENTITY_REGISTRY),
             '","chainId":97}'
         );
+    }
+
+    /// @dev The honest sentence shown on the agent card. Two different truths, because
+    ///      "has a tested decision engine but cannot act" and "has no code at all" are not
+    ///      the same limitation and must not be blurred into one comfortable phrase.
+    function _limits(AgentPlan memory p) internal pure returns (string memory) {
+        if (p.implemented) {
+            return "Deterministic decision engine and backtest only. This agent has never sent a transaction of its own. Hiring it holds your payment until it is claimed and does not start an autonomous loop yet. See docs/STATUS.md.";
+        }
+        return string.concat(
+            "Not built yet. This listing reserves the category, the price, and the wallet the agent will sign from. At the time it was registered there was no code for it in ai/",
+            p.slug,
+            ", the wallet had never signed anything, and hiring it holds your payment without anything running. See docs/STATUS.md."
+        );
+    }
+
+    /// @dev What a reader can run to check the claim above. An agent with no code gets a
+    ///      command that shows its absence, not a test count that does not exist.
+    function _verify(AgentPlan memory p) internal pure returns (string memory) {
+        if (p.implemented) {
+            return string.concat("cd ai/", p.slug, "/app/agent && corepack pnpm test  # ", p.testCount, " tests");
+        }
+        return string.concat("ls ai/", p.slug, "  # no test suite at the time of listing");
     }
 
     function _categoryName(Category c) internal pure returns (string memory) {
         if (c == Category.REBALANCING) return "REBALANCING";
         if (c == Category.GRID) return "GRID";
         if (c == Category.YIELD) return "YIELD";
-        return "HEALTH_FACTOR";
+        if (c == Category.HEALTH_FACTOR) return "HEALTH_FACTOR";
+        if (c == Category.HIRING) return "HIRING";
+        if (c == Category.COMMERCE) return "COMMERCE";
+        if (c == Category.AUTONOMOUS) return "AUTONOMOUS";
+        if (c == Category.STREAMING) return "STREAMING";
+        return "TREASURY";
     }
 
     function _logResult(FuguRegistry registry) internal view {
         console.log("== Result (re-read from chain) ==");
         console.log("listingCount          ", registry.listingCount());
-        console.log("countByCategory(0) REBALANCING  ", registry.countByCategory(Category.REBALANCING));
-        console.log("countByCategory(1) GRID         ", registry.countByCategory(Category.GRID));
-        console.log("countByCategory(2) YIELD        ", registry.countByCategory(Category.YIELD));
-        console.log("countByCategory(3) HEALTH_FACTOR", registry.countByCategory(Category.HEALTH_FACTOR));
+        for (uint8 c = 0; c <= uint8(Category.TREASURY); ++c) {
+            console.log("countByCategory", _categoryName(Category(c)), registry.countByCategory(Category(c)));
+        }
 
-        AgentPlan[3] memory plans = _plan();
+        AgentPlan[8] memory plans = _plan();
         for (uint256 i = 0; i < plans.length; ++i) {
             uint256 listingId = registry.listingByAgentId(plans[i].erc8004AgentId);
             Listing memory l = registry.getListing(listingId);
