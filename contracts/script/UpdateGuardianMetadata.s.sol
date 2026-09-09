@@ -7,15 +7,28 @@ import {FuguRegistry} from "../src/FuguRegistry.sol";
 import {Category, Listing} from "../src/types/FuguTypes.sol";
 
 /// @title UpdateGuardianMetadata
-/// @notice Give listing 1 (Fugu Guardian) a readable `metadataURI`.
+/// @notice Keep listing 1 (Fugu Guardian) carrying a readable `metadataURI` that is
+///         still true.
 ///
 /// @dev Listing 1 was created during the earliest E2E run, before the
 ///      `data:application/json;base64,…` convention existed, so its
-///      `metadataURI` is the placeholder `ipfs://fugu-guardian-v1`. The backend
+///      `metadataURI` was the placeholder `ipfs://fugu-guardian-v1`. The backend
 ///      metadata reader declines non-`data:` URIs on purpose (it never fetches
-///      the network), so the one agent that has actually executed on-chain shows
+///      the network), so the one agent that has actually executed on-chain showed
 ///      up as `Agent #8004` next to three agents that cannot execute anything
-///      yet but carry proper names. This script fixes exactly that.
+///      yet but carry proper names. The first run of this script fixed that.
+///
+///      **This script is re-run whenever the repo overtakes the chain.** On-chain
+///      metadata is the one claim about this agent that cannot be corrected
+///      quietly, so it must not be left saying things that stopped being true.
+///      Run 2 (2026-09-09) replaced three stale claims: the strategy is now wired
+///      into the served runtime (`guardianRuntime.ts` / `guardianTools.ts` reach
+///      `createGuardian()` from `dualMain.ts` and `mcpMain.ts`), a kill switch
+///      exists and answers an MCP client in a separate process, and the Guardian
+///      test count moved 249 → 285. Every limit that survived those changes is
+///      still written into `limits` — no repay has ever left through the runtime,
+///      the kill switch is only proven to stop a *send* in unit tests, and there
+///      is no lever in the UI.
 ///
 ///      Usage — ALWAYS simulate first, without `--broadcast`, and read the output:
 ///
@@ -187,13 +200,21 @@ contract UpdateGuardianMetadata is Script {
         json = string.concat(json, ',"onchainExecution":true');
         json = string.concat(
             json,
-            ',"proof":"Raised a position from health factor 1.14 to 1.50 on BSC testnet by repaying $4.03 in one atomic userOp (approve + repay), tx 0x619cfbe351703913ebafd0e76db86af0f90953bbff33335d78d8dbf1e41e08cc at block 129852222. Repay.user on the receipt is the Altana wallet, not the deployer EOA, and the on-chain debt fell by exactly the amount claimed. The same key was refused when it tried an off-allowlist transfer."'
+            ',"proof":"Raised a position from health factor 1.14 to 1.50 on BSC testnet by repaying $4.03 in one atomic userOp (approve + repay), tx 0x619cfbe351703913ebafd0e76db86af0f90953bbff33335d78d8dbf1e41e08cc at block 129852222. Repay.user on the receipt is the Altana wallet, not the deployer EOA, and the on-chain debt fell by exactly the amount claimed. The same key was refused when it tried an off-allowlist transfer. '
         );
         json = string.concat(
             json,
-            ',"limits":"Proven end to end by a script, not yet wired into the A2A/MCP runtime the agent serves; hiring records payment in escrow and does not start an autonomous loop today, and there is no user-facing kill switch. The on-chain agentWallet field of this listing still holds the deployer EOA ',
+            'The strategy also runs inside the agent that is served: guardianRuntime.ts and guardianTools.ts call createGuardian() from dualMain.ts and mcpMain.ts, and five monitoring cycles 15 seconds apart were watched against this BSC testnet position under bag dev (each action NONE, health factor 8.49). A kill switch exists and was pulled from a separate process: an MCP client called guardian_kill_switch over http, the next cycle refused with Kill switch engaged: execution is stopped entirely, killed:true was persisted, and monitoring carried on reading the position."'
+        );
+        json = string.concat(
+            json,
+            ',"limits":"No repay has ever been sent through the runtime. The only on-chain repay Guardian has made is the script transaction quoted above; every live loop cycle so far decided NONE. That the kill switch stops an actual send is proven in unit tests only, not on chain: the live position sits at health factor 8.49, so the cycle after the kill would have answered NONE regardless, and the testnet price was deliberately not manipulated to manufacture an emergency. There is no kill switch lever in the UI either - what exists is an MCP/A2A tool, a lever for a client rather than for a person in a browser. Hiring records payment in escrow and does not start an autonomous loop today. '
+        );
+        json = string.concat(
+            json,
+            'The on-chain agentWallet field of this listing still holds the deployer EOA ',
             vm.toString(DEPLOYER_EOA),
-            ' because updateListing cannot change that field and FuguRegistry has no setter for it: only a new listing could, which would double the HEALTH_FACTOR category count. See docs/STATUS.md sections A3 and A4."'
+            ' because updateListing cannot change that field and FuguRegistry has no setter for it: only a new listing could, which would double the HEALTH_FACTOR category count. See docs/STATUS.md sections A4, A9, B1 and B2."'
         );
         json = string.concat(
             json,
@@ -201,7 +222,7 @@ contract UpdateGuardianMetadata is Script {
             vm.toString(ALTANA_KEYSTORE),
             " 'isValidKey(address,bytes32)(bool)' ",
             vm.toString(GUARDIAN_ALTANA_WALLET),
-            ' 0x7a467115cdf6d03f85f0f059733843b43cbe291d9f4489e3bf27d45e5148b377  # true, no API key needed. Strategy tests: cd ai/fuguguardian/app/agent && corepack pnpm test  # 249 tests"'
+            ' 0x7a467115cdf6d03f85f0f059733843b43cbe291d9f4489e3bf27d45e5148b377  # true, no API key needed. Strategy and runtime tests: cd ai/fuguguardian/app/agent && corepack pnpm test  # 285 tests, 36 of them the runtime tests. The runtime wiring itself: grep -rn strategy ai/fuguguardian/app/agent/src/*.ts"'
         );
         json = string.concat(
             json,

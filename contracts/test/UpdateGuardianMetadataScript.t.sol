@@ -115,6 +115,50 @@ contract UpdateGuardianMetadataScriptTest is Test {
         assertTrue(vm.contains(limits, vm.toString(DEPLOYER_EOA)));
     }
 
+    /// @notice The metadata must not repeat the claims the repo has since overtaken.
+    /// @dev These three sentences were TRUE when run 1 wrote them and are false now.
+    ///      Asserting their absence is cheap and it is the only thing standing between a
+    ///      future edit and a listing that lies about its own agent again.
+    function test_metadataDropsTheClaimsThatStoppedBeingTrue() public view {
+        string memory json = harness.metadataJson();
+        assertFalse(vm.contains(json, "not yet wired into the A2A/MCP runtime"));
+        assertFalse(vm.contains(json, "no user-facing kill switch"));
+        assertFalse(vm.contains(json, "249 tests"));
+        assertTrue(vm.contains(vm.parseJsonString(json, ".verify"), "285 tests"));
+    }
+
+    /// @notice The runtime and the kill switch are claimed, and each carries the
+    ///         evidence that a reader can reproduce.
+    function test_metadataClaimsTheRuntimeAndTheKillSwitchWithEvidence() public view {
+        string memory proof = vm.parseJsonString(harness.metadataJson(), ".proof");
+        // The wiring, named by the files that do it.
+        assertTrue(vm.contains(proof, "guardianRuntime.ts"));
+        assertTrue(vm.contains(proof, "createGuardian()"));
+        // The loop that was actually watched, not an intention.
+        assertTrue(vm.contains(proof, "five monitoring cycles"));
+        // The kill switch, and the string the next cycle answered with.
+        assertTrue(vm.contains(proof, "guardian_kill_switch"));
+        assertTrue(vm.contains(proof, "execution is stopped entirely"));
+    }
+
+    /// @notice Every limit that survived the runtime work must still be stated.
+    /// @dev The runtime being live makes it MORE tempting to drop these, not less: a
+    ///      listing that says "it executes on-chain and it has a kill switch" without
+    ///      them reads as a promise nobody can keep. Each assertion below is one
+    ///      sentence in docs/STATUS.md §A9 that the chain is required to carry too.
+    function test_metadataKeepsEveryUnprovenClaimMarkedAsUnproven() public view {
+        string memory limits = vm.parseJsonString(harness.metadataJson(), ".limits");
+        // 1. No repay has gone out through the runtime; the only one came from a script.
+        assertTrue(vm.contains(limits, "No repay has ever been sent through the runtime"));
+        // 2. The kill switch stopping a SEND is a unit-test claim, and the live position
+        //    at HF 8.49 is why: that cycle would have decided NONE anyway.
+        assertTrue(vm.contains(limits, "unit tests only"));
+        assertTrue(vm.contains(limits, "8.49"));
+        assertTrue(vm.contains(limits, "not manipulated"));
+        // 3. There is no lever in the UI.
+        assertTrue(vm.contains(limits, "no kill switch lever in the UI"));
+    }
+
     /// @notice Nothing else about the listing may move.
     function test_categoryOwnerAndCountsAreUntouched() public {
         harness.updateMetadata(registry);
