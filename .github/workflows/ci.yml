@@ -7,7 +7,7 @@
 # baseline:
 #
 #     contracts       206   forge test
-#     backend         659   vitest (plus 1 deliberately skipped)
+#     backend         665   vitest (plus 1 deliberately skipped)
 #     fuguguardian    285   vitest
 #     fugurebalancer  130   vitest
 #     fugugrid        144   vitest
@@ -18,7 +18,7 @@
 #     fugumeter       146   vitest
 #     fugusteward     169   vitest
 #                   -----
-#                    2302
+#                    2308
 #
 # A green suite is not by itself evidence that the suite ran. A `describe` block
 # accidentally renamed to `describe.skip`, a glob that stops matching after a file
@@ -119,7 +119,7 @@ jobs:
           fi
 
   backend:
-    name: backend (vitest, baseline 659)
+    name: backend (vitest, baseline 665)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -166,7 +166,7 @@ jobs:
         working-directory: backend
         run: |
           set -uo pipefail
-          baseline=659
+          baseline=665
           # "Tests  484 passed | 1 skipped (485)" — the PASSED figure is the one
           # that matters; a test converted to `.skip` must show up as a loss.
           #
@@ -325,7 +325,7 @@ jobs:
               exit 1
             fi
           done
-          echo "all 2302 tests green"
+          echo "all 2308 tests green"
 
   # ── images ────────────────────────────────────────────────────────────────
   #

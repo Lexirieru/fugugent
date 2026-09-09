@@ -232,6 +232,40 @@ describe("GET /api/skills/:id", () => {
 });
 
 describe("GET /api/auditors", () => {
+  /**
+   * The auditor roster used to answer the whole list whatever a client asked for, so
+   * `/auditors` was the one list on the site that could not be paged. These pin the
+   * window down, and in particular that `total` keeps reporting the roster rather than
+   * the size of the slice: a pager that reads `total` as "what I just received" never
+   * offers a second page.
+   */
+  it("returns only the requested window, and still reports the true total", async () => {
+    const all = await json(await get(app(), "/api/auditors"));
+    expect(all.items.length).toBeGreaterThan(1);
+
+    const first = await json(await get(app(), "/api/auditors?limit=1"));
+    expect(first.items).toHaveLength(1);
+    expect(first.total).toBe(all.total);
+    expect(first.items[0].id).toBe(all.items[0].id);
+
+    const second = await json(await get(app(), "/api/auditors?limit=1&offset=1"));
+    expect(second.items).toHaveLength(1);
+    expect(second.total).toBe(all.total);
+    expect(second.items[0].id).toBe(all.items[1].id);
+  });
+
+  it("answers an empty page past the end rather than wrapping round", async () => {
+    const body = await json(await get(app(), "/api/auditors?offset=9999"));
+    expect(body.items).toEqual([]);
+    expect(body.total).toBeGreaterThan(0);
+  });
+
+  it("rejects a limit that is not a positive integer", async () => {
+    const res = await get(app(), "/api/auditors?limit=0");
+    expect(res.status).toBe(400);
+    expect((await json(res)).field).toBe("limit");
+  });
+
   it("lists auditors with their reputation provenance", async () => {
     const res = await get(app(), "/api/auditors");
     expect(res.status).toBe(200);

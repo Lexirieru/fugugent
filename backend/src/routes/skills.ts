@@ -286,9 +286,16 @@ function toDetailResponse(detail: SkillServiceDetail): SkillDetailResponse {
   };
 }
 
-function toAuditorResponse(list: AuditorServiceList): AuditorListResponse {
+function toAuditorResponse(
+  list: AuditorServiceList,
+  window?: { limit: number; offset: number },
+): AuditorListResponse {
+  const items =
+    window === undefined
+      ? list.items
+      : list.items.slice(window.offset, window.offset + window.limit);
   return {
-    items: list.items.map(serializeAuditor),
+    items: items.map(serializeAuditor),
     total: list.total,
     source: list.source,
     healthy: list.healthy,
@@ -443,9 +450,29 @@ export function createSkillRoutes(deps: SkillRoutesDeps): Hono {
   });
 
   app.get("/auditors", async (c) => {
+    let limit: number;
+    let offset: number;
+    try {
+      limit = parseSkillLimit(c.req.query("limit"));
+      offset = parseSkillOffset(c.req.query("offset"));
+    } catch (err) {
+      return queryErrorResponse(c, err);
+    }
+
     const fetchedAt = now().toISOString();
     try {
-      return c.json(toAuditorResponse(await deps.service.listAuditors()));
+      // The window is cut here, not in the store.
+      //
+      // `listAuditors` returns the whole roster, and it is small: the auditors are
+      // whoever holds a bond, which is a handful. Slicing at the route gives a client
+      // a real, shareable page without pretending the datastore is doing work it is
+      // not. `total` stays the true count rather than the size of this slice, because
+      // that is the number a pager needs to know when to stop.
+      //
+      // If the roster ever grows past a page or two, this becomes the wrong place and
+      // the query belongs in the store. It is one function either way.
+      const list = await deps.service.listAuditors();
+      return c.json(toAuditorResponse(list, { limit, offset }));
     } catch (err) {
       return c.json({
         items: [],
