@@ -8,9 +8,13 @@
 
   The two apps ship side by side (hellofugu.xyz and app.hellofugu.xyz) and used to look
   like two different products, because they had two copies of the palette. Please do not
-  add a colour here. Add it there.
+  add a colour here. Add it there, then run `node scripts/sync-theme-tokens.mjs`.
+
+  The generated copy imported below is committed rather than produced at build time:
+  a Vercel build only sees this app's own directory, so an import reaching above it
+  resolves on a laptop and fails in CI. CI regenerates and fails on any diff.
 */
-@import "../../../theme/tokens.css";
+@import "./theme-tokens.generated.css";
 
 /*
   Fugugent — marketplace (app.hellofugu.xyz).

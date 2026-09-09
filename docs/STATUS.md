@@ -22,17 +22,19 @@ evidence was insufficient. That list is kept on purpose.
 | Backend | **484** tests (1 skipped) | `cd backend && corepack pnpm test` |
 | **Total** | **1,331** tests | |
 | History | **136** commits on top of the initial commit, clean working tree | `git log --oneline \| wc -l` → 137 (including `87508a2` "Initial commit"); `git status --porcelain` → empty |
-| Landing + marketplace | build and lint green | `bun --cwd landingpage-fugugent run build && bun --cwd landingpage-fugugent run lint`; the same for `frontend` |
+| Landing + marketplace | build and lint green | `bun --cwd landingpage run build`; `bun --cwd frontend run build && … run lint` |
 
 Every number in that table was recounted on 2026-09-09 by running the command beside it, not
 carried over from a previous edit. The previous values (131 / 249 / 88 / 99 / 93 / 374 =
 1,034) are wrong everywhere they still appear outside this document.
 
-**The landing page is `landingpage-fugugent/`, not `landingpage/`.** `landingpage/` is a
-leftover Vite scaffold (`src/App.tsx` and nothing else) that is still committed; the Next.js 16
-landing page, the brand SVGs and the puff meter all live in `landingpage-fugugent/`. Earlier
-versions of this document pointed the build, lint and SVG-generation commands at the wrong
-directory.
+**The landing page is `landingpage/`.** This reverses what earlier versions of this document
+said, and the reversal is real rather than a correction of a mistake: there were two landing
+pages for a while. The Next.js one in `landingpage-fugugent/` was the live one; the HelloFugu
+redesign was then built in `landingpage/` (Vite + React + Tailwind v4), and it is the directory
+the Vercel `landingpage` project deploys. `landingpage-fugugent/` was deleted on 2026-09-09 so
+that only one of them can be the answer. Its brand SVGs and puff meter were already present in
+`landingpage/public/`, byte for byte; nothing was lost with it.
 
 The one skipped backend test is the real Postgres path, which only runs when
 `FUGU_TEST_DATABASE_URL` is set (`skipIf`); without that variable the repositories are tested
@@ -254,7 +256,7 @@ assumption: the OASF fields (`oasf_skills`/`oasf_domains`) are **absent** from b
 and the detail endpoint, and their vocabulary is entirely generic — OASF cannot pick a category,
 so it is used only as a multiplier.
 
-### A7. Marketplace (`frontend/`) and landing page (`landingpage-fugugent/`)
+### A7. Marketplace (`frontend/`) and landing page (`landingpage/`)
 
 Both build and lint green (`bun --cwd <dir> run build`, `… run lint`), with zero horizontal
 scroll measured via `scrollWidth` vs `clientWidth` from 320 to 1280 px.
@@ -276,24 +278,20 @@ no reading are drawn hollow and dashed with a "no live reading" chip, their iden
 readable, only their risk channel missing. The landing page also carries no link to
 `app.hellofugu.xyz` (checked: no `href` to it anywhere in `page.tsx`).
 
-**Found while checking this, and not fixed here because this document may only touch itself:**
-the landing page's own honesty copy is now out of date in both directions.
-`landingpage-fugugent/src/app/page.tsx` still claims *"223 tests"*, and its `NOT_LIVE` list
-still says the strategy is not wired into the runtime, that the kill switch has no lever, that
-Rebalancer/Grid/Yield are "scaffolds with a session key", and that the contracts are not
-verified on BscScan. A9, A10 and B9 have overtaken all four. The page understates the project
-rather than overstating it, which is the safe direction, but a page whose selling point is
-accuracy cannot be inaccurate — it needs the same pass this document just had.
+The stale honesty copy recorded here earlier (*"223 tests"*, a `NOT_LIVE` list that A9, A10
+and B9 had already overtaken) lived in `landingpage-fugugent/src/app/page.tsx`, which no longer
+exists. The rewritten landing page in `landingpage/` carries its own honest section, and it is
+the one to check from now on.
 
 ### A8. Visual identity
 
 `docs/brand/` holds the palette, the characters, the 5-step puff scale, and the rules that are
 **enforced in code**: body colour = agent identity and never changes because of risk; body
-shape + ring pattern = risk. 13 SVG files in `landingpage-fugugent/public/brand/`, regenerated
+shape + ring pattern = risk. 13 SVG files in `landingpage/public/brand/`, regenerated
 with:
 
 ```bash
-python3 docs/brand/generate-svg.py landingpage-fugugent/public/brand
+python3 docs/brand/generate-svg.py landingpage/public/brand
 ```
 
 Tested in **full grayscale at 48 px**: all four characters can still be matched to their names
@@ -577,7 +575,7 @@ payloads say so in their own `costModel.why` field rather than hiding it.
     domain has been purchased and **nothing is deployed to it** — do not expect a site there.
     One thing that cannot be settled from inside this repo: the domain name itself. `README.md`
     and the root `CLAUDE.md` say `hellofugu.xyz`; `docs/setup/ENVIRONMENT.md`, the rest of
-    `docs/`, and the shipped code (`landingpage-fugugent/src/app/layout.tsx`,
+    `docs/`, and the shipped code (`landingpage/index.html`,
     `frontend/src/app/layout.tsx`) all say `hellofugu.xyz`. Which one is actually registered is
     not verifiable here, and this document will not guess. Either way the answer to "is it
     live?" is no.
@@ -715,7 +713,7 @@ written or planned**, then withdrawn once the evidence was examined.
 | "Rebalancer, Grid and Yield are wired up" (2026-09-09) | They are *callable*, not *capable*. B3 was rewritten rather than closed: six tools answer over A2A and MCP, and not one of them can send a transaction. |
 | "The marketplace runs against the live backend" | One manual browser session is reported, with no artifact left in the repo. A report of a run is not a run anyone else can check, so it stayed in §B (B4). |
 | "There is no connect wallet button" | Stale in the *other* direction: the button and the whole signing path now exist. The honest replacement is not "you can hire an agent" but "no hire has ever been signed, because no wallet here holds tBNB" (B12). |
-| "The landing page is `landingpage/`" | It is `landingpage-fugugent/`. `landingpage/` is a leftover Vite scaffold; the build, lint and SVG-generation commands in this document had been pointing at it. |
+| "The landing page is `landingpage-fugugent/`" | True when written, and no longer: the HelloFugu redesign was built in `landingpage/`, that is what the Vercel project deploys, and `landingpage-fugugent/` was deleted on 2026-09-09. A directory that used to be right is the easiest kind of stale claim to miss. |
 | Guardian listing metadata: "no user-facing kill switch", "249 tests" | Still what the chain says. The repo moved and the on-chain string did not; recorded as B14 rather than quietly corrected here. |
 
 ---

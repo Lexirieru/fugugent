@@ -226,10 +226,41 @@ jobs:
 
   # A single job the branch-protection rule and the deploy workflow can point at,
   # so neither has to enumerate a matrix that will grow.
+  # ── theme ─────────────────────────────────────────────────────────────────
+  #
+  # The palette lives once, in `theme/tokens.css`. Each app imports a committed
+  # copy of it rather than the file itself, because a Vercel build only sees its
+  # own project directory and an import reaching above it resolves on a laptop
+  # and fails in CI — which is exactly how two landing-page deploys died while
+  # the production alias quietly stayed four hours old.
+  #
+  # A committed copy can drift from its source, so this job regenerates both and
+  # fails if anything changed. That turns "someone edited the copy" from a bug
+  # that ships into a red check.
+  theme:
+    name: theme tokens are in sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: regenerate and diff
+        run: |
+          set -euo pipefail
+          node scripts/sync-theme-tokens.mjs
+          if ! git diff --quiet -- '*theme-tokens.generated.css'; then
+            echo "::error::the generated token copies differ from theme/tokens.css."
+            echo "::error::Run 'node scripts/sync-theme-tokens.mjs' and commit the result."
+            git diff -- '*theme-tokens.generated.css'
+            exit 1
+          fi
+          echo "theme tokens in sync"
+
   ci:
     name: CI gate
     runs-on: ubuntu-latest
-    needs: [contracts, backend, agents]
+    needs: [contracts, backend, agents, theme]
     if: always()
     steps:
       - name: verify every suite passed
@@ -238,9 +269,9 @@ jobs:
           # `needs.*.result` is 'success' only when every matrix leg succeeded.
           # Checked explicitly because `needs:` alone treats a skipped job as
           # satisfied, and a suite that never ran must not read as a pass.
-          for r in "${{ needs.contracts.result }}" "${{ needs.backend.result }}" "${{ needs.agents.result }}"; do
+          for r in "${{ needs.contracts.result }}" "${{ needs.backend.result }}" "${{ needs.agents.result }}" "${{ needs.theme.result }}"; do
             if [ "$r" != "success" ]; then
-              echo "::error::a CI suite did not succeed (contracts=${{ needs.contracts.result }} backend=${{ needs.backend.result }} agents=${{ needs.agents.result }})"
+              echo "::error::a CI suite did not succeed (contracts=${{ needs.contracts.result }} backend=${{ needs.backend.result }} agents=${{ needs.agents.result }} theme=${{ needs.theme.result }})"
               exit 1
             fi
           done

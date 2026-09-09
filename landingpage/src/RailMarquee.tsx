@@ -1,9 +1,15 @@
-import { useEffect, useRef } from "react";
 import { RAILS } from "./content";
 
 /**
- * Motion pattern B — a marquee whose position is driven by the page scroll, with
- * no animation library involved at all.
+ * The rails marquee. It loops on its own, forever, and the page scroll has no say
+ * in it — a rail that only moves while you happen to be scrolling reads as broken
+ * the moment you stop.
+ *
+ * This is a CSS animation rather than a rAF loop on purpose: the compositor runs it
+ * off the main thread, it cannot drift out of sync with itself, and it stops for a
+ * reader who asked for less motion through a media query rather than a JS branch
+ * that has to remember to exist. The list is tripled and the keyframe travels
+ * exactly one third, so the wrap is invisible.
  *
  * How it works: on every scroll event we take the section's top relative to the
  * document, work out how far the page has scrolled past the moment the section
@@ -18,50 +24,11 @@ import { RAILS } from "./content";
  * cannot be seen.
  */
 export default function RailMarquee() {
-  const sectionRef = useRef<HTMLElement>(null);
-  const rowRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const section = sectionRef.current;
-    const row = rowRef.current;
-    if (!section || !row) return;
-
-    // A reader who asked for less motion gets a still row, and no listener at all.
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
-    if (reduced.matches) return;
-
-    // Measured once per layout instead of once per scroll event: reading
-    // scrollWidth inside the handler would force a reflow on every frame.
-    let copyWidth = row.scrollWidth / 3;
-
-    const apply = () => {
-      const sectionTop = section.getBoundingClientRect().top + window.scrollY;
-      const scrolled = window.scrollY - sectionTop + window.innerHeight;
-      const offset = scrolled * 0.3 - 200;
-      if (copyWidth <= 0) return;
-      const wrapped = ((offset % copyWidth) + copyWidth) % copyWidth;
-      row.style.transform = `translateX(${wrapped - copyWidth}px)`;
-    };
-
-    const onResize = () => {
-      copyWidth = row.scrollWidth / 3;
-      apply();
-    };
-
-    apply();
-    window.addEventListener("scroll", apply, { passive: true });
-    window.addEventListener("resize", onResize);
-    return () => {
-      window.removeEventListener("scroll", apply);
-      window.removeEventListener("resize", onResize);
-    };
-  }, []);
-
   // Tripled on purpose — see the note above.
   const items = [...RAILS, ...RAILS, ...RAILS];
 
   return (
-    <section className="section rails" ref={sectionRef} aria-labelledby="rails-title">
+    <section className="section rails" aria-labelledby="rails-title">
       <div className="section-inner">
         <p className="eyebrow">the rails this runs on</p>
         <h2 className="section-title" id="rails-title">
@@ -74,7 +41,7 @@ export default function RailMarquee() {
       </div>
 
       <div className="marquee" aria-hidden="true">
-        <div className="marquee-row" ref={rowRef} style={{ willChange: "transform" }}>
+        <div className="marquee-row">
           {items.map((rail, i) => (
             <span className="marquee-item" key={`${rail.name}-${i}`}>
               <img

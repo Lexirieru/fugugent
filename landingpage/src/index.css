@@ -5,8 +5,13 @@
  * again. Everything below uses those semantic names — `--bg`, `--fg`,
  * `--fg-muted`, `--surface`, `--border`, `--accent` — and defines no colour of
  * its own. Values, and the reasoning behind them, are in that file.
+ *
+ * Edit `theme/tokens.css` at the repository root, then run
+ * `node scripts/sync-theme-tokens.mjs`. The generated copy imported below is
+ * committed on purpose: a Vercel build only sees this app's own directory, so an
+ * import reaching above it resolves here and fails there.
  */
-@import "../../theme/tokens.css";
+@import "./theme-tokens.generated.css";
 
 /* ── Figma-hosted fonts ─────────────────────────────────────────── */
 
@@ -514,6 +519,31 @@ body {
   gap: clamp(48px, 4.5vw, 96px);
   width: max-content;
   padding-inline: clamp(24px, 3vw, 56px);
+
+  /*
+   * The list is rendered three times and the keyframe travels exactly one third,
+   * so the row returns to a position identical to where it began and the loop has
+   * no visible seam. Scroll position is deliberately not part of this: a rail that
+   * moves only while you happen to be scrolling reads as broken when you stop.
+   */
+  animation: marquee-drift 42s linear infinite;
+  will-change: transform;
+}
+
+@keyframes marquee-drift {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-33.3333%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* A reader who asked for less motion gets a still row, not a slower one. */
+  .marquee-row {
+    animation: none;
+  }
 }
 
 .marquee-item {
