@@ -84,28 +84,28 @@ export default defineConfig({
 import { describe, expect, it } from "vitest";
 import { DEFAULT_THRESHOLDS, HF_ONE, PositionError } from "../types.js";
 
-describe("konstanta domain", () => {
-  it("HF_ONE adalah 1e18", () => {
+describe("domain constants", () => {
+  it("HF_ONE is 1e18", () => {
     expect(HF_ONE).toBe(10n ** 18n);
   });
 
-  it("ambang default berurutan menurun dan semuanya di atas 1.0", () => {
+  it("the default thresholds descend in order and are all above 1.0", () => {
     expect(DEFAULT_THRESHOLDS.warn).toBeGreaterThan(DEFAULT_THRESHOLDS.partialRepay);
     expect(DEFAULT_THRESHOLDS.partialRepay).toBeGreaterThan(DEFAULT_THRESHOLDS.deleverage);
     expect(DEFAULT_THRESHOLDS.deleverage).toBeGreaterThan(HF_ONE);
   });
 
-  it("ambang default sesuai riset: 1.5 / 1.2 / 1.1", () => {
+  it("the default thresholds match the research: 1.5 / 1.2 / 1.1", () => {
     expect(DEFAULT_THRESHOLDS.warn).toBe(1_500_000_000_000_000_000n);
     expect(DEFAULT_THRESHOLDS.partialRepay).toBe(1_200_000_000_000_000_000n);
     expect(DEFAULT_THRESHOLDS.deleverage).toBe(1_100_000_000_000_000_000n);
   });
 
-  it("PositionError membawa nama yang benar", () => {
-    const e = new PositionError("uji");
+  it("PositionError carries the right name", () => {
+    const e = new PositionError("test");
     expect(e).toBeInstanceOf(Error);
     expect(e.name).toBe("PositionError");
-    expect(e.message).toBe("uji");
+    expect(e.message).toBe("test");
   });
 });
 ```
@@ -242,73 +242,73 @@ const pos = (collateral: bigint, debt: bigint, ltBps = 8000n): Position => ({
 });
 
 describe("computeHealthFactor", () => {
-  it("agunan 1000, hutang 500, LT 80% menghasilkan HF 1.6", () => {
+  it("collateral 1000, debt 500, LT 80% produces HF 1.6", () => {
     expect(computeHealthFactor(1000n, 500n, 8000n)).toBe(1_600_000_000_000_000_000n);
   });
 
-  it("tepat di ambang likuidasi menghasilkan HF 1.0", () => {
+  it("exactly at the liquidation threshold produces HF 1.0", () => {
     expect(computeHealthFactor(1000n, 800n, 8000n)).toBe(HF_ONE);
   });
 
-  it("hutang nol berarti tidak ada risiko sama sekali, dikembalikan null", () => {
+  it("zero debt means no risk at all, returned as null", () => {
     expect(computeHealthFactor(1000n, 0n, 8000n)).toBeNull();
   });
 
-  it("agunan nol dengan hutang berjalan menghasilkan HF nol", () => {
+  it("zero collateral with debt outstanding produces an HF of zero", () => {
     expect(computeHealthFactor(0n, 100n, 8000n)).toBe(0n);
   });
 });
 
 describe("dropToLiquidationBps", () => {
-  it("HF 2.0 berarti agunan boleh turun 50%", () => {
+  it("HF 2.0 means the collateral may fall 50%", () => {
     expect(dropToLiquidationBps(2n * HF_ONE)).toBe(5000n);
   });
 
-  it("HF 1.25 berarti agunan boleh turun 20%", () => {
+  it("HF 1.25 means the collateral may fall 20%", () => {
     expect(dropToLiquidationBps(1_250_000_000_000_000_000n)).toBe(2000n);
   });
 
-  it("HF tepat 1.0 berarti tidak ada ruang turun sama sekali", () => {
+  it("an HF of exactly 1.0 means there is no room to fall at all", () => {
     expect(dropToLiquidationBps(HF_ONE)).toBe(0n);
   });
 
-  it("HF di bawah 1.0 tetap nol, bukan negatif", () => {
+  it("an HF below 1.0 stays zero, not negative", () => {
     expect(dropToLiquidationBps(900_000_000_000_000_000n)).toBe(0n);
   });
 
-  it("tanpa hutang, jarak ke likuidasi tidak terdefinisi", () => {
+  it("with no debt, the room to liquidation is undefined", () => {
     expect(dropToLiquidationBps(null)).toBeNull();
   });
 });
 
 describe("healthFactorAfterPriceDrop", () => {
-  it("HF 1.6 setelah agunan turun 25% menjadi 1.2", () => {
+  it("HF 1.6 becomes 1.2 after the collateral falls 25%", () => {
     expect(healthFactorAfterPriceDrop(pos(1000n, 500n), 2500n)).toBe(1_200_000_000_000_000_000n);
   });
 
-  it("turun sebesar jarak ke likuidasi mendaratkan HF tepat di 1.0", () => {
+  it("a fall equal to the room to liquidation lands the HF exactly on 1.0", () => {
     const p = pos(1000n, 500n);
     const d = dropToLiquidationBps(p.healthFactor)!;
     expect(healthFactorAfterPriceDrop(p, d)).toBe(HF_ONE);
   });
 
-  it("posisi tanpa hutang tetap aman berapa pun harga turun", () => {
+  it("a debt-free position stays safe however far the price falls", () => {
     expect(healthFactorAfterPriceDrop(pos(1000n, 0n), 9000n)).toBeNull();
   });
 });
 
 describe("repayToReachTarget", () => {
-  it("menghitung pembayaran yang membawa HF ke target", () => {
+  it("computes the repayment that brings the HF to the target", () => {
     const p = pos(1000n, 800n); // HF 1.0
     const repay = repayToReachTarget(p, 1_600_000_000_000_000_000n);
-    expect(repay).toBe(300n); // remaining debt of 500 gives HF 1.6
+    expect(repay).toBe(300n); // a remaining debt of 500 gives HF 1.6
   });
 
-  it("posisi yang sudah lebih aman dari target tidak perlu membayar apa pun", () => {
+  it("a position already safer than the target needs to repay nothing", () => {
     expect(repayToReachTarget(pos(1000n, 100n), 1_200_000_000_000_000_000n)).toBe(0n);
   });
 
-  it("posisi tanpa hutang tidak perlu membayar apa pun", () => {
+  it("a debt-free position needs to repay nothing", () => {
     expect(repayToReachTarget(pos(1000n, 0n), 2n * HF_ONE)).toBe(0n);
   });
 });
@@ -352,9 +352,9 @@ export function dropToLiquidationBps(hf: bigint | null): bigint | null {
 /** The HF if the collateral price were to fall by `dropBps`. */
 export function healthFactorAfterPriceDrop(pos: Position, dropBps: bigint): bigint | null {
   if (pos.debtBase === 0n) return null;
-  const sisa = dropBps >= BPS ? 0n : BPS - dropBps;
+  const remaining = dropBps >= BPS ? 0n : BPS - dropBps;
   return computeHealthFactor(
-    (pos.collateralBase * sisa) / BPS,
+    (pos.collateralBase * remaining) / BPS,
     pos.debtBase,
     pos.liquidationThresholdBps,
   );
@@ -403,7 +403,7 @@ git commit -m "feat(guardian): pure and tested health factor formulas"
 | `hf <= warn` | `WARN` | 0n |
 | otherwise | `NONE` | 0n |
 
-`reason` must state the HF number and the distance to liquidation as a percentage, in Indonesian, without jargon.
+`reason` must state the HF number and the distance to liquidation as a percentage, in plain language, without jargon.
 
 - [ ] **Step 1: Write the tests first**
 
@@ -430,7 +430,7 @@ function posWithHf(hf: bigint): Position {
 }
 
 describe("decide", () => {
-  it("posisi tanpa hutang tidak memerlukan aksi apa pun", () => {
+  it("a position with no debt requires no action at all", () => {
     const p = posWithHf(0n);
     const d = decide(p);
     expect(d.action).toBe("NONE");
@@ -438,51 +438,51 @@ describe("decide", () => {
     expect(d.dropToLiquidationBps).toBeNull();
   });
 
-  it("HF 2.0 aman, tidak ada aksi", () => {
+  it("HF 2.0 is safe, no action", () => {
     expect(decide(posWithHf(2n * HF_ONE)).action).toBe("NONE");
   });
 
-  it("HF tepat di ambang peringatan memicu WARN", () => {
+  it("an HF exactly at the warning threshold triggers WARN", () => {
     expect(decide(posWithHf(DEFAULT_THRESHOLDS.warn)).action).toBe("WARN");
   });
 
-  it("WARN tidak menyarankan pembayaran apa pun", () => {
+  it("WARN suggests no repayment at all", () => {
     expect(decide(posWithHf(DEFAULT_THRESHOLDS.warn)).suggestedRepayBase).toBe(0n);
   });
 
-  it("HF tepat di ambang partial repay memicu PARTIAL_REPAY", () => {
+  it("an HF exactly at the partial repay threshold triggers PARTIAL_REPAY", () => {
     expect(decide(posWithHf(DEFAULT_THRESHOLDS.partialRepay)).action).toBe("PARTIAL_REPAY");
   });
 
-  it("PARTIAL_REPAY menyarankan pembayaran yang lebih dari nol", () => {
+  it("PARTIAL_REPAY suggests a repayment greater than zero", () => {
     expect(decide(posWithHf(DEFAULT_THRESHOLDS.partialRepay)).suggestedRepayBase).toBeGreaterThan(0n);
   });
 
-  it("HF tepat di ambang deleverage memicu DELEVERAGE", () => {
+  it("an HF exactly at the deleverage threshold triggers DELEVERAGE", () => {
     expect(decide(posWithHf(DEFAULT_THRESHOLDS.deleverage)).action).toBe("DELEVERAGE");
   });
 
-  it("HF tepat 1.0 sudah darurat", () => {
+  it("an HF of exactly 1.0 is already an emergency", () => {
     expect(decide(posWithHf(HF_ONE)).action).toBe("EMERGENCY");
   });
 
-  it("HF di bawah 1.0 tetap darurat, bukan lempar error", () => {
+  it("an HF below 1.0 is still an emergency, not a thrown error", () => {
     expect(decide(posWithHf(900_000_000_000_000_000n)).action).toBe("EMERGENCY");
   });
 
-  it("alasan menyebut angka health factor", () => {
+  it("the reason names the health factor number", () => {
     const d = decide(posWithHf(1_300_000_000_000_000_000n));
-    expect(d.reason).toMatch(/1[.,]3/);
+    expect(d.reason).toMatch(/1\.3/);
   });
 
-  it("alasan menyebut jarak ke likuidasi dalam persen untuk posisi berisiko", () => {
+  it("the reason names the room to liquidation as a percentage for a risky position", () => {
     const d = decide(posWithHf(1_250_000_000_000_000_000n));
-    expect(d.reason).toMatch(/20([.,]0)?\s*%/);
+    expect(d.reason).toMatch(/20\.0\s*%/);
   });
 
-  it("ambang khusus menggantikan ambang default", () => {
-    const ketat = { warn: 3n * HF_ONE, partialRepay: 2n * HF_ONE, deleverage: 15n * HF_ONE / 10n };
-    expect(decide(posWithHf(25n * HF_ONE / 10n), ketat).action).toBe("WARN");
+  it("custom thresholds replace the default ones", () => {
+    const strict = { warn: 3n * HF_ONE, partialRepay: 2n * HF_ONE, deleverage: 15n * HF_ONE / 10n };
+    expect(decide(posWithHf(25n * HF_ONE / 10n), strict).action).toBe("WARN");
   });
 });
 ```
@@ -493,7 +493,7 @@ Run: `corepack pnpm test`
 
 - [ ] **Step 3: Implement**
 
-`src/strategy/decide.ts`. A pure function; `reason` is assembled from numbers, not from an LLM. Format the HF with two decimals and the distance to liquidation with one decimal, using a comma as the decimal separator per Indonesian convention. The order of the checks is exactly as in the table above — from the most severe to the mildest, so that boundary cases fall to the safer action.
+`src/strategy/decide.ts`. A pure function; `reason` is assembled from numbers, not from an LLM. Format the HF with two decimals and the distance to liquidation with one decimal, using a period as the decimal separator. The order of the checks is exactly as in the table above — from the most severe to the mildest, so that boundary cases fall to the safer action.
 
 Binding implementation notes:
 - `suggestedRepayBase` for `PARTIAL_REPAY`, `DELEVERAGE`, and `EMERGENCY` is computed with `repayToReachTarget(pos, thresholds.warn)` — the recovery target is the warning threshold, not merely clearing the nearest threshold.
@@ -546,30 +546,30 @@ import { describe, expect, it } from "vitest";
 import { createReader } from "../chain/client.js";
 import { readVenusLiquidity } from "../chain/venus.js";
 
-const AKUN_KOSONG = "0x0000000000000000000000000000000000000001" as const;
+const EMPTY_ACCOUNT = "0x0000000000000000000000000000000000000001" as const;
 
-describe("adapter Aave v3 (BSC mainnet, read-only)", () => {
-  it("membaca posisi akun kosong tanpa melempar", { timeout: 30_000 }, async () => {
+describe("the Aave v3 adapter (BSC mainnet, read-only)", () => {
+  it("reads an empty account's position without throwing", { timeout: 30_000 }, async () => {
     const r = createReader();
-    const pos = await r.readAavePosition(AKUN_KOSONG);
+    const pos = await r.readAavePosition(EMPTY_ACCOUNT);
     expect(pos.protocol).toBe("aave");
-    expect(pos.account).toBe(AKUN_KOSONG);
+    expect(pos.account).toBe(EMPTY_ACCOUNT);
     expect(pos.blockNumber).toBeGreaterThan(0n);
   });
 
-  it("menormalkan healthFactor tak terhingga menjadi null", { timeout: 30_000 }, async () => {
+  it("normalizes an infinite healthFactor to null", { timeout: 30_000 }, async () => {
     const r = createReader();
-    const pos = await r.readAavePosition(AKUN_KOSONG);
+    const pos = await r.readAavePosition(EMPTY_ACCOUNT);
     // an account with no debt: Aave returns 2^256-1
     expect(pos.debtBase).toBe(0n);
     expect(pos.healthFactor).toBeNull();
   });
 });
 
-describe("adapter Venus (BSC mainnet, read-only)", () => {
-  it("membaca likuiditas akun tanpa melempar", { timeout: 30_000 }, async () => {
+describe("the Venus adapter (BSC mainnet, read-only)", () => {
+  it("reads an account's liquidity without throwing", { timeout: 30_000 }, async () => {
     const r = createReader();
-    const v = await readVenusLiquidity(r.client, AKUN_KOSONG);
+    const v = await readVenusLiquidity(r.client, EMPTY_ACCOUNT);
     expect(v.shortfallBase).toBe(0n);
     expect(v.blockNumber).toBeGreaterThan(0n);
   });
@@ -640,52 +640,52 @@ const pos: Position = {
   blockNumber: 1n,
 };
 
-const keputusan: Decision = {
+const decision: Decision = {
   action: "WARN",
   healthFactor: 1_600_000_000_000_000_000n,
   dropToLiquidationBps: 3750n,
-  reason: "Health factor 1,60. Agunan boleh turun 37,5% sebelum likuidasi.",
+  reason: "Health factor 1.60. The collateral may fall 37.5% before liquidation.",
   suggestedRepayBase: 0n,
 };
 
 describe("explainDecision", () => {
-  it("memakai keluaran model bila pemanggilan berhasil", async () => {
-    const teks = await explainDecision(pos, keputusan, {
-      generate: async () => "Posisi Anda masih aman.",
+  it("uses the model's output when the call succeeds", async () => {
+    const text = await explainDecision(pos, decision, {
+      generate: async () => "Your position is still safe.",
     });
-    expect(teks).toBe("Posisi Anda masih aman.");
+    expect(text).toBe("Your position is still safe.");
   });
 
-  it("jatuh kembali ke alasan deterministik bila model gagal", async () => {
-    const teks = await explainDecision(pos, keputusan, {
+  it("falls back to the deterministic reason when the model fails", async () => {
+    const text = await explainDecision(pos, decision, {
       generate: async () => {
-        throw new Error("dGrid mati");
+        throw new Error("dGrid is down");
       },
     });
-    expect(teks).toBe(keputusan.reason);
+    expect(text).toBe(decision.reason);
   });
 
-  it("jatuh kembali ke alasan deterministik bila model mengembalikan teks kosong", async () => {
-    const teks = await explainDecision(pos, keputusan, { generate: async () => "   " });
-    expect(teks).toBe(keputusan.reason);
+  it("falls back to the deterministic reason when the model returns empty text", async () => {
+    const text = await explainDecision(pos, decision, { generate: async () => "   " });
+    expect(text).toBe(decision.reason);
   });
 
-  it("tidak pernah mengubah keputusan yang diterimanya", async () => {
-    const salinan = { ...keputusan };
-    await explainDecision(pos, keputusan, { generate: async () => "apa pun" });
-    expect(keputusan).toEqual(salinan);
+  it("never modifies the decision it was given", async () => {
+    const copy = { ...decision };
+    await explainDecision(pos, decision, { generate: async () => "anything" });
+    expect(decision).toEqual(copy);
   });
 
-  it("prompt memuat angka health factor dan melarang mengarang", async () => {
-    let promptTertangkap = "";
-    await explainDecision(pos, keputusan, {
+  it("the prompt carries the health factor number and forbids inventing figures", async () => {
+    let capturedPrompt = "";
+    await explainDecision(pos, decision, {
       generate: async (p) => {
-        promptTertangkap = p;
+        capturedPrompt = p;
         return "ok";
       },
     });
-    expect(promptTertangkap).toContain("1,60");
-    expect(promptTertangkap.toLowerCase()).toContain("jangan");
+    expect(capturedPrompt).toContain("1.60");
+    expect(capturedPrompt.toLowerCase()).toContain("never invent numbers");
   });
 });
 ```
@@ -742,16 +742,16 @@ git commit -m "feat(guardian): dGrid explanation outside the critical path, fail
 import { describe, expect, it } from "vitest";
 import { runBacktest } from "../backtest.js";
 
-const dasar = {
+const base = {
   startCollateralBase: 10_000n,
   startDebtBase: 5_000n,
   liquidationThresholdBps: 8000n,
 };
 
 describe("runBacktest", () => {
-  it("pasar tenang tidak menghasilkan intervensi maupun likuidasi", () => {
+  it("a calm market produces neither an intervention nor a liquidation", () => {
     const r = runBacktest({
-      ...dasar,
+      ...base,
       priceSeriesBps: [10_000n, 10_050n, 9_980n, 10_010n],
       humanReactionCandles: 3,
     });
@@ -761,15 +761,15 @@ describe("runBacktest", () => {
     expect(r.liquidationsAvoided).toBe(0);
   });
 
-  it("menghitung setiap candle yang diberikan", () => {
-    const r = runBacktest({ ...dasar, priceSeriesBps: [10_000n, 9_000n, 8_000n], humanReactionCandles: 1 });
+  it("counts every candle it was given", () => {
+    const r = runBacktest({ ...base, priceSeriesBps: [10_000n, 9_000n, 8_000n], humanReactionCandles: 1 });
     expect(r.candles).toBe(3);
   });
 
-  it("penurunan tajam melikuidasi manusia yang lambat tetapi tidak melikuidasi agent", () => {
+  it("a sharp drop liquidates the slow human but not the agent", () => {
     // the collateral falls 45% over two candles; the human only reacts five candles later
     const r = runBacktest({
-      ...dasar,
+      ...base,
       priceSeriesBps: [10_000n, 7_000n, 5_500n, 5_400n, 5_300n, 5_200n],
       humanReactionCandles: 5,
     });
@@ -778,15 +778,15 @@ describe("runBacktest", () => {
     expect(r.liquidationsAvoided).toBe(r.humanLiquidations - r.agentLiquidations);
   });
 
-  it("manusia yang bereaksi secepat agent tidak tertolong lebih banyak", () => {
-    const seri = [10_000n, 7_000n, 5_500n, 5_400n];
-    const cepat = runBacktest({ ...dasar, priceSeriesBps: seri, humanReactionCandles: 0 });
-    expect(cepat.liquidationsAvoided).toBe(0);
+  it("a human reacting as fast as the agent is not helped any further", () => {
+    const series = [10_000n, 7_000n, 5_500n, 5_400n];
+    const fast = runBacktest({ ...base, priceSeriesBps: series, humanReactionCandles: 0 });
+    expect(fast.liquidationsAvoided).toBe(0);
   });
 
-  it("posisi tanpa hutang tidak pernah terlikuidasi seberapa pun harga jatuh", () => {
+  it("a position with no debt is never liquidated however far the price falls", () => {
     const r = runBacktest({
-      ...dasar,
+      ...base,
       startDebtBase: 0n,
       priceSeriesBps: [10_000n, 1_000n, 100n],
       humanReactionCandles: 0,

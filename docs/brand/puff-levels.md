@@ -144,7 +144,7 @@ agent is already running `DELEVERAGE`, we are lying.
 | 5 Emergency | `HF ≤ 1.0` | `EMERGENCY` | emergency action; already at the liquidation point |
 
 **The `HF = null` case (no debt).** This is the **safest** state, not an unknown one, and the
-code already says so (`"Tidak ada hutang sehingga tidak ada risiko likuidasi."`). Visually:
+code already says so (`"There is no debt, so there is no liquidation risk."`). Visually:
 level 1 at full, with an `∞` chip replacing the number. Never show `—` or `N/A`; that makes
 the safest state look like data that failed to load.
 
