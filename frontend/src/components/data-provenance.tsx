@@ -56,11 +56,11 @@ export function DataProvenance({
     return (
       <div className={`rounded-xl border border-line bg-surface px-4 py-3 ${className}`}>
         <p className="text-sm font-medium text-fg">
-          Bundled sample — no marketplace API is connected.
+          The live catalogue is not connected yet.
         </p>
         <p className="mt-1 text-sm leading-relaxed text-muted">
-          {SOURCE_MEANING.seed} These are the agents that exist in this repository, with each one&apos;s
-          real status written on its card. Every transaction hash is real and opens on BscScan.
+          {SOURCE_MEANING.seed} Each card says what that agent can actually do today, and every
+          transaction link opens on BscScan.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <ButtonLink href="https://hellofugu.xyz" variant="ghost" external>

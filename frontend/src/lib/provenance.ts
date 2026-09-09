@@ -51,7 +51,7 @@ export const SOURCE_MEANING: Record<AgentSource, string> = {
   cache: "Our own copy, served because the live index did not answer in time.",
   onchain:
     "Read straight from the contracts, because neither the index nor the cache could answer.",
-  seed: "A curated list bundled with this build — the last floor before an empty page.",
+  seed: "The agents that ship with this build, shown when the live catalogue is unreachable.",
 };
 
 const OUTCOME_LABEL: Record<string, string> = {

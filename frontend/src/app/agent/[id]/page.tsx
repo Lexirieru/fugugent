@@ -212,7 +212,11 @@ function AgentDetail({
             )}
           </Card>
 
-          {/* Question 2: what the agent does. Code token, square box, no fugu. */}
+          {/* Question 2: what the agent does. Code token, square box, no fugu.
+              The square box and the monospace face are load-bearing: this string is
+              the identifier the decision engine branches on, and it must never be
+              mistaken for the risk name beside it, which is a word we chose. The
+              page used to spell that out in a paragraph; the styling says it. */}
           <Card>
             <p className="text-xs uppercase tracking-[0.14em] text-faint">
               What the agent does about it
@@ -230,9 +234,7 @@ function AgentDetail({
                   <SpendMarker spends={action.spendsMoney} />
                 </p>
                 <p className="mt-4 text-xs leading-relaxed text-faint">
-                  That label is the identifier the decision engine branches on, not a word chosen
-                  for this page — which is why it is written in code, in a square box, and never
-                  in the same style as the risk name beside it. The two are separate answers.
+                  Taken from the agent&apos;s code, not written for this page.
                 </p>
               </>
             ) : (
@@ -242,9 +244,8 @@ function AgentDetail({
                 </p>
                 <p className="mt-2 text-sm leading-relaxed text-muted">
                   The risk scale on the left is measured and real. What this agent would{" "}
-                  <em>do</em> at each level is not in the code yet, and we are not borrowing Fugu
-                  Guardian&apos;s repay ladder to fill the gap — naming an action an agent cannot
-                  take is exactly the kind of unverifiable claim this marketplace exists to stop.
+                  <em>do</em> at each level is not written yet, and we are not filling the gap with
+                  another agent&apos;s ladder.
                 </p>
               </>
             )}
@@ -262,14 +263,13 @@ function AgentDetail({
                 : "This agent has no category, so there is no equivalent metric to compare it on."}
             </p>
             <p className="mt-3 text-sm leading-relaxed text-muted">
-              Each of the four categories gets the risk metric that fits it, rather than being
-              forced onto a shared APR number that would mean four different things. The fish
-              swells on that metric and on nothing else — never on popularity, never on funds
-              under management, never on how many people hired it.
+              Each category is judged on the number that fits it. The fish swells on that number
+              and nothing else — not on popularity, not on how much money it handles, not on how
+              many people hired it.
             </p>
             <p className="mt-3 text-xs leading-relaxed text-faint">
-              Thresholds come from the same decision engine that runs the agent. This page never
-              recomputes them, so the picture can never disagree with what the agent is doing.
+              The thresholds are read from the agent&apos;s own code, so this page cannot disagree
+              with what the agent does.
             </p>
           </Card>
         </div>
