@@ -1,0 +1,7 @@
+# Agent workspace. The agent sub-project has its own package.
+packages:
+  - app/agent
+# pnpm blocks dependency lifecycle scripts unless they are approved explicitly.
+# esbuild's install script picks the platform binary the test runner needs.
+allowBuilds:
+  esbuild: true

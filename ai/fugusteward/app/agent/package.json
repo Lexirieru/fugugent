@@ -1,0 +1,22 @@
+{
+  "name": "fugusteward-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fugu Steward: runs repeating payments and scheduled subscriptions.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p tsconfig.scripts.json"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0",
+    "vitest": "^5.0.0"
+  }
+}

@@ -1,0 +1,18 @@
+# bnbagent-studio workspace defaults.
+# Agent secrets (the encrypted keystore AND .env.local) live at the workspace
+# root under .studio/, OUTSIDE app/agent, so no packaging path can bundle them.
+.studio/
+agentcore/.env.local
+
+# Node
+node_modules/
+dist/
+
+# Editor / OS junk
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Skills installed at workspace root.
+.claude/skills/
