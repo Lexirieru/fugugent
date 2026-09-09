@@ -278,7 +278,7 @@ export default function Features() {
             <ul className="mini-finder__results">
               <li className="mini-finder__row is-allowed">
                 <CheckBadge />
-                <code>mLendingPool.repay(address,uint256,address)</code>
+                <code>MockLendingPool.repay(address,uint256)</code>
                 <span className="mini-finder__tag">Allowed</span>
               </li>
               <li className="mini-finder__row is-allowed">
@@ -291,7 +291,7 @@ export default function Features() {
                   ×
                 </span>
                 <code>everything else</code>
-                <span className="mini-finder__tag">Refused by the wallet</span>
+                <span className="mini-finder__tag">Refused on chain</span>
               </li>
             </ul>
             <p className="mini-finder__foot">

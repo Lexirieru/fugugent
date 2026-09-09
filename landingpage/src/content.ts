@@ -272,10 +272,21 @@ export const AGENT_WALLET_URL = `${BSCSCAN}/address/${AGENT_WALLET}`;
 /**
  * The two calls the session key may make, and nothing else. An empty allowlist in
  * Altana means unlimited, so this list is written out in full on purpose.
- * Source: docs/STATUS.md, the session key section.
+ *
+ * These strings must match the chain exactly, character for character. A permission is
+ * bound to a function SELECTOR, which is a hash of the signature, so an extra argument
+ * here is not a typo: it names a different function that the key was never granted. The
+ * page invites people to check this against the on-chain Keystore, and it has to survive
+ * being checked.
+ *
+ * This list carried `repay(address,uint256,address)` for a while. The real function, in
+ * `contracts/src/mocks/MockLendingPool.sol`, takes two arguments. The contract is also
+ * `MockLendingPool`, not `mLendingPool`.
+ *
+ * Source: `contracts/src/mocks/MockLendingPool.sol` and docs/STATUS.md §A4.
  */
 export const ALLOWLIST = [
-  "mLendingPool.repay(address,uint256,address)",
+  "MockLendingPool.repay(address,uint256)",
   "mUSD.approve(address,uint256)",
 ];
 export const ALLOWLIST_CAP = "0.02 tBNB and 100 mUSD per day";

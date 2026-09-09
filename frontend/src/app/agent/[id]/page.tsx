@@ -302,7 +302,14 @@ function AgentDetail({
             {outcomes.map((o) => (
               <li
                 key={o}
-                className="rounded-xl border border-line bg-surface px-4 py-3 text-pretty text-sm leading-relaxed text-fg"
+                /*
+                 * `break-words` is load-bearing, not tidying. What a listing owner writes
+                 * here is evidence, and evidence means transaction hashes: 66 characters
+                 * with no space in them. Without a break opportunity one hash forces this
+                 * box wider than a phone and takes the whole page into horizontal scroll.
+                 * Measured at 390px: 558px wide, 168px of overflow, from this element.
+                 */
+                className="rounded-xl border border-line bg-surface px-4 py-3 text-pretty text-sm leading-relaxed break-words text-fg"
               >
                 {o}
               </li>
