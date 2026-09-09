@@ -1,0 +1,516 @@
+# ---------------------------------------------------------------------------
+# The Fugugent PRODUCTION stack, for the shared VPS at Ubuntu 24.04 / 2 vCPU /
+# 1.9 GB RAM.
+#
+#     docker compose -f docker-compose.prod.yml pull
+#     docker compose -f docker-compose.prod.yml up -d --no-build
+#     docker compose -f docker-compose.prod.yml ps
+#
+# Read `docker-compose.yml` (the local stack) first. Its header records decisions
+# that still hold here and are NOT re-argued below: no secret value lives in a
+# committed compose file, the host ports are deliberately shifted away from the
+# defaults, `api` boots even without `DATABASE_URL` because an `/api/health` that
+# reports a missing cache beats a process that refuses to start, and Redis is
+# already running for a BullMQ scheduler that has not been written yet. The
+# differences from that file are the eight decisions below.
+#
+# Full operator documentation: `docs/setup/VPS-DEPLOYMENT.md`.
+#
+# ## 1. THIS MACHINE IS NOT OURS
+#
+# It has been serving someone else's production for 151 days: a Hermes agent
+# stack (~700 MB), a Next.js app, `9router`, a Claude Telegram bot, and nginx
+# with a `swipenit` site proxying :8545, :1317 and :26657. 813 MB of RAM is free
+# and 2.9 GB of the 9.9 GB swap is already in use.
+#
+# Every consequence of that fact is marked `SHARED HOST` below. The single rule
+# behind all of them: when this stack has to choose between hurting itself and
+# hurting the host, it hurts itself.
+#
+# ## 2. Hard memory ceilings, and the arithmetic behind them
+#
+# `mem_limit` is a cgroup ceiling, not a hint: a container that reaches it is
+# OOM-killed. `memswap_limit` is set EQUAL to `mem_limit` on every service, which
+# means "this container gets no swap at all". That is the point — the host is
+# already 2.9 GB into swap, and a stack that quietly grows into the remaining
+# swap would degrade the owner's services long before anything of ours failed
+# visibly. A container of ours dying loudly is the outcome we want.
+#
+# The agent numbers below are MEASURED, not estimated: each image was built and
+# run under the exact ceiling it is given here, and `docker stats` was read at
+# boot and after 60 requests. The two numbers differ enough to matter — boot is
+# the peak, because the whole module graph is resolved before V8's first real
+# collection — so the ceilings are set against the BOOT figure, not the steady
+# one. A limit that fits the steady state and not the boot produces a container
+# that dies and restarts forever, which is the worst of all outcomes because it
+# reads as a deploy bug.
+#
+#   service          limit    why this number
+#   ---------------  -------  -----------------------------------------------
+#   postgres          176 MiB  The largest single share, because Postgres is the
+#                              only service here that cannot simply be restarted
+#                              out of trouble. Default `shared_buffers` is
+#                              128 MiB, which alone would be three quarters of
+#                              this ceiling, so `command:` retunes it to 48 MiB
+#                              and caps connections at 30. That leaves room for
+#                              WAL buffers, ~30 backend stacks, and the musl
+#                              allocator arenas.
+#   redis              24 MiB  A job queue and nothing else. `maxmemory 16mb`
+#                              with `allkeys-lru` makes it EVICT rather than grow
+#                              into the ceiling; redis-server's own baseline on
+#                              alpine is ~6 MiB.
+#   api               112 MiB  Node 22 + Hono + drizzle + postgres.js + viem.
+#                              Measured module-graph RSS for that set is ~102 MiB
+#                              on a developer machine and lower on alpine, with
+#                              only ~12 MiB of live heap. The image caps V8 at
+#                              64 MiB so it collects instead of expanding.
+#   fuguguardian      224 MiB  The most of any agent, and the only one that is
+#                              not advice-only. Measured 86 MiB steady in its
+#                              container — but that measurement is with the
+#                              monitoring loop OFF, because measuring it ON means
+#                              broadcasting a real testnet repay. What is NOT
+#                              measured is the repay path: a cycle allocates ABI
+#                              encodings, a viem PublicClient and an Altana
+#                              userOp on top of the steady footprint. The ceiling
+#                              is deliberately ~2.6x the measured idle for that
+#                              reason. An OOM kill halfway through a repay is the
+#                              one failure this stack must not make likely, and
+#                              it is the only service here whose headroom is
+#                              bought with a number rather than a measurement.
+#   ---------------  -------  -----------------------------------------------
+#   DEFAULT TOTAL     536 MiB  of the 700 MiB budget. 164 MiB spare.
+#
+#   fugurebalancer    160 MiB  \  All three are ADVICE-ONLY: they read chain
+#   fugugrid          160 MiB   > state and return a recommendation, hold no
+#   fuguyield         160 MiB  /  spending session, and persist nothing.
+#
+#                              160 rather than 144 because of the boot transient.
+#                              Measured on fugugrid: 113 MiB at boot, settling to
+#                              86 MiB after 60 requests. At a 144 MiB ceiling
+#                              that boot peak is 78% of the limit — 31 MiB of
+#                              headroom for a cold start on a host that is
+#                              already swapping. 160 MiB makes it 47 MiB. The
+#                              extra 16 MiB is the cheapest insurance in this
+#                              file.
+#
+# ## 3. Why the three advisory agents sit behind a profile
+#
+# All four agents are defined in this file. Only `fuguguardian` starts by
+# default, because the arithmetic does not permit more:
+#
+#     default stack                      536 MiB   fits, 164 MiB spare
+#     default stack + ONE advisor        696 MiB   fits, 4 MiB spare
+#     default stack + all three         1016 MiB   OVER the 700 MiB budget, and
+#                                                  over the 813 MiB the machine
+#                                                  actually has free
+#
+# The cause is measured, not guessed: all four agents import
+# `@bnbagent/studio-runtime/b402`, which pulls in viem and the Altana SDK, so an
+# advice-only agent's module graph is very nearly as large as Guardian's (~196
+# MiB RSS on a developer machine for the import set in `dualMain.ts`). Four Node
+# processes of that shape genuinely do not fit in 700 MiB beside Postgres.
+# Pretending otherwise by writing 64 MiB ceilings would produce a stack that
+# boots, gets OOM-killed, and restarts forever — which reads as a deploy bug
+# rather than as the capacity problem it is.
+#
+# So the honest arrangement is an explicit one:
+#
+#     docker compose -f docker-compose.prod.yml up -d                     # core
+#     docker compose -f docker-compose.prod.yml --profile advisors up -d  # all 4
+#     docker compose -f docker-compose.prod.yml up -d fugugrid            # just one
+#
+# The last form is the demo path: bring an advisor up for the minutes it is being
+# shown, then `stop` it. Guardian is the one that must never be stopped, because
+# it is the one watching a health factor.
+#
+# ## 4. Ports: bound to the loopback, and shifted
+#
+# SHARED HOST. Taken on the machine already: 22, 80, 443, 8545, 1317, 26657,
+# 20128. Nothing here may collide, and nothing here may become newly reachable
+# from the internet on a box whose nginx someone else owns.
+#
+# So every published port binds to 127.0.0.1 explicitly. Postgres and Redis have
+# no business being internet-reachable at all, and the agents' A2A/MCP faces
+# authenticate at the platform gateway, not at the socket. Public exposure is the
+# owner's nginx to arrange, in the owner's own time — this file never touches it.
+#
+#     127.0.0.1:55432 -> postgres:5432   (the local stack's shift, preserved)
+#     127.0.0.1:56379 -> redis:6379      (idem)
+#     127.0.0.1:8787  -> api:8787        (idem; the only one meant to be proxied)
+#     127.0.0.1:59001 -> fuguguardian:9000
+#     127.0.0.1:59002 -> fugurebalancer:9000
+#     127.0.0.1:59003 -> fugugrid:9000
+#     127.0.0.1:59004 -> fuguyield:9000
+#
+# The agent ports continue the local stack's "prefix a 5" convention (9000 ->
+# 59000+n). One caveat, inherited from that convention and worth writing down:
+# 55432/56379/5900x sit inside Linux's default ephemeral range (32768-60999), so
+# an outbound connection can transiently hold one and make a container restart
+# fail to bind. Fix it on the host, not here:
+# `net.ipv4.ip_local_reserved_ports = 55432,56379,59001-59004`.
+#
+# ## 5. `restart: unless-stopped`, never `always`
+#
+# SHARED HOST. `unless-stopped` means `docker compose stop` is final: the owner
+# can take our stack down to recover memory and it stays down, including across a
+# reboot. `always` would fight that decision and come back on its own.
+#
+# ## 6. Log rotation is not optional here
+#
+# SHARED HOST. 14 GB of disk is free, shared. The json-file driver is unbounded
+# by default, and a crash-looping container fills a disk faster than anything
+# else in this file. Every service caps at 3 x 10 MB via the `*logging` anchor,
+# so the whole stack's logs are bounded at ~210 MB.
+#
+# ## 7. Images are built in CI, not on this machine
+#
+# `docker compose build` here would run four `pnpm install` + `tsc` passes on 2
+# vCPUs and 813 MB of free RAM, and would almost certainly OOM. CI builds and
+# pushes to GHCR; the VPS only pulls. The `build:` blocks are retained so the
+# images remain reproducible from a workstation, but the deploy path is
+# `pull` + `up --no-build` (see `.github/workflows/deploy.yml`).
+#
+# `IMAGE_PREFIX` defaults to a bare local name so a workstation build works with
+# no environment at all; CI sets it to `ghcr.io/<owner>/<repo>`.
+#
+# ## 8. Secrets: none here, and required rather than defaulted
+#
+# The local stack defaults `POSTGRES_PASSWORD` to `fugugent_local_dev`, which is
+# correct there and would be a disaster here. Production secrets use `${VAR:?...}`
+# so `docker compose up` REFUSES to start when one is missing, instead of
+# silently standing up a database with a password published on GitHub.
+#
+# The Altana session files are not environment variables and are not in any
+# image. They are gitignored, they are copied to the VPS out of band, and they
+# arrive as READ-ONLY bind mounts. See `docs/setup/VPS-DEPLOYMENT.md`.
+# ---------------------------------------------------------------------------
+
+name: fugugent-prod
+
+# ── shared fragments ────────────────────────────────────────────────────────
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+# Applied to the five Node services. Postgres is deliberately excluded: its
+# entrypoint starts as root and drops to `postgres` with setpriv, so it needs
+# CAP_SETUID/CAP_SETGID and cannot run with all capabilities dropped.
+x-node-hardening: &node-hardening
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  # A Node HTTP server needs no capability: it runs as the unprivileged `node`
+  # user from the image and binds a port above 1024.
+  pids_limit: 128
+
+# Everything the four agents share. Per-agent blocks below add only what differs.
+x-agent-common: &agent-common
+  restart: unless-stopped
+  logging: *logging
+  <<: *node-hardening
+  networks: [fugugent]
+  environment: &agent-env
+    NODE_ENV: production
+    # CLAUDE.md #3 / ai/CLAUDE.md: the SDK's own default RPC uses the
+    # `binance.org` domain, proven blocked from Indonesian networks. Guardian's
+    # config loader REFUSES to boot on a binance.org URL rather than looping
+    # through timeouts that look like a healthy-but-quiet agent. Both spellings
+    # are set because `readGuardianRuntimeConfig` reads FUGU_GUARDIAN_RPC_URL
+    # first and BSC_TESTNET_RPC_URL second.
+    RPC_URL: ${RPC_URL:-https://data-seed-prebsc-1-s1.bnbchain.org:8545}
+    BSC_TESTNET_RPC_URL: ${RPC_URL:-https://data-seed-prebsc-1-s1.bnbchain.org:8545}
+    # The dGrid key, under the variable name the `openai` provider convention in
+    # studio.toml requires (`src/model.ts` reads OPENAI_API_KEY and points the
+    # base URL at dGrid). Required: an agent that cannot explain its own
+    # decisions is a broken demo, and failing at `up` beats failing at the first
+    # delivery. It is never a financial decision — dGrid measures 30-46 s and is
+    # only ever on the asynchronous explanation path.
+    OPENAI_API_KEY: ${DGRID_API_KEY:?DGRID_API_KEY must be set in the root .env on the VPS}
+    # Optional Altana relay override; empty means "use the SDK preset".
+    ALTANA_RELAY_URL: ${ALTANA_RELAY_URL:-}
+
+services:
+  # ── data ──────────────────────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: fugugent-prod-postgres
+    restart: unless-stopped
+    logging: *logging
+    # SHARED HOST. Retuned for a 176 MiB ceiling. `shared_buffers` is the one
+    # that matters: the 128 MiB default would consume three quarters of the limit
+    # before a single client connected. The rest bounds the per-backend
+    # allocations that the ceiling cannot see — 30 connections x 2 MiB work_mem
+    # is the worst case this stack can reach, and the indexer plus the BFF need
+    # nowhere near 30.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=48MB
+      - -c
+      - max_connections=30
+      - -c
+      - work_mem=2MB
+      - -c
+      - maintenance_work_mem=32MB
+      - -c
+      - effective_cache_size=256MB
+      - -c
+      - max_wal_size=512MB
+      - -c
+      - min_wal_size=80MB
+      # 2 vCPUs, shared with someone else's production. Parallel workers would
+      # buy little and cost CPU the host cannot spare.
+      - -c
+      - max_parallel_workers_per_gather=0
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fugugent}
+      # No default. See decision 8 in the header: the local stack's
+      # `fugugent_local_dev` must never reach a machine with a public IP.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in the root .env on the VPS}
+      POSTGRES_DB: ${POSTGRES_DB:-fugugent}
+      # Without this, initdb uses `trust` and the container accepts any
+      # connection with no password the moment its port is exposed.
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    ports:
+      # 127.0.0.1 only. A database has no business on a public interface, and
+      # this host has one.
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-55432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    mem_limit: 176m
+    # Equal to mem_limit = no swap allowance. See decision 2.
+    memswap_limit: 176m
+    mem_reservation: 128m
+    healthcheck:
+      # `-U`/`-d` explicitly: without them `pg_isready` uses the `root` user and
+      # reports healthy before the application database actually exists.
+      test:
+        ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fugugent} -d ${POSTGRES_DB:-fugugent}"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks: [fugugent]
+
+  redis:
+    image: redis:7-alpine
+    container_name: fugugent-prod-redis
+    restart: unless-stopped
+    logging: *logging
+    <<: *node-hardening
+    # `--save 60 1` is enough for a job queue; AOF is not needed because a job
+    # lost on restart is rescheduled by the scheduler, not recovered.
+    #
+    # SHARED HOST additions: `maxmemory 16mb` with `allkeys-lru` means Redis
+    # evicts its coldest keys when it fills, instead of growing until the 24 MiB
+    # cgroup ceiling kills it. For a job queue, an evicted key is a rescheduled
+    # job; an OOM kill is a lost worker.
+    command: >
+      sh -c 'exec redis-server --save 60 1 --appendonly no
+      --maxmemory 16mb --maxmemory-policy allkeys-lru
+      ${REDIS_PASSWORD:+--requirepass "$$REDIS_PASSWORD"}'
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    ports:
+      - "127.0.0.1:${REDIS_HOST_PORT:-56379}:6379"
+    volumes:
+      - redis-data:/data
+    mem_limit: 24m
+    memswap_limit: 24m
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ${REDIS_PASSWORD:+-a \"$$REDIS_PASSWORD\"} ping | grep -q PONG"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks: [fugugent]
+
+  # ── backend ───────────────────────────────────────────────────────────────
+
+  api:
+    image: ${IMAGE_PREFIX:-fugugent}/api:${IMAGE_TAG:-latest}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fugugent-prod-api
+    restart: unless-stopped
+    logging: *logging
+    <<: *node-hardening
+    # Upstream credentials (SCAN8004_API_KEY, DGRID_API_KEY) come ONLY from here.
+    # Deliberately not repeated under `environment:` — `environment` wins over
+    # `env_file`, so writing them there with an empty default would erase the
+    # keys correctly filled in in the file. `required: false` because the api is
+    # designed to boot degraded and say so on /api/health.
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      PORT: 8787
+      NODE_ENV: production
+      # V8 sizes its heap from the machine's RAM, not from the cgroup limit.
+      # Without this it would grow toward 176 MiB+ and be killed at the 112 MiB
+      # ceiling instead of collecting. Live heap measures ~12 MiB.
+      NODE_OPTIONS: --max-old-space-size=64
+      DATABASE_URL: postgres://${POSTGRES_USER:-fugugent}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in the root .env on the VPS}@postgres:5432/${POSTGRES_DB:-fugugent}
+      REDIS_URL: redis://${REDIS_PASSWORD:+:$REDIS_PASSWORD@}redis:6379
+      # Mandatory: the SDK default uses the `binance.org` domain, which is proven
+      # to be blocked from Indonesian networks.
+      RPC_URL: ${RPC_URL:-https://data-seed-prebsc-1-s1.bnbchain.org:8545}
+      SCAN8004_BASE_URL: ${SCAN8004_BASE_URL:-https://api.8004scan.io/api/v1}
+      DGRID_BASE_URL: ${DGRID_BASE_URL:-https://api.dgrid.ai/v1}
+    ports:
+      # The one port meant to be proxied — but still loopback-only here, because
+      # publishing it publicly is an nginx change and nginx belongs to the
+      # machine's owner. Override API_HOST_BIND once a vhost exists.
+      - "${API_HOST_BIND:-127.0.0.1}:${API_HOST_PORT:-8787}:8787"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    mem_limit: 112m
+    memswap_limit: 112m
+    mem_reservation: 64m
+    networks: [fugugent]
+
+  # ── agents ────────────────────────────────────────────────────────────────
+
+  # The ONLY agent that signs and broadcasts. Starts by default; the other three
+  # do not. It deliberately does NOT `depends_on: api` — an agent watching a
+  # health factor must keep watching through a database outage, and a dependency
+  # that stops it during one would be a liability dressed as tidiness.
+  fuguguardian:
+    <<: *agent-common
+    image: ${IMAGE_PREFIX:-fugugent}/fuguguardian:${IMAGE_TAG:-latest}
+    build:
+      # The context is the workspace root, not app/agent: `app/agent/pnpm-lock.yaml`
+      # is stale and resolves only three of ten dependencies. See the Dockerfile
+      # header.
+      context: ./ai/fuguguardian
+      dockerfile: app/agent/Dockerfile
+    container_name: fugugent-prod-fuguguardian
+    environment:
+      <<: *agent-env
+      # The monitoring loop is opt-in in code so `bag dev` keeps working
+      # untouched. On the VPS it is the entire reason this container exists.
+      FUGU_GUARDIAN_ENABLED: "1"
+      # Absolute container paths rather than the code defaults, because they
+      # document the two mounts below and their two different permissions.
+      FUGU_GUARDIAN_SESSION_FILE: /srv/agent/.studio/wallets/altana-session-guardian.json
+      FUGU_GUARDIAN_STATE_FILE: /var/lib/fuguguardian/guardian-state.json
+      # Money caps, on the 8-decimal USD basis (100000000 = $1.00). Written out
+      # rather than left to the code defaults so an operator can read the numbers
+      # in force without opening TypeScript. Both sit well under the session's
+      # own cryptographic cap of 100 mUSD/day, so OUR limit always binds first
+      # and the chain-enforced one stays a backstop.
+      FUGU_GUARDIAN_MAX_PER_ACTION_USD8: ${FUGU_GUARDIAN_MAX_PER_ACTION_USD8:-1000000000}
+      FUGU_GUARDIAN_MAX_PER_DAY_USD8: ${FUGU_GUARDIAN_MAX_PER_DAY_USD8:-5000000000}
+      FUGU_GUARDIAN_MIN_INTERVAL_SECONDS: ${FUGU_GUARDIAN_MIN_INTERVAL_SECONDS:-300}
+      FUGU_GUARDIAN_INTERVAL_MS: ${FUGU_GUARDIAN_INTERVAL_MS:-60000}
+      # Empty means "use the address compiled into the strategy". An empty string
+      # is what `requireAddress` treats as absent, so this is safe to leave unset.
+      FUGU_GUARDIAN_POOL: ${FUGU_GUARDIAN_POOL:-}
+      FUGU_GUARDIAN_REPAY_ASSET: ${FUGU_GUARDIAN_REPAY_ASSET:-}
+    volumes:
+      # SECRET IN, READ-ONLY. These files are the live spend-capped session
+      # signers and the encrypted admin keystore. They are gitignored, so they do
+      # not arrive with a `git pull` — the owner copies them to the VPS out of
+      # band (see docs/setup/VPS-DEPLOYMENT.md). `:ro` because nothing in the
+      # container has any business writing a session file, and the container path
+      # matches `[wallet].keystore_dir` resolved from /srv/agent/app/agent.
+      - ./ai/fuguguardian/.studio/wallets:/srv/agent/.studio/wallets:ro
+      # STATE OUT, READ-WRITE, and on a NAMED VOLUME because losing it means
+      # paying twice. `ExecuteState` is the record of what has ALREADY been
+      # spent: today's total against the daily cap, the last-action timestamp
+      # behind the cooldown, the kill-switch latch, and any repay recorded as
+      # in-flight. A container that restarts with a fresh state file reads a zero
+      # daily budget and a lapsed cooldown, and can re-issue a repay that was
+      # already broadcast. This volume survives `down`, image replacement, and
+      # reboot. The audit log shares it for the same reason.
+      - fuguguardian-state:/var/lib/fuguguardian
+    ports:
+      - "127.0.0.1:${FUGUGUARDIAN_HOST_PORT:-59001}:9000"
+    mem_limit: 224m
+    memswap_limit: 224m
+    mem_reservation: 160m
+    # Long enough for an in-flight cycle to finish and write its state. The
+    # process installs SIGTERM/SIGINT handlers that stop the loop's timer; node
+    # runs as PID 1 so they actually fire.
+    stop_grace_period: 30s
+
+  # ── advice-only agents: `--profile advisors` ───────────────────────────────
+  #
+  # All three read chain state and return a recommendation. None holds a session
+  # it spends through, none broadcasts a transaction, and none persists anything
+  # worth a volume — so no state mount, and 160 MiB instead of Guardian's 224.
+  #
+  # They are behind a profile because of the arithmetic in decision 3, not
+  # because they are optional to the product. Bring ONE up for a demo:
+  #     docker compose -f docker-compose.prod.yml up -d fugugrid
+  # and stop it afterwards. All three at once exceeds both the 700 MiB budget and
+  # the machine's free RAM.
+
+  fugurebalancer:
+    <<: *agent-common
+    profiles: ["advisors"]
+    image: ${IMAGE_PREFIX:-fugugent}/fugurebalancer:${IMAGE_TAG:-latest}
+    build:
+      context: ./ai/fugurebalancer
+      dockerfile: app/agent/Dockerfile
+    container_name: fugugent-prod-fugurebalancer
+    volumes:
+      - ./ai/fugurebalancer/.studio/wallets:/srv/agent/.studio/wallets:ro
+    ports:
+      - "127.0.0.1:${FUGUREBALANCER_HOST_PORT:-59002}:9000"
+    mem_limit: 160m
+    memswap_limit: 160m
+
+  fugugrid:
+    <<: *agent-common
+    profiles: ["advisors"]
+    image: ${IMAGE_PREFIX:-fugugent}/fugugrid:${IMAGE_TAG:-latest}
+    build:
+      context: ./ai/fugugrid
+      dockerfile: app/agent/Dockerfile
+    container_name: fugugent-prod-fugugrid
+    volumes:
+      - ./ai/fugugrid/.studio/wallets:/srv/agent/.studio/wallets:ro
+    ports:
+      - "127.0.0.1:${FUGUGRID_HOST_PORT:-59003}:9000"
+    mem_limit: 160m
+    memswap_limit: 160m
+
+  fuguyield:
+    <<: *agent-common
+    profiles: ["advisors"]
+    image: ${IMAGE_PREFIX:-fugugent}/fuguyield:${IMAGE_TAG:-latest}
+    build:
+      context: ./ai/fuguyield
+      dockerfile: app/agent/Dockerfile
+    container_name: fugugent-prod-fuguyield
+    volumes:
+      - ./ai/fuguyield/.studio/wallets:/srv/agent/.studio/wallets:ro
+    ports:
+      - "127.0.0.1:${FUGUYIELD_HOST_PORT:-59004}:9000"
+    mem_limit: 160m
+    memswap_limit: 160m
+
+volumes:
+  postgres-data:
+  redis-data:
+  # Guardian's ExecuteState + audit log. The one volume in this file whose loss
+  # is a financial event rather than an inconvenience — back it up before any
+  # `down -v`. There is no `down -v` in the deploy workflow for this reason.
+  fuguguardian-state:
+
+networks:
+  fugugent:
+    # Named separately from the local stack's `fugugent` network so the two can
+    # never share a bridge if both ever run on one machine.
+    name: fugugent-prod

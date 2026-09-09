@@ -1,0 +1,324 @@
+# ---------------------------------------------------------------------------
+# CI — every test in the repository, on every push and every pull request.
+#
+# ## The baseline counts are asserted, not just observed
+#
+# Each job checks that the number of PASSING tests is at least the recorded
+# baseline:
+#
+#     contracts       150   forge test
+#     backend         484   vitest (plus 1 deliberately skipped)
+#     fuguguardian    285   vitest
+#     fugurebalancer  130   vitest
+#     fugugrid        144   vitest
+#     fuguyield       141   vitest
+#                   -----
+#                    1334
+#
+# A green suite is not by itself evidence that the suite ran. A `describe` block
+# accidentally renamed to `describe.skip`, a glob that stops matching after a file
+# move, a `vitest.config.ts` `include` that silently narrows — all of those leave
+# the run green while quietly testing less than yesterday. `>=` rather than `==`
+# so adding tests never breaks the build; only losing them does. When a suite
+# legitimately shrinks, edit the number here in the same commit, so the reduction
+# is a reviewed line in a diff instead of a silence.
+#
+# ## The agents install with --no-frozen-lockfile, and that is a known defect
+#
+# None of the four `ai/*/pnpm-lock.yaml` files matches its
+# `app/agent/package.json`: `viem`, `@ai-sdk/openai` and `vitest` were added
+# without a `pnpm install` being committed, so `--frozen-lockfile` fails with
+# ERR_PNPM_OUTDATED_LOCKFILE. The same defect and the same one-line fix are
+# documented at the `build` stage of every `ai/*/app/agent/Dockerfile`. Fixing it
+# means committing four regenerated lockfiles:
+#
+#     for a in fuguguardian fugurebalancer fugugrid fuguyield; do
+#       ( cd ai/$a && pnpm install --lockfile-only )
+#     done
+#
+# After that, change `--no-frozen-lockfile` to `--frozen-lockfile` here and in
+# the four Dockerfiles. Until then CI resolves three specifiers on every run,
+# which is slower and not reproducible.
+#
+# ## pnpm versions are pinned per component, deliberately differently
+#
+# The agents pin 10.24.0 (their `packageManager` field, and their Dockerfiles);
+# the backend pins 10.12.4 (`backend/Dockerfile`, which has no `packageManager`
+# field to read). CI matches each component's own pin so it tests what the image
+# will actually build, rather than what one convenient version happens to do.
+# ---------------------------------------------------------------------------
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# A second push to the same ref makes the first run's answer worthless. Cancel it
+# — except on main, where a completed run is the gate the deploy workflow waits
+# for and cancelling one would strand the deploy.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  contracts:
+    name: contracts (forge test, baseline 150)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # forge-std, openzeppelin-contracts and openzeppelin-contracts-upgradeable
+          # are git submodules (see .gitmodules). Without this the compile fails on
+          # a missing import, not on anything to do with our code.
+          submodules: recursive
+
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: forge build
+        working-directory: contracts
+        run: forge build
+
+      - name: forge test
+        working-directory: contracts
+        # foundry.toml's [rpc_endpoints] interpolates ${BSC_TESTNET_RPC_URL}, but
+        # no test forks, so it is only read if a --fork-url is requested. Left
+        # unset on purpose: CI must never depend on a testnet being reachable.
+        run: |
+          set -o pipefail
+          forge test | tee forge-test.log
+
+      - name: assert the test count has not regressed
+        working-directory: contracts
+        run: |
+          set -euo pipefail
+          baseline=150
+          # "Ran 10 test suites ...: 150 tests passed, 0 failed, 0 skipped (150 total tests)"
+          actual=$(grep -oE '[0-9]+ tests passed' forge-test.log | tail -1 | grep -oE '[0-9]+')
+          echo "forge: $actual passed, baseline $baseline"
+          if [ "$actual" -lt "$baseline" ]; then
+            echo "::error::contracts test count fell from $baseline to $actual — tests were lost, not fixed."
+            exit 1
+          fi
+
+  backend:
+    name: backend (vitest, baseline 484)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          # Matches backend/Dockerfile. See the header.
+          version: 10.12.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: backend/pnpm-lock.yaml
+
+      - name: install
+        working-directory: backend
+        # Frozen: this lockfile IS in sync with its package.json (verified), so a
+        # drift here should fail the build rather than be papered over.
+        run: pnpm install --frozen-lockfile
+
+      - name: typecheck
+        working-directory: backend
+        # tsconfig.json deliberately includes src/**/__tests__ so this checks the
+        # tests too — the reason backend/Dockerfile needs a separate
+        # tsconfig.build.json.
+        run: pnpm typecheck
+
+      - name: test
+        working-directory: backend
+        # The suite runs against @electric-sql/pglite, an in-process Postgres, so
+        # no service container and no DATABASE_URL are needed.
+        run: |
+          set -o pipefail
+          pnpm test 2>&1 | tee vitest.log
+
+      - name: assert the test count has not regressed
+        working-directory: backend
+        run: |
+          set -euo pipefail
+          baseline=484
+          # "Tests  484 passed | 1 skipped (485)" — the PASSED figure is the one
+          # that matters; a test converted to `.skip` must show up as a loss.
+          actual=$(grep -oE 'Tests[[:space:]]+[0-9]+ passed' vitest.log | tail -1 | grep -oE '[0-9]+')
+          echo "backend: $actual passed, baseline $baseline"
+          if [ "$actual" -lt "$baseline" ]; then
+            echo "::error::backend test count fell from $baseline to $actual — tests were lost, not fixed."
+            exit 1
+          fi
+
+  agents:
+    name: ${{ matrix.agent }} (vitest, baseline ${{ matrix.baseline }})
+    runs-on: ubuntu-latest
+    strategy:
+      # One agent failing should not hide the state of the other three.
+      fail-fast: false
+      matrix:
+        include:
+          - agent: fuguguardian
+            baseline: 285
+          - agent: fugurebalancer
+            baseline: 130
+          - agent: fugugrid
+            baseline: 144
+          - agent: fuguyield
+            baseline: 141
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          # The `packageManager` field of every ai/*/package.json, and the pin in
+          # every agent Dockerfile.
+          version: 10.24.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: ai/${{ matrix.agent }}/pnpm-lock.yaml
+
+      - name: install
+        working-directory: ai/${{ matrix.agent }}
+        # --no-frozen-lockfile: see the header. This is the workspace root, which
+        # is where the lockfile covering app/agent lives.
+        run: pnpm install --no-frozen-lockfile
+
+      - name: typecheck
+        working-directory: ai/${{ matrix.agent }}
+        # fuguguardian alone has a tsconfig.scripts.json (its typecheck script
+        # covers scripts/ as well as src/); the other three point `typecheck` at
+        # tsconfig.json. Running the package's own script keeps that difference
+        # where it belongs — in the package.
+        run: pnpm --filter ${{ matrix.agent }}-agent run typecheck
+
+      - name: test
+        working-directory: ai/${{ matrix.agent }}
+        run: |
+          set -o pipefail
+          pnpm --filter ${{ matrix.agent }}-agent run test 2>&1 | tee vitest.log
+
+      - name: assert the test count has not regressed
+        working-directory: ai/${{ matrix.agent }}
+        run: |
+          set -euo pipefail
+          baseline=${{ matrix.baseline }}
+          actual=$(grep -oE 'Tests[[:space:]]+[0-9]+ passed' vitest.log | tail -1 | grep -oE '[0-9]+')
+          echo "${{ matrix.agent }}: $actual passed, baseline $baseline"
+          if [ "$actual" -lt "$baseline" ]; then
+            echo "::error::${{ matrix.agent }} test count fell from $baseline to $actual — tests were lost, not fixed."
+            exit 1
+          fi
+
+  # A single job the branch-protection rule and the deploy workflow can point at,
+  # so neither has to enumerate a matrix that will grow.
+  ci:
+    name: CI gate
+    runs-on: ubuntu-latest
+    needs: [contracts, backend, agents]
+    if: always()
+    steps:
+      - name: verify every suite passed
+        run: |
+          set -euo pipefail
+          # `needs.*.result` is 'success' only when every matrix leg succeeded.
+          # Checked explicitly because `needs:` alone treats a skipped job as
+          # satisfied, and a suite that never ran must not read as a pass.
+          for r in "${{ needs.contracts.result }}" "${{ needs.backend.result }}" "${{ needs.agents.result }}"; do
+            if [ "$r" != "success" ]; then
+              echo "::error::a CI suite did not succeed (contracts=${{ needs.contracts.result }} backend=${{ needs.backend.result }} agents=${{ needs.agents.result }})"
+              exit 1
+            fi
+          done
+          echo "all 1334 tests green"
+
+  # ── images ────────────────────────────────────────────────────────────────
+  #
+  # Built here rather than on the VPS. That machine has 2 vCPUs and 813 MB of
+  # free RAM and is running someone else's production; five `pnpm install` + `tsc`
+  # passes on it would at best take an age and at worst OOM something that is not
+  # ours. The VPS only ever pulls.
+  #
+  # Only on a push to main, and only after the gate above is green — an image
+  # tagged with a commit whose tests failed should not exist to be deployed by
+  # accident.
+  images:
+    name: build & push images
+    runs-on: ubuntu-latest
+    needs: [ci]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: api
+            context: ./backend
+            dockerfile: ./backend/Dockerfile
+          # The agent contexts are the workspace roots, not app/agent: the
+          # lockfile that covers app/agent lives one level up. See each
+          # Dockerfile's header.
+          - name: fuguguardian
+            context: ./ai/fuguguardian
+            dockerfile: ./ai/fuguguardian/app/agent/Dockerfile
+          - name: fugurebalancer
+            context: ./ai/fugurebalancer
+            dockerfile: ./ai/fugurebalancer/app/agent/Dockerfile
+          - name: fugugrid
+            context: ./ai/fugugrid
+            dockerfile: ./ai/fugugrid/app/agent/Dockerfile
+          - name: fuguyield
+            context: ./ai/fuguyield
+            dockerfile: ./ai/fuguyield/app/agent/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          # The automatic per-run token. No long-lived registry credential is
+          # stored for pushing.
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: lower-case the image prefix
+        id: prefix
+        # GHCR rejects an upper-case path, and `github.repository` preserves the
+        # owner's capitalisation.
+        run: echo "value=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          # Two tags on purpose. The SHA tag is what the deploy pins and what a
+          # rollback names; `latest` is only a convenience for a human running
+          # `docker compose pull` by hand. Deploying `latest` would make "which
+          # code is live" unanswerable.
+          tags: |
+            ${{ steps.prefix.outputs.value }}/${{ matrix.name }}:${{ github.sha }}
+            ${{ steps.prefix.outputs.value }}/${{ matrix.name }}:latest
+          # linux/amd64 only: the VPS is x86_64, and building arm64 under QEMU
+          # would roughly double the job for an artefact nothing pulls.
+          platforms: linux/amd64
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}

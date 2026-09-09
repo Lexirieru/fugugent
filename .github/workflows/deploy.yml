@@ -1,0 +1,282 @@
+# ---------------------------------------------------------------------------
+# Deploy to the VPS over SSH, on a push to `main`, only after CI is green.
+#
+# ## "Only after CI green" is enforced by the trigger, not by a convention
+#
+# This workflow starts from `workflow_run` on CI's completion and refuses to do
+# anything unless that run's conclusion was `success` and its branch was `main`.
+# A `push` trigger with an `if:` could not make that promise — it would race CI
+# and deploy a commit whose tests were still running.
+#
+# `workflow_run` has one genuine trap and it is handled explicitly below: the
+# event's `github.sha` and `github.ref` describe the DEFAULT BRANCH, not the
+# commit that triggered CI. Everything here uses
+# `github.event.workflow_run.head_sha`. Getting this wrong deploys whatever is at
+# the head of main rather than the commit that was actually tested — which is
+# usually the same thing, and is silently not the same thing on the day it
+# matters.
+#
+# ## Nothing here names the host
+#
+# The address, the user, the path and the SSH key are all secrets. The host key is
+# a secret too (`VPS_KNOWN_HOSTS`) rather than `StrictHostKeyChecking=no`, so this
+# job cannot be talked into handing a deploy key to whatever answers on port 22.
+#
+# Secrets the repository owner must fill in — see docs/setup/VPS-DEPLOYMENT.md:
+#
+#     VPS_HOST          the address. Never written in this file.
+#     VPS_USER          the SSH user (a member of the `docker` group).
+#     VPS_SSH_KEY       a deploy-only private key, in full PEM form.
+#     VPS_KNOWN_HOSTS   output of `ssh-keyscan <host>`, pinning the host key.
+#     VPS_PATH          the absolute path of the checkout on the VPS.
+#     GHCR_PULL_TOKEN   a read:packages PAT, so the VPS can pull private images.
+#                       Not needed if the GHCR packages are made public.
+#
+# ## Idempotent, and revertible
+#
+# Idempotent: deploying the same SHA twice is a no-op. The images are already
+# pulled and `docker compose up -d` recreates nothing whose configuration and
+# image digest are unchanged.
+#
+# Revertible: the tag that is currently live is recorded on the VPS BEFORE the new
+# one is written. If the new containers do not become healthy inside the timeout,
+# the previous tag is put back and brought up again, and the job then fails. The
+# rule the whole remote script is built around: never leave the machine with the
+# service down. A failed deploy that rolled back is a red build and a working
+# site; a failed deploy that gave up halfway is a red build and an outage.
+#
+# ## Deliberately absent
+#
+#   - `docker compose down`. It would stop Guardian and take the network with it
+#     for the length of the pull. `up -d` replaces containers one at a time.
+#   - `down -v` / any volume removal. `fuguguardian-state` holds the record of
+#     what has already been repaid; deleting it can cause a double payment.
+#   - `git clean`. The Altana session files under `ai/*/.studio/wallets/` are
+#     gitignored and therefore untracked, so `git clean -fdx` would delete the
+#     credentials the agents boot from. `git reset --hard` leaves untracked files
+#     alone, which is exactly why it is the one used.
+#   - anything touching nginx, systemd, or the host's own services.
+# ---------------------------------------------------------------------------
+
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+# One deploy at a time, and never cancel one midway — a half-applied deploy is
+# the state this workflow exists to avoid.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: deploy to VPS
+    runs-on: ubuntu-latest
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.event == 'push'
+    environment: production
+    env:
+      # The commit CI actually tested. NOT github.sha — see the header.
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: resolve the image prefix
+        id: prefix
+        run: |
+          set -euo pipefail
+          # Must match the tag CI pushed, including the lower-casing GHCR needs.
+          echo "value=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+          echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: configure SSH
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # The pinned host key. Without this, `ssh` either refuses or — worse,
+          # with StrictHostKeyChecking=no — trusts anything that answers.
+          printf '%s\n' "${{ secrets.VPS_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          {
+            echo "Host target"
+            echo "  HostName ${{ secrets.VPS_HOST }}"
+            echo "  User ${{ secrets.VPS_USER }}"
+            echo "  IdentityFile ~/.ssh/deploy_key"
+            echo "  IdentitiesOnly yes"
+            echo "  StrictHostKeyChecking yes"
+            echo "  UserKnownHostsFile ~/.ssh/known_hosts"
+            echo "  ServerAliveInterval 30"
+          } > ~/.ssh/config
+          chmod 600 ~/.ssh/config
+
+      - name: log the VPS in to GHCR
+        # Piped over stdin rather than passed as an argument, so the token never
+        # appears in the remote host's process list.
+        run: |
+          set -euo pipefail
+          if [ -n "${{ secrets.GHCR_PULL_TOKEN }}" ]; then
+            printf '%s' '${{ secrets.GHCR_PULL_TOKEN }}' \
+              | ssh target "docker login ghcr.io -u '${{ steps.prefix.outputs.owner }}' --password-stdin"
+          else
+            echo "GHCR_PULL_TOKEN not set — assuming the packages are public."
+          fi
+
+      - name: deploy
+        id: deploy
+        env:
+          IMAGE_PREFIX: ${{ steps.prefix.outputs.value }}
+          VPS_PATH: ${{ secrets.VPS_PATH }}
+        run: |
+          set -euo pipefail
+          # The remote script is passed on stdin and read by `bash -s`, with the
+          # three values it needs as positional arguments. Nothing is interpolated
+          # by GitHub INTO the script body, so a value containing a quote cannot
+          # change what the script does.
+          ssh target "bash -s -- '$VPS_PATH' '$IMAGE_PREFIX' '$DEPLOY_SHA'" <<'REMOTE'
+          set -euo pipefail
+
+          REPO="$1"; PREFIX="$2"; SHA="$3"
+          COMPOSE="docker compose -f docker-compose.prod.yml"
+          # Services that must be healthy for the deploy to count as successful.
+          # The three advisory agents are excluded on purpose: they live behind the
+          # `advisors` profile and are not running (see the compose header's
+          # memory arithmetic), so waiting on them would time out every time.
+          CORE="postgres redis api fuguguardian"
+
+          cd "$REPO"
+
+          # ── remember what is live, before changing anything ──────────────────
+          # `.deploy-state` is written by this script and read only by the
+          # rollback below. It is the previous IMAGE_TAG, and it is captured
+          # BEFORE the new one is written, because after that the information is
+          # gone.
+          PREV_TAG=""
+          if [ -f .env ]; then
+            PREV_TAG="$(grep -E '^IMAGE_TAG=' .env | tail -1 | cut -d= -f2- || true)"
+          fi
+          echo "previous IMAGE_TAG: ${PREV_TAG:-<none>}"
+          echo "deploying:          $SHA"
+
+          # ── fetch the tested commit ─────────────────────────────────────────
+          # `reset --hard`, never `clean`: the Altana session files under
+          # ai/*/.studio/wallets/ are gitignored, so they are untracked and
+          # `clean -fdx` would delete the credentials the agents boot from.
+          # `.env` is gitignored too and survives for the same reason.
+          git fetch --quiet origin "$SHA" || git fetch --quiet origin main
+          git reset --hard --quiet "$SHA"
+          echo "checked out $(git rev-parse --short HEAD)"
+
+          # ── point the stack at the new images ───────────────────────────────
+          # IMAGE_PREFIX/IMAGE_TAG are read by docker-compose.prod.yml. Rewritten
+          # in place rather than appended, so repeated deploys do not grow the
+          # file and the last value is unambiguous.
+          touch .env
+          grep -vE '^(IMAGE_PREFIX|IMAGE_TAG)=' .env > .env.next || true
+          printf 'IMAGE_PREFIX=%s\n' "$PREFIX" >> .env.next
+          printf 'IMAGE_TAG=%s\n' "$SHA"       >> .env.next
+          mv .env.next .env
+
+          # A missing secret must stop the deploy here, while the OLD containers
+          # are still serving, rather than half way through a recreate. `config
+          # -q` resolves every ${VAR:?} in the compose file without touching a
+          # single container.
+          if ! $COMPOSE config -q; then
+            echo "compose configuration is invalid — nothing was changed." >&2
+            exit 1
+          fi
+
+          # ── pull, then switch ───────────────────────────────────────────────
+          # Pull first and separately: a slow or failed registry pull should not
+          # happen with containers already torn down. If this fails, the old stack
+          # is still up and untouched.
+          $COMPOSE pull --quiet postgres redis api fuguguardian
+
+          # --no-build because the images are built in CI; this machine has 2
+          # vCPUs and someone else's production on it. --remove-orphans so a
+          # service deleted from the compose file does not linger forever.
+          # Idempotent: a container whose image digest and config are unchanged is
+          # left running, so re-deploying the same SHA does nothing.
+          $COMPOSE up -d --no-build --remove-orphans $CORE
+
+          # ── verify, and roll back if it did not work ────────────────────────
+          wait_healthy() {
+            local deadline=$(( $(date +%s) + 180 ))
+            while [ "$(date +%s)" -lt "$deadline" ]; do
+              local bad=""
+              for svc in $CORE; do
+                cid="$($COMPOSE ps -q "$svc" 2>/dev/null || true)"
+                if [ -z "$cid" ]; then bad="$bad $svc(missing)"; continue; fi
+                # A container with no healthcheck reports "<no value>"; treat
+                # `running` as good for those. Every service in this stack does
+                # define one, so in practice this reads `healthy`.
+                state="$(docker inspect -f '{{.State.Status}}/{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$cid")"
+                case "$state" in
+                  running/healthy|running/none) ;;
+                  *) bad="$bad $svc($state)" ;;
+                esac
+              done
+              if [ -z "$bad" ]; then echo "all core services healthy"; return 0; fi
+              echo "waiting on:$bad"
+              sleep 6
+            done
+            return 1
+          }
+
+          if wait_healthy; then
+            echo "deploy ok at $SHA"
+            exit 0
+          fi
+
+          echo "::group::logs from the failed deploy"
+          $COMPOSE ps || true
+          $COMPOSE logs --tail=60 $CORE || true
+          echo "::endgroup::"
+
+          # The machine must not be left with the service down. If there is a
+          # previous tag, put it back; if there is not (a first deploy), there is
+          # nothing better to return to, so leave the new containers up for
+          # diagnosis rather than deleting the only thing installed.
+          if [ -z "$PREV_TAG" ] || [ "$PREV_TAG" = "$SHA" ]; then
+            echo "no distinct previous tag to roll back to; leaving the stack up for diagnosis." >&2
+            exit 1
+          fi
+
+          echo "rolling back to $PREV_TAG" >&2
+          grep -vE '^IMAGE_TAG=' .env > .env.next || true
+          printf 'IMAGE_TAG=%s\n' "$PREV_TAG" >> .env.next
+          mv .env.next .env
+          # Best-effort: the previous images are already on disk, so this does not
+          # need the registry. Deliberately not `set -e`-fatal — a failed rollback
+          # must still report the original failure, not mask it.
+          $COMPOSE up -d --no-build $CORE || true
+          if wait_healthy; then
+            echo "rolled back to $PREV_TAG; the service is up on the previous version." >&2
+          else
+            echo "ROLLBACK ALSO FAILED — the stack needs a human." >&2
+          fi
+          exit 1
+          REMOTE
+
+      - name: reclaim disk
+        # Always, including after a rollback: a failed deploy still pulled images,
+        # and this host has 14 GB of disk shared with someone else's production.
+        # `image prune -f` without `-a` removes only dangling layers — the
+        # previous tag stays pullable-free on disk, which is what makes the next
+        # rollback instant.
+        if: always()
+        run: ssh target 'docker image prune -f >/dev/null 2>&1; docker builder prune -f --keep-storage 1GB >/dev/null 2>&1; df -h / | tail -1'
+
+      - name: report
+        if: always()
+        run: |
+          echo "commit:  $DEPLOY_SHA"
+          echo "outcome: ${{ steps.deploy.outcome }}"

@@ -1,0 +1,57 @@
+# Build-context exclusions for `app/agent/Dockerfile`.
+#
+# BuildKit reads THIS file rather than a plain `.dockerignore`, because the build
+# points at `app/agent/Dockerfile` while the context is the workspace root, and
+# BuildKit prefers a `<dockerfile-path>.dockerignore` sibling when one exists.
+# The identical rules are duplicated in `app/agent/.dockerignore` so they still
+# apply to anyone who builds with `app/agent` itself as the context.
+#
+# Only the first block is load-bearing. The rest is about keeping the context
+# small — the daemon is on a host with 14 GB of disk shared with someone else's
+# production.
+
+# ── Secrets. These must never reach the daemon. ─────────────────────────────
+# `.studio/wallets/` holds the encrypted Altana ADMIN keystore and the live,
+# spend-capped session signers. The agent receives its session as a READ-ONLY
+# bind mount at run time (see docker-compose.prod.yml) — never as a build input.
+# No COPY instruction in the Dockerfile references it either; this file is the
+# second lock, not the only one. An image layer is readable by anyone who can
+# pull the image, and a session key in a layer cannot be un-published.
+.studio/
+**/.studio/
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+*.pem
+*.key
+
+# ── Reinstalled or recompiled inside the image ─────────────────────────────
+# The host's node_modules is a darwin-arm64 tree; the image installs its own
+# linux one from the workspace lockfile.
+node_modules/
+**/node_modules/
+# dist is produced by the build stage. A stale host dist shadowing a fresh
+# compile is a bug that is invisible from outside the container.
+dist/
+**/dist/
+
+# ── Not needed to build or to run ──────────────────────────────────────────
+# Tests: excluded from the image by tsconfig.docker.json as well, so a source
+# tree that reaches the daemon and one that reaches `tsc` agree.
+app/agent/src/__tests__/
+# Operator scripts (session grant, e2e, probes) are run from a developer machine
+# against the testnet, never from inside the container.
+app/agent/scripts/
+app/agent/vitest.config.ts
+app/agent/tsconfig.scripts.json
+app/agent/vendor/
+# AgentCore deployment descriptors — the AWS path, not the VPS one.
+agentcore/
+*.md
+.git/
+.gitignore
+.gitattributes
+.DS_Store
+*.log
