@@ -135,6 +135,18 @@ export const FIRST_PARTY: Record<string, FuguKind> = {
   "97:8012": "steward",
 };
 
+/**
+ * Where to send somebody who should look at an agent of ours that has actually run.
+ *
+ * The two catalogues address the same agent by two different ids, so a hard-coded
+ * `/agent/97:1` opens Fugu Guardian against the bundled sample and somebody else's
+ * test agent against the live one. A link that lands on the wrong agent is worse than
+ * no link, so the id follows whichever catalogue answered.
+ */
+export function guardianHref(kind: "seed" | "http"): string {
+  return kind === "seed" ? "/agent/97%3A1" : "/agent/97%3A8004";
+}
+
 export function fuguKindFor(record: AgentRecord): FuguKind {
   return FIRST_PARTY[record.id] ?? "fallback";
 }

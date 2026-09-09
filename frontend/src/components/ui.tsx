@@ -77,10 +77,15 @@ export function PageHeader({
   return (
     <header>
       <Eyebrow>{eyebrow}</Eyebrow>
-      <h1 className="mt-3 max-w-3xl text-balance text-3xl font-semibold leading-[1.15] tracking-tight sm:text-4xl">
+      <h1 className="mt-3 max-w-4xl text-balance text-3xl font-semibold leading-[1.15] tracking-tight sm:text-4xl">
         {title}
       </h1>
-      <p className="mt-4 max-w-2xl text-pretty text-base leading-relaxed text-muted">{lede}</p>
+      {/* `max-w-4xl`, the same measure as the heading above it, so the head of a page
+          reads as one column rather than two of different widths. It used to be
+          `max-w-2xl`, which at 1440 left the lede visibly narrower than the grid it
+          introduces and made every lede run to three lines. The rule for a lede is two
+          lines at 1440 and it is measured, not judged by eye. */}
+      <p className="mt-4 max-w-4xl text-pretty text-base leading-relaxed text-muted">{lede}</p>
     </header>
   );
 }
@@ -104,7 +109,7 @@ export function SectionHeader({
         {title}
       </h2>
       {lede ? (
-        <p className="mt-2 max-w-2xl text-pretty text-sm leading-relaxed text-muted">{lede}</p>
+        <p className="mt-2 max-w-4xl text-pretty text-sm leading-relaxed text-muted">{lede}</p>
       ) : null}
     </div>
   );

@@ -380,7 +380,7 @@ export default async function SkillPage({ params }: PageProps<"/skills/[id]">) {
         <SectionHeader
           id="verdict-cost"
           title="What makes a verdict cost something"
-          lede="The fee and the money at stake live in FuguAuditEscrow on the BNB Chain test network, deployed and verified. The cycle below has been run on it end to end: job created, fee funded, money put at stake, settled. The mechanism behind every verdict on this page is a contract anybody can read, not a promise."
+          lede="The fee and the money at stake live in FuguAuditEscrow, deployed and verified on the test network, and the cycle below has been run on it end to end."
         />
         <ProofList proofs={AUDIT_ESCROW_CYCLE} />
       </Section>

@@ -60,8 +60,9 @@ export function RiskLegend() {
         <p className="mt-6 text-pretty text-xs leading-relaxed text-faint">
           Level 5 is the only one that holds still, and the only one whose ring is a black-and-white
           pattern rather than a colour, so it stays unmistakable with the colour taken away and for
-          anyone who turns animation off. A hollow, dashed fish means there is no fresh reading. We
-          draw the gap rather than guess a level.
+          anyone who turns animation off. A hollow, dashed fish means there is no fresh reading.
+          We draw the gap rather than guess a level, because a dashboard showing an amount nobody
+          could check is what closed Giza and ARMA in February 2026.
         </p>
       </section>
 

@@ -31,8 +31,14 @@ export default async function AuditorsPage() {
         <PageHeader
           eyebrow="Auditors"
           title="The people who lose money when a verdict is wrong."
-          lede="Anyone can call a skill safe. What separates an audit from an opinion is the money at stake: an auditor puts it down before starting, is paid when the verdict stands, and loses it when the verdict is overturned. The two numbers that matter on each row below are therefore the money at stake and the number of times it was taken away, not the number of audits shipped."
+          lede="Anyone can call a skill safe. What separates an audit from an opinion is the money an auditor loses when the verdict is overturned."
         />
+
+        <p className="mt-4 max-w-4xl text-pretty text-base leading-relaxed text-muted">
+          They put it down before starting and are paid when the verdict stands, so the two
+          numbers that matter on each row below are the money at stake and the number of times
+          it was taken away, not the number of audits shipped.
+        </p>
 
         <div className="mt-8">
           <SkillProvenanceRow

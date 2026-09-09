@@ -104,12 +104,14 @@ export default async function SkillsPage({ searchParams }: PageProps<"/skills">)
         <PageHeader
           eyebrow="Skills"
           title="Your agent installs code. Somebody should have read it first."
-          lede="An agent gains its abilities by installing add-ons from open sources nobody checks. That is a live attack surface: instructions hidden inside a tool description that hijack the agent, a price checker that quietly reads your keys, a clean first version followed by a poisoned second one. One bad add-on empties the wallet, and the agent does it to itself."
+          lede="An agent gains its abilities by installing add-ons from open sources nobody checks. One bad add-on empties the wallet, and the agent does it to itself."
         />
-        <p className="mt-4 max-w-2xl text-pretty text-base leading-relaxed text-muted">
-          So an auditor puts money down, reads a build, is paid when the verdict stands, and loses
-          the money when it does not. Below, every add-on carries what is actually known about it,
-          and five of the seven states are ways of not knowing.
+        <p className="mt-4 max-w-4xl text-pretty text-base leading-relaxed text-muted">
+          The attacks are real ones: instructions hidden inside a tool description that hijack the
+          agent, a price checker that quietly reads your keys, a clean first version followed by a
+          poisoned second one. So an auditor puts money down, reads a build, is paid when the
+          verdict stands, and loses the money when it does not. Below, every add-on carries what is
+          actually known about it, and five of the seven states are ways of not knowing.
         </p>
 
         <div className="mt-8">
@@ -249,9 +251,9 @@ export default async function SkillsPage({ searchParams }: PageProps<"/skills">)
         <h2 id="verdict-cost" className="text-balance text-lg font-semibold tracking-tight text-fg">
           What makes a verdict cost something
         </h2>
-        <p className="mt-2 mb-6 max-w-2xl text-pretty text-sm leading-relaxed text-muted">
-          A badge is worth exactly as much as the auditor loses by handing it out wrongly. The fee
-          and the money at stake sit in{" "}
+        <p className="mt-2 mb-6 max-w-4xl text-pretty text-sm leading-relaxed text-muted">
+          A badge is worth what the auditor loses by handing it out wrongly. Fee and stake sit
+          in{" "}
           <a
             href={addressUrl(CONTRACTS.auditEscrow)}
             target="_blank"
@@ -260,8 +262,7 @@ export default async function SkillsPage({ searchParams }: PageProps<"/skills">)
           >
             {shorten(CONTRACTS.auditEscrow)} ↗
           </a>
-          , deployed and verified on BNB Chain testnet, and the whole cycle has been run on it.
-          These are those four transactions.
+          , and the whole cycle has been run on it.
         </p>
         <ProofList proofs={AUDIT_ESCROW_CYCLE} />
         <div className="mt-6">
