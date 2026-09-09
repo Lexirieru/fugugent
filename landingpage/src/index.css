@@ -29,10 +29,24 @@
 /* ── Canvas ─────────────────────────────────────────────────────── */
 
 :root {
-  --cream: #F4EBE3;
+  /*
+   * Sampled from the video's own sky, not chosen by eye: three clean patches of the
+   * first frame average #ece2db–#ede3dc. The brief's #F4EBE3 is lighter and pinker,
+   * which drew a visible seam where the page met the footage.
+   */
+  --cream: #EDE2DC;
   --ink: #000;
   --muted: #616161;
   --accent: #EA580C;
+
+  /*
+   * How far down the video starts, in pixels. This is the one number to turn if the
+   * artwork sits too high or too low: larger pushes the aircraft down and opens more
+   * clear cream behind the headline; 0 puts the video back against the top edge.
+   * The video keeps filling everything below the offset, so nothing is ever left
+   * empty at the bottom.
+   */
+  --video-offset-y: 290px;
 
   background-color: var(--cream);
   min-height: 100%;
@@ -136,8 +150,8 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 10px 20px 10px 16px;
+  /* The asymmetric padding existed to balance an icon; without one it just looks off-centre. */
+  padding: clamp(10px, 0.7vw, 14px) clamp(22px, 1.5vw, 30px);
   border-radius: 48px;
   border: none;
   color: #fff;
@@ -202,7 +216,7 @@ body {
 .hero-title {
   font-family: 'Geist:SemiBold', ui-sans-serif, system-ui, sans-serif;
   color: var(--ink);
-  max-width: 483px;
+  max-width: min(30.2vw, 640px);
   font-size: clamp(40px, 2.5vw, 52px);
   font-weight: 600;
   letter-spacing: -2px;
@@ -213,8 +227,8 @@ body {
 .hero-desc {
   position: absolute;
   right: 0;
-  top: clamp(184px, 11.5vw, 242px);
-  width: min(24.6vw, 512px);
+  top: clamp(184px, 12.4vw, 260px);
+  width: min(27vw, 560px);
   margin: 0;
   font-family: 'Geist:Medium', ui-sans-serif, system-ui, sans-serif;
   color: var(--muted);
@@ -240,8 +254,11 @@ body {
    * the headline sits.
    */
   position: absolute;
-  inset: 0;
-  height: 100%;
+  top: var(--video-offset-y);
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: auto;
   object-fit: cover;
   object-position: center bottom;
   margin: 0;
@@ -264,7 +281,7 @@ body {
   }
 
   .site-header .download-btn {
-    padding: 9px 15px 9px 13px;
+    padding: 9px 18px;
     font-size: 13px;
   }
 

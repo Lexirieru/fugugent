@@ -1,0 +1,15 @@
+<svg width="54" height="54" viewBox="0 0 54 54" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect x="0.75" y="0.75" width="52.5" height="52.5" rx="12.25" fill="black"/>
+<rect x="0.75" y="0.75" width="52.5" height="52.5" rx="12.25" stroke="url(#paint0_linear_1438_11556)" stroke-width="1.5"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M31.0517 23.6275L41.9604 34.5362L38.2648 38.2317L27.0006 26.9676V20.2875L34.2853 13.0029L37.9809 16.6985L31.0517 23.6275ZM22.9484 30.3727L12.0397 19.4641L15.7352 15.7686L26.9995 27.0326V33.7128L19.7149 40.9974L16.0193 37.3018L22.9484 30.3727Z" fill="url(#paint1_radial_1438_11556)"/>
+<defs>
+<linearGradient id="paint0_linear_1438_11556" x1="-5.26988e-07" y1="5.81986" x2="54" y2="48.1801" gradientUnits="userSpaceOnUse">
+<stop stop-color="#AEF431"/>
+<stop offset="1" stop-color="#32F5D4"/>
+</linearGradient>
+<radialGradient id="paint1_radial_1438_11556" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(26.5006 27.0029) scale(29 17.196)">
+<stop stop-color="#AEF431"/>
+<stop offset="1" stop-color="#32F5D4"/>
+</radialGradient>
+</defs>
+</svg>
