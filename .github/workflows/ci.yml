@@ -6,7 +6,7 @@
 # Each job checks that the number of PASSING tests is at least the recorded
 # baseline:
 #
-#     contracts       206   forge test
+#     contracts       212   forge test
 #     backend         665   vitest (plus 1 deliberately skipped)
 #     fuguguardian    285   vitest
 #     fugurebalancer  130   vitest
@@ -18,7 +18,7 @@
 #     fugumeter       146   vitest
 #     fugusteward     169   vitest
 #                   -----
-#                    2308
+#                    2314
 #
 # A green suite is not by itself evidence that the suite ran. A `describe` block
 # accidentally renamed to `describe.skip`, a glob that stops matching after a file
@@ -72,7 +72,7 @@ env:
 
 jobs:
   contracts:
-    name: contracts (forge test, baseline 206)
+    name: contracts (forge test, baseline 212)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -109,7 +109,7 @@ jobs:
         working-directory: contracts
         run: |
           set -euo pipefail
-          baseline=206
+          baseline=212
           # "Ran 10 test suites ...: 150 tests passed, 0 failed, 0 skipped (150 total tests)"
           actual=$(grep -oE '[0-9]+ tests passed' forge-test.log | tail -1 | grep -oE '[0-9]+')
           echo "forge: $actual passed, baseline $baseline"
@@ -325,7 +325,7 @@ jobs:
               exit 1
             fi
           done
-          echo "all 2308 tests green"
+          echo "all 2314 tests green"
 
   # ── images ────────────────────────────────────────────────────────────────
   #
