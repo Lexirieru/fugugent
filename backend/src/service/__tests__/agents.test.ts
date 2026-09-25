@@ -3066,6 +3066,23 @@ describe("level 0: the ERC-8004 registry", () => {
     expect(trace).not.toContain("cache.getAgents");
   });
 
+  it("a listing the classifier missed is served as its registry record, in the category it declared", async () => {
+    // Guardian's registry record: evidence present, but the classifier said nothing.
+    const guardian = { ...registryRecord("2480", "GRID"), classification: { category: null, confidence: 0, reason: "no match" } };
+    const h = harness({ registry: fakeRegistry([guardian, registryRecord("1", "HEALTH_FACTOR")]) });
+    h.onchain.page = page([onchainRecord("2480", "HEALTH_FACTOR")], { source: "onchain" });
+
+    const list = await h.service.getAgentsByCategory("HEALTH_FACTOR");
+    const card = list.items.find((i) => i.tokenId === "2480")!;
+    expect(card.source).toBe("registry");
+    expect(card.evidence).not.toBeNull();
+    expect(card.fuguListing?.category).toBe("HEALTH_FACTOR");
+    expect(card.classification).toMatchObject({ category: "HEALTH_FACTOR", confidence: 1 });
+
+    const detail = await h.service.getAgentDetail("97:2480");
+    expect(detail.agent?.classification?.category).toBe("HEALTH_FACTOR");
+  });
+
   it("still puts our own rentable listing on top of a registry page", async () => {
     const h = harness({ registry: fakeRegistry([registryRecord("1", "GRID")]) });
     h.onchain.page = page([onchainRecord("500", "GRID")], { source: "onchain" });

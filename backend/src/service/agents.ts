@@ -790,6 +790,18 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
     };
   }
 
+  /**
+   * The richest record we hold for a first-party listing.
+   *
+   * A listing the registry page did not contain (the classifier read Guardian's
+   * description and did not call it health factor) used to be prepended as the bare
+   * FuguRegistry record, with no registry evidence, while its own detail page,
+   * served from the registry, had it. The card and the page it opens must agree.
+   */
+  function firstPartyRecord(item: AgentRecord): AgentRecord {
+    return deps.registry?.get(item.id).agent ?? item;
+  }
+
   /** Count items per source, so a mixed page never hides behind one label. */
   function censusOf(items: readonly AgentRecord[]): Partial<Record<AgentSource, number>> {
     const census: Partial<Record<AgentSource, number>> = {};
@@ -832,13 +844,17 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       const listing = byId.get(item.id);
       if (listing === undefined) return item;
       byId.delete(item.id);
-      return attachFirstParty(item, matching).record;
+      return withListingCategory(attachFirstParty(item, matching).record);
     });
 
     // Rule 3: only page 1 carries the leftover listings. They go through the same
     // attach step too, so there is exactly one way a listing reaches a caller.
     const prepend =
-      offset === 0 ? [...byId.values()].map((item) => attachFirstParty(item, matching).record) : [];
+      offset === 0
+        ? [...byId.values()].map((item) =>
+            withListingCategory(attachFirstParty(firstPartyRecord(item), matching).record),
+          )
+        : [];
     const items = [...prepend, ...enriched];
     const listed = items.filter((item) => item.fuguListing !== null).length;
     return { items, added: prepend.length, listed };
@@ -1301,7 +1317,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       // which is what this did before — gave the detail page a price but no name
       // and no `onchainExecution`, so it contradicted the card that led here.
       const resolved: ListedAgentRecord | null =
-        agent === null ? null : attachFirstParty(agent, listings).record;
+        agent === null ? null : withListingCategory(attachFirstParty(agent, listings).record);
 
       const ageSeconds = resolved === null ? null : oldestAgeSeconds([resolved], at);
       const bound = maxAgeFor(source, maxAgeSeconds);
@@ -1689,6 +1705,25 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
   }
 
   return { getAgentsByCategory, getAgentDetail, getHealth };
+}
+
+/**
+ * For an agent with one of our listings, the category its owner declared on chain
+ * in `FuguRegistry` is its classification. The keyword classifier is a guess for
+ * agents nobody categorised; overriding a signed declaration with a guess would let
+ * a rewording of a description move a listed agent into another tab.
+ */
+export function withListingCategory<T extends AgentRecord>(record: T): T {
+  const listing = record.fuguListing;
+  if (listing == null || record.classification?.category === listing.category) return record;
+  return {
+    ...record,
+    classification: {
+      category: listing.category,
+      confidence: 1,
+      reason: "category declared on chain in its FuguRegistry listing",
+    },
+  };
 }
 
 /**
