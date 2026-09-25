@@ -42,6 +42,7 @@ import {
   scan8004Hint,
 } from "./sources/registry-proof.js";
 import { createScan8004Source } from "./sources/scan8004.js";
+import { createTrackingService, createViemTrackingChain } from "./sources/tracking.js";
 import { createApp } from "./routes/app.js";
 import { createDbSkillStore } from "./skills/repo.js";
 import { createMemorySkillStore } from "./skills/store.js";
@@ -163,10 +164,34 @@ export function buildServer(env: NodeJS.ProcessEnv = process.env): BuiltServer {
     chainId: config.chainId,
   });
 
+  // What BNB Chain's quest tracker reads: hires per wallet, agents per owner,
+  // ratings per wallet. Answered from contract state, block-stamped.
+  const trackingContracts = {
+    registry: config.contracts.registry,
+    subscription: config.contracts.subscription,
+    reputation: config.contracts.reputation,
+  };
+  const tracking = createTrackingService({
+    chain: createViemTrackingChain(rpcClient, trackingContracts),
+    chainId: config.chainId,
+    contracts: trackingContracts,
+    registryAgents: () => registry.all(),
+    registryBlock: () => registry.status().blockNumber,
+  });
+
   const handle = dbHandle;
   let stopRegistry: (() => void) | null = null;
   return {
-    app: createApp({ service, skills, allowedOrigins: config.allowedOrigins }),
+    app: createApp({
+      service,
+      skills,
+      allowedOrigins: config.allowedOrigins,
+      tracking: {
+        tracking,
+        chainId: config.chainId,
+        contracts: { ...trackingContracts, identityRegistry: config.contracts.identityRegistry },
+      },
+    }),
     config,
     hasCache: handle !== null,
     startBackground: () => {
