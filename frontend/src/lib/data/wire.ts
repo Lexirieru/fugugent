@@ -11,7 +11,16 @@
  * not through a `NaN` that quietly renders as a price.
  */
 
-import type { AgentRecord, Address, Category, FuguListing, PublisherTier } from "@/lib/agent-types";
+import type {
+  AgentRecord,
+  AgentSource,
+  Address,
+  Category,
+  FuguListing,
+  MetadataStatus,
+  PublisherTier,
+  RegistryEvidence,
+} from "@/lib/agent-types";
 import { CATEGORIES } from "@/lib/agent-types";
 
 export interface WireFuguListing {
@@ -71,6 +80,72 @@ function parseListing(v: unknown, at: string): FuguListing {
     active: Boolean(o.active),
     curated: Boolean(o.curated),
     metadataURI: String(o.metadataURI ?? ""),
+  };
+}
+
+const SOURCES: readonly AgentSource[] = ["registry", "scan8004", "cache", "onchain", "seed"];
+const METADATA_STATUSES: readonly MetadataStatus[] = [
+  "inline",
+  "fetched",
+  "empty",
+  "unsupported",
+  "refused",
+  "unreachable",
+  "invalid",
+];
+const HASH = /^0x[0-9a-fA-F]{64}$/;
+const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+const DECIMAL = /^\d+$/;
+
+/**
+ * The registry evidence block. Lenient in the one way that is safe, a malformed
+ * block becomes `null`, which the page renders as "no registry read to show", and
+ * strict in the way that matters: a hash or address that is not shaped like one is
+ * never turned into a BscScan link.
+ */
+function parseEvidence(v: unknown): RegistryEvidence | null {
+  if (typeof v !== "object" || v === null || Array.isArray(v)) return null;
+  const o = v as Record<string, unknown>;
+  if (typeof o.registryAddress !== "string" || !ADDRESS.test(o.registryAddress)) return null;
+  if (typeof o.blockNumber !== "string" || !DECIMAL.test(o.blockNumber)) return null;
+  if (typeof o.readAt !== "string") return null;
+  const status = METADATA_STATUSES.includes(o.metadataStatus as MetadataStatus)
+    ? (o.metadataStatus as MetadataStatus)
+    : null;
+  if (status === null) return null;
+
+  const reg = o.registration as Record<string, unknown> | null | undefined;
+  const registration =
+    reg && typeof reg.txHash === "string" && HASH.test(reg.txHash) &&
+    typeof reg.blockNumber === "string" && DECIMAL.test(reg.blockNumber)
+      ? {
+          txHash: reg.txHash as `0x${string}`,
+          blockNumber: reg.blockNumber,
+          registeredAt: typeof reg.registeredAt === "string" ? reg.registeredAt : null,
+          hintedBy: "8004scan" as const,
+        }
+      : null;
+
+  const endpoints = Array.isArray(o.endpoints)
+    ? o.endpoints
+        .filter((e): e is Record<string, unknown> => typeof e === "object" && e !== null)
+        .filter((e) => typeof e.name === "string" && typeof e.endpoint === "string")
+        .map((e) => ({
+          name: e.name as string,
+          endpoint: e.endpoint as string,
+          version: typeof e.version === "string" ? e.version : null,
+        }))
+    : [];
+
+  return {
+    registryAddress: o.registryAddress as Address,
+    blockNumber: o.blockNumber,
+    readAt: o.readAt,
+    agentURI: typeof o.agentURI === "string" ? o.agentURI : "",
+    metadataStatus: status,
+    metadataReason: typeof o.metadataReason === "string" ? o.metadataReason : null,
+    endpoints,
+    registration,
   };
 }
 
@@ -155,11 +230,12 @@ export function parseAgentRecord(v: unknown, at = "agent"): AgentRecord {
 
     fuguListing: o.fuguListing == null ? null : parseListing(o.fuguListing, `${at}.fuguListing`),
 
-    source: (o.source as AgentRecord["source"]) ?? "cache",
+    source: SOURCES.includes(o.source as AgentSource) ? (o.source as AgentSource) : "cache",
     fetchedAt: String(o.fetchedAt ?? new Date(0).toISOString()),
     createdAt: nullableString(o.createdAt),
     updatedAt: nullableString(o.updatedAt),
     similarityScore: nullableNumber(o.similarityScore),
+    evidence: parseEvidence(o.evidence),
   };
 }
 

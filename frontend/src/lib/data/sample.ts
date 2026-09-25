@@ -74,6 +74,8 @@ function baseRecord(
     // The bundled sample carries its evidence in `outcomes` directly rather than
     // through a listing document, so there is nothing to decode here.
     listingMetadata: null,
+    // Bundled with the build, not read from the ERC-8004 registry: nothing to show.
+    evidence: null,
     source: "seed",
     fetchedAt: SEED_FETCHED_AT,
     createdAt: null,

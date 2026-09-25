@@ -39,7 +39,46 @@ export function categoryFromOnchainIndex(index: number): Category | null {
   return CATEGORIES[index] ?? null;
 }
 
-export type AgentSource = "scan8004" | "cache" | "onchain" | "seed";
+export type AgentSource = "registry" | "scan8004" | "cache" | "onchain" | "seed";
+
+/** How an agent's `agentURI` resolved. Mirror of `MetadataStatus` in the backend. */
+export type MetadataStatus =
+  | "inline"
+  | "fetched"
+  | "empty"
+  | "unsupported"
+  | "refused"
+  | "unreachable"
+  | "invalid";
+
+export interface AgentEndpoint {
+  name: string;
+  endpoint: string;
+  version: string | null;
+}
+
+/**
+ * The mint transaction, found through 8004scan and **checked against its receipt**
+ * by the backend before it is ever sent here. There is no unverified variant.
+ */
+export interface RegistrationProof {
+  txHash: `0x${string}`;
+  blockNumber: string;
+  registeredAt: string | null;
+  hintedBy: "8004scan";
+}
+
+/** What the ERC-8004 IdentityRegistry itself said about one agent, and when. */
+export interface RegistryEvidence {
+  registryAddress: Address;
+  blockNumber: string;
+  readAt: string;
+  agentURI: string;
+  metadataStatus: MetadataStatus;
+  metadataReason: string | null;
+  endpoints: AgentEndpoint[];
+  registration: RegistrationProof | null;
+}
 
 export type PublisherTier = "OFFICIAL" | "VERIFIED" | "COMMUNITY";
 
@@ -132,6 +171,8 @@ export interface AgentRecord {
   createdAt: string | null;
   updatedAt: string | null;
   similarityScore: number | null;
+  /** Present only on records read straight from the ERC-8004 registry. */
+  evidence: RegistryEvidence | null;
   raw?: unknown;
 }
 

@@ -34,7 +34,7 @@ import type { Provenance, TrailStep } from "@/lib/provenance";
 
 const TIMEOUT_MS = 8_000;
 
-const SOURCES: AgentSource[] = ["scan8004", "cache", "onchain", "seed"];
+const SOURCES: AgentSource[] = ["registry", "scan8004", "cache", "onchain", "seed"];
 
 function reasonOf(err: unknown): string {
   if (err instanceof Error) return err.message;

@@ -31,6 +31,11 @@ export function shorten(value: string, head = 10, tail = 6): string {
 }
 
 export const CONTRACTS = {
+  /**
+   * The ERC-8004 IdentityRegistry every agent in the catalogue is read from. Not ours:
+   * the canonical one BNB Agent Studio registers into (`bnbagent-sdk`).
+   */
+  identityRegistry: "0x8004A818BFB912233c491871b3d84c89A494BD9e",
   registry: "0xb2f36070E6eae3353E8e755172B477DF213ae248",
   subscription: "0xfdb083371f44Cf53181350389D3217e51B431776",
   reputation: "0x279B31B00F64C0ce85BCe2Bd7e377CdcAE58d400",
@@ -44,6 +49,11 @@ export const CONTRACTS = {
 } as const;
 
 export const CONTRACT_LIST = [
+  {
+    name: "ERC-8004 IdentityRegistry",
+    address: CONTRACTS.identityRegistry,
+    role: "Where every agent in the catalogue is read from, directly",
+  },
   {
     name: "FuguRegistry",
     address: CONTRACTS.registry,

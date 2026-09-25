@@ -7,6 +7,7 @@ import { Fugu } from "@/components/fugu";
 import { HirePanel } from "@/components/hire-panel";
 import { HiredBadge } from "@/components/hired-badge";
 import { ProofList } from "@/components/proof";
+import { RegistryIdentity } from "@/components/registry-identity";
 import { RiskChip } from "@/components/risk-chip";
 import { Badge, ButtonLink, Card, EmptyState, Page, Section, SectionHeader } from "@/components/ui";
 import { ListAgent } from "@/components/wallet/list-agent";
@@ -155,6 +156,16 @@ function AgentDetail({
             </p>
           </div>
         </div>
+      </Section>
+
+      {/* Where the agent comes from, read off the ERC-8004 registry, before anything else. */}
+      <Section labelledBy="identity">
+        <SectionHeader
+          id="identity"
+          title="On-chain identity"
+          lede="Read directly from the ERC-8004 IdentityRegistry contract, not from an index of it. Every row opens on the block explorer."
+        />
+        <RegistryIdentity record={record} />
       </Section>
 
       {/* The limits of the claim, stated before anything that flatters. */}

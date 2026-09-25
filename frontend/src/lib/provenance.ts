@@ -40,6 +40,7 @@ export interface Provenance {
 }
 
 export const SOURCE_LABEL: Record<AgentSource, string> = {
+  registry: "ERC-8004 registry",
   scan8004: "8004scan",
   cache: "our cache",
   onchain: "read from chain",
@@ -47,8 +48,10 @@ export const SOURCE_LABEL: Record<AgentSource, string> = {
 };
 
 export const SOURCE_MEANING: Record<AgentSource, string> = {
-  scan8004: "The live ERC-8004 index.",
-  cache: "Our own copy, served because the live index did not answer in time.",
+  registry:
+    "Read straight from the ERC-8004 IdentityRegistry contract, every agent, pinned to one block. No indexer in between.",
+  scan8004: "The 8004scan index of the ERC-8004 registry.",
+  cache: "Our own copy of the last registry read, served because a fresh read was not available.",
   onchain:
     "Read straight from the contracts, because neither the index nor the cache could answer.",
   seed: "The agents that ship with this build, shown when the live catalogue is unreachable.",
