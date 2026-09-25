@@ -18,7 +18,7 @@
 //   (cd frontend && NEXT_PUBLIC_API_BASE_URL=http://localhost:8799 \
 //      NEXT_PUBLIC_RPC_URL=http://127.0.0.1:8546 NEXT_PUBLIC_REOWN_PROJECT_ID=<id> \
 //      bun run build && bun run start -p 3100)
-//   cd frontend && bunx --bun playwright install chromium && AGENT=97:8004 node e2e/hire-flow.mjs
+//   cd frontend && bunx --bun playwright install chromium && AGENT=97:2480 node e2e/hire-flow.mjs
 //
 // Screenshots of every step land in `e2e/out/`.
 import { chromium } from "playwright";
@@ -28,7 +28,7 @@ import { bscTestnet } from "viem/chains";
 
 const FORK = "http://127.0.0.1:8546";
 const APP = "http://127.0.0.1:3100";
-const AGENT = process.env.AGENT ?? "97:8004";
+const AGENT = process.env.AGENT ?? "97:2480";
 const SUBSCRIPTION = "0xfdb083371f44Cf53181350389D3217e51B431776";
 const OUT = new URL("./out/", import.meta.url).pathname;
 await import("node:fs").then((fs) => fs.mkdirSync(OUT, { recursive: true }));

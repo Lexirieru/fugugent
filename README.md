@@ -180,7 +180,7 @@ find `isValidKey`, and paste these two values:
 
 It answers `true`. The permission is registered on the chain, not asserted by us, and the
 marketplace shows the same call's result on
-[Fugu Guardian's page](https://app.hellofugu.xyz/agent/97:8004).
+[Fugu Guardian's page](https://app.hellofugu.xyz/agent/97:2480).
 
 The whole session allowlist is two entries, each binding a **contract and a selector**:
 

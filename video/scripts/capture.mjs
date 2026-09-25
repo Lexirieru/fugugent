@@ -56,8 +56,8 @@ const SCENES = [
   { id: "landing-rails", url: "https://hellofugu.xyz/",                         seconds: 6, from: 200,  to: 1500 },
   { id: "marketplace",  url: "https://app.hellofugu.xyz/agents",                seconds: 6, from: 0,    to: 900 },
   { id: "ready-filter", url: "https://app.hellofugu.xyz/agents?available=yes",  seconds: 6, from: 0,    to: 800 },
-  { id: "agent-detail", url: "https://app.hellofugu.xyz/agent/97:8004",         seconds: 6, from: 300,  to: 1000 },
-  { id: "agent-proof",  url: "https://app.hellofugu.xyz/agent/97:8004",         seconds: 7, from: 1150, to: 1390 },
+  { id: "agent-detail", url: "https://app.hellofugu.xyz/agent/97:2480",         seconds: 6, from: 300,  to: 1000 },
+  { id: "agent-proof",  url: "https://app.hellofugu.xyz/agent/97:2480",         seconds: 7, from: 1150, to: 1390 },
   { id: "skills",       url: "https://app.hellofugu.xyz/skills",                seconds: 5, from: 0,    to: 700 },
 ];
 

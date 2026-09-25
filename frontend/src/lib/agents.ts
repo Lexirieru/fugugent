@@ -112,10 +112,16 @@ export const CATEGORY_ORDER: Category[] = [...CATEGORIES];
  * the shield to whoever asked for it.
  *
  * There are two sets of ids because there are two catalogues. The `97:1` to `97:4`
- * keys belong to the sample bundled with this build. The `97:8004` to `97:8012` keys
- * are the ERC-8004 token ids of the same agents as they are actually registered on
- * the test network, all owned by 0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E. Both are
- * listed rather than one, because the app has to be right whichever catalogue answers.
+ * keys belong to the sample bundled with this build. The `97:2480` to `97:2488` keys
+ * are the ERC-8004 token ids of the same agents in the IdentityRegistry at
+ * 0x8004A818BFB912233c491871b3d84c89A494BD9e, minted on 2026-09-25 and all owned by
+ * 0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E. Both are listed rather than one,
+ * because the app has to be right whichever catalogue answers.
+ *
+ * The old `97:8004` to `97:8012` keys are gone on purpose, not forgotten. They were
+ * placeholders that no registry token backed, and the registry will reach 8004 one
+ * day: keeping them here would hand our shield to whoever registers that id.
+ * `next.config.ts` redirects the old links instead.
  */
 export const FIRST_PARTY: Record<string, FuguKind> = {
   // The bundled sample.
@@ -124,15 +130,15 @@ export const FIRST_PARTY: Record<string, FuguKind> = {
   "97:3": "grid",
   "97:4": "yield",
   // Registered on chain, ERC-8004 token ids.
-  "97:8004": "guardian",
-  "97:8005": "rebalancer",
-  "97:8006": "grid",
-  "97:8007": "yield",
-  "97:8008": "broker",
-  "97:8009": "trader",
-  "97:8010": "pilot",
-  "97:8011": "meter",
-  "97:8012": "steward",
+  "97:2480": "guardian",
+  "97:2481": "rebalancer",
+  "97:2482": "grid",
+  "97:2483": "yield",
+  "97:2484": "broker",
+  "97:2485": "trader",
+  "97:2486": "pilot",
+  "97:2487": "meter",
+  "97:2488": "steward",
 };
 
 /**
@@ -144,7 +150,7 @@ export const FIRST_PARTY: Record<string, FuguKind> = {
  * no link, so the id follows whichever catalogue answered.
  */
 export function guardianHref(kind: "seed" | "http"): string {
-  return kind === "seed" ? "/agent/97%3A1" : "/agent/97%3A8004";
+  return kind === "seed" ? "/agent/97%3A1" : "/agent/97%3A2480";
 }
 
 export function fuguKindFor(record: AgentRecord): FuguKind {
