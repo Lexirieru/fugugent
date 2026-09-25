@@ -25,6 +25,12 @@ export const CONTRACT_ADDRESSES = {
   registry: "0xb2f36070E6eae3353E8e755172B477DF213ae248",
   subscription: "0xfdb083371f44Cf53181350389D3217e51B431776",
   reputation: "0x279B31B00F64C0ce85BCe2Bd7e377CdcAE58d400",
+  /**
+   * The ERC-8004 IdentityRegistry the catalogue is read from — not ours, the
+   * canonical one BNB Agent Studio registers into (`bnbagent-sdk`,
+   * `NETWORKS["bsc-testnet"].registryContract`). Mainnet: `0x8004A169…a432`.
+   */
+  identityRegistry: "0x8004A818BFB912233c491871b3d84c89A494BD9e",
 } as const;
 
 /** Requests-per-minute tier without an API key. Rises automatically once a key is set. */

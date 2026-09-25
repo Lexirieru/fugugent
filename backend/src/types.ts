@@ -70,8 +70,85 @@ export function categoryFromOnchainIndex(index: number): Category | null {
  * Where a record came from. This is what is shown to the user (and the judges)
  * so it is clear whether the numbers they see come from upstream, from a stale
  * cache, or from the on-chain safety net.
+ *
+ * `registry` is a direct read of the ERC-8004 IdentityRegistry contract itself
+ * (`src/sources/registry.ts`): no indexer and no third party between the chain
+ * and the card. It is the primary source in production.
  */
-export type AgentSource = "scan8004" | "cache" | "onchain" | "seed";
+export type AgentSource = "registry" | "scan8004" | "cache" | "onchain" | "seed";
+
+/**
+ * How an agent's `agentURI` resolved to a registration file.
+ *
+ * The URI is written by whoever registered the agent, so it is anything from a
+ * base64 `data:` URI to a bare word like `"my-twin"`. Every outcome is named
+ * rather than collapsed into "no metadata", because "the owner never published a
+ * description" and "the owner's server is down" are different facts about the
+ * agent and the page says which one it is.
+ */
+export type MetadataStatus =
+  /** Decoded from the URI itself (`data:` or raw JSON). Nothing was fetched. */
+  | "inline"
+  /** Fetched over HTTPS or through an IPFS gateway, and parsed. */
+  | "fetched"
+  /** The registry holds an empty `agentURI`. */
+  | "empty"
+  /** Neither a URL we fetch nor inline JSON: `"my-twin"`, `http://…`, `ar://…`. */
+  | "unsupported"
+  /** A URL we refuse to fetch from a server: private network, IP literal, redirect loop. */
+  | "refused"
+  /** The URL did not answer in time or answered with an error status. */
+  | "unreachable"
+  /** It answered, but not with a JSON object. */
+  | "invalid";
+
+/** One service endpoint an agent declares in its registration file. */
+export interface AgentEndpoint {
+  /** `"A2A"`, `"MCP"`, `"web"`, `"OASF"`, … exactly as declared. */
+  name: string;
+  endpoint: string;
+  version: string | null;
+}
+
+/**
+ * The transaction that minted an agent's identity, **checked against the chain**.
+ *
+ * The hash is found through 8004scan (the chain offers no index from token id to
+ * transaction, and public RPCs refuse historical `eth_getLogs`), but it is only
+ * ever reported after its receipt was fetched from our own RPC and shown to
+ * contain `Registered(agentId)` emitted by this registry. A hint that fails that
+ * check is dropped, never shown as "unverified".
+ */
+export interface RegistrationProof {
+  txHash: `0x${string}`;
+  /** Decimal string: a block number is a `uint64`. */
+  blockNumber: string;
+  /** ISO 8601 of that block, UTC. */
+  registeredAt: string | null;
+  /** Always `"8004scan"` today: where the hash was learned, not what proves it. */
+  hintedBy: "8004scan";
+}
+
+/**
+ * What the ERC-8004 IdentityRegistry itself says about one agent, with enough
+ * detail for a reader to repeat the read.
+ */
+export interface RegistryEvidence {
+  /** The IdentityRegistry the record was read from. */
+  registryAddress: Address;
+  /** The block the whole snapshot was read at, as a decimal string. */
+  blockNumber: string;
+  /** ISO 8601 of the read. The age a card shows is computed from this. */
+  readAt: string;
+  /** `tokenURI(agentId)` verbatim, truncated to 512 characters. */
+  agentURI: string;
+  metadataStatus: MetadataStatus;
+  /** Why the metadata could not be used, when it could not. */
+  metadataReason: string | null;
+  endpoints: AgentEndpoint[];
+  /** `null` until it has been found and checked; see {@link RegistrationProof}. */
+  registration: RegistrationProof | null;
+}
 
 /** Publisher certification tier on 8004scan. */
 export type PublisherTier = "OFFICIAL" | "VERIFIED" | "COMMUNITY";
@@ -189,6 +266,12 @@ export interface AgentRecord {
   updatedAt: string | null;
   /** Similarity score, populated only on `semanticSearch` results. */
   similarityScore: number | null;
+  /**
+   * The registry read behind this record. Present only on `source: "registry"`
+   * records; the cache does not store it, so a record served from the cache
+   * says so by having none.
+   */
+  evidence?: RegistryEvidence | null;
   /**
    * The raw upstream payload, for debugging and the classifier's LLM layer.
    * The cache layer may drop it — nothing may depend on it.

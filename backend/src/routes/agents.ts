@@ -58,10 +58,10 @@ export interface AgentRoutesDeps {
 export const CATEGORY_COUNT_LIMIT = MAX_PAGE_LIMIT;
 
 /** The fallback order. Used to pick the most degraded source when merging. */
-const SOURCE_ORDER: readonly AgentSource[] = ["scan8004", "cache", "onchain", "seed"];
+const SOURCE_ORDER: readonly AgentSource[] = ["registry", "scan8004", "cache", "onchain", "seed"];
 
 function worstSource(sources: readonly AgentSource[]): AgentSource {
-  let worst: AgentSource = "scan8004";
+  let worst: AgentSource = "registry";
   for (const source of sources) {
     if (SOURCE_ORDER.indexOf(source) > SOURCE_ORDER.indexOf(worst)) worst = source;
   }

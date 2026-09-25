@@ -6,8 +6,8 @@
 # Each job checks that the number of PASSING tests is at least the recorded
 # baseline:
 #
-#     contracts       212   forge test
-#     backend         665   vitest (plus 1 deliberately skipped)
+#     contracts       256   forge test
+#     backend         739   vitest (plus 1 deliberately skipped)
 #     fuguguardian    285   vitest
 #     fugurebalancer  130   vitest
 #     fugugrid        144   vitest
@@ -18,7 +18,7 @@
 #     fugumeter       146   vitest
 #     fugusteward     169   vitest
 #                   -----
-#                    2314
+#                    2432
 #
 # A green suite is not by itself evidence that the suite ran. A `describe` block
 # accidentally renamed to `describe.skip`, a glob that stops matching after a file
@@ -72,7 +72,7 @@ env:
 
 jobs:
   contracts:
-    name: contracts (forge test, baseline 212)
+    name: contracts (forge test, baseline 256)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -109,7 +109,7 @@ jobs:
         working-directory: contracts
         run: |
           set -euo pipefail
-          baseline=212
+          baseline=256
           # "Ran 10 test suites ...: 150 tests passed, 0 failed, 0 skipped (150 total tests)"
           actual=$(grep -oE '[0-9]+ tests passed' forge-test.log | tail -1 | grep -oE '[0-9]+')
           echo "forge: $actual passed, baseline $baseline"
@@ -119,7 +119,7 @@ jobs:
           fi
 
   backend:
-    name: backend (vitest, baseline 665)
+    name: backend (vitest, baseline 739)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -166,7 +166,7 @@ jobs:
         working-directory: backend
         run: |
           set -uo pipefail
-          baseline=665
+          baseline=739
           # "Tests  484 passed | 1 skipped (485)" — the PASSED figure is the one
           # that matters; a test converted to `.skip` must show up as a loss.
           #
@@ -325,7 +325,7 @@ jobs:
               exit 1
             fi
           done
-          echo "all 2314 tests green"
+          echo "all 2432 tests green"
 
   # ── images ────────────────────────────────────────────────────────────────
   #

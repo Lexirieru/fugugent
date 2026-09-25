@@ -2986,3 +2986,184 @@ describe("a stale cached listing never outranks the live registry read", () => {
     expect(kept.fuguListing?.priceUsd8PerPeriod).toBe(1_500_000_000n);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Level 0: the ERC-8004 IdentityRegistry read directly
+// ---------------------------------------------------------------------------
+
+/** A registry port answering from a fixed list — the index itself is tested in `registry.test.ts`. */
+function fakeRegistry(items: AgentRecord[] | null, statusOverrides: Record<string, unknown> = {}) {
+  const readAt = NOW.toISOString();
+  return {
+    list(category: Category, { limit, offset }: { limit: number; offset: number }): AgentListPage {
+      trace.push("registry.list");
+      if (items === null) {
+        return page([], { source: "registry", healthy: false, reason: "the first registry sweep has not finished yet" });
+      }
+      const bucket = items.filter((i) => i.classification?.category === category);
+      return { ...page(bucket.slice(offset, offset + limit), { source: "registry", fetchedAt: readAt }), total: bucket.length };
+    },
+    get(id: string): AgentDetailResult {
+      trace.push("registry.get");
+      if (items === null) {
+        return { agent: null, source: "registry", healthy: false, reason: "no snapshot", fetchedAt: readAt };
+      }
+      return { agent: items.find((i) => i.id === id) ?? null, source: "registry", healthy: true, reason: null, fetchedAt: readAt };
+    },
+    status() {
+      return {
+        ready: items !== null,
+        healthy: items !== null,
+        reason: items === null ? "the first registry sweep has not finished yet" : null,
+        blockNumber: items === null ? null : "133000000",
+        readAt: items === null ? null : readAt,
+        agents: items?.length ?? 0,
+        lastSweep: null,
+        ...statusOverrides,
+      };
+    },
+  };
+}
+
+function registryRecord(tokenId: string, category: Category): AgentRecord {
+  return record({
+    tokenId,
+    source: "registry",
+    classification: { category, confidence: 0.9, reason: "test" },
+    evidence: {
+      registryAddress: "0x8004A818BFB912233c491871b3d84c89A494BD9e",
+      blockNumber: "133000000",
+      readAt: NOW.toISOString(),
+      agentURI: "data:application/json;base64,e30=",
+      metadataStatus: "inline",
+      metadataReason: null,
+      endpoints: [],
+      registration: null,
+    },
+  });
+}
+
+describe("level 0: the ERC-8004 registry", () => {
+  it("serves from the registry and never asks 8004scan, the cache or the seed", async () => {
+    const h = harness({ registry: fakeRegistry([registryRecord("1", "GRID"), registryRecord("2", "YIELD")]) });
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.source).toBe("registry");
+    expect(result.items.map((i) => i.tokenId)).toEqual(["1"]);
+    expect(result.degraded).toBe(false);
+    expect(result.stale).toBe(false);
+    expect(result.trail).toEqual([{ source: "registry", outcome: "ok", reason: null, items: 1 }]);
+    expect(trace).not.toContain("scan.semanticSearch");
+    expect(trace).not.toContain("cache.getAgents");
+  });
+
+  it("an empty category from a healthy registry is an answer, not a reason to fall back", async () => {
+    const h = harness({ registry: fakeRegistry([registryRecord("1", "GRID")]) });
+    h.cache.items = [record({ tokenId: "999", source: "cache" })];
+    const result = await h.service.getAgentsByCategory("TREASURY");
+    expect(result.source).toBe("registry");
+    expect(result.items).toEqual([]);
+    expect(result.healthy).toBe(true);
+    expect(trace).not.toContain("cache.getAgents");
+  });
+
+  it("still puts our own rentable listing on top of a registry page", async () => {
+    const h = harness({ registry: fakeRegistry([registryRecord("1", "GRID")]) });
+    h.onchain.page = page([onchainRecord("500", "GRID")], { source: "onchain" });
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.items.map((i) => i.tokenId)).toEqual(["500", "1"]);
+    expect(result.itemSources).toEqual({ onchain: 1, registry: 1 });
+  });
+
+  it("does not call a snapshot a few minutes old stale", async () => {
+    const readAt = new Date(NOW.getTime() - 4 * 60_000).toISOString();
+    const old = { ...registryRecord("1", "GRID"), fetchedAt: readAt };
+    const h = harness({ registry: fakeRegistry([old]) });
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.ageSeconds).toBe(240);
+    expect(result.stale).toBe(false);
+  });
+
+  it("before its first sweep, falls through to the next level and says why", async () => {
+    const h = harness({ registry: fakeRegistry(null) });
+    h.scan.page = page([record({ tokenId: "1" })]);
+    const result = await h.service.getAgentsByCategory("GRID");
+    expect(result.source).toBe("scan8004");
+    expect(result.trail[0]).toMatchObject({ source: "registry", outcome: "unhealthy" });
+  });
+
+  it("leaves levels switched off by design out of the trail entirely", async () => {
+    const onchain = new FakeOnchain();
+    const service = createAgentService({ registry: fakeRegistry(null), onchain, seed: null, chainId: CHAIN_ID, now });
+    const result = await service.getAgentsByCategory("GRID");
+    // No 8004scan row and no seed row: both are off by design. The cache is
+    // different — a cache that is not installed is a place we could not ask.
+    expect(result.trail.map((t) => [t.source, t.outcome])).toEqual([
+      ["registry", "unhealthy"],
+      ["cache", "unavailable"],
+      ["onchain", "empty"],
+    ]);
+    expect(result.source).toBe("onchain");
+  });
+
+  it("detail: answers from the registry and attaches a proved mint transaction", async () => {
+    const proof = {
+      txHash: `0x${"cd".repeat(32)}` as const,
+      blockNumber: "125824927",
+      registeredAt: "2026-08-18T15:40:19.000Z",
+      hintedBy: "8004scan" as const,
+    };
+    const h = harness({
+      registry: fakeRegistry([registryRecord("1854", "YIELD")]),
+      registrationProver: { peek: () => null, prove: async () => proof },
+    });
+    const detail = await h.service.getAgentDetail("97:1854");
+    expect(detail.source).toBe("registry");
+    expect(detail.degraded).toBe(false);
+    expect(detail.agent?.evidence?.registration).toEqual(proof);
+  });
+
+  it("detail: a proof that takes too long is left off rather than waited for", async () => {
+    const h = harness({
+      registry: fakeRegistry([registryRecord("1854", "YIELD")]),
+      registrationProver: { peek: () => null, prove: () => hangs() },
+      localBudgetMs: 20,
+    });
+    const detail = await h.service.getAgentDetail("97:1854");
+    expect(detail.agent?.evidence?.registration).toBeNull();
+  });
+
+  it("detail: an id the registry lacks goes on to FuguRegistry rather than 404", async () => {
+    const h = harness({ registry: fakeRegistry([registryRecord("1", "GRID")]) });
+    h.scan.detail = { agent: null, source: "scan8004", healthy: true, reason: null, fetchedAt: NOW.toISOString() };
+    h.onchain.page = page([onchainRecord("8004", "HEALTH_FACTOR")], { source: "onchain" });
+    const detail = await h.service.getAgentDetail("97:8004");
+    expect(detail.source).toBe("onchain");
+    expect(detail.trail[0]).toMatchObject({ source: "registry", outcome: "empty" });
+  });
+
+  it("detail: with the seed off and every level healthily empty, 'does not exist' is a fact", async () => {
+    const onchain = new FakeOnchain();
+    const cache = new FakeCache();
+    const service = createAgentService({ registry: fakeRegistry([]), onchain, cache, seed: null, chainId: CHAIN_ID, now });
+    const detail = await service.getAgentDetail("97:424242");
+    expect(detail.agent).toBeNull();
+    expect(detail.healthy).toBe(true);
+    expect(detail.trail.map((t) => t.outcome)).toEqual(["empty", "empty", "empty"]);
+  });
+
+  it("health: the registry decides `degraded`, and a switched-off seed is not listed", async () => {
+    const service = createAgentService({ registry: fakeRegistry([registryRecord("1", "GRID")]), seed: null, chainId: CHAIN_ID, now });
+    const health = await service.getHealth();
+    expect(health.healthy).toBe(true);
+    expect(health.degraded).toBe(false);
+    expect(health.sources.map((s) => s.source)).toEqual(["registry"]);
+    expect(health.sources[0]!.reason).toContain("block 133000000");
+  });
+
+  it("health: a registry with no snapshot yet is degraded and not healthy", async () => {
+    const service = createAgentService({ registry: fakeRegistry(null), seed: null, chainId: CHAIN_ID, now });
+    const health = await service.getHealth();
+    expect(health.degraded).toBe(true);
+    expect(health.healthy).toBe(false);
+  });
+});

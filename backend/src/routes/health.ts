@@ -43,11 +43,11 @@ export interface HealthRoutesDeps {
 }
 
 /** The fallback order — used to name which source is currently serving. */
-const SOURCE_ORDER: readonly AgentSource[] = ["scan8004", "cache", "onchain", "seed"];
+const SOURCE_ORDER: readonly AgentSource[] = ["registry", "scan8004", "cache", "onchain", "seed"];
 
 export interface HealthResponse {
   healthy: boolean;
-  /** `true` when 8004scan is unhealthy — we are running from the safety net. */
+  /** `true` when the primary source (the registry) is unhealthy — we are running from the safety net. */
   degraded: boolean;
   /**
    * The topmost source that is still healthy: this is most likely where the next

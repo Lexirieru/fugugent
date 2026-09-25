@@ -71,6 +71,11 @@ import {
   ONCHAIN_MAX_LIMIT,
   type OnchainSource,
 } from "../sources/onchain.js";
+import {
+  REGISTRY_MAX_AGE_SECONDS,
+  type RegistryIndex,
+} from "../sources/registry.js";
+import type { RegistrationProver } from "../sources/registry-proof.js";
 import type { Scan8004Source } from "../sources/scan8004.js";
 import type {
   AgentDetailResult,
@@ -261,7 +266,7 @@ export interface ServiceHealth {
  * The real data sources — the ones that can genuinely go down, and therefore the
  * ones that determine `ServiceHealth.healthy`. The seed is deliberately excluded.
  */
-export const LIVE_SOURCES: readonly AgentSource[] = ["scan8004", "cache", "onchain"];
+export const LIVE_SOURCES: readonly AgentSource[] = ["registry", "scan8004", "cache", "onchain"];
 
 /**
  * One health observation, **together with its age**.
@@ -558,13 +563,34 @@ export interface GetAgentsOptions {
 }
 
 export interface AgentServiceDeps {
-  scan8004: Scan8004Source;
+  /**
+   * Level 0: the ERC-8004 IdentityRegistry read directly. When installed and
+   * holding a snapshot, it is the answer — including an empty one, because the
+   * registry is the complete population and "no agent in this category" is then
+   * a fact rather than a gap. The levels below only run while it has nothing to
+   * serve (before its first sweep finishes).
+   */
+  registry?: Pick<RegistryIndex, "list" | "get" | "status">;
+  /** Finds and checks the mint transaction of a registry agent. Detail pages only. */
+  registrationProver?: RegistrationProver;
+  /**
+   * Level 1. Optional: production no longer asks 8004scan for the catalogue.
+   * A level that is not installed **by design** is left out of `trail`
+   * entirely rather than reported `unavailable`, because `unavailable` means
+   * "there is a place we could not ask" and would stop the detail route from
+   * ever answering an honest 404.
+   */
+  scan8004?: Scan8004Source;
   /** Level 2. Without it level 2 is marked `unavailable`, not failed. */
   cache?: AgentCachePort;
   /** Level 3. Without it level 3 is marked `unavailable`. */
   onchain?: OnchainSource;
-  /** Level 4. Defaults to the repo's built-in curated seed. */
-  seed?: SeedSource;
+  /**
+   * Level 4. Defaults to the repo's built-in curated seed; `null` switches it
+   * off. Production passes `null`: the Phase 2 rules forbid seeded records, and
+   * with the registry as level 0 the seed has nothing left to rescue.
+   */
+  seed?: SeedSource | null;
   chainId?: number;
   now?: () => Date;
   /** How many on-chain listings are read at once before being filtered per category. */
@@ -643,10 +669,24 @@ function isStale(source: AgentSource, ageSeconds: number | null, maxAgeSeconds: 
   return ageSeconds !== null && ageSeconds > maxAgeSeconds;
 }
 
+/**
+ * The freshness bound a page is judged by. The registry is swept every few
+ * minutes, so holding it to the 60-second bound meant for a live API call would
+ * flag every registry page stale forever — a flag that is always on says nothing.
+ */
+function maxAgeFor(source: AgentSource, requested: number): number {
+  return source === "registry" ? Math.max(requested, REGISTRY_MAX_AGE_SECONDS) : requested;
+}
+
+/** Served from a primary source, not from a safety net. */
+function isPrimary(source: AgentSource): boolean {
+  return source === "registry" || source === "scan8004";
+}
+
 export function createAgentService(deps: AgentServiceDeps): AgentService {
   const now = deps.now ?? (() => new Date());
   const chainId = deps.chainId ?? CHAIN_ID;
-  const seed = deps.seed ?? createSeedSource({ now });
+  const seed = deps.seed === null ? null : (deps.seed ?? createSeedSource({ now }));
   const onchainScanLimit = deps.onchainScanLimit ?? ONCHAIN_DEFAULT_LIMIT;
   const persistHealth = deps.persistHealth ?? true;
   const healthTtlSeconds = deps.healthTtlSeconds ?? DEFAULT_HEALTH_TTL_SECONDS;
@@ -866,6 +906,18 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
     }
   }
 
+  /**
+   * Attach an already-proved mint transaction to a registry record. Never
+   * waits: the list path shows what is known; the detail path is where a proof
+   * is looked up.
+   */
+  function withProof(item: AgentRecord): AgentRecord {
+    const prover = deps.registrationProver;
+    if (prover === undefined || item.evidence == null || item.evidence.registration !== null) return item;
+    const proof = prover.peek(item.tokenId);
+    return proof === null ? item : { ...item, evidence: { ...item.evidence, registration: proof } };
+  }
+
   // -------------------------------------------------------------------------
   // The per-category list
   // -------------------------------------------------------------------------
@@ -930,6 +982,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       const served = merged.items;
 
       const ageSeconds = oldestAgeSeconds(served, at);
+      const bound = maxAgeFor(source, maxAgeSeconds);
       return {
         items: served,
         // `total` must keep meaning "items we can actually serve", so listings
@@ -950,15 +1003,45 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
         // `ageSeconds === now - fetchedAt` holds across all four levels.
         fetchedAt: oldestFetchedAt(served) ?? fetchedAt,
         ageSeconds,
-        stale: isStale(source, ageSeconds, maxAgeSeconds),
-        degraded: source !== "scan8004",
-        maxAgeSeconds,
+        stale: isStale(source, ageSeconds, bound),
+        degraded: !isPrimary(source),
+        maxAgeSeconds: bound,
         trail,
       };
     }
 
+    // --- Level 0: the ERC-8004 IdentityRegistry ------------------------------
+    if (deps.registry !== undefined) {
+      try {
+        const page = deps.registry.list(category, { limit, offset });
+        if (!page.healthy) {
+          step({
+            source: "registry",
+            outcome: "unhealthy",
+            reason: redact(page.reason ?? "registry has no snapshot yet"),
+            items: 0,
+          });
+        } else {
+          // Served even when empty: the snapshot is the whole registry, so an
+          // empty category is an answer, not a reason to go and ask a stale cache.
+          step({
+            source: "registry",
+            outcome: page.items.length === 0 ? "empty" : "ok",
+            reason: page.reason === null ? null : redact(page.reason),
+            items: page.items.length,
+          });
+          const items = page.items.map((item) => withProof(item));
+          return finish("registry", items, page.total, true, page.reason === null ? null : redact(page.reason));
+        }
+      } catch (err) {
+        step(failure("registry", err));
+      }
+    }
+
     // --- Level 1: 8004scan ---------------------------------------------------
-    if (at.getTime() < upstreamBlockedUntil) {
+    if (deps.scan8004 === undefined) {
+      // Not installed by design — see `AgentServiceDeps.scan8004`. No trail row.
+    } else if (at.getTime() < upstreamBlockedUntil) {
       // The service-level gate: 8004scan just failed, and the safety net is
       // ready. Trying again only burns the user's time — this is what turns
       // 4 x the budget (one per category) into one budget per render.
@@ -1117,7 +1200,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
     // NOT bounded by a time budget: this is the last net, and letting it run out
     // of time means an empty marketplace — the very thing this whole file exists
     // to prevent. It touches neither the network nor the disk.
-    try {
+    if (seed !== null) try {
       const page = await seed.listAgents(category, { limit, offset });
       // An empty page must carry its explanation in `reason`, not only in
       // `trail`: that is the most natural place to look, and "empty for no
@@ -1152,14 +1235,31 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       step({ source: "seed", outcome: "threw", reason: describeThrow(err), items: 0 });
     }
 
-    // All four levels failed. Still no throw: an empty page that admits it is
-    // empty, with every cause readable in `reason` and `trail`.
-    return finish("seed", [], 0, false, summarize(trail));
+    // Every level failed. Still no throw: an empty page that admits it is
+    // empty, with every cause readable in `reason` and `trail`. It is labelled
+    // with the last level actually tried, never with a seed that is switched off.
+    return finish(trail.at(-1)?.source ?? "registry", [], 0, false, summarize(trail));
   }
 
   // -------------------------------------------------------------------------
   // A single agent's detail
   // -------------------------------------------------------------------------
+
+  /**
+   * The mint transaction for a registry agent, looked up on the detail path
+   * only and bounded like any other local level: a page that waits more than
+   * {@link DEFAULT_LOCAL_BUDGET_MS} for a proof renders without it, and the
+   * lookup still finishes in the background for the next visit.
+   */
+  async function provedDetail(agent: AgentRecord): Promise<AgentRecord> {
+    const prover = deps.registrationProver;
+    if (prover === undefined || agent.evidence == null || agent.evidence.registration !== null) return agent;
+    let proof = prover.peek(agent.tokenId);
+    if (proof === null) {
+      proof = await withDeadline(prover.prove(agent.tokenId), localBudgetMs, "registry").catch(() => null);
+    }
+    return proof === null ? agent : { ...agent, evidence: { ...agent.evidence, registration: proof } };
+  }
 
   async function getAgentDetail(id: string): Promise<AgentServiceDetail> {
     const at = now();
@@ -1204,6 +1304,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
         agent === null ? null : attachFirstParty(agent, listings).record;
 
       const ageSeconds = resolved === null ? null : oldestAgeSeconds([resolved], at);
+      const bound = maxAgeFor(source, maxAgeSeconds);
       return {
         agent: resolved,
         source,
@@ -1213,9 +1314,9 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
         // Same as the list path: `fetchedAt` names when the DATA was fetched.
         fetchedAt: resolved?.fetchedAt ?? fetchedAt,
         ageSeconds,
-        stale: resolved === null ? false : isStale(source, ageSeconds, maxAgeSeconds),
-        degraded: source !== "scan8004",
-        maxAgeSeconds,
+        stale: resolved === null ? false : isStale(source, ageSeconds, bound),
+        degraded: !isPrimary(source),
+        maxAgeSeconds: bound,
         trail,
       };
     }
@@ -1242,8 +1343,34 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       ? `id "${id}" points at chain ${parsed?.chainId}, this service only serves chain ${chainId}`
       : `id "${id}" is not shaped chainId:tokenId`;
 
+    // --- Level 0: the ERC-8004 IdentityRegistry ------------------------------
+    if (deps.registry !== undefined && target !== null) {
+      try {
+        const detail = deps.registry.get(id);
+        if (!detail.healthy) {
+          step({
+            source: "registry",
+            outcome: "unhealthy",
+            reason: redact(detail.reason ?? "registry has no snapshot yet"),
+            items: 0,
+          });
+        } else if (detail.agent === null) {
+          // Not in the ERC-8004 registry. A FuguRegistry listing can still hold
+          // this id, so the ladder goes on rather than answering 404 here.
+          step({ source: "registry", outcome: "empty", reason: null, items: 0 });
+        } else {
+          step({ source: "registry", outcome: "ok", reason: null, items: 1 });
+          return finish("registry", await provedDetail(detail.agent), true, null);
+        }
+      } catch (err) {
+        step(failure("registry", err));
+      }
+    }
+
     // --- Level 1: 8004scan ---------------------------------------------------
-    if (target === null) {
+    if (deps.scan8004 === undefined) {
+      // Not installed by design — see `AgentServiceDeps.scan8004`. No trail row.
+    } else if (target === null) {
       step({ source: "scan8004", outcome: "unavailable", reason: targetReason, items: 0 });
     } else if (at.getTime() < upstreamBlockedUntil) {
       step({
@@ -1356,7 +1483,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
     }
 
     // --- Level 4: the curated seed -------------------------------------------
-    try {
+    if (seed !== null) try {
       const detail = await seed.getAgent(id);
       step({
         source: "seed",
@@ -1384,6 +1511,22 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       step({ source: "seed", outcome: "threw", reason: describeThrow(err), items: 0 });
     }
 
+    // Nothing answered. When the seed is switched off and every level that ran
+    // said "not here" healthily, that is a real "does not exist" and the route
+    // may answer 404 — `upperTierFailed` is what keeps it from claiming so when
+    // a level was merely down.
+    if (seed === null) {
+      const failed = upperTierFailed(trail);
+      return finish(
+        trail.at(-1)?.source ?? "registry",
+        null,
+        failed === undefined,
+        failed === undefined
+          ? `no agent ${id} in any source`
+          : `cannot be confirmed to exist or not: ${failed.source} ${failed.outcome}` +
+              `${failed.reason ? ` (${failed.reason})` : ""}`,
+      );
+    }
     return finish("seed", null, false, summarize(trail));
   }
 
@@ -1474,22 +1617,54 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
     // THIS PROCESS (e.g. a seed that genuinely threw) are kept. The seed still
     // does NOT get to determine `healthy` — see the note on
     // `ServiceHealth.healthy`.
-    const observedSeed = lastSeen.get("seed");
-    merged.set(
-      "seed",
-      observedSeed ?? {
-        source: "seed",
-        healthy: true,
-        reason: "the curated seed is always available",
+    if (seed !== null) {
+      const observedSeed = lastSeen.get("seed");
+      merged.set(
+        "seed",
+        observedSeed ?? {
+          source: "seed",
+          healthy: true,
+          reason: "the curated seed is always available",
+          checkedAt,
+        },
+      );
+    } else {
+      // Switched off in this deployment: an old `seed` row in `source_health`
+      // must not make it look like a level that is still standing by.
+      merged.delete("seed");
+    }
+
+    // The registry is read in-process, so its state is known exactly and now —
+    // it goes through neither the DB history nor `observe()`'s 30-second expiry,
+    // which would call a snapshot swept four minutes ago "not re-checked".
+    // Instead its own bound applies: healthy while the last sweep succeeded and
+    // the snapshot is younger than `REGISTRY_MAX_AGE_SECONDS`.
+    let registryHealth: ObservedSourceHealth | undefined;
+    if (deps.registry !== undefined) {
+      const status = deps.registry.status();
+      const readMs = status.readAt === null ? Number.NaN : Date.parse(status.readAt);
+      const ageSeconds = Number.isNaN(readMs) ? null : Math.max(0, Math.floor((at.getTime() - readMs) / 1000));
+      const fresh = ageSeconds !== null && ageSeconds <= REGISTRY_MAX_AGE_SECONDS;
+      registryHealth = {
+        source: "registry",
+        healthy: status.healthy && fresh,
+        reason: !status.ready
+          ? (status.reason ?? "no snapshot yet")
+          : `${status.agents} agents read at block ${status.blockNumber}, ${ageSeconds ?? "?"} s ago` +
+            `${status.reason ? `; ${status.reason}` : ""}`,
         checkedAt,
-      },
-    );
+        ageSeconds,
+        stale: !fresh,
+      };
+      merged.delete("registry");
+    }
 
     const order: AgentSource[] = ["scan8004", "cache", "onchain", "seed"];
-    const sources = order
+    const observed = order
       .map((source) => merged.get(source))
       .filter((health): health is SourceHealth => health !== undefined)
       .map((health) => observe(health, at, healthTtlSeconds));
+    const sources = registryHealth === undefined ? observed : [registryHealth, ...observed];
 
     return {
       // Only a real source may light the green lamp — see the long note on
@@ -1499,7 +1674,11 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       healthy: sources.some(
         (health) => health.healthy && LIVE_SOURCES.includes(health.source),
       ),
-      degraded: sources.find((h) => h.source === "scan8004")?.healthy !== true,
+      // Degraded means "the primary source is not answering": the registry where
+      // it is installed, 8004scan where it is not.
+      degraded:
+        sources.find((h) => h.source === (deps.registry !== undefined ? "registry" : "scan8004"))
+          ?.healthy !== true,
       sources,
       checkedAt,
     };

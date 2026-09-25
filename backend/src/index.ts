@@ -31,8 +31,16 @@ import { bscTestnet } from "viem/chains";
 import { loadConfig } from "./config.js";
 import { connectDb, ensureSchema, type DbHandle } from "./db/client.js";
 import { createHttpClient } from "./http/client.js";
+import { upsertAgents } from "./db/repo.js";
 import { createAgentService, createDbAgentCache, redact } from "./service/agents.js";
 import { createOnchainSource } from "./sources/onchain.js";
+import { createRegistryIndex, createViemIdentityReader } from "./sources/registry.js";
+import { createMetadataResolver } from "./sources/registry-metadata.js";
+import {
+  createRegistrationProver,
+  createViemReceiptReader,
+  scan8004Hint,
+} from "./sources/registry-proof.js";
 import { createScan8004Source } from "./sources/scan8004.js";
 import { createApp } from "./routes/app.js";
 import { createDbSkillStore } from "./skills/repo.js";
@@ -65,8 +73,13 @@ export interface BuiltServer {
   app: ReturnType<typeof createApp>;
   config: ReturnType<typeof loadConfig>;
   hasCache: boolean;
+  /** Starts the registry sweeper. Separate from `buildServer` so building never opens a network. */
+  startBackground: () => void;
   close: () => Promise<void>;
 }
+
+/** Rows per cache write: ~45 columns each keeps one statement under Postgres's 65,535 parameters. */
+export const CACHE_WRITE_CHUNK = 500;
 
 /**
  * Assembles the whole service from the environment. Returns `close` so a process
@@ -94,10 +107,43 @@ export function buildServer(env: NodeJS.ProcessEnv = process.env): BuiltServer {
     });
   }
 
+  // The primary source: the ERC-8004 IdentityRegistry itself. 8004scan is no
+  // longer asked for the catalogue; it survives only as the place a mint
+  // transaction hash is *found*, and every such hash is checked against a
+  // receipt from our own RPC before it is shown (`registry-proof.ts`).
+  const rpcClient = createPublicClient({ chain: bscTestnet, transport: viemHttp(config.rpcUrl) });
+  const registryAddress = config.contracts.identityRegistry;
+  const db = dbHandle?.db;
+  const registry = createRegistryIndex({
+    reader: createViemIdentityReader(rpcClient, registryAddress),
+    metadata: createMetadataResolver(),
+    registryAddress,
+    chainId: config.chainId,
+    log: (message) => console.log(`[fugugent] ${message}`),
+    // Each published snapshot is written to Postgres, so a restart serves the
+    // last sweep (flagged stale) instead of nothing while the first sweep runs.
+    onSnapshot:
+      db === undefined
+        ? undefined
+        : async (records) => {
+            for (let i = 0; i < records.length; i += CACHE_WRITE_CHUNK) {
+              await upsertAgents(db, records.slice(i, i + CACHE_WRITE_CHUNK));
+            }
+          },
+  });
+  const registrationProver = createRegistrationProver({
+    hint: scan8004Hint(scan8004, config.chainId),
+    receipts: createViemReceiptReader(rpcClient),
+    registryAddress,
+  });
+
   const service = createAgentService({
-    scan8004,
+    registry,
+    registrationProver,
     onchain,
     cache: dbHandle === null ? undefined : createDbAgentCache(dbHandle.db),
+    // No seed in production: the Phase 2 rules forbid seeded records.
+    seed: null,
   });
 
   // The audited-skill marketplace. With Postgres it uses the durable registry;
@@ -118,11 +164,16 @@ export function buildServer(env: NodeJS.ProcessEnv = process.env): BuiltServer {
   });
 
   const handle = dbHandle;
+  let stopRegistry: (() => void) | null = null;
   return {
     app: createApp({ service, skills, allowedOrigins: config.allowedOrigins }),
     config,
     hasCache: handle !== null,
+    startBackground: () => {
+      stopRegistry ??= registry.start();
+    },
     close: async (): Promise<void> => {
+      stopRegistry?.();
       if (handle !== null) await handle.close();
     },
   };
@@ -210,6 +261,7 @@ export function createRequestListener(app: { fetch: (request: Request) => Respon
 
 export function startServer(port = Number(process.env.PORT ?? DEFAULT_PORT)) {
   const built = buildServer();
+  built.startBackground();
 
   const server = createServer(createRequestListener(built.app));
 
