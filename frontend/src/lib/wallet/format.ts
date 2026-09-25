@@ -47,6 +47,12 @@ export function explainWriteError(err: unknown): string {
   if (text.includes("listinginactive")) {
     return "The owner deactivated this listing while you were deciding. It cannot be hired right now.";
   }
+  if (text.includes("notsubscriber")) {
+    return "Only the wallet that paid for this subscription can cancel it, and the connected wallet is a different one. Switch to the paying wallet and try again.";
+  }
+  if (text.includes("alreadycancelled")) {
+    return "This subscription is already cancelled and its refund was already paid out. There is nothing left to return.";
+  }
   if (text.includes("zeroperiods")) {
     return "Periods must be at least 1. Pick a number above zero.";
   }

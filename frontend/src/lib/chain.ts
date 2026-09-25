@@ -12,8 +12,12 @@ export const CHAIN = {
   id: 97,
   name: "BNB Smart Chain Testnet",
   explorer: "https://testnet.bscscan.com",
-  /** `binance.org` is blocked from Indonesia, always override the RPC. */
-  rpc: "https://data-seed-prebsc-1-s1.bnbchain.org:8545",
+  /**
+   * `binance.org` is blocked from Indonesia, always override the RPC.
+   * `NEXT_PUBLIC_RPC_URL` exists for one reason: to point a test build at a local
+   * fork so the hire and cancel flow can be driven end to end without real funds.
+   */
+  rpc: process.env.NEXT_PUBLIC_RPC_URL?.trim() || "https://data-seed-prebsc-1-s1.bnbchain.org:8545",
 } as const;
 
 export function txUrl(hash: string): string {

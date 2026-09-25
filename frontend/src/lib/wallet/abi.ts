@@ -25,6 +25,21 @@ export const SUBSCRIPTION_ABI = [
   },
   {
     type: "function",
+    name: "cancel",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "subId", type: "uint256" }],
+    outputs: [],
+  },
+  {
+    type: "event",
+    name: "Cancelled",
+    inputs: [
+      { name: "subId", type: "uint256", indexed: true },
+      { name: "refunded", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "function",
     name: "subCount",
     stateMutability: "view",
     inputs: [],

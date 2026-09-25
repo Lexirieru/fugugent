@@ -25,6 +25,10 @@
  * 4. **No dead ends.** Not connected, wrong network, not enough balance, rejected,
  *    pending, already hired, every state names what happened and offers the next
  *    step.
+ *
+ * 5. **The way out is on the same card as the way in.** A running subscription shows
+ *    its cancel button right here (`CancelSubscription`), and the button names the
+ *    agent it pays, so nobody signs a payment without seeing whose it is.
  */
 
 import { useAppKit } from "@reown/appkit/react";
@@ -44,6 +48,7 @@ import { formatDuration, formatUsd8 } from "@/lib/money";
 import { NATIVE_TOKEN, ORACLE_ABI, REGISTRY_ABI, SUBSCRIPTION_ABI } from "@/lib/wallet/abi";
 import { explainWriteError, formatChainTime, formatTbnb } from "@/lib/wallet/format";
 import { useSubscription } from "@/lib/wallet/subscription";
+import { CancelSubscription, type CancelOutcome } from "@/components/wallet/cancel-subscription";
 
 const FAUCET = "https://www.bnbchain.org/en/testnet-faucet";
 /** The signing window. Long enough to read the modal, short enough not to go stale. */
@@ -80,9 +85,10 @@ export function HireAction({
   const { switchChain, isPending: switching } = useSwitchChain();
   const publicClient = usePublicClient({ chainId: CHAIN.id });
   const { writeContractAsync } = useWriteContract();
-  const { add } = useHires();
+  const { add, remove } = useHires();
   const subscription = useSubscription(listingIdBig);
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
+  const [cancelled, setCancelled] = useState<CancelOutcome | null>(null);
 
   const onRightChain = chainId === CHAIN.id;
 
@@ -256,6 +262,52 @@ export function HireAction({
             {formatTbnb(subscription.active.claimed)} tBNB has been drawn so far. Hiring again opens
             a <em>second</em> subscription and charges you again. It does not extend this one.
           </p>
+          {address ? (
+            <CancelSubscription
+              key={subscription.active.subId.toString()}
+              sub={subscription.active}
+              agentName={agentName}
+              chainNow={subscription.chainNow}
+              account={address}
+              onCancelled={(outcome) => {
+                setCancelled(outcome);
+                // The local "this browser hired it" note would now point at a hire that
+                // was just stopped. The receipt above is the record that remains.
+                remove(agentId);
+                // The hire that created it is history now; do not leave "Hired" under a
+                // subscription that no longer runs.
+                setPhase({ kind: "idle" });
+                subscription.refetch();
+              }}
+            />
+          ) : null}
+        </div>
+      ) : null}
+
+      {cancelled && subscription.active?.subId !== cancelled.subId ? (
+        <div
+          className="mt-4 rounded-lg border border-line px-3 py-2.5"
+          data-testid="cancel-result"
+        >
+          <p className="text-sm font-medium text-fg">
+            Cancelled.{" "}
+            {cancelled.refunded === null
+              ? "The unused part of your payment"
+              : `${formatTbnb(cancelled.refunded)} tBNB`}{" "}
+            went back to your wallet in the same transaction.
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-muted">
+            {agentName} keeps only what it earned up to that block. Subscription #
+            {cancelled.subId.toString()} can no longer draw anything.
+          </p>
+          <a
+            href={txUrl(cancelled.hash)}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="mt-2 inline-block rounded-full border border-line px-3 py-1.5 font-mono text-xs text-accent-strong transition hover:border-line-strong"
+          >
+            {cancelled.hash.slice(0, 14)}… ↗
+          </a>
         </div>
       ) : null}
 
@@ -405,8 +457,8 @@ export function HireAction({
               {phase.kind === "signing"
                 ? "Check your wallet…"
                 : subscription.active
-                  ? `Hire again anyway for ${usdTotal8 === null ? "" : formatUsd8(usdTotal8)}`
-                  : `Hire for ${usdTotal8 === null ? "" : formatUsd8(usdTotal8)}`}
+                  ? `Hire ${agentName} again anyway for ${usdTotal8 === null ? "" : formatUsd8(usdTotal8)}`
+                  : `Hire ${agentName} for ${usdTotal8 === null ? "" : formatUsd8(usdTotal8)}`}
             </button>
             <p className="mt-2 text-xs leading-relaxed text-faint">
               One signature. We simulate the call against the live contract first, so a listing that
