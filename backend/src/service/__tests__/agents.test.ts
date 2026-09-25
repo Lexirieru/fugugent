@@ -3160,6 +3160,16 @@ describe("level 0: the ERC-8004 registry", () => {
     expect(health.sources[0]!.reason).toContain("block 133000000");
   });
 
+  it("health: an old 8004scan row in the DB history is not reported once 8004scan is out", async () => {
+    const cache = new FakeCache();
+    cache.latest = [
+      { source: "scan8004", healthy: false, reason: "old outage", checkedAt: NOW.toISOString() },
+    ];
+    const service = createAgentService({ registry: fakeRegistry([registryRecord("1", "GRID")]), cache, seed: null, chainId: CHAIN_ID, now });
+    const health = await service.getHealth();
+    expect(health.sources.map((s) => s.source)).not.toContain("scan8004");
+  });
+
   it("health: a registry with no snapshot yet is degraded and not healthy", async () => {
     const service = createAgentService({ registry: fakeRegistry(null), seed: null, chainId: CHAIN_ID, now });
     const health = await service.getHealth();

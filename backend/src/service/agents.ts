@@ -1633,6 +1633,10 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
       // must not make it look like a level that is still standing by.
       merged.delete("seed");
     }
+    // The same for 8004scan once it is out of the ladder: its last row in
+    // `source_health` predates the switch, and "8004scan: unhealthy" on a
+    // service that no longer asks 8004scan reads as a failure that is not one.
+    if (deps.scan8004 === undefined) merged.delete("scan8004");
 
     // The registry is read in-process, so its state is known exactly and now —
     // it goes through neither the DB history nor `observe()`'s 30-second expiry,
