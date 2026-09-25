@@ -43,9 +43,11 @@ enum Category {
 ///      **must never be swapped** — see the NatSpec on each field.
 struct Listing {
     /// @notice The ERC-8004 identity ID this listing claims.
-    /// @dev WARNING: `FuguRegistry` only guarantees this ID is unique within
-    ///      its own registry; it does NOT verify against the external ERC-8004
-    ///      registry that `owner` actually owns that ID.
+    /// @dev Unique within `FuguRegistry`. Checked against the external ERC-8004
+    ///      IdentityRegistry only when `FuguRegistry.identityRegistry` is set, and only
+    ///      at `list()` / `rebindAgentId()` time — a later transfer of the identity
+    ///      token does not move the listing. Listings created before the check existed
+    ///      may still hold a placeholder id until `rebindAgentId` moves them.
     uint256 erc8004AgentId;
     /// @notice The listing owner — **this is who gets paid**.
     /// @dev Every subscription payout (`FuguSubscription.claim`) goes to this
