@@ -92,6 +92,10 @@ export default function SiteFooter() {
             <Ext href={REPO_URL}>GitHub</Ext>
             <Ext href={STATUS_DOC_URL}>What is not built</Ext>
             <Ext href={SUPPORT_URL}>Support</Ext>
+            {/* Served from this site, so `download` applies and it saves instead of opening. */}
+            <a href="/hellofugu-brand-kit.zip" download>
+              Brand kit ↓
+            </a>
           </nav>
         </div>
 

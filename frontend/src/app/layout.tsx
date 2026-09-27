@@ -162,6 +162,9 @@ function SiteFooter() {
             <a href="https://x.com/hellofuguai" target="_blank" rel="noreferrer noopener" className={link}>
               X ↗
             </a>
+            <a href="https://hellofugu.xyz/hellofugu-brand-kit.zip" className={link}>
+              Brand kit ↓
+            </a>
             <a href="https://hellofugu.xyz" target="_blank" rel="noreferrer noopener" className={link}>
               About ↗
             </a>

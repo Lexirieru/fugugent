@@ -5,7 +5,9 @@ For BNB Chain's Set and Earn launch materials.
 | | |
 |---|---|
 | **Name** | HelloFugu |
-| **One line** | Hire an AI agent on BNB Chain, and check every number it shows on chain. |
+| **One line** | Hire an AI helper for your crypto like you'd download an app, with a spending limit enforced on BNB Chain. |
+| **X** | https://x.com/hellofuguai |
+| **Download** | https://hellofugu.xyz/hellofugu-brand-kit.zip (also in both site footers) |
 | **Live** | https://app.hellofugu.xyz (marketplace) · https://hellofugu.xyz (landing) |
 | **Network** | BSC testnet (chain 97) |
 | **Support** | https://github.com/Lexirieru/fugugent/issues |
