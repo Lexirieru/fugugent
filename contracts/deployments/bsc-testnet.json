@@ -548,5 +548,14 @@
         "9": "0x8a56a7550b30a5f870f7a5ff24862856acf232d877c0ee223fb70e3f525d6bcf"
       }
     }
-  }
+  },
+  "listingMetadataEdits": [
+    {
+      "date": "2026-09-27",
+      "listingId": 1,
+      "field": "limits",
+      "tx": "0x780d8c890e508d31c7b5a884c0776b0ecfdae99525e50bf6f4f0796cc6732428",
+      "note": "Shortened from 126 to 48 words for the simplified UI; every limitation kept (one scripted repay, scheduled copy never sent a tx, hiring starts nothing yet, stop switch proven in tests only, listing wallet is ours). Price and period unchanged; no other field changed."
+    }
+  ]
 }
