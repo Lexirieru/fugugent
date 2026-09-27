@@ -302,12 +302,18 @@ export const CONTRACTS = [
 
 /** Recounted in this working tree, not carried over from an older note. */
 export const TEST_COUNTS = [
-  { name: "contracts", count: 150 },
+  // The CI baselines in .github/workflows/ci.yml, 2026-09-27. CI fails if any drops.
+  { name: "contracts", count: 256 },
+  { name: "backend", count: 755 },
   { name: "Guardian", count: 285 },
   { name: "Rebalancer", count: 130 },
   { name: "Grid", count: 144 },
   { name: "Yield", count: 141 },
-  { name: "backend", count: 484 },
+  { name: "Broker", count: 156 },
+  { name: "Trader", count: 119 },
+  { name: "Pilot", count: 147 },
+  { name: "Meter", count: 146 },
+  { name: "Steward", count: 169 },
 ];
 
 export const TEST_TOTAL = TEST_COUNTS.reduce((sum, t) => sum + t.count, 0);

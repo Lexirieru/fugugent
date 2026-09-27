@@ -252,8 +252,8 @@ export function ProofSection() {
           <h3 className="proof-name">The first rental was signed and paid</h3>
           <p className="proof-body">
             Subscription {RENTAL_SUB_ID} exists on chain and the money is held by the
-            contract, not by us. The renting flow has still never been driven by a
-            person in a browser, which is why it is also in the list further down.
+            contract, not by us. Hiring, cancelling and rating now all work from the
+            browser.
           </p>
         </StaggerItem>
 
@@ -279,8 +279,8 @@ export function ProofSection() {
 
 const NOT_YET = [
   {
-    title: "Nothing is deployed",
-    body: "A domain has been bought and there is nothing on it. No public site, no public API, no running agent you can reach from here.",
+    title: "Not on mainnet yet",
+    body: "Everything runs on BSC testnet. Mainnet comes after the campaign.",
   },
   {
     title: "Eight of the nine cannot act",
@@ -291,8 +291,8 @@ const NOT_YET = [
     body: "The loan Guardian repaid sits in a pool we wrote and deployed ourselves. It copies a real one's interface closely enough to be a fair test of the machinery, and it is still not a real lending market.",
   },
   {
-    title: "Nobody has ever signed a rental in a browser",
-    body: "The first rental was signed by a script, not by a person clicking. The flow is written and it simulates, and until somebody drives it by hand we will not tell you it works.",
+    title: "Few outside renters so far",
+    body: "Hiring, cancelling and rating all work from the browser. Most rentals so far came from our own wallet.",
   },
 ];
 
