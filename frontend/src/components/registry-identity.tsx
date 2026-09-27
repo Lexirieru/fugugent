@@ -14,12 +14,8 @@
 import { InfoTip } from "@/components/info-tip";
 import { Card } from "@/components/ui";
 import type { AgentRecord, MetadataStatus } from "@/lib/agent-types";
-import { CHAIN, addressUrl, shorten, txUrl } from "@/lib/chain";
+import { addressUrl, shorten, txUrl } from "@/lib/chain";
 import { formatUtc } from "@/lib/provenance";
-
-function nftUrl(registry: string, tokenId: string): string {
-  return `${CHAIN.explorer}/nft/${registry}/${tokenId}`;
-}
 
 /** What each resolution outcome means for someone deciding whether to hire. */
 function metadataSentence(status: MetadataStatus, reason: string | null): { text: string; warn: boolean } {

@@ -1,3 +1,4 @@
+import { InfoTip } from "@/components/info-tip";
 import { CONTRACTS, addressUrl, shorten, txUrl } from "@/lib/chain";
 import { formatUsd8 } from "@/lib/money";
 import { SEVERITY_COLOR, formatDate, linkability, shortDigest } from "@/lib/skills/format";
@@ -45,7 +46,7 @@ export function AuditReport({ audit }: { audit: AuditRecord }) {
               {audit.auditorId}
             </a>
           ) : (
-            <span className="text-muted">none selected yet: the job is funded and unassigned</span>
+            <span className="text-muted">none yet: funded, unassigned</span>
           )}
         </Row>
         <Row label="Build examined">
@@ -61,14 +62,14 @@ export function AuditReport({ audit }: { audit: AuditRecord }) {
         </Row>
         <Row label="Fee">
           <span className="tnum font-mono text-fg">{formatUsd8(audit.feeUsd8)}</span>
-          <span className="text-muted"> paid to the auditor when the verdict stands</span>
+          <span className="text-muted"> paid if the verdict stands</span>
         </Row>
         <Row label="Bond">
           <span className="tnum font-mono text-fg">{formatUsd8(audit.bondUsd8)}</span>
           <span className="text-muted">
             {audit.bondUsd8 === 0n
-              ? ". No bond has been posted on this job yet"
-              : " lost by the auditor if the verdict is overturned"}
+              ? ". None posted yet"
+              : " lost if the verdict is overturned"}
           </span>
         </Row>
       </dl>
@@ -81,8 +82,8 @@ export function AuditReport({ audit }: { audit: AuditRecord }) {
 
       {audit.scope.length > 0 ? (
         <p className="mt-4 text-sm leading-relaxed text-muted">
-          <span className="font-medium text-fg">Scope:</span> {audit.scope.join(" · ")}. Anything
-          outside it was not examined.
+          <span className="font-medium text-fg">Scope:</span> {audit.scope.join(" · ")}. Nothing
+          else was examined.
         </p>
       ) : null}
 
@@ -112,7 +113,7 @@ export function AuditReport({ audit }: { audit: AuditRecord }) {
         </div>
       ) : (
         <p className="mt-5 text-sm leading-relaxed text-faint">
-          No pipeline stage has run yet, so there is nothing to report from one.
+          No pipeline stage has run yet.
         </p>
       )}
 
@@ -149,8 +150,14 @@ export function AuditReport({ audit }: { audit: AuditRecord }) {
                 its digest is on record: sha256 {shortDigest(audit.evidence.sha256, 24)}
               </span>
             ) : (
-              " Without a report and its digest, a verdict is a rumour, which is why a SAFE" +
-              " verdict in this state is reported as inconclusive rather than as a pass."
+              <>
+                {" "}
+                No digest either.{" "}
+                <InfoTip label="What this means" align="end">
+                  Without a report and its digest a verdict is a rumour, so a SAFE verdict here is
+                  shown as inconclusive, not as a pass.
+                </InfoTip>
+              </>
             )}
           </p>
         )}
@@ -255,26 +262,37 @@ function EscrowBlock({ audit }: { audit: AuditRecord }) {
     ["settled", escrow.settlementTxHash],
   ];
   const anyHash = rows.some(([, hash]) => hash !== null);
+  const offChain = escrow.contract === null || !anyHash;
 
   return (
     <div className="mt-5 border-t border-line pt-4">
-      <h4 className="text-xs font-medium uppercase tracking-[0.16em] text-faint">Escrow</h4>
+      <h4 className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-faint">
+        Escrow
+        {offChain ? (
+          <InfoTip label="What is on chain" align="start">
+            No job id and no transactions for this audit. The escrow contract itself is deployed
+            and verified, and its full cycle ran end to end: those transactions are at the foot of
+            this page.
+          </InfoTip>
+        ) : null}
+      </h4>
+      {/* The condition is spelled out again rather than read from `offChain`, so that
+          TypeScript narrows `escrow.contract` to a string in the branch below. */}
       {escrow.contract === null || !anyHash ? (
         <p className="mt-2 text-sm leading-relaxed text-muted">
-          This job is not on chain: the backend reports{" "}
-          <span className="font-mono text-xs text-fg">{escrow.status}</span>, with no job id and no
-          transactions. The escrow contract itself is deployed and verified,{" "}
-          <a
-            href={addressUrl(CONTRACTS.auditEscrow)}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="font-mono text-xs text-accent-strong underline decoration-dotted underline-offset-4"
-          >
-            {shorten(CONTRACTS.auditEscrow)} ↗
-          </a>
-          , and its fee, money at stake and release cycle has been run end to end. Those
-          transactions are at the foot of this page. What has not happened is this audit being
-          settled through it.
+          This audit has not been settled on chain: the backend reports{" "}
+          <span className="font-mono text-xs text-fg">{escrow.status}</span>.
+          <span className="mt-1 block">
+            Escrow contract:{" "}
+            <a
+              href={addressUrl(CONTRACTS.auditEscrow)}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="font-mono text-xs text-accent-strong underline decoration-dotted underline-offset-4"
+            >
+              {shorten(CONTRACTS.auditEscrow)} ↗
+            </a>
+          </span>
         </p>
       ) : (
         <ul className="mt-2 space-y-1.5">

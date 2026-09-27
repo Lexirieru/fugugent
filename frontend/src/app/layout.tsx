@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Kalam } from "next/font/google";
+import Image from "next/image";
 import Link from "next/link";
 import "./globals.css";
 import { PillNav } from "@/components/pill-nav";
@@ -103,67 +104,71 @@ function SiteHeader() {
  * wants to check a claim on this site can start here without having to ask.
  */
 function SiteFooter() {
+  const link = "inline-block text-sm font-medium text-bg/85 transition hover:translate-x-0.5 hover:text-bg";
   return (
-    <footer className="border-t border-line">
-      <div className="mx-auto w-full max-w-6xl px-5 py-10 sm:px-8 sm:py-12">
-        <h2 className="text-xs uppercase tracking-[0.16em] text-faint">
-          Live contracts on network {CHAIN.id}
-        </h2>
-        <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          {CONTRACT_LIST.map((c) => (
-            <li key={c.address} className="flex">
+    <footer className="site-footer mt-16 bg-fg text-bg">
+      <div className="footer-dots" aria-hidden />
+      <div className="mx-auto w-full max-w-6xl px-5 pb-8 pt-10 sm:px-8">
+        <div className="grid gap-10 md:grid-cols-[1.4fr_repeat(3,minmax(0,1fr))]">
+          <h2 className="max-w-sm text-3xl font-light leading-tight tracking-tight text-bg sm:text-4xl">
+            Every number, on chain.
+          </h2>
+
+          <nav aria-label="Product" className="flex flex-col items-start gap-3">
+            <span className="text-[11px] uppercase tracking-[0.16em] text-bg/50">Product</span>
+            <Link href="/agents" className={link}>Agents</Link>
+            <Link href="/list" className={link}>List your agent</Link>
+            <Link href="/skills" className={link}>Skills</Link>
+            <Link href="/auditors" className={link}>Auditors</Link>
+          </nav>
+
+          {/* The contracts every page reads from, each one click from its source on BscScan. */}
+          <nav aria-label={`Contracts on network ${CHAIN.id}`} className="flex min-w-0 flex-col items-start gap-3">
+            <span className="text-[11px] uppercase tracking-[0.16em] text-bg/50">Contracts</span>
+            {CONTRACT_LIST.map((c) => (
               <a
+                key={c.address}
                 href={addressUrl(c.address)}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="flex w-full flex-col rounded-xl border border-line px-3 py-3 transition hover:border-line-strong hover:bg-surface"
+                title={c.role}
+                className="group min-w-0 text-sm text-bg/85 transition hover:text-bg"
               >
-                <span className="block text-sm font-medium text-fg">{c.name}</span>
-                <span className="mt-1 block font-mono text-[11px] text-accent-strong">
-                  {shorten(c.address)} ↗
-                </span>
-                <span className="mt-2 block text-[11px] leading-snug text-faint">{c.role}</span>
+                <span className="font-medium">{c.name.replace("ERC-8004 ", "")}</span>{" "}
+                <span className="font-mono text-[11px] text-bg/50 group-hover:text-bg/80">{shorten(c.address, 6, 4)} ↗</span>
               </a>
-            </li>
-          ))}
-        </ul>
+            ))}
+          </nav>
 
-        <nav
-          aria-label="Elsewhere"
-          className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs"
-        >
-          <Link href="/agents" className="text-muted transition hover:text-fg">
-            Agents
-          </Link>
-          <Link href="/skills" className="text-muted transition hover:text-fg">
-            Skills
-          </Link>
-          <Link href="/auditors" className="text-muted transition hover:text-fg">
-            Auditors
-          </Link>
-          <Link href="/list" className="text-muted transition hover:text-fg">
-            List your agent
-          </Link>
-          <a
-            href="https://github.com/Lexirieru/fugugent/issues/new"
-            className="text-muted transition hover:text-fg"
-            target="_blank"
-            rel="noreferrer noopener"
-          >
-            Support ↗
-          </a>
-          <a
-            href="https://hellofugu.xyz"
-            className="text-muted transition hover:text-fg"
-            target="_blank"
-            rel="noreferrer noopener"
-          >
-            About HelloFugu ↗
-          </a>
-        </nav>
+          <nav aria-label="Help" className="flex flex-col items-start gap-3">
+            <span className="text-[11px] uppercase tracking-[0.16em] text-bg/50">Help</span>
+            <a href="https://github.com/Lexirieru/fugugent/issues/new" target="_blank" rel="noreferrer noopener" className={link}>
+              Support ↗
+            </a>
+            <a href="https://github.com/Lexirieru/fugugent" target="_blank" rel="noreferrer noopener" className={link}>
+              GitHub ↗
+            </a>
+            <a href="https://hellofugu.xyz" target="_blank" rel="noreferrer noopener" className={link}>
+              About ↗
+            </a>
+          </nav>
+        </div>
 
-        <p className="mt-8 max-w-3xl text-xs leading-relaxed text-faint">
-          BSC testnet only. Contracts verified on BscScan. Not financial advice.
+        <Link href="/" aria-label="HelloFugu home" className="mt-12 flex items-center gap-4 text-bg">
+          <Image
+            src="/logos/hellofugu-logo.webp"
+            alt=""
+            width={96}
+            height={96}
+            className="size-[clamp(40px,6vw,96px)] shrink-0 rounded-full"
+          />
+          <span className="min-w-0 truncate pb-[0.12em] text-[clamp(44px,11vw,150px)] font-bold leading-[0.9] tracking-[-0.055em]">
+            HelloFugu
+          </span>
+        </Link>
+
+        <p className="mt-6 text-[11px] text-bg/50">
+          BSC testnet ({CHAIN.id}) only. Contracts verified on BscScan. Not financial advice.
         </p>
       </div>
     </footer>

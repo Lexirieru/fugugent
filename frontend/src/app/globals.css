@@ -458,3 +458,38 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .bento-in, .blur-in { animation: none; }
 }
+
+/*
+  Footer, after MotionSites' "Stark Minimal Footer": a band of slowly drifting dots,
+  link columns, an oversized wordmark. Colours come from the site tokens (ink on the
+  page's background), not the prompt's pure black and white.
+*/
+.footer-dots {
+  position: relative;
+  height: 64px;
+  overflow: hidden;
+}
+.footer-dots::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 200%;
+  height: 44px;
+  opacity: 0.6;
+  transform: translateY(-50%);
+  background-image:
+    radial-gradient(circle, color-mix(in srgb, var(--bg) 55%, transparent) 1.5px, transparent 2px),
+    radial-gradient(circle, color-mix(in srgb, var(--accent) 60%, transparent) 1px, transparent 1.5px),
+    radial-gradient(circle, color-mix(in srgb, var(--bg) 40%, transparent) 1.2px, transparent 1.8px);
+  background-position: 0 8px, 24px 22px, 48px 14px;
+  background-size: 72px 38px, 110px 44px, 160px 52px;
+  animation: footer-dots-move 18s linear infinite;
+}
+@keyframes footer-dots-move {
+  from { transform: translate3d(0, -50%, 0); }
+  to { transform: translate3d(-50%, -50%, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .footer-dots::before { animation: none; }
+}

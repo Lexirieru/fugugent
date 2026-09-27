@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Pagination, pageFromParam } from "@/components/pagination";
-import { ProofList } from "@/components/proof";
+import { InfoTip } from "@/components/info-tip";
+import { EscrowCycle } from "@/components/skills/escrow-cycle";
 import { SkillCard } from "@/components/skills/skill-card";
 import { SkillProvenanceRow } from "@/components/skills/skill-provenance";
 import { TrustFilter, TrustLegend } from "@/components/skills/trust-filter";
@@ -20,7 +21,7 @@ import {
 export const metadata: Metadata = {
   title: "Audited skills",
   description:
-    "Every skill and MCP server here carries what is actually known about it: audited and clean, audited and dangerous, or one of five ways of not knowing. Only one of the seven means safe.",
+    "Every skill and MCP server here shows what is known about it. Only one of seven statuses means safe.",
 };
 
 const LIMIT = 24;
@@ -104,15 +105,17 @@ export default async function SkillsPage({ searchParams }: PageProps<"/skills">)
         <PageHeader
           eyebrow="Skills"
           title="Your agent installs code. Somebody should have read it first."
-          lede="An agent gains its abilities by installing add-ons from open sources nobody checks. One bad add-on empties the wallet, and the agent does it to itself."
+          lede={
+            <>
+              One bad add-on can empty an agent&apos;s wallet. Here is what is known about each.{" "}
+              <InfoTip label="What the risk is" align="end">
+                Real attacks: a tool description that hijacks the agent, a price checker that reads
+                your keys, a clean v1 then a poisoned v2. An auditor stakes money on each verdict
+                and loses it if the verdict is wrong.
+              </InfoTip>
+            </>
+          }
         />
-        <p className="mt-4 max-w-4xl text-pretty text-base leading-relaxed text-muted">
-          The attacks are real ones: instructions hidden inside a tool description that hijack the
-          agent, a price checker that quietly reads your keys, a clean first version followed by a
-          poisoned second one. So an auditor puts money down, reads a build, is paid when the
-          verdict stands, and loses the money when it does not. Below, every add-on carries what is
-          actually known about it, and five of the seven states are ways of not knowing.
-        </p>
 
         <div className="mt-8">
           <SkillProvenanceRow provenance={result.provenance} origin={src.origin} />
@@ -194,7 +197,7 @@ export default async function SkillsPage({ searchParams }: PageProps<"/skills">)
           ) : pageNumber > 1 ? (
             <EmptyState
               title="There is nothing on this page"
-              body="The registry answered and this page of it is empty. The list is shorter than the page number in the address, so the first page is where the skills are."
+              body="The list is shorter than this page number. The skills are on page one."
               actions={
                 <>
                   <ButtonLink href={hrefForPage(1)}>Back to the first page</ButtonLink>
@@ -209,8 +212,8 @@ export default async function SkillsPage({ searchParams }: PageProps<"/skills">)
               title={filtered ? "Nothing matches those filters" : "No skill has been listed yet"}
               body={
                 filtered
-                  ? "The registry answered, and nothing in it fits. Clearing the filters shows everything it does hold, including the skills nobody has audited, which are the ones worth looking at hardest."
-                  : "The registry answered and it is empty. That is a real answer, not a failed request: nothing has been listed, so there is nothing to audit yet."
+                  ? "The registry answered, and nothing fits. Clear the filters to see everything."
+                  : "The registry answered, and nothing has been listed yet."
               }
               actions={
                 <>
@@ -224,7 +227,7 @@ export default async function SkillsPage({ searchParams }: PageProps<"/skills">)
           ) : (
             <EmptyState
               title="We have nothing we can stand behind"
-              body="The registry did not answer, so this list is empty on purpose. An audit status is a claim about whether code is safe to install, and serving a cached one without saying so is exactly the failure this marketplace exists to prevent."
+              body="The registry did not answer, so this list is empty on purpose. We will not show an audit status we cannot confirm."
               actions={
                 <>
                   <ButtonLink href={hrefWith({})}>Try again</ButtonLink>
@@ -241,8 +244,16 @@ export default async function SkillsPage({ searchParams }: PageProps<"/skills">)
       <Section labelledBy="legend">
         <SectionHeader
           id="legend"
-          title="Seven statuses, and only one of them means safe"
-          lede="Colour is never the only difference between two of them: each has its own wording, its own glyph and its own border texture, so the seven stay seven in grayscale as well."
+          title="Seven statuses. Only one means safe."
+          lede={
+            <>
+              Each has its own words, glyph and border, not only a colour.{" "}
+              <InfoTip label="Where a status comes from" align="start">
+                The status is worked out from the audits actually held. No publisher, auditor or
+                this page can set it by hand.
+              </InfoTip>
+            </>
+          }
         />
         <TrustLegend />
       </Section>
@@ -252,8 +263,7 @@ export default async function SkillsPage({ searchParams }: PageProps<"/skills">)
           What makes a verdict cost something
         </h2>
         <p className="mt-2 mb-6 max-w-4xl text-pretty text-sm leading-relaxed text-muted">
-          A badge is worth what the auditor loses by handing it out wrongly. Fee and stake sit
-          in{" "}
+          Fee and stake sit in{" "}
           <a
             href={addressUrl(CONTRACTS.auditEscrow)}
             target="_blank"
@@ -262,9 +272,12 @@ export default async function SkillsPage({ searchParams }: PageProps<"/skills">)
           >
             {shorten(CONTRACTS.auditEscrow)} ↗
           </a>
-          , and the whole cycle has been run on it.
+          . The whole cycle has run on it.{" "}
+          <InfoTip label="Why money is at stake">
+            A badge is worth what the auditor loses by handing it out wrongly.
+          </InfoTip>
         </p>
-        <ProofList proofs={AUDIT_ESCROW_CYCLE} />
+        <EscrowCycle proofs={AUDIT_ESCROW_CYCLE} />
         <div className="mt-6">
           <ButtonLink href="/auditors" variant="ghost">
             Who is putting up the money →

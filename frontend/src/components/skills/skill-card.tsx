@@ -68,8 +68,7 @@ export function SkillCard({ skill }: { skill: SkillRecord }) {
         {intake !== null ? (
           <p className="mt-3 text-xs leading-relaxed text-fg">
             <span className="font-medium">Intake scan:</span> {skill.intakeFindings.length}{" "}
-            {skill.intakeFindings.length === 1 ? "hit" : "hits"} in the declared text, worst{" "}
-            {intake}. A scan raises suspicion; it never clears anything.
+            {skill.intakeFindings.length === 1 ? "hit" : "hits"}, worst {intake}. A scan clears nothing.
           </p>
         ) : null}
 

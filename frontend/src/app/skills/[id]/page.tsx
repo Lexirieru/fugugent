@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CopyButton } from "@/components/copy-button";
-import { ProofList } from "@/components/proof";
+import { InfoTip } from "@/components/info-tip";
 import { AuditReport, FindingList } from "@/components/skills/audit-report";
+import { EscrowCycle } from "@/components/skills/escrow-cycle";
 import { SkillProvenanceRow } from "@/components/skills/skill-provenance";
 import { TrustBadge, TrustStatement } from "@/components/skills/trust-badge";
 import { ButtonLink, Card, EmptyState, Page, Section, SectionHeader } from "@/components/ui";
-import { AUDIT_ESCROW_CYCLE, addressUrl, shorten } from "@/lib/chain";
+import { AUDIT_ESCROW_CYCLE, CONTRACTS, addressUrl, shorten } from "@/lib/chain";
 import { formatUsd8 } from "@/lib/money";
 import { formatUtc } from "@/lib/provenance";
 import { skillSource } from "@/lib/skills";
@@ -70,7 +71,7 @@ export default async function SkillPage({ params }: PageProps<"/skills/[id]">) {
           <div className="mt-6">
             <EmptyState
               title="We cannot tell you whether this skill exists"
-              body={`The registry did not answer, so we do not know whether ${decodeURIComponent(id)} is listed, unlisted, or dangerous. That is different from "not found", and we will not print the one when we mean the other.`}
+              body={`The registry did not answer, so we do not know whether ${decodeURIComponent(id)} is listed, unlisted, or dangerous. That is not the same as "not found".`}
               actions={
                 <>
                   <ButtonLink href={`/skills/${encodeURIComponent(id)}`}>Try again</ButtonLink>
@@ -147,7 +148,7 @@ export default async function SkillPage({ params }: PageProps<"/skills/[id]">) {
                 <span className="text-muted">
                   {skill.trust.auditCount === 0
                     ? ". Nobody has ever asked for one"
-                    : " · the full history is below, in whatever state each one is in"}
+                    : " · full history below"}
                 </span>
               </Row>
               <Row label="Verdict completed">
@@ -184,9 +185,12 @@ export default async function SkillPage({ params }: PageProps<"/skills/[id]">) {
                     </span>
                   )
                 ) : (
-                  <span className="text-muted">
-                    no report is held. A safe verdict without one is reported as inconclusive,
-                    because a badge is a claim and a claim needs evidence.
+                  <span className="inline-flex items-center gap-2 text-muted">
+                    No report is held
+                    <InfoTip label="Why this matters">
+                      A safe verdict without a report is shown as inconclusive. A badge is a claim,
+                      and a claim needs evidence.
+                    </InfoTip>
                   </span>
                 )}
               </Row>
@@ -199,7 +203,15 @@ export default async function SkillPage({ params }: PageProps<"/skills/[id]">) {
         <SectionHeader
           id="claims"
           title="What the author claims"
-          lede="Quoted word for word, and treated as untrusted. On a poisoned add-on this text is the attack: it reads as documentation to a person and as an instruction to an agent."
+          lede={
+            <>
+              Quoted word for word, and treated as untrusted.{" "}
+              <InfoTip label="Why untrusted" align="end">
+                On a poisoned add-on this text is the attack: documentation to a person, an
+                instruction to an agent.
+              </InfoTip>
+            </>
+          }
         />
         <div className="rounded-[var(--radius-card)] border border-dashed border-line-strong bg-bg-elev p-5">
           <p className="whitespace-pre-wrap break-words font-mono text-sm leading-relaxed text-fg">
@@ -222,10 +234,11 @@ export default async function SkillPage({ params }: PageProps<"/skills/[id]">) {
               The intake scan flagged that text
             </h3>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
-              A deterministic scan of the declared text, run at submission with no model involved.
-              It is <strong>not an audit</strong>: it can raise suspicion and it never clears
-              anything, and the audit status above does not read it at all. A skill with a clean
-              scan is still unaudited.
+              <strong>Not an audit.</strong> A scan can raise suspicion, never clear anything.{" "}
+              <InfoTip label="About the intake scan" align="start">
+                A fixed text scan run at submission, with no model involved. The audit status above
+                ignores it, and a clean scan is still unaudited.
+              </InfoTip>
             </p>
             <FindingList findings={skill.intakeFindings} />
           </div>
@@ -236,7 +249,15 @@ export default async function SkillPage({ params }: PageProps<"/skills/[id]">) {
         <SectionHeader
           id="builds"
           title="Builds"
-          lede="A verdict is bound to the exact bytes it examined. When a new version is published, the old verdict does not move with it. That is the whole defence against a clean first version followed by a poisoned second one."
+          lede={
+            <>
+              A verdict covers only the exact bytes it examined.{" "}
+              <InfoTip label="Why per build" align="end">
+                A new version does not inherit the old verdict. That is the defence against a clean
+                v1 followed by a poisoned v2.
+              </InfoTip>
+            </>
+          }
         />
         <ul className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">
           {skill.versions.map((v) => {
@@ -293,7 +314,7 @@ export default async function SkillPage({ params }: PageProps<"/skills/[id]">) {
           <div>
             <EmptyState
               title="Nobody has audited this"
-              body="There is no audit to read, in any state: not requested, not funded, not running. That is not a small gap. It is the state most skills on an open registry are in when an agent installs them."
+              body="No audit exists in any state: not requested, not funded, not running. Most skills are installed like this."
               actions={
                 <>
                   <ButtonLink href="/skills?status=PASSED">Show skills that did pass</ButtonLink>
@@ -380,9 +401,22 @@ export default async function SkillPage({ params }: PageProps<"/skills/[id]">) {
         <SectionHeader
           id="verdict-cost"
           title="What makes a verdict cost something"
-          lede="The fee and the money at stake live in FuguAuditEscrow, deployed and verified on the test network, and the cycle below has been run on it end to end."
+          lede={
+            <>
+              Fee and stake sit in{" "}
+              <a
+                href={addressUrl(CONTRACTS.auditEscrow)}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="font-mono text-xs text-accent-strong underline decoration-dotted underline-offset-4"
+              >
+                FuguAuditEscrow ↗
+              </a>
+              , verified on testnet. This cycle ran on it end to end.
+            </>
+          }
         />
-        <ProofList proofs={AUDIT_ESCROW_CYCLE} />
+        <EscrowCycle proofs={AUDIT_ESCROW_CYCLE} />
       </Section>
     </Page>
   );
@@ -448,8 +482,7 @@ function DigestComparison({ skill }: { skill: SkillRecord }) {
       </dl>
       {skill.trust.buildChanged ? (
         <p className="mt-2 text-sm leading-relaxed text-muted">
-          The verdict on record belongs to the first of those two digests. It does not carry over to
-          the second, whatever it said.
+          The verdict belongs to the first digest. It does not carry over to the second.
         </p>
       ) : null}
     </div>

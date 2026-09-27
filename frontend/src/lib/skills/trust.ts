@@ -52,8 +52,10 @@ export interface TrustPresentation {
   filled: boolean;
   /** The sentence that answers "can I install this?". Plain language, no hedging. */
   verdictLine: string;
-  /** What the status means, for the legend. */
+  /** What the status means, for the legend. A few words, always visible. */
   meaning: string;
+  /** Why it means that, one sentence, kept behind the legend's info tip. */
+  why: string;
 }
 
 export const TRUST_PRESENTATION: Record<TrustStatus, TrustPresentation> = {
@@ -65,9 +67,9 @@ export const TRUST_PRESENTATION: Record<TrustStatus, TrustPresentation> = {
     pattern: "solid",
     color: "var(--risk-1)",
     filled: false,
-    verdictLine: "An auditor examined this exact build, found it clean, and we hold the report.",
-    meaning:
-      "The only status that means safe. The audited digest equals the digest being served, and the evidence is held.",
+    verdictLine: "An auditor checked this exact build, found it clean, and we hold the report.",
+    meaning: "The only status that means safe.",
+    why: "The audited digest equals the digest being served, and the report is held.",
   },
   FAILED: {
     label: "Failed audit",
@@ -77,9 +79,9 @@ export const TRUST_PRESENTATION: Record<TrustStatus, TrustPresentation> = {
     pattern: "hazard",
     color: "var(--risk-5)",
     filled: true,
-    verdictLine: "An auditor examined this exact build and found it dangerous. Do not install it.",
-    meaning:
-      "Knowledge, not ignorance. This build was examined and found harmful, a different thing from never having been looked at.",
+    verdictLine: "An auditor checked this exact build and found it dangerous. Do not install it.",
+    meaning: "Checked, and found harmful.",
+    why: "This is knowledge, not ignorance: a different thing from never having been looked at.",
   },
   STALE_AUDIT: {
     label: "Audit is for an older build",
@@ -89,10 +91,9 @@ export const TRUST_PRESENTATION: Record<TrustStatus, TrustPresentation> = {
     pattern: "double",
     color: "var(--risk-4)",
     filled: false,
-    verdictLine:
-      "The verdict on record examined different bytes from the ones being served. It says nothing about this build.",
-    meaning:
-      "The rug-pull shape: a clean v1 followed by a v2 nobody checked. A verdict is bound to the digest it examined and does not travel.",
+    verdictLine: "The audit on record checked a different build. It says nothing about this one.",
+    meaning: "A clean v1, then a v2 nobody checked.",
+    why: "The rug-pull shape. A verdict is bound to the digest it examined and does not travel to a new build.",
   },
   INCONCLUSIVE: {
     label: "Audit inconclusive",
@@ -102,10 +103,9 @@ export const TRUST_PRESENTATION: Record<TrustStatus, TrustPresentation> = {
     pattern: "dotted",
     color: "var(--risk-3)",
     filled: false,
-    verdictLine:
-      "An audit ran and could not decide, or its evidence is not held. Nothing was cleared and nothing was ruled out.",
-    meaning:
-      "An audit that reached no verdict has still told us something real, and it is not rounded to either clean or dangerous.",
+    verdictLine: "An audit ran with no verdict, or its evidence is not held. Nothing is cleared.",
+    meaning: "An audit ran and could not decide.",
+    why: "That is still real information, and it is never rounded to clean or dangerous.",
   },
   AUDITING: {
     label: "Audit running",
@@ -115,8 +115,9 @@ export const TRUST_PRESENTATION: Record<TrustStatus, TrustPresentation> = {
     pattern: "dashed",
     color: "var(--fg-muted)",
     filled: false,
-    verdictLine: "The pipeline is running against this build. There is no verdict yet.",
-    meaning: "Work in progress is not a result. A partial pipeline clears nothing.",
+    verdictLine: "An audit is running on this build. There is no verdict yet.",
+    meaning: "Work in progress, not a result.",
+    why: "A partial pipeline clears nothing.",
   },
   AUDIT_REQUESTED: {
     label: "Audit requested",
@@ -126,8 +127,9 @@ export const TRUST_PRESENTATION: Record<TrustStatus, TrustPresentation> = {
     pattern: "ticks",
     color: "var(--fg-muted)",
     filled: false,
-    verdictLine: "An audit has been funded, and no auditor has produced a verdict yet.",
-    meaning: "Money put at stake is a promise about the future, not a statement about the code.",
+    verdictLine: "An audit has been funded. No auditor has given a verdict yet.",
+    meaning: "Funded, not yet examined.",
+    why: "Money put at stake is a promise about the future, not a statement about the code.",
   },
   UNAUDITED: {
     label: "Never audited",
@@ -138,8 +140,8 @@ export const TRUST_PRESENTATION: Record<TrustStatus, TrustPresentation> = {
     color: "var(--fg-faint)",
     filled: false,
     verdictLine: "Nobody has ever audited this skill. We know nothing about what it does.",
-    meaning:
-      "The default state of everything on an open registry, and the state most installs happen in today.",
+    meaning: "Nobody has looked.",
+    why: "The default state of everything on an open registry, and the state most installs happen in today.",
   },
 };
 

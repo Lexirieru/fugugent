@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { InfoTip } from "@/components/info-tip";
 import { TrustBadge } from "@/components/skills/trust-badge";
 import { BAND_HEADING, TRUST_DISPLAY_ORDER, TRUST_PRESENTATION } from "@/lib/skills/trust";
 import type { TrustBand } from "@/lib/skills/trust";
@@ -81,15 +82,10 @@ const KNOWN_BANDS: TrustBand[] = ["verified", "dangerous"];
 export function TrustLegend() {
   return (
     <div className="rounded-[var(--radius-card)] border border-line bg-surface p-5 sm:p-6">
-      <p className="max-w-3xl text-pretty text-sm leading-relaxed text-muted">
-        The status is worked out from the audits actually held. There is no column anywhere that a
-        publisher, an auditor or this page could write by hand.
-      </p>
-
       {/* Two columns rather than three: one status means safe and one means dangerous,
           against five ways of not knowing. A 2 : 5 split shows that proportion; three
           equal columns would imply the three bands are the same size. */}
-      <div className="mt-6 grid gap-6 sm:grid-cols-2">
+      <div className="grid gap-6 sm:grid-cols-2">
         <div className="space-y-6">
           {KNOWN_BANDS.map((band) => (
             <BandBlock key={band} band={band} />
@@ -112,7 +108,15 @@ function BandBlock({ band }: { band: TrustBand }) {
       <ul className="mt-3 space-y-3">
         {rows.map((status) => (
           <li key={status}>
-            <TrustBadge status={status} size="sm" />
+            {/* The few words stay visible; the reason behind them waits in the tip. The tip
+                sits beside the badge, not after the words, so it lands in the same place on
+                every row and its bubble stays on a 390px screen. */}
+            <div className="flex items-center gap-2">
+              <TrustBadge status={status} size="sm" />
+              <InfoTip label={`Why "${TRUST_PRESENTATION[status].label}" means that`}>
+                {TRUST_PRESENTATION[status].why}
+              </InfoTip>
+            </div>
             <p className="mt-1.5 text-sm leading-relaxed text-muted">
               {TRUST_PRESENTATION[status].meaning}
             </p>
