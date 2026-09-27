@@ -119,7 +119,7 @@ jobs:
           fi
 
   backend:
-    name: backend (vitest, baseline 758)
+    name: backend (vitest, baseline 771)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -166,7 +166,7 @@ jobs:
         working-directory: backend
         run: |
           set -uo pipefail
-          baseline=758
+          baseline=771
           # "Tests  484 passed | 1 skipped (485)" — the PASSED figure is the one
           # that matters; a test converted to `.skip` must show up as a loss.
           #

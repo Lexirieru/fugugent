@@ -43,6 +43,7 @@ import {
 } from "./sources/registry-proof.js";
 import { createScan8004Source } from "./sources/scan8004.js";
 import { createTrackingService, createViemTrackingChain } from "./sources/tracking.js";
+import { createTools, createViemToolsChain } from "./sources/tools.js";
 import { createApp } from "./routes/app.js";
 import { createDbSkillStore } from "./skills/repo.js";
 import { createMemorySkillStore } from "./skills/store.js";
@@ -185,6 +186,22 @@ export function buildServer(env: NodeJS.ProcessEnv = process.env): BuiltServer {
     registryBlock: () => registry.status().blockNumber,
   });
 
+  // The five read-only agents. Each is an endpoint that reads the chain or the
+  // catalogue and signs nothing; their ERC-8004 registrations point here.
+  const tools = createTools({
+    chain: createViemToolsChain(rpcClient),
+    tracking,
+    chainId: config.chainId,
+    catalogue: async (category, limit) => {
+      const page = await service.getAgentsByCategory(category, { limit, offset: 0 });
+      return {
+        total: page.total,
+        source: page.source,
+        items: page.items.map((a) => ({ id: a.id, name: a.name, source: a.source })),
+      };
+    },
+  });
+
   const handle = dbHandle;
   let stopRegistry: (() => void) | null = null;
   return {
@@ -197,6 +214,7 @@ export function buildServer(env: NodeJS.ProcessEnv = process.env): BuiltServer {
         chainId: config.chainId,
         contracts: { ...trackingContracts, identityRegistry: config.contracts.identityRegistry },
       },
+      tools,
     }),
     config,
     hasCache: handle !== null,
