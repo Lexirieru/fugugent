@@ -11,6 +11,7 @@
  * less true. So it stays, and the page says what is wrong with it in words.
  */
 
+import { InfoTip } from "@/components/info-tip";
 import { Card } from "@/components/ui";
 import type { AgentRecord, MetadataStatus } from "@/lib/agent-types";
 import { CHAIN, addressUrl, shorten, txUrl } from "@/lib/chain";
@@ -80,13 +81,11 @@ export function RegistryIdentity({ record }: { record: AgentRecord }) {
   if (evidence === null) {
     return (
       <Card>
-        <p className="text-pretty text-sm leading-relaxed text-fg">
-          This record was not read from the ERC-8004 registry on this request.
-        </p>
-        <p className="mt-3 text-pretty text-sm leading-relaxed text-muted">
-          It came from {record.fuguListing ? "our FuguRegistry listing" : "a stored copy"}, so there is
-          no registry read to show here. The banner at the top of the page says where it came from
-          and how old it is.
+        <p className="inline-flex items-center gap-2 text-sm text-fg">
+          No registry read on this request
+          <InfoTip label="Where this record came from">
+            It came from {record.fuguListing ? "our FuguRegistry listing" : "a stored copy"}. The banner at the top says how old it is.
+          </InfoTip>
         </p>
       </Card>
     );
@@ -117,15 +116,20 @@ export function RegistryIdentity({ record }: { record: AgentRecord }) {
           {registration ? (
             <>
               <ExternalLink href={txUrl(registration.txHash)}>{shorten(registration.txHash, 14, 8)}</ExternalLink>
-              <span className="mt-1 block text-xs text-faint">
+              <span className="mt-1 flex items-center gap-1.5 text-xs text-faint">
                 Block {registration.blockNumber}
-                {registeredAt ? `, ${registeredAt}` : ""}. Checked against the transaction receipt.
+                {registeredAt ? `, ${registeredAt}` : ""}
+                <InfoTip label="How this is checked">
+                  Found through 8004scan, then confirmed from the receipt: it minted this id in this registry.
+                </InfoTip>
               </span>
             </>
           ) : (
-            <span className="text-sm text-muted">
-              Not proved yet. We only show a minting transaction after reading its receipt and
-              finding this id in it; open the registry id above to see the mint on BscScan.
+            <span className="inline-flex items-center gap-2 text-sm text-muted">
+              Not proved yet
+              <InfoTip label="Why not shown">
+                A mint transaction is shown only after its receipt is checked. The registry id link shows it on BscScan.
+              </InfoTip>
             </span>
           )}
         </Row>
@@ -148,7 +152,12 @@ export function RegistryIdentity({ record }: { record: AgentRecord }) {
 
         <Row label="Last read">
           Block {evidence.blockNumber}
-          {readAt ? <span className="mt-1 block text-xs text-faint">{readAt}. The whole registry is re-read every few minutes.</span> : null}
+          {readAt ? (
+            <span className="mt-1 flex items-center gap-1.5 text-xs text-faint">
+              {readAt}
+              <InfoTip label="Freshness" align="end">The whole registry is re-read every five minutes.</InfoTip>
+            </span>
+          ) : null}
         </Row>
       </dl>
 

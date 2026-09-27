@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * "What the chain says" — the record carousel on the start page.
+ * "What the chain says": the record carousel on the start page.
  *
  * ## Where it came from, and the one thing that had to change
  *
@@ -176,8 +176,7 @@ export function ChainNotesCarousel({ counts }: { counts: HireableCount }) {
                 What the <span className="font-hand text-accent-strong">chain</span> says
               </h2>
               <p className="mt-4 max-w-md text-pretty text-sm leading-relaxed text-muted">
-                Nobody is quoted here. These are five things that happened on the test
-                network, and each one opens the record of itself on the block explorer.
+                Five real testnet records, each linked to the block explorer.
               </p>
             </div>
 
@@ -267,11 +266,11 @@ function CatalogueCard({ counts }: { counts: HireableCount }) {
       ) : null}
       <span className="mt-2 block max-w-[16rem] text-xs leading-relaxed text-faint md:ml-auto">
         {counts.hireable !== null
-          ? "agents carry a price and can be hired today. Read from listingCount() on the registry contract just now, so it is the same number for you as for anyone else."
-          : "The registry contract did not answer just now, so no count is shown rather than a remembered one. The list still works."}
+          ? "agents can be hired today, read live from listingCount() on the registry."
+          : "The registry did not answer just now, so no count is shown. The list still works."}
       </span>
       <span className="mt-2 block text-xs text-accent-strong">
-        Open the list and count them →
+        Open the list →
       </span>
     </Link>
   );

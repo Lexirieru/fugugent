@@ -73,27 +73,24 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
 }
 
 /**
- * The header carries the whole product in one line: which page you are on, which
- * network you are on, and whether a wallet is connected.
+ * Navigation in the middle, the network on the left, the wallet on the right.
  *
- * `PillNav` sits in normal flow here rather than at the `position: absolute; top: 1em`
- * its stylesheet ships with, which would have covered the wallet control. The header
- * keeps its sticky behaviour and nothing ends up underneath anything.
- *
- * At 390px the nav takes a full-width row of its own below the wallet control and its
- * pills wrap inside their own track. Nothing is hidden behind a menu button at any
- * width, and the logo is the way back to the start page rather than a second link
- * with a second name for it.
+ * Desktop is a three-column grid with equal outer columns, so the nav sits in the true
+ * centre whatever the wallet button says. On a phone the network and wallet share the
+ * top row and the nav gets its own centred row below; nothing hides behind a menu.
  */
 function SiteHeader() {
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-4 gap-y-3 px-5 py-3 sm:px-8">
-        <PillNav className="order-last w-full sm:order-none sm:w-auto" />
-        <span className="ml-auto flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent-soft px-2.5 py-0.5 text-[11px] font-medium text-accent-strong">
+      <div className="mx-auto grid w-full max-w-6xl grid-cols-2 items-center gap-y-3 px-4 py-3 sm:grid-cols-[1fr_auto_1fr] sm:px-8">
+        <span className="justify-self-start">
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-accent/40 bg-accent-soft px-2.5 py-0.5 text-[11px] font-medium text-accent-strong">
+            <span aria-hidden className="size-1.5 rounded-full bg-accent" />
             {CHAIN.name}
           </span>
+        </span>
+        <PillNav className="order-last col-span-2 justify-self-center sm:order-none sm:col-span-1" />
+        <span className="justify-self-end">
           <ConnectControl />
         </span>
       </div>
@@ -158,10 +155,7 @@ function SiteFooter() {
         </nav>
 
         <p className="mt-8 max-w-3xl text-xs leading-relaxed text-faint">
-          Test network only. All five contracts are deployed, exercised end to end, and verified on
-          BscScan, so the explorer shows the source code rather than raw bytes. The links above go
-          straight to it. Nothing on this site is financial advice, and every strategy on it can
-          lose money.
+          BSC testnet only. Contracts verified on BscScan. Not financial advice.
         </p>
       </div>
     </footer>

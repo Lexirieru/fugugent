@@ -15,6 +15,7 @@
  */
 
 import { useMemo, useState } from "react";
+import { InfoTip } from "@/components/info-tip";
 import { HireAction } from "@/components/wallet/hire-action";
 import { CONTRACTS, addressUrl, txUrl } from "@/lib/chain";
 import { useHires } from "@/lib/hired";
@@ -111,22 +112,13 @@ export function HirePanel({
         </div>
       </dl>
 
-      <ul className="mt-6 space-y-3 text-pretty text-sm leading-relaxed text-muted">
-        <li>
-          The price is set in dollars and paid in tBNB. The rate is taken at the moment your payment
-          lands, so the tBNB figure is only final at signing. That is why the quote below refreshes,
-          and why the payment carries both a ceiling and a cut-off time.
-        </li>
-        <li>
-          Your money is held by <span className="font-mono text-xs">FuguSubscription</span> until
-          the work is done, and released to the agent only for time it has actually served.
-          Cancelling returns the rest to you.
-        </li>
-        <li>
-          A 5% platform fee comes out of the agent&apos;s payout, not out of your deposit. What you
-          pay is the number above.
-        </li>
-      </ul>
+      <p className="mt-4 inline-flex items-center gap-2 text-sm text-muted">
+        Held in escrow, paid by the second
+        <InfoTip label="How payment works">
+          Priced in dollars, paid in tBNB at signing. FuguSubscription holds it and releases it only for time served;
+          cancel any time to get the rest back. The 5% fee comes out of the agent&apos;s payout.
+        </InfoTip>
+      </p>
 
       {/* The limits of the claim, repeated where the money moves. Somebody who
           scrolled straight to Hire must not miss what they are buying: "listed and
@@ -151,13 +143,7 @@ export function HirePanel({
         />
       ) : (
         <div className="mt-6 rounded-xl border border-line bg-bg-elev p-4 sm:p-5">
-          <p className="text-sm font-medium text-fg">
-            This build cannot open a wallet, so there is no pay button here.
-          </p>
-          <p className="mt-2 text-pretty text-sm leading-relaxed text-muted">
-            A button that opens nothing is worse than no button, so it is left out rather than shown
-            broken. The contract that would take the payment is public and you can read it now.
-          </p>
+          <p className="text-sm font-medium text-fg">This build cannot open a wallet.</p>
           <a
             href={addressUrl(CONTRACTS.subscription)}
             target="_blank"
@@ -192,11 +178,7 @@ export function HirePanel({
               Forget it
             </button>
           </div>
-          <p className="mt-3 text-xs leading-relaxed text-faint">
-            The note is kept in this browser only, and it links to the transaction so anyone can
-            check it. Whether the hire is still running is read from the contract, not from this
-            note.
-          </p>
+
         </div>
       ) : null}
     </div>

@@ -41,8 +41,10 @@ export function InfoTip({
       <span
         id={id}
         role="tooltip"
-        className={`pointer-events-none absolute top-full z-50 mt-2 w-64 max-w-[calc(100vw-2rem)] rounded-lg border border-line bg-surface-strong px-3 py-2 text-left text-xs font-normal normal-case leading-relaxed tracking-normal text-fg shadow-lg transition-opacity ${position} ${
-          open ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+        // `hidden` rather than transparent while closed: an invisible bubble still takes
+        // up layout, and one near the right edge pushed a 390px page into sideways scroll.
+        className={`pointer-events-none absolute top-full z-50 mt-2 w-64 max-w-[calc(100vw-2rem)] rounded-lg border border-line bg-surface-strong px-3 py-2 text-left text-xs font-normal normal-case leading-relaxed tracking-normal text-fg shadow-lg ${position} ${
+          open ? "block" : "hidden group-hover:block group-focus-within:block"
         }`}
       >
         {children}

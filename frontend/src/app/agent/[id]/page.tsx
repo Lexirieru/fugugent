@@ -5,6 +5,7 @@ import { ActionToken, SpendMarker } from "@/components/action-token";
 import { DataProvenance } from "@/components/data-provenance";
 import { Fugu } from "@/components/fugu";
 import { HirePanel } from "@/components/hire-panel";
+import { InfoTip } from "@/components/info-tip";
 import { HiredBadge } from "@/components/hired-badge";
 import { ProofList } from "@/components/proof";
 import { RegistryIdentity } from "@/components/registry-identity";
@@ -165,7 +166,7 @@ function AgentDetail({
         <SectionHeader
           id="identity"
           title="On-chain identity"
-          lede="Read directly from the ERC-8004 IdentityRegistry contract, not from an index of it. Every row opens on the block explorer."
+          lede="Read straight from the ERC-8004 registry. Every row opens on BscScan."
         />
         <RegistryIdentity record={record} />
       </Section>
@@ -234,11 +235,11 @@ function AgentDetail({
               </>
             ) : (
               <>
-                <p className="mt-4 text-sm font-medium text-fg">No fresh reading.</p>
-                <p className="mt-3 text-pretty text-sm leading-relaxed text-muted">
-                  The fish is drawn hollow rather than at a guessed level. Working out a risk level
-                  from stale numbers is the most expensive lie this product could tell, so we draw
-                  the gap instead.
+                <p className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-fg">
+                  No fresh reading
+                  <InfoTip label="Why the fish is hollow">
+                    With no fresh reading the fish is drawn hollow instead of at a guessed level.
+                  </InfoTip>
                 </p>
               </>
             )}
@@ -265,46 +266,26 @@ function AgentDetail({
                   <SpendMarker spends={action.spendsMoney} />
                 </p>
                 <div className="grow" />
-                <p className="mt-6 text-xs leading-relaxed text-faint">
-                  Taken from the agent&apos;s code, not written for this page.
-                </p>
               </>
             ) : (
               <>
-                <p className="mt-4 text-pretty text-sm leading-relaxed text-fg">
-                  No action ladder is written for this kind of agent.
-                </p>
-                <p className="mt-3 text-pretty text-sm leading-relaxed text-muted">
-                  The risk scale on the left is measured and real. What this agent would <em>do</em>{" "}
-                  at each level is not written yet, and we are not filling the gap with another
-                  agent&apos;s ladder.
+                <p className="mt-4 inline-flex items-center gap-2 text-sm text-fg">
+                  No action ladder for this kind yet
+                  <InfoTip label="What this means">
+                    The risk scale is real. What this agent does at each level is not written yet.
+                  </InfoTip>
                 </p>
               </>
             )}
           </Card>
         </div>
 
-        <div className="mt-6">
-          <Card>
-            <p className="text-xs uppercase tracking-[0.14em] text-faint">
-              How this kind of agent is measured
-            </p>
-            <p className="mt-3 max-w-3xl text-pretty text-sm leading-relaxed text-fg">
-              {meta
-                ? `${meta.label}: ${meta.riskMetric}.`
-                : "This agent has no kind set, so there is no matching number to compare it on."}
-            </p>
-            <p className="mt-3 max-w-3xl text-pretty text-sm leading-relaxed text-muted">
-              Each kind is judged on the number that fits it. The fish swells on that number and
-              nothing else: not on popularity, not on how much money it handles, not on how many
-              people hired it.
-            </p>
-            <p className="mt-3 max-w-3xl text-xs leading-relaxed text-faint">
-              The thresholds are read from the agent&apos;s own code, so this page cannot disagree
-              with what the agent does.
-            </p>
-          </Card>
-        </div>
+        <p className="mt-4 inline-flex items-center gap-2 text-sm text-muted">
+          {meta ? `Measured as ${meta.riskMetric}` : "No kind set, so no risk number to compare"}
+          <InfoTip label="How this kind is measured">
+            Each kind is judged on the one number that fits it, read from the agent&apos;s own code.
+          </InfoTip>
+        </p>
       </Section>
 
       {/* Outcomes with numbers in them, past tense */}
@@ -330,8 +311,8 @@ function AgentDetail({
           </ul>
         ) : (
           <EmptyState
-            title="Nothing to show, because it has not run"
-            body="This agent has no completed runs, so there is no history to display. Fugu Guardian has run on the test network and its transactions are open to read."
+            title="No runs yet"
+            body="Fugu Guardian has run on testnet; its transactions are open to read."
             actions={
               <>
                 <ButtonLink href={ourAgentHref}>Open Fugu Guardian</ButtonLink>
@@ -349,7 +330,7 @@ function AgentDetail({
         <SectionHeader
           id="permissions"
           title="What this agent is allowed to do with money"
-          lede="Read from the Altana keystore contract, not from anything we claim. The limits are enforced by the account contract, so a call outside this list fails before it is sent: no fee spent, nothing moved."
+          lede="Read from the Altana keystore. Anything outside this list fails on chain."
         />
         {session ? (
           <Card>
@@ -413,10 +394,11 @@ function AgentDetail({
               keyHash={session.keyHash}
             />
 
-            <p className="mt-4 max-w-3xl text-xs leading-relaxed text-faint">
-              One thing this does not cover, said plainly. The permission binds a contract and the
-              name of a function, not the values passed to it. What keeps a spending approval from
-              being abused is the daily limit and the account contract&apos;s own behaviour.
+            <p className="mt-4 inline-flex items-center gap-2 text-xs text-faint">
+              What this does not cover
+              <InfoTip label="Limit of this permission">
+                It binds a contract and a function name, not the values passed. The daily limit is what caps spending.
+              </InfoTip>
             </p>
           </Card>
         ) : (
@@ -429,14 +411,11 @@ function AgentDetail({
            * with.
            */
           <Card>
-            <p className="text-pretty text-sm leading-relaxed text-fg">
-              This page does not read this agent&apos;s permissions from the chain yet.
-            </p>
-            <p className="mt-3 text-pretty text-sm leading-relaxed text-muted">
-              That is a gap in this page, not a statement about the agent. It may hold a
-              limited key already, or none at all, and we are not going to guess which from
-              here. When this panel reads them, it will list every call the agent may make
-              before you can hire it, not after.
+            <p className="inline-flex items-center gap-2 text-pretty text-sm leading-relaxed text-fg">
+              Permissions not read for this agent yet
+              <InfoTip label="What this means">
+                A gap in this page, not a claim about the agent. It may or may not hold a limited key.
+              </InfoTip>
             </p>
           </Card>
         )}
@@ -447,7 +426,7 @@ function AgentDetail({
         <SectionHeader
           id="proof"
           title="Recorded on the blockchain"
-          lede="Every row here either opens a transaction on the explorer or says openly why there is none."
+          lede="Each row opens a transaction, or says why there is none."
         />
         {proofs.length > 0 ? (
           <ProofList proofs={proofs} />
@@ -460,7 +439,7 @@ function AgentDetail({
              * transaction in this list. Guardian's own page carried that sentence while
              * quoting its on-chain repay two sections above.
              */
-            body="Nobody has attached a transaction to this list. That is not the same as the agent never having sent one, and this page will not pretend to know the difference."
+            body="Nobody has attached a transaction here yet."
             actions={
               <>
                 <ButtonLink href={ourAgentHref}>See an agent that has</ButtonLink>
@@ -481,7 +460,7 @@ function AgentDetail({
           lede={
             listing && listing.active
               ? `Listing number ${listing.listingId.toString()}. ${formatPricePerPeriod(listing.priceUsd8PerPeriod, listing.periodSeconds)}, and one period is ${formatPeriod(listing.periodSeconds)}.`
-              : "Nobody has put a price on this agent, so there is nothing to pay yet. Its owner can change that from this page."
+              : "No price yet. Its owner can list it here."
           }
         />
         {listing && listing.active ? (

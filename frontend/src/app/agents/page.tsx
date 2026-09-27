@@ -1,3 +1,4 @@
+import { InfoTip } from "@/components/info-tip";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AgentCard } from "@/components/agent-card";
@@ -151,10 +152,10 @@ export default async function AgentsPage({ searchParams }: PageProps<"/agents">)
         <PageHeader
           eyebrow="Agents"
           title="Hire an agent, then check its work yourself."
-          lede="Every number here links to its record on the blockchain, and where there is no record this page says so instead of filling the gap."
+          lede="Every number links to its record on chain."
         />
         <p className="mt-4 text-sm text-muted">
-          Built an agent of your own?{" "}
+          Built your own agent?{" "}
           <Link href="/list" className="text-accent-strong underline decoration-accent/40 underline-offset-4">
             List it here
           </Link>
@@ -170,12 +171,17 @@ export default async function AgentsPage({ searchParams }: PageProps<"/agents">)
       <Section labelledBy="catalogue">
         <SectionHeader
           id="catalogue"
-          title={meta ? `${meta.label} agents` : "Every agent"}
-          lede={
-            meta
-              ? `${meta.blurb} Risk here is measured as ${meta.riskMetric}, because an interest rate is the wrong question for this kind.`
-              : "Nine kinds of agent, each judged by the one number that fits it. Most of them carry no price yet, and the filter below is how you see only the ones that do."
+          title={
+            <span className="inline-flex items-center gap-2">
+              {meta ? `${meta.label} agents` : "Every agent"}
+              <InfoTip label="How agents are grouped" align="start">
+                {meta
+                  ? `Risk for this kind is measured as ${meta.riskMetric}.`
+                  : "Read straight from the ERC-8004 registry and sorted into nine kinds. Most have no price yet."}
+              </InfoTip>
+            </span>
           }
+          lede={meta ? meta.blurb : undefined}
         />
 
         <CategoryTabs
@@ -205,21 +211,21 @@ export default async function AgentsPage({ searchParams }: PageProps<"/agents">)
               </span>
             ) : null}
           </Link>
-          <p className="text-pretty text-xs leading-relaxed text-faint">
+          <InfoTip label="About this filter" align="end">
             {onlyListed
               ? listed?.complete
-                ? `Every agent here carries a price and can be paid today. ${listed.agents.length} of the ${listed.scanned} in the catalogue.`
-                : `${listed?.agents.length ?? 0} found in the first ${listed?.scanned ?? 0} agents. The scan stopped before the end of the catalogue, so there may be more.`
-              : "Most agents in this catalogue have no price on them yet. On each page, the ones that do are shown first."}
-          </p>
+                ? `${listed.agents.length} of the ${listed.scanned} agents carry a price and can be hired today.`
+                : `${listed?.agents.length ?? 0} found in the first ${listed?.scanned ?? 0} agents; there may be more.`
+              : "Most agents have no price yet. Hireable ones are shown first on each page."}
+          </InfoTip>
         </div>
 
         <div className="mt-8">
           {shown.length > 0 ? (
             <>
-              <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {shown.map((view) => (
-                  <li key={view.record.id} className="flex">
+                  <li key={view.record.id} className="flex min-w-0">
                     <AgentCard view={view} />
                   </li>
                 ))}
@@ -305,7 +311,7 @@ export default async function AgentsPage({ searchParams }: PageProps<"/agents">)
         <SectionHeader
           id="how-to-read"
           title="How to read the fish"
-          lede="Two questions with two different answers, kept visibly apart so that answering one is never mistaken for answering both."
+          lede="Shape shows risk. The token shows what the agent does."
         />
         <RiskLegend />
       </Section>

@@ -1,5 +1,6 @@
 import { ActionToken, SpendMarker } from "@/components/action-token";
 import { Fugu } from "@/components/fugu";
+import { InfoTip } from "@/components/info-tip";
 import { BLOAT, BLOAT_LEVELS, GUARDIAN_ACTIONS } from "@/lib/risk";
 
 /**
@@ -19,7 +20,8 @@ import { BLOAT, BLOAT_LEVELS, GUARDIAN_ACTIONS } from "@/lib/risk";
  * distinguished by colour alone, so the separation survives grayscale and colour
  * blindness exactly as the avatar assets do.
  *
- * This is a legend, not a claim: there is not a single agent number in it.
+ * This is a legend, not a claim: there is not a single agent number in it. The copy is
+ * kept to a heading and one short line per track; the longer notes sit in `InfoTip`s.
  */
 export function RiskLegend() {
   return (
@@ -28,8 +30,12 @@ export function RiskLegend() {
       <section>
         <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
           <h3 className="text-sm font-medium text-fg">1 · How much trouble is the money in?</h3>
-          <p className="text-xs text-faint">
-            Body colour says which agent. Body shape says how much risk.
+          <p className="flex items-center gap-2 text-xs text-faint">
+            Colour is the agent. Shape is the risk.
+            <InfoTip label="How to read the levels" align="end">
+              Level 5 alone holds still and has a black-and-white ring, so it reads without
+              colour or motion.
+            </InfoTip>
           </p>
         </div>
 
@@ -57,12 +63,12 @@ export function RiskLegend() {
           })}
         </ol>
 
-        <p className="mt-6 text-pretty text-xs leading-relaxed text-faint">
-          Level 5 is the only one that holds still, and the only one whose ring is a black-and-white
-          pattern rather than a colour, so it stays unmistakable with the colour taken away and for
-          anyone who turns animation off. A hollow, dashed fish means there is no fresh reading.
-          We draw the gap rather than guess a level, because a dashboard showing an amount nobody
-          could check is what closed Giza and ARMA in February 2026.
+        <p className="mt-6 flex items-start justify-between gap-3 text-pretty text-xs leading-relaxed text-faint">
+          <span>A hollow, dashed fish means no fresh reading. We never guess a level.</span>
+          <InfoTip label="Why we never guess" align="end">
+            Giza and ARMA shut down in February 2026 after dashboards showed amounts nobody
+            could check.
+          </InfoTip>
         </p>
       </section>
 
@@ -70,8 +76,12 @@ export function RiskLegend() {
       <section className="mt-8 border-t border-line pt-8">
         <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
           <h3 className="text-sm font-medium text-fg">2 · What does the agent do about it?</h3>
-          <p className="text-xs text-faint">
-            These are the names in the code, not labels we wrote for the page.
+          <p className="flex items-center gap-2 text-xs text-faint">
+            Names straight from the code.
+            <InfoTip label="Where these names come from">
+              These are the <code className="font-mono">Action</code> names Fugu Guardian&apos;s
+              decision code branches on, not labels written for the page.
+            </InfoTip>
           </p>
         </div>
 
@@ -81,8 +91,12 @@ export function RiskLegend() {
               key={spec.action}
               className="flex flex-col items-start rounded-xl border border-line bg-bg-elev px-3 py-3"
             >
-              <ActionToken spec={spec} />
-              <span className="mt-3 text-[11px] leading-snug text-muted">{spec.does}</span>
+              <span className="flex w-full items-center justify-between gap-2">
+                <ActionToken spec={spec} />
+                <InfoTip label={`What ${spec.action} does`} align="end">
+                  {spec.does}
+                </InfoTip>
+              </span>
               <div className="grow" />
               <span className="mt-3">
                 <SpendMarker spends={spec.spendsMoney} />
@@ -95,11 +109,7 @@ export function RiskLegend() {
         </ol>
 
         <p className="mt-6 text-pretty text-xs leading-relaxed text-faint">
-          This ladder is Fugu Guardian&apos;s, and the tokens are the{" "}
-          <code className="font-mono">Action</code> names its decision code actually branches on.
-          The other kinds swell on their own number across the same five levels, but they have no
-          ladder written yet, so their pages show the risk scale and say nothing about actions
-          rather than borrowing Guardian&apos;s.
+          Only Fugu Guardian has this ladder. Other kinds have no actions written yet.
         </p>
       </section>
     </div>

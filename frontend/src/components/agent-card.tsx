@@ -1,3 +1,4 @@
+import { InfoTip } from "@/components/info-tip";
 import Link from "next/link";
 import { Fugu } from "@/components/fugu";
 import { HiredBadge } from "@/components/hired-badge";
@@ -40,7 +41,7 @@ export function AgentCard({ view }: { view: AgentView }) {
   const ours = Boolean(FIRST_PARTY[record.id]);
 
   return (
-    <article className="group relative flex w-full flex-col rounded-[var(--radius-card)] border border-line bg-surface p-5 transition hover:border-line-strong hover:bg-surface-strong">
+    <article className="group relative flex w-full min-w-0 flex-col rounded-[var(--radius-card)] border border-line bg-surface p-5 transition hover:border-line-strong hover:bg-surface-strong">
       <div className="flex items-start gap-4">
         <div className="shrink-0">
           <Fugu
@@ -108,7 +109,14 @@ export function AgentCard({ view }: { view: AgentView }) {
       ) : null}
 
       {notShipped ? (
-        <p className="mt-3 text-xs leading-relaxed break-words text-faint">Not shipped: {notShipped}</p>
+        // The limitation stays on the card, as a label anyone can open; the full text
+        // is the tooltip. `relative z-10` keeps it above the card's full-size link.
+        <p className="relative z-10 mt-3 inline-flex items-center gap-1.5 text-xs text-[var(--risk-3)]">
+          Limits
+          <InfoTip label="What this agent does not do yet" align="start">
+            {notShipped.length > 280 ? `${notShipped.slice(0, 277)}...` : notShipped}
+          </InfoTip>
+        </p>
       ) : null}
 
       {/* Spacer: the price row always sits at the foot of the card, so card heights match. */}

@@ -48,6 +48,7 @@ import { formatDuration, formatUsd8 } from "@/lib/money";
 import { NATIVE_TOKEN, ORACLE_ABI, REGISTRY_ABI, SUBSCRIPTION_ABI } from "@/lib/wallet/abi";
 import { explainWriteError, formatChainTime, formatTbnb } from "@/lib/wallet/format";
 import { useSubscription } from "@/lib/wallet/subscription";
+import { InfoTip } from "@/components/info-tip";
 import { CancelSubscription, type CancelOutcome } from "@/components/wallet/cancel-subscription";
 
 const FAUCET = "https://www.bnbchain.org/en/testnet-faucet";
@@ -215,19 +216,13 @@ export function HireAction({
             : "Reading the listing price and the current rate from the blockchain…"}
         </p>
       ) : (
-        <ul className="mt-3 space-y-1 text-xs leading-relaxed text-faint">
-          <li>
-            A ceiling goes with the payment:{" "}
-            <span className="font-mono text-muted">{formatTbnb(capFor(amount))} tBNB</span>, the
-            quoted price plus 1%. It is never left open, because an open ceiling would let the
-            listing owner raise the price after you have signed.
-          </li>
-          <li>
-            A cut-off time goes with it too: 10 minutes, counted by the blockchain&apos;s own clock
-            rather than your computer&apos;s. A payment that sits in the queue past that expires
-            instead of going through at a price you never saw.
-          </li>
-        </ul>
+        <p className="mt-2 inline-flex items-center gap-2 text-xs text-faint">
+          Capped at <span className="font-mono text-muted">{formatTbnb(capFor(amount))} tBNB</span>, valid 10 minutes
+          <InfoTip label="Why a cap and a deadline">
+            The cap is the quote plus 1%, so the owner cannot raise the price after you sign. The 10 minutes
+            are counted by the chain&apos;s clock, so a stuck payment expires instead of going through later.
+          </InfoTip>
+        </p>
       )}
 
       {priceMismatch !== null ? (
@@ -253,14 +248,17 @@ export function HireAction({
             You already have subscription #{subscription.active.subId.toString()} running on this
             listing.
           </p>
-          <p className="mt-1 text-xs leading-relaxed text-muted">
-            It covers {agentName} until {formatChainTime(subscription.active.endsAt)}
-            {subscription.chainNow !== null && subscription.active.endsAt > subscription.chainNow
-              ? `, ${formatDuration(Number(subscription.active.endsAt - subscription.chainNow))} left`
-              : ""}
-            . {formatTbnb(subscription.active.deposited)} tBNB is held and{" "}
-            {formatTbnb(subscription.active.claimed)} tBNB has been drawn so far. Hiring again opens
-            a <em>second</em> subscription and charges you again. It does not extend this one.
+          <p className="mt-1 inline-flex flex-wrap items-center gap-x-2 text-xs text-muted">
+            <span>
+              Until {formatChainTime(subscription.active.endsAt)}
+              {subscription.chainNow !== null && subscription.active.endsAt > subscription.chainNow
+                ? ` (${formatDuration(Number(subscription.active.endsAt - subscription.chainNow))} left)`
+                : ""}
+              , {formatTbnb(subscription.active.deposited)} tBNB held
+            </span>
+            <InfoTip label="About this subscription">
+              {formatTbnb(subscription.active.claimed)} tBNB drawn so far. Hiring again opens a second subscription; it does not extend this one.
+            </InfoTip>
           </p>
           {address ? (
             <CancelSubscription
@@ -343,10 +341,7 @@ export function HireAction({
             >
               Connect a wallet to hire
             </button>
-            <p className="mt-2 text-xs leading-relaxed text-faint">
-              The figures above are read straight from the contracts and need no wallet. Connecting
-              only lets you sign: one transaction, on {CHAIN.name}, network {CHAIN.id}.
-            </p>
+            <p className="mt-2 text-xs text-faint">One transaction on {CHAIN.name}.</p>
           </>
         ) : !onRightChain ? (
           <>
@@ -368,10 +363,7 @@ export function HireAction({
             <p className="text-sm font-medium text-[var(--risk-1)]">
               Hired. The transaction is in a block.
             </p>
-            <p className="mt-1 text-xs leading-relaxed text-muted">
-              The money is held by FuguSubscription and released to {agentName} only for the time
-              it actually serves. Cancelling returns the rest to you.
-            </p>
+            <p className="mt-1 text-xs text-muted">Held in escrow, released only for time served.</p>
             <div className="mt-3 flex flex-wrap gap-2">
               <a
                 href={txUrl(phase.hash)}
@@ -460,9 +452,11 @@ export function HireAction({
                   ? `Hire ${agentName} again anyway for ${usdTotal8 === null ? "" : formatUsd8(usdTotal8)}`
                   : `Hire ${agentName} for ${usdTotal8 === null ? "" : formatUsd8(usdTotal8)}`}
             </button>
-            <p className="mt-2 text-xs leading-relaxed text-faint">
-              One signature. We simulate the call against the live contract first, so a listing that
-              went inactive or a price that moved is caught before your wallet opens.
+            <p className="mt-2 inline-flex items-center gap-2 text-xs text-faint">
+              One signature, no token approval
+              <InfoTip label="Before your wallet opens">
+                The call is simulated against the live contract first, so a problem shows here instead of in your wallet.
+              </InfoTip>
             </p>
           </>
         )}

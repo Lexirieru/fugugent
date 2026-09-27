@@ -149,6 +149,10 @@ function parseEvidence(v: unknown): RegistryEvidence | null {
   };
 }
 
+function plainDashes(text: string): string {
+  return text.replace(/\s*[\u2014\u2013]\s*/g, " - ");
+}
+
 function strArray(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
 }
@@ -179,8 +183,11 @@ export function parseAgentRecord(v: unknown, at = "agent"): AgentRecord {
     registryAddress: (nullableString(o.registryAddress) as Address | null) ?? null,
     agentId: nullableString(o.agentId),
 
-    name: String(o.name ?? ""),
-    description: String(o.description ?? ""),
+    // Third-party names and descriptions are shown as their owners wrote them, with one
+    // typographic exception: em and en dashes become a plain hyphen, so this site's
+    // no-em-dash rule holds for text it does not write. The data itself is untouched.
+    name: plainDashes(String(o.name ?? "")),
+    description: plainDashes(String(o.description ?? "")),
     imageUrl: nullableString(o.imageUrl),
     agentType: nullableString(o.agentType),
     tags: strArray(o.tags),

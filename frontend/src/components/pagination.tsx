@@ -1,3 +1,4 @@
+import { InfoTip } from "@/components/info-tip";
 import Link from "next/link";
 
 /**
@@ -80,6 +81,11 @@ export function Pagination({
             : total === null
               ? `${first} to ${last}`
               : `${first} to ${last} of ${total}`}
+          {note ? (
+            <span className="ml-1.5">
+              <InfoTip label="About this count">{note}</InfoTip>
+            </span>
+          ) : null}
         </p>
 
         {hasNext ? (
@@ -95,9 +101,6 @@ export function Pagination({
         )}
       </div>
 
-      {note ? (
-        <p className="mt-3 text-pretty text-center text-xs leading-relaxed text-faint">{note}</p>
-      ) : null}
     </nav>
   );
 }

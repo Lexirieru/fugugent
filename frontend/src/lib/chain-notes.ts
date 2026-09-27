@@ -49,7 +49,7 @@ export interface ChainNote {
 export const CHAIN_NOTES: ChainNote[] = [
   {
     id: "health-factor",
-    fact: "A loan was close to being sold off underneath its owner, at a health factor of 1.14. The agent paid $4.03 of the debt and brought that number back to 1.50, in a single transaction it signed with a key that was only ever allowed to repay.",
+    fact: "A loan hit health factor 1.14. The agent repaid $4.03 and lifted it to 1.50, with a key that can only repay.",
     actor: "Fugu Guardian",
     category: "Health factor",
     kind: "guardian",
@@ -60,17 +60,17 @@ export const CHAIN_NOTES: ChainNote[] = [
   },
   {
     id: "refused-call",
-    fact: "The same key was then told to send that money somewhere else. The wallet contract refused, because moving money was never on the list of things it could do. Nothing was spent and no balance moved.",
+    fact: "The same key was told to send the money elsewhere. The wallet contract refused. Nothing moved.",
     actor: "The wallet the agent signs with",
     category: "Refused on purpose",
     kind: "guardian",
     link: null,
     noLinkReason:
-      "No link, and that is the point. The refusal came before the transaction was sent, so no block ever held it. The probe script in ai/fuguguardian repeats it.",
+      "No link, on purpose: it was refused before sending, so no block holds it. The probe script in ai/fuguguardian repeats it.",
   },
   {
     id: "first-hire",
-    fact: "Somebody hired an agent here for the first time. $0.50 went into the escrow contract as subscription 2, and it stays there until the agent claims the seconds it has actually served.",
+    fact: "First hire: $0.50 held in escrow as subscription 2, released only for seconds served.",
     actor: "FuguSubscription",
     category: "First hire",
     kind: "broker",
@@ -81,7 +81,7 @@ export const CHAIN_NOTES: ChainNote[] = [
   },
   {
     id: "nine-kinds",
-    fact: "The catalogue used to hold four kinds of agent and now holds nine. The upgrade took one transaction and 37,649 units of gas, and the four listings that already existed read back exactly as they did before it.",
+    fact: "The registry went from four agent kinds to nine: one transaction, 37,649 gas, old listings unchanged.",
     actor: "FuguRegistry",
     category: "Contract upgrade",
     kind: "fallback",
@@ -93,7 +93,7 @@ export const CHAIN_NOTES: ChainNote[] = [
   },
   {
     id: "verified-source",
-    fact: "Five contracts run this marketplace and the source code of all five is published on BscScan, so the explorer shows you what they do instead of a wall of bytes. This link opens the registry; the foot of every page carries the other four.",
+    fact: "All five marketplace contracts have verified source on BscScan. This opens the registry; the page footer links the other four.",
     actor: "Five contracts on network 97",
     category: "Published source",
     kind: "fallback",
