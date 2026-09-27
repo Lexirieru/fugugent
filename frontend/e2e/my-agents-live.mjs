@@ -20,7 +20,7 @@ import { createPublicClient, createWalletClient, decodeFunctionData, http, parse
 import { privateKeyToAccount } from "viem/accounts";
 import { bscTestnet } from "viem/chains";
 
-const APP = "http://localhost:3000";
+const APP = process.env.APP ?? "http://localhost:3000";
 const RPC = "https://bsc-testnet.rpc.sentio.xyz";
 const SUBSCRIPTION = "0xfdb083371f44Cf53181350389D3217e51B431776";
 const OUT = new URL("./out/", import.meta.url).pathname;
@@ -84,9 +84,20 @@ await page.addInitScript(() => {
 });
 
 // 1. Connect on /me and read the console.
-await page.goto(`${APP}/me`, { waitUntil: "domcontentloaded" });
-await page.getByRole("button", { name: "Connect wallet" }).last().click();
-await page.getByText("Deployer Wallet").first().click();
+page.setDefaultNavigationTimeout(90000);
+await page.goto(`${APP}/me`, { waitUntil: "load" });
+// A click before hydration does nothing, and over a slow link that is easy to hit:
+// click, and click again until the wallet modal actually shows the option.
+const option = page.getByText("Deployer Wallet").first();
+for (let attempt = 0; attempt < 5 && !(await option.isVisible()); attempt++) {
+  await page.getByRole("button", { name: "Connect wallet" }).last().click();
+  await option.waitFor({ timeout: 8000 }).catch(() => {});
+}
+if (!(await option.isVisible())) {
+  await page.screenshot({ path: `${OUT}me-debug-modal.png` });
+  throw new Error("wallet modal never showed the injected wallet");
+}
+await option.click();
 await page.getByTestId("my-console").waitFor({ timeout: 40000 });
 await page.waitForTimeout(1500);
 await page.screenshot({ path: `${OUT}me-1-before.png`, fullPage: true });
@@ -96,7 +107,7 @@ log("/me loaded for", account.address);
 const before = await pub.readContract({ address: SUBSCRIPTION, abi: SUB_ABI, functionName: "subCount" });
 await page.goto(`${APP}/agent/97%3A2480`, { waitUntil: "domcontentloaded" });
 const hire = page.getByRole("button", { name: /^Hire Fugu Guardian (again anyway )?for \$/ });
-await hire.waitFor({ timeout: 40000 });
+await hire.waitFor({ timeout: 90000 });
 await hire.scrollIntoViewIfNeeded();
 await hire.click();
 await page.getByText("Hired. The transaction is in a block.").waitFor({ timeout: 90000 });
