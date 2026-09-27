@@ -100,7 +100,7 @@ export function AgentCard({ view }: { view: AgentView }) {
         </div>
       </div>
 
-      <p className="mt-4 line-clamp-3 text-sm leading-relaxed text-muted">{record.description}</p>
+      <p className="mt-4 line-clamp-3 text-sm leading-relaxed break-words text-muted">{record.description}</p>
 
       {outcomes.length > 0 ? (
         <p className="mt-3 border-l-2 border-line pl-3 text-sm leading-relaxed text-fg">

@@ -137,7 +137,7 @@ function AgentDetail({
                 listingId={listing?.active ? listing.listingId.toString() : null}
               />
             </div>
-            <p className="mt-4 max-w-3xl text-pretty text-base leading-relaxed text-muted">
+            <p className="mt-4 max-w-3xl text-pretty text-base leading-relaxed break-words text-muted">
               {record.description}
             </p>
             {record.tags.length > 0 ? (
