@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionToken, SpendMarker } from "@/components/action-token";
+import { AgentStats } from "@/components/agent-stats";
 import { DataProvenance } from "@/components/data-provenance";
 import { Fugu } from "@/components/fugu";
 import { HirePanel } from "@/components/hire-panel";
@@ -20,7 +21,7 @@ import { addressUrl, shorten, txUrl } from "@/lib/chain";
 import { source } from "@/lib/data";
 import type { AgentView } from "@/lib/data/types";
 import { formatPeriod, formatPricePerPeriod } from "@/lib/money";
-import { SOURCE_LABEL, formatUtc, type Provenance } from "@/lib/provenance";
+import type { Provenance } from "@/lib/provenance";
 import { BLOAT, guardianActionFor, riskAriaLabel } from "@/lib/risk";
 
 export async function generateMetadata({ params }: PageProps<"/agent/[id]">): Promise<Metadata> {
@@ -96,11 +97,6 @@ function AgentDetail({
   // The action band is Guardian's ladder. Showing it for another kind would put a
   // transaction name next to an agent that cannot send it. See `lib/risk.ts`.
   const action = risk && category === "HEALTH_FACTOR" ? guardianActionFor(risk.level) : null;
-  // A record's own provenance can differ from the envelope's: one page may be served
-  // from the cache while its contents came from 8004scan, or the other way round.
-  // The relative age is already in the banner, computed by the backend. This one names
-  // the time.
-  const recordFetchedAt = formatUtc(record.fetchedAt);
 
   return (
     <Page>
@@ -152,13 +148,12 @@ function AgentDetail({
                 ))}
               </p>
             ) : null}
-            <p className="mt-4 text-xs text-faint">
-              This record came from {SOURCE_LABEL[record.source]}
-              {recordFetchedAt ? `, read ${recordFetchedAt}` : ""} · key{" "}
-              <span className="font-mono">{record.id}</span>
-            </p>
           </div>
         </div>
+      </Section>
+
+      <Section>
+        <AgentStats record={record} />
       </Section>
 
       {/* Where the agent comes from, read off the ERC-8004 registry, before anything else. */}

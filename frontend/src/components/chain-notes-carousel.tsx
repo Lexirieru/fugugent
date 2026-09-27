@@ -158,20 +158,22 @@ export function ChainNotesCarousel({ counts }: { counts: HireableCount }) {
   });
 
   return (
-    <section ref={ref} className="w-full py-20" aria-labelledby="chain-notes-heading">
+    <section ref={ref} className="w-full px-5 py-6 sm:px-8" aria-labelledby="chain-notes-heading">
       {/* Without this the section is invisible to a reader whose scripts did not run,
           because the reveal starts at zero opacity and only JavaScript ends it. */}
       <noscript>
         <style>{".fugu-reveal{opacity:1!important;animation:none!important}"}</style>
       </noscript>
 
-      <div className="mx-auto max-w-7xl px-6">
-        <div className="w-full md:pr-6">
-          <div className="mb-16 flex flex-col gap-6 md:ml-auto md:max-w-4xl md:flex-row md:items-start md:justify-between md:gap-0">
+      {/* Same container as every other section, so the title, the count and the cards
+          all start on the page's left edge instead of floating to the right. */}
+      <div className="mx-auto w-full max-w-6xl">
+        <div className="w-full">
+          <div className="mb-8 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
             <div {...reveal("0.1s")}>
               <h2
                 id="chain-notes-heading"
-                className="text-[32px] font-normal leading-[1.1] tracking-tight md:text-[40px] lg:text-[44px]"
+                className="text-[28px] font-semibold leading-[1.1] tracking-tight md:text-[36px]"
               >
                 What the <span className="font-hand text-accent-strong">chain</span> says
               </h2>
@@ -180,22 +182,22 @@ export function ChainNotesCarousel({ counts }: { counts: HireableCount }) {
               </p>
             </div>
 
-            <div {...reveal("0.2s", "md:pl-8")}>
+            <div {...reveal("0.2s", "md:shrink-0")}>
               <CatalogueCard counts={counts} />
             </div>
           </div>
 
-          <div {...reveal("0.3s", "-mx-6 md:mx-0")}>
+          <div {...reveal("0.3s")}>
             <div
               ref={viewportRef}
-              className="relative overflow-hidden py-6 md:ml-auto md:max-w-4xl md:pl-6"
+              className="relative overflow-hidden py-4"
               onMouseEnter={() => setIsPaused(true)}
               onMouseLeave={() => setIsPaused(false)}
               onFocusCapture={() => setIsPaused(true)}
               onBlurCapture={() => setIsPaused(false)}
             >
               <div
-                className="flex gap-6 pl-6 md:pl-0"
+                className="flex gap-6"
                 style={{
                   transform: `translateX(-${offset}px)`,
                   transition: "transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
@@ -216,7 +218,7 @@ export function ChainNotesCarousel({ counts }: { counts: HireableCount }) {
             </div>
           </div>
 
-          <div {...reveal("0.4s", "mt-8 flex gap-4 md:ml-auto md:max-w-4xl md:pl-6")}>
+          <div {...reveal("0.4s", "mt-4 flex gap-3")}>
             <button
               type="button"
               onClick={goPrev}
@@ -318,7 +320,7 @@ function NoteCard({
   return (
     <article
       aria-hidden={onScreen ? undefined : true}
-      className="flex flex-shrink-0 flex-col justify-between rounded-[32px] bg-surface px-6 py-8 shadow-[0_4px_16px_rgba(0,0,0,0.08)] md:rounded-[40px] md:pb-[2.63rem] md:pl-10 md:pr-24 md:pt-[2.36rem]"
+      className="flex flex-shrink-0 flex-col justify-between rounded-[var(--radius-card)] border border-line bg-surface px-6 py-6 md:px-8 md:py-7"
       style={{
         width: `${cardWidth}px`,
         opacity,

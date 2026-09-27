@@ -28,7 +28,7 @@ export function RiskChip({
       <span
         className={`inline-flex items-center gap-1.5 rounded-full border border-dashed border-line-strong font-medium text-faint ${pad}`}
       >
-        no live reading
+        no live data
       </span>
     );
   }

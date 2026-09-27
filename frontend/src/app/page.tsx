@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ChainNotesCarousel } from "@/components/chain-notes-carousel";
 import { Fugu } from "@/components/fugu";
 import { InfoTip } from "@/components/info-tip";
-import { ButtonLink, Page, PageHeader, Section, SectionHeader } from "@/components/ui";
+import { ButtonLink, Page, Section, SectionHeader } from "@/components/ui";
 import { CATEGORY_META, CATEGORY_ORDER } from "@/lib/agents";
 import { txUrl } from "@/lib/chain";
 import { readHireableCount } from "@/lib/chain-notes";
@@ -32,25 +32,65 @@ export default async function StartPage() {
 
   return (
     <Page>
+      {/*
+        Split hero, after MotionSites' "Crypto Vault": copy in a rounded pane on the left,
+        a showcase pane on the right, lines blurring in one after another. Rebuilt in this
+        site's light tokens; the showcase is our own fugu and live numbers, not stock art.
+      */}
       <Section>
-        <PageHeader
-          eyebrow="HelloFugu"
-          title="Hire an agent to look after your money, then check its work yourself."
-          lede={
-            <>
-              Every number links to its record on BNB Chain.{" "}
-              <InfoTip label="What an agent is" align="start">
-                An agent is a small program that watches something for you and acts on it.
-                Where there is no on-chain record, the page says so instead of filling the gap.
-              </InfoTip>
-            </>
-          }
-        />
-        <div className="mt-8 flex flex-wrap gap-3">
-          <ButtonLink href="/agents">Browse the agents</ButtonLink>
-          <ButtonLink href="/skills" variant="ghost">
-            See the skills
-          </ButtonLink>
+        <div className="grid gap-3 lg:grid-cols-2">
+          <div className="flex flex-col justify-between rounded-[28px] border border-line bg-surface p-6 sm:p-10">
+            <div>
+              <p className="blur-in text-xs font-semibold uppercase tracking-[0.18em] text-accent-strong">
+                HelloFugu
+              </p>
+              <h1 className="mt-5 text-balance text-4xl font-semibold leading-[1.05] tracking-tight text-fg sm:text-5xl lg:text-6xl">
+                <span className="blur-in block" style={{ animationDelay: "120ms" }}>Hire an agent.</span>
+                <span className="blur-in block" style={{ animationDelay: "220ms" }}>Check its work</span>
+                <span className="blur-in block text-accent-strong" style={{ animationDelay: "320ms" }}>on chain.</span>
+              </h1>
+              <p className="blur-in mt-6 max-w-md text-pretty text-base leading-relaxed text-muted" style={{ animationDelay: "440ms" }}>
+                DeFi agents on BNB Chain. Every number links to its record.{" "}
+                <InfoTip label="What an agent is" align="start">
+                  An agent is a small program that watches something for you and acts on it.
+                  Where there is no on-chain record, the page says so instead of filling the gap.
+                </InfoTip>
+              </p>
+            </div>
+            <div className="blur-in mt-10 flex flex-wrap gap-3" style={{ animationDelay: "540ms" }}>
+              <ButtonLink href="/agents">Browse the agents</ButtonLink>
+              <ButtonLink href="/list" variant="ghost">
+                List your agent
+              </ButtonLink>
+            </div>
+          </div>
+
+          <div className="relative flex min-h-[320px] flex-col items-center justify-center overflow-hidden rounded-[28px] bg-accent-soft p-6 sm:min-h-[420px]">
+            <span className="absolute left-6 top-5 text-xs text-accent-strong/80">Live on BSC testnet</span>
+            <Fugu
+              kind="guardian"
+              level={2}
+              seed="hero"
+              label="Fugu Guardian, the agent that has repaid a real loan on chain"
+              className="bento-in size-40 sm:size-52"
+            />
+            <div className="mt-6 flex flex-wrap justify-center gap-2">
+              {[
+                { value: hireableCount.hireable === null ? "Agents" : `${hireableCount.hireable} hireable`, href: hireableCount.href },
+                { value: "ERC-8004 registry", href: "/agents" },
+                { value: "No token approvals", href: "/agent/97:2480#hire" },
+              ].map((pill, i) => (
+                <Link
+                  key={pill.value}
+                  href={pill.href}
+                  className="bento-in rounded-full border border-accent/30 bg-surface px-3 py-1.5 text-xs font-medium text-fg transition hover:border-accent"
+                  style={{ animationDelay: `${600 + i * 90}ms` }}
+                >
+                  {pill.value}
+                </Link>
+              ))}
+            </div>
+          </div>
         </div>
       </Section>
 

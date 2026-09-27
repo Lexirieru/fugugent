@@ -547,6 +547,21 @@
         "8": "0x09d0fdd88e8350afedc7f4875ea0c5ad44896e672c91e5271dacf6e95342deae",
         "9": "0x8a56a7550b30a5f870f7a5ff24862856acf232d877c0ee223fb70e3f525d6bcf"
       }
+    },
+    "phase4_descriptions": {
+      "date": "2026-09-27",
+      "what": "setAgentURI on ids 2480-2488 rewriting only the registration file's `description` to one or two plain sentences; the boilerplate about the network and the FuguRegistry address was dropped (both are shown elsewhere on the agent page). Every other field decoded identical before and after.",
+      "txs": {
+        "2480": "0xcb934674939432f5506c71e067acdebbd0f2c4a7ee9394d1e86bee6e0a913ce5",
+        "2481": "0x6bc85c39b20cc5dd32c0780984d91155009500b6b6ad86121271e973a58f6996",
+        "2482": "0x85be272e3a69c3c08de0f38101436171031fe0331139181410277be1acf057b4",
+        "2483": "0x3ab6604cd250716f43a021f3dbce4f6ca796d9e4452e168baab646c764c81f60",
+        "2484": "0x908d676bf4e633a18b07459b7c5215d193e5877b248be616cba46d47c1359bac",
+        "2485": "0xc52b85f0a7f69a643ceb0a62fad9e06183d3e74c7fddde3b311d7d58156f2467",
+        "2486": "0x3aae36a76f6da192ef971c39b391357c9283561d38e794c284557fe5fe6ae0ec",
+        "2487": "0x6f8715d80fe7a11652a79ecbd26b67b880b810235f5edee9cead48267f171bbd",
+        "2488": "0xfab9bb7153881b533cc1f683518e2b502ac22b68aba73b7d9d4dba22acec7e3b"
+      }
     }
   },
   "listingMetadataEdits": [

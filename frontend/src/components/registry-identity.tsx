@@ -95,6 +95,8 @@ export function RegistryIdentity({ record }: { record: AgentRecord }) {
   const readAt = formatUtc(evidence.readAt);
   const registeredAt = registration?.registeredAt ? formatUtc(registration.registeredAt) : null;
   const metadata = metadataSentence(evidence.metadataStatus, evidence.metadataReason);
+  // Only ways to reach the agent. `agentWallet` entries are an address, already shown above.
+  const endpoints = evidence.endpoints.filter((e) => e.name.toLowerCase() !== "agentwallet");
 
   return (
     <Card>
@@ -103,14 +105,9 @@ export function RegistryIdentity({ record }: { record: AgentRecord }) {
           <ExternalLink href={addressUrl(evidence.registryAddress)}>
             {shorten(evidence.registryAddress)}
           </ExternalLink>
-          <span className="mt-1 block text-xs text-faint">ERC-8004 IdentityRegistry, {CHAIN.name}</span>
         </Row>
 
-        <Row label="Registry id">
-          <ExternalLink href={nftUrl(evidence.registryAddress, record.tokenId)}>
-            #{record.tokenId}
-          </ExternalLink>
-        </Row>
+        {/* The registry id is the lead fact in the stats above; not repeated here. */}
 
         <Row label="Registered in">
           {registration ? (
@@ -163,9 +160,9 @@ export function RegistryIdentity({ record }: { record: AgentRecord }) {
 
       <div className="mt-6 border-t border-line pt-5">
         <p className="text-[11px] uppercase tracking-[0.14em] text-faint">How to reach it</p>
-        {evidence.endpoints.length > 0 ? (
+        {endpoints.length > 0 ? (
           <ul className="mt-2 space-y-1.5">
-            {evidence.endpoints.map((e) => (
+            {endpoints.map((e) => (
               <li key={`${e.name}-${e.endpoint}`} className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-sm">
                 <span className="font-mono text-xs text-fg">{e.name}</span>
                 <span className="min-w-0 break-all font-mono text-xs text-muted">{e.endpoint}</span>
