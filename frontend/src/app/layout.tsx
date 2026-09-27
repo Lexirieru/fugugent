@@ -77,25 +77,35 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
  * Navigation in the middle, the network on the left, the wallet on the right.
  *
  * Desktop is a three-column grid with equal outer columns, so the nav sits in the true
- * centre whatever the wallet button says. On a phone the network and wallet share the
- * top row and the nav gets its own centred row below; nothing hides behind a menu.
+ * centre whatever the wallet button says. On a phone the network and wallet sit in a
+ * bar above that scrolls away, and only the nav row stays pinned; nothing hides behind
+ * a menu.
  */
 function SiteHeader() {
+  const network = (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-accent/40 bg-accent-soft px-2.5 py-0.5 text-[11px] font-medium text-accent-strong">
+      <span aria-hidden className="size-1.5 rounded-full bg-accent" />
+      {CHAIN.name}
+    </span>
+  );
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur">
-      <div className="mx-auto grid w-full max-w-6xl grid-cols-2 items-center gap-y-3 px-4 py-3 sm:grid-cols-[1fr_auto_1fr] sm:px-8">
-        <span className="justify-self-start">
-          <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-accent/40 bg-accent-soft px-2.5 py-0.5 text-[11px] font-medium text-accent-strong">
-            <span aria-hidden className="size-1.5 rounded-full bg-accent" />
-            {CHAIN.name}
-          </span>
-        </span>
-        <PillNav className="order-last col-span-2 justify-self-center sm:order-none sm:col-span-1" />
-        <span className="justify-self-end">
-          <ConnectControl />
-        </span>
+    <>
+      {/* Phone: the network and the wallet sit in a slim bar that scrolls away, so the
+          sticky header below is only the nav, not two rows eating the screen. */}
+      <div className="flex items-center justify-between px-4 pt-3 sm:hidden">
+        {network}
+        <ConnectControl />
       </div>
-    </header>
+      <header className="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur">
+        <div className="mx-auto grid w-full max-w-6xl grid-cols-1 items-center px-4 py-2.5 sm:grid-cols-[1fr_auto_1fr] sm:px-8 sm:py-3">
+          <span className="hidden justify-self-start sm:block">{network}</span>
+          <PillNav className="justify-self-center" />
+          <span className="hidden justify-self-end sm:block">
+            <ConnectControl />
+          </span>
+        </div>
+      </header>
+    </>
   );
 }
 

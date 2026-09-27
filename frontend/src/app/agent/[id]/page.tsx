@@ -112,13 +112,13 @@ function AgentDetail({
         </div>
 
         {/* Page head */}
-        <div className="mt-8 flex flex-col gap-6 sm:flex-row sm:items-start">
+        <div className="mt-6 flex items-start gap-4 sm:mt-8 sm:gap-6">
           <Fugu
             kind={kind}
             level={risk?.level ?? null}
             seed={record.id}
             label={riskAriaLabel(record.name, risk)}
-            className="size-28 shrink-0 sm:size-32"
+            className="size-16 shrink-0 sm:size-32"
           />
           <div className="min-w-0 flex-1">
             <h1 className="text-balance text-2xl font-semibold tracking-tight text-fg sm:text-3xl">

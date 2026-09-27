@@ -41,15 +41,18 @@ export function AgentCard({ view }: { view: AgentView }) {
   const ours = Boolean(FIRST_PARTY[record.id]);
 
   return (
-    <article className="group relative flex w-full min-w-0 flex-col rounded-[var(--radius-card)] border border-line bg-surface p-5 transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-1 hover:border-line-strong hover:bg-surface-strong hover:shadow-[0_12px_32px_-12px_rgba(0,0,0,0.18)] motion-reduce:hover:translate-y-0">
-      <div className="flex items-start gap-4">
+    <article className="group relative flex w-full min-w-0 flex-col rounded-[var(--radius-card)] border border-line bg-surface p-4 transition sm:p-5 duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-1 hover:border-line-strong hover:bg-surface-strong hover:shadow-[0_12px_32px_-12px_rgba(0,0,0,0.18)] motion-reduce:hover:translate-y-0">
+      {/* On a phone the card is compact: a smaller fish, no reserved second title line,
+          two lines of description, and no "no live data" chip (it is the same on almost
+          every card; the agent page still shows it). */}
+      <div className="flex items-start gap-3 sm:gap-4">
         <div className="shrink-0">
           <Fugu
             kind={kind}
             level={risk?.level ?? null}
             seed={record.id}
             label={riskAriaLabel(record.name, risk)}
-            className="h-16 w-16"
+            className="size-12 sm:size-16"
           />
         </div>
         <div className="min-w-0 flex-1">
@@ -62,7 +65,7 @@ export function AgentCard({ view }: { view: AgentView }) {
             a broken one. `line-clamp-2` caps the other direction: a third line would
             push the same rhythm out again.
           */}
-          <h3 className="line-clamp-2 min-h-[2.5rem] text-base font-semibold leading-tight text-fg">
+          <h3 className="line-clamp-2 text-base font-semibold leading-tight text-fg sm:min-h-[2.5rem]">
             <Link
               href={`/agent/${encodeURIComponent(record.id)}`}
               className="after:absolute after:inset-0 after:rounded-[var(--radius-card)]"
@@ -91,7 +94,9 @@ export function AgentCard({ view }: { view: AgentView }) {
                 By HelloFugu
               </span>
             ) : null}
-            <RiskChip reading={risk} size="sm" />
+            <span className="hidden sm:contents">
+              <RiskChip reading={risk} size="sm" />
+            </span>
             <HiredBadge
               agentId={record.id}
               listingId={listing?.active ? listing.listingId.toString() : null}
@@ -100,10 +105,10 @@ export function AgentCard({ view }: { view: AgentView }) {
         </div>
       </div>
 
-      <p className="mt-4 line-clamp-3 text-sm leading-relaxed break-words text-muted">{record.description}</p>
+      <p className="mt-3 line-clamp-2 text-sm leading-relaxed break-words text-muted sm:mt-4 sm:line-clamp-3">{record.description}</p>
 
       {outcomes.length > 0 ? (
-        <p className="mt-3 border-l-2 border-line pl-3 text-sm leading-relaxed text-fg">
+        <p className="mt-3 line-clamp-2 border-l-2 border-line pl-3 text-sm leading-relaxed text-fg sm:line-clamp-none">
           {outcomes[0]}
         </p>
       ) : null}
@@ -125,7 +130,7 @@ export function AgentCard({ view }: { view: AgentView }) {
       {/* The foot of the card. When there is no listing this used to say "Nothing to pay
           yet" and stop, which is a dead end for 103 of the 112 agents in the catalogue.
           It now names the one wallet that can change that, as a link anybody can open. */}
-      <div className="mt-5 flex flex-wrap items-baseline justify-between gap-2 border-t border-line pt-4">
+      <div className="mt-4 flex flex-wrap items-baseline justify-between gap-2 border-t border-line pt-3 sm:mt-5 sm:pt-4">
         {listing?.active ? (
           <span className="font-mono text-sm tabular-nums text-fg">
             {formatPricePerPeriod(listing.priceUsd8PerPeriod, listing.periodSeconds)}
@@ -147,7 +152,8 @@ export function AgentCard({ view }: { view: AgentView }) {
         ) : (
           <span className="text-sm text-faint">No price, and no owner on record</span>
         )}
-        <span className="text-xs text-faint transition group-hover:text-accent-strong">
+        {/* The whole card is the link; on a phone the extra words only cost a line. */}
+        <span className="hidden text-xs text-faint transition group-hover:text-accent-strong sm:inline">
           Open the agent →
         </span>
       </div>
