@@ -107,21 +107,28 @@ export function AgentCard({ view }: { view: AgentView }) {
 
       <p className="mt-3 line-clamp-2 text-sm leading-relaxed break-words text-muted sm:mt-4 sm:line-clamp-3">{record.description}</p>
 
-      {outcomes.length > 0 ? (
-        <p className="mt-3 line-clamp-2 border-l-2 border-line pl-3 text-sm leading-relaxed text-fg sm:line-clamp-none">
-          {outcomes[0]}
-        </p>
-      ) : null}
-
-      {notShipped ? (
-        // The limitation stays on the card, as a label anyone can open; the full text
-        // is the tooltip. `relative z-10` keeps it above the card's full-size link.
-        <p className="relative z-10 mt-3 inline-flex items-center gap-1.5 text-xs text-[var(--risk-3)]">
-          Limits
-          <InfoTip label="What this agent does not do yet" align="start">
-            {notShipped.length > 280 ? `${notShipped.slice(0, 277)}...` : notShipped}
-          </InfoTip>
-        </p>
+      {outcomes.length > 0 || notShipped ? (
+        // Proof and limits both stay on the card as labels anyone can open, the full text
+        // in the tooltip, so every card is the same height whatever its agent has done.
+        // `relative z-10` keeps them above the card's full-size link.
+        <div className="relative z-10 mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+          {outcomes.length > 0 ? (
+            <span className="inline-flex items-center gap-1.5 font-medium text-[var(--risk-1)]">
+              Proven on chain
+              <InfoTip label="What this agent has done on chain" align="start">
+                {outcomes[0].length > 280 ? `${outcomes[0].slice(0, 277)}...` : outcomes[0]}
+              </InfoTip>
+            </span>
+          ) : null}
+          {notShipped ? (
+            <span className="inline-flex items-center gap-1.5 text-[var(--risk-3)]">
+              Limits
+              <InfoTip label="What this agent does not do yet" align="start">
+                {notShipped.length > 280 ? `${notShipped.slice(0, 277)}...` : notShipped}
+              </InfoTip>
+            </span>
+          ) : null}
+        </div>
       ) : null}
 
       {/* Spacer: the price row always sits at the foot of the card, so card heights match. */}
