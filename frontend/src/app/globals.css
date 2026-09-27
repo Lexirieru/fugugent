@@ -493,3 +493,14 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .footer-dots::before { animation: none; }
 }
+
+/* Four pills on one row on a phone: "My agents" is longer than the "Start" it
+   replaced, so the pills tighten below 430px instead of wrapping to a second line. */
+@media (max-width: 430px) {
+  .pill-nav { --pn-pad-x: 10px; gap: 6px; }
+  .pill-list { flex-wrap: nowrap; }
+}
+@media (max-width: 360px) {
+  .pill-nav { --pn-pad-x: 7px; gap: 4px; }
+  .pill { font-size: 12px; }
+}

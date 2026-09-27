@@ -53,8 +53,10 @@ export interface PillNavItem {
 }
 
 const ITEMS: PillNavItem[] = [
-  { href: "/", label: "Start", match: (p) => p === "/" },
+  // No "Start" pill: the logo beside the nav is the way home, and the slot goes to the
+  // wallet's own console.
   { href: "/agents", label: "Agents", match: (p) => p === "/agents" || p.startsWith("/agent/") },
+  { href: "/me", label: "My agents", match: (p) => p === "/me" },
   { href: "/skills", label: "Skills", match: (p) => p.startsWith("/skills") },
   { href: "/auditors", label: "Auditors", match: (p) => p.startsWith("/auditors") },
 ];
