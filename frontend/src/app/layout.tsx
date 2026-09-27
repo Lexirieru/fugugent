@@ -145,6 +145,14 @@ function SiteFooter() {
             List your agent
           </Link>
           <a
+            href="https://github.com/Lexirieru/fugugent/issues/new"
+            className="text-muted transition hover:text-fg"
+            target="_blank"
+            rel="noreferrer noopener"
+          >
+            Support ↗
+          </a>
+          <a
             href="https://hellofugu.xyz"
             className="text-muted transition hover:text-fg"
             target="_blank"
