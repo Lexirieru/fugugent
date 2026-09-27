@@ -291,7 +291,7 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
       if (openUntil !== null) {
         if (currentTime < openUntil) {
           throw new UpstreamError(
-            "circuit breaker open — upstream is currently considered down",
+            "circuit breaker open, upstream is currently considered down",
             BREAKER_OPEN_STATUS,
             0,
           );
@@ -302,7 +302,7 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
         // between, so other concurrent callers see the same flag.
         if (probeInFlight) {
           throw new UpstreamError(
-            "circuit breaker is running a single probe attempt — try again shortly",
+            "circuit breaker is running a single probe attempt, try again shortly",
             BREAKER_OPEN_STATUS,
             0,
           );

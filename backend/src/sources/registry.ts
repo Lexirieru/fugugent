@@ -124,7 +124,7 @@ export const REGISTRY_SWEEP_INTERVAL_MS = 5 * 60_000;
  */
 export const REGISTRY_MAX_AGE_SECONDS = (2 * REGISTRY_SWEEP_INTERVAL_MS) / 1000 + 120;
 /** Concurrent metadata fetches. */
-export const METADATA_CONCURRENCY = 16;
+export const METADATA_CONCURRENCY = 8;
 /** A metadata fetch that failed is retried after this long, not on every sweep. */
 export const METADATA_RETRY_MS = 15 * 60_000;
 /** A metadata fetch that worked is refetched after this long, to pick up edits. */

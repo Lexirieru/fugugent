@@ -55,7 +55,7 @@ export function decodeMoney(value: string | bigint): bigint {
   if (typeof value === "bigint") return value;
   if (typeof value === "number") {
     throw new TypeError(
-      "money value arrived as a number — precision is already lost; pass a decimal string or a bigint",
+      "money value arrived as a number, precision is already lost; pass a decimal string or a bigint",
     );
   }
   if (typeof value !== "string" || !DECIMAL_INTEGER.test(value)) {

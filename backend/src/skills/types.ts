@@ -482,7 +482,7 @@ export function deriveTrust(
           unknown: true,
           reason:
             `audit ${decided.id} reports a clean verdict, but we do not hold the ` +
-            `evidence for it (${decided.auditorId === null ? "no auditor recorded" : "no report URI or digest"}) — ` +
+            `evidence for it (${decided.auditorId === null ? "no auditor recorded" : "no report URI or digest"}), ` +
             "an unevidenced verdict is not proof, so this skill is not shown as verified",
         };
       }
@@ -548,7 +548,7 @@ export function deriveTrust(
       reason:
         `the newest completed audit (${stale.id}) examined build ` +
         `${stale.auditedSha256.slice(0, 12)}… of version ${stale.skillVersion}, ` +
-        `not the ${current.slice(0, 12)}… being served now — ` +
+        `not the ${current.slice(0, 12)}… being served now, ` +
         `its ${stale.verdict ?? "unknown"} verdict does not carry over to this build`,
     };
   }

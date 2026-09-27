@@ -59,7 +59,7 @@
 #                              with `allkeys-lru` makes it EVICT rather than grow
 #                              into the ceiling; redis-server's own baseline on
 #                              alpine is ~6 MiB.
-#   api               112 MiB  Node 22 + Hono + drizzle + postgres.js + viem.
+#   api               160 MiB  Node 22 + Hono + drizzle + postgres.js + viem.
 #                              Measured module-graph RSS for that set is ~102 MiB
 #                              on a developer machine and lower on alpine, with
 #                              only ~12 MiB of live heap. The image caps V8 at
@@ -374,8 +374,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    mem_limit: 112m
-    memswap_limit: 112m
+    # Raised from 112m on 2026-09-27: the API now also holds a snapshot of the whole
+    # ERC-8004 registry (2,500 agents) and the kernel OOM-killed it at 112m during a
+    # sweep, with a `node -e` healthcheck running beside it. Measured steady ~80 MiB;
+    # 160m keeps real headroom, and the host had ~630 MiB available when this was set.
+    mem_limit: 160m
+    memswap_limit: 160m
     mem_reservation: 64m
     networks: [fugugent]
 

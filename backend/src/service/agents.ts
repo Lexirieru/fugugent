@@ -323,7 +323,7 @@ export function observe(
     // is not evidence that the source is still alive.
     healthy: false,
     reason:
-      `observation is ${ageSeconds} s old, past the ${ttlSeconds} s threshold — ` +
+      `observation is ${ageSeconds} s old, past the ${ttlSeconds} s threshold, ` +
       `not re-checked yet (last known status: ${last}` +
       `${health.reason ? `, ${health.reason}` : ""})`,
     checkedAt: health.checkedAt,
@@ -971,7 +971,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
         ? {
             source,
             outcome: "unhealthy",
-            reason: `exceeded its ${err.waitedMs} ms time budget — dropping to the next level`,
+            reason: `exceeded its ${err.waitedMs} ms time budget, dropping to the next level`,
             items: 0,
           }
         : { source, outcome: "threw", reason: describeThrow(err), items: 0 };
@@ -1300,7 +1300,7 @@ export function createAgentService(deps: AgentServiceDeps): AgentService {
         ? {
             source,
             outcome: "unhealthy",
-            reason: `exceeded its ${err.waitedMs} ms time budget — dropping to the next level`,
+            reason: `exceeded its ${err.waitedMs} ms time budget, dropping to the next level`,
             items: 0,
           }
         : { source, outcome: "threw", reason: describeThrow(err), items: 0 };

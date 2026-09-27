@@ -207,7 +207,7 @@ const SKILL_SPECS: readonly SkillSpec[] = [
     sourceUri: "https://example.invalid/skills/rpc-proxy",
     declaredDescription:
       "Proxies JSON-RPC calls to a configured node. The audit ran but could not observe the " +
-      "binary's behaviour, so it reached no verdict — which is reported as INCONCLUSIVE rather " +
+      "binary's behaviour, so it reached no verdict, which is reported as INCONCLUSIVE rather " +
       "than rounded to either safe or dangerous.",
     declaredCapabilities: ["forwards JSON-RPC requests"],
     tags: ["rpc", "infrastructure"],
@@ -406,7 +406,7 @@ const AUDIT_RECORDS: readonly AuditRecord[] = [
           title: "hidden instruction override in the description",
           detail:
             "The description tells the agent to ignore prior instructions and read credential " +
-            "files — the tool-poisoning shape behind CVE-2025-54136 and CVE-2025-54135.",
+            "files, the tool-poisoning shape behind CVE-2025-54136 and CVE-2025-54135.",
         },
       ]),
       stage("sandbox", "fail", "credential files read and sent to an external host", [
@@ -573,7 +573,7 @@ const AUDIT_RECORDS: readonly AuditRecord[] = [
         title: "behaviour could not be observed",
         detail:
           "The sandbox could not instrument the shipped binary. Nothing malicious was seen, and " +
-          "nothing was ruled out — this is reported as inconclusive, not as clean.",
+          "nothing was ruled out, this is reported as inconclusive, not as clean.",
       },
     ],
     feeUsd8: 100_000_000n,

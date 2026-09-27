@@ -103,7 +103,7 @@ const SEED_SPECS: readonly SeedSpec[] = [
     description:
       "Portfolio rebalancing agent for PancakeSwap v3 concentrated liquidity positions on BNB Chain. " +
       "It repositions the LP range back to its target allocation when price leaves the range, when " +
-      "deviation from target exceeds the configured band, or on a fixed interval — whichever comes first. " +
+      "deviation from target exceeds the configured band, or on a fixed interval, whichever comes first. " +
       "The strategy is deterministic code and can be backtested; no language model decides money.",
     tags: ["rebalancing", "pancakeswap-v3", "bnb-chain"],
     agentWallet: "0xb8f155D1278f0437b9De7c63911f2C0EDa485941",

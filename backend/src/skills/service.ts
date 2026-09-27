@@ -618,7 +618,7 @@ export function createSkillService(deps: SkillServiceDeps): SkillService {
           invalid: null,
           reason:
             "no skill registry is installed on this instance (no DATABASE_URL), so this " +
-            "registration was not stored — the record above is what would have been stored",
+            "registration was not stored, the record above is what would have been stored",
           fetchedAt,
         };
       }

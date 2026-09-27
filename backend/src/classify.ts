@@ -658,7 +658,7 @@ export function classify(agent: AgentRecord): AgentClassification {
       category: null,
       confidence,
       reason:
-        `not categorized: strongest evidence ${top.category} ${round(top.raw)} — ${describeHits(top.hits)}; ` +
+        `not categorized: strongest evidence ${top.category} ${round(top.raw)}, ${describeHits(top.hits)}; ` +
         `${rivalNote}${oasfNote}; confidence ${confidence} below the threshold ${MIN_CONFIDENCE}`,
     };
   }

@@ -108,7 +108,7 @@ export function parsePriceUsd8(value: unknown): { value: bigint } | { error: str
   if (typeof value === "number") {
     return {
       error:
-        "priceUsd8PerVersion arrived as a JSON number — precision may already be lost; " +
+        "priceUsd8PerVersion arrived as a JSON number, precision may already be lost; " +
         "send it as a decimal string of USD with 8 decimals (\"1500000000\" = $15.00)",
     };
   }
@@ -148,7 +148,7 @@ const INTAKE_PATTERNS: readonly Pattern[] = [
     severity: "critical",
     title: "instruction-override directive in the declared text",
     detail:
-      "The description tells the calling agent to discard its own instructions — the core of " +
+      "The description tells the calling agent to discard its own instructions, the core of " +
       "MCP tool poisoning (CVE-2025-54136 / CVE-2025-54135). A description is documentation " +
       "for a human; it has no legitimate reason to address the agent's control flow.",
   },
@@ -166,14 +166,14 @@ const INTAKE_PATTERNS: readonly Pattern[] = [
     title: "HTML comment inside the declared text",
     detail:
       "Comments render invisibly to a human reviewer while still reaching the agent's context " +
-      "window — a standard place to hide directives.",
+      "window, a standard place to hide directives.",
   },
   {
     pattern: /[​-‏‪-‮⁠-⁤﻿]/,
     severity: "high",
     title: "zero-width or bidirectional control characters",
     detail:
-      "Invisible codepoints let two different texts render identically — what a reviewer reads " +
+      "Invisible codepoints let two different texts render identically, what a reviewer reads " +
       "and what the agent receives can be made to differ.",
   },
   {
@@ -321,7 +321,7 @@ export function normalizeSkillSubmission(
     return {
       ok: false,
       field: "sourceUri",
-      message: "sourceUri is required — a skill nobody can fetch cannot be audited",
+      message: "sourceUri is required, a skill nobody can fetch cannot be audited",
     };
   }
 
@@ -331,7 +331,7 @@ export function normalizeSkillSubmission(
       ok: false,
       field: "contentSha256",
       message:
-        "contentSha256 must be 64 hex characters — it pins the exact build an audit " +
+        "contentSha256 must be 64 hex characters, it pins the exact build an audit " +
         "would apply to, and without it a clean v1 could silently serve a malicious v2",
     };
   }

@@ -67,7 +67,10 @@ EXPOSE 8787
 # never to return 5xx — including while Postgres is down — so this container is
 # considered healthy as long as the process answers, and each source's health is
 # read from the response body, not from the container status.
-HEALTHCHECK --interval=10s --timeout=5s --start-period=5s --retries=5 \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8787)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+# busybox `wget`, not a second `node -e fetch(...)`: every probe used to start another
+# Node process inside the same 112 MiB cgroup, and on 2026-09-27 one landed on a
+# registry sweep and the kernel OOM-killed the API. wget costs a few hundred KiB.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD wget -q -O /dev/null "http://127.0.0.1:${PORT:-8787}/api/health" || exit 1
 
 CMD ["node", "dist/index.js"]
