@@ -317,7 +317,7 @@ export const MARKETPLACE_CYCLE = [
   {
     label: "An agent was listed, in the Health factor kind, at $0.10 per 120 seconds",
     detail:
-      "The first listing: listingCount went to 1, countByCategory(HEALTH_FACTOR) to 1. The registry now holds four, one per category.",
+      "The first listing: listingCount went to 1, countByCategory(HEALTH_FACTOR) to 1. The registry now holds twenty, in all nine categories.",
     hash: "0x590d2f13731bef32c6409d32c9f278af8b897766a0a82e0b504acf6799ffeab7",
   },
   {
