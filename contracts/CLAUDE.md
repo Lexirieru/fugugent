@@ -2,7 +2,7 @@
 
 Foundry. Solidity `^0.8.30`, OpenZeppelin 5.7.0 (a submodule in `lib/`). BSC testnet (97).
 
-## The five contracts
+## The five contracts (all live, UUPS, verified)
 
 | Contract | Responsibility |
 |---|---|
@@ -32,6 +32,26 @@ Foundry. Solidity `^0.8.30`, OpenZeppelin 5.7.0 (a submodule in `lib/`). BSC tes
 - **USDT on BSC has 18 decimals.** Do not hardcode 6.
 - Custom errors, not `require` strings.
 - The native coin = `address(0)`.
+
+## ERC-8004 binding (FuguRegistry, upgraded 2026-09-25)
+
+- Every listing stores an `erc8004AgentId` in the IdentityRegistry
+  `0x8004A818BFB912233c491871b3d84c89A494BD9e` (testnet). `list()` reverts unless
+  `ownerOf(id) == msg.sender`; `rebindAgentId` moved the old listings to real ids.
+- Our listings 1–9 are ids 2480–2488. ERC-8004 ids start at 0 and the registry is not
+  enumerable.
+- `identityRegistry` sits at the end of storage (append-only still holds).
+
+## FuguReputation
+
+One review per wallet per listing, score 1–5, only from a wallet that has paid that
+listing (`hasSubscribed`). It does **not** stop a listing owner reviewing their own
+listing; the only on-chain review today is exactly that, from the deployer.
+
+## Where the live addresses are
+
+`deployments/bsc-testnet.json` is the source of truth: proxies, current and previous
+implementations, every upgrade and migration tx. Read it before quoting an address.
 
 ## Addresses verified live (BSC testnet 97, 2026-09-08)
 

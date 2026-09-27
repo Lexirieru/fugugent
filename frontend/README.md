@@ -16,7 +16,7 @@ through `source()` in `src/lib/data/index.ts`:
 
 | Implementation | File | Used when |
 |---|---|---|
-| `seedSource` | `src/lib/data/seed.ts` | the default — the sample data bundled with this build |
+| `seedSource` | `src/lib/data/seed.ts` | only when no API is configured (local UI work). Production always sets the API; the Phase 2 rules forbid seed data there |
 | `createHttpSource(base)` | `src/lib/data/http.ts` | as soon as `NEXT_PUBLIC_API_BASE_URL` is set |
 
 ```bash
@@ -31,6 +31,9 @@ GET /api/agents?category=&limit=&offset=
 GET /api/agents/:id
 GET /api/categories
 GET /api/health
+GET /api/tracking/hires?wallet=     (used by /me)
+GET /api/tracking/reviews?wallet=   (used by /me)
+GET /api/tracking/agents?owner=     (used by /me)
 ```
 
 Three things keep that swap from touching the UI:

@@ -21,6 +21,25 @@ before building any UI.
   a large AUM while on-chain measurement showed positions close to zero.
 - **The fugu puffs up as risk grows** — the puff level is mapped from real risk metrics.
 
+## Pages
+
+`/` catalogue · `/agents` · `/agent/[id]` (hire, cancel, rate; id is `97:<erc8004Id>`) ·
+`/me` My agents console (running hires with countdown, past hires, ratings, owned
+agents) · `/list` builder path · `/skills` · `/auditors`.
+
+## Copy
+
+No em dashes. Few words. Anything explanatory goes behind `InfoTip` (the "i").
+Fugu puff levels are risk readings: with no reading, draw the fish hollow (`level={null}`).
+
+## E2E (Playwright, injected EIP-6963 wallet)
+
+- `e2e/hire-flow.mjs`, `e2e/builder-flow.mjs`: on a fork, with a burner.
+- `e2e/my-agents-live.mjs`: the real testnet with the deployer key read from
+  `../contracts/.env` in-process. `APP=https://app.hellofugu.xyz` runs it on production;
+  locally it must be `http://localhost:3000` (the only non-production origin the API's
+  CORS allows). It spends a little tBNB.
+
 ## Commands
 
 ```bash

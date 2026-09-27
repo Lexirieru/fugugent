@@ -22,6 +22,16 @@ their on-chain wallet and pass `bag doctor`; the other three have not been scaff
 all. Their listings and `agentWallet` addresses are already fixed on chain, so those
 addresses must be adopted rather than generated. See `docs/setup/ENVIRONMENT.md` §G3.
 
+On chain, each agent is an ERC-8004 identity and a FuguRegistry listing:
+
+| Agent | ERC-8004 id | Listing |
+|---|---|---|
+| Guardian · Rebalancer · Grid · Yield | 2480 · 2481 · 2482 · 2483 | 1 · 2 · 3 · 4 |
+| Broker · Trader · Pilot · Meter · Steward | 2484 · 2485 · 2486 · 2487 · 2488 | 5 · 6 · 7 · 8 · 9 |
+
+Guardian's listing names the deployer (`0x56A2…FB0E`) as `agentWallet`, not its Altana
+wallet; the other eight name their own Altana wallet.
+
 Project names are ≤23 chars, alphanumeric, starting with a letter (an AgentCore rule) — no
 `-`/`_`/`.`.
 

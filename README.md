@@ -15,7 +15,7 @@ instead of filling the gap.
 
 ![BNB Chain](https://img.shields.io/badge/BNB%20Chain-testnet%20%C2%B7%20chainId%2097-F0B90B?style=for-the-badge&logo=binance&logoColor=black)
 ![Contracts](https://img.shields.io/badge/contracts-5%20UUPS%20%C2%B7%20verified-0072B2?style=for-the-badge)
-![Tests](https://img.shields.io/badge/tests-2%2C302%20in%20CI-009E73?style=for-the-badge)
+![Tests](https://img.shields.io/badge/tests-baselines%20asserted%20in%20CI-009E73?style=for-the-badge)
 ![Solidity](https://img.shields.io/badge/Solidity-0.8.30-363636?style=for-the-badge&logo=solidity&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
 ![Licence](https://img.shields.io/badge/licence-GPL--3.0--or--later-a8420a?style=for-the-badge)
@@ -32,6 +32,8 @@ instead of filling the gap.
 | **Agent endpoint** | **[agents.hellofugu.xyz/guardian/](https://agents.hellofugu.xyz/guardian/.well-known/agent-card.json)** |
 | **Demo video** | **[Google Drive](https://drive.google.com/drive/folders/1TiFCk9V-Peq8E0L0fdl5-0s1do9rxQDW?usp=sharing)** |
 | **Repo** | **[github.com/Lexirieru/fugugent](https://github.com/Lexirieru/fugugent)** |
+| **X** | **[@hellofuguai](https://x.com/hellofuguai)** |
+| **Tracking (BNB Chain Phase 2)** | **[api.hellofugu.xyz/api/tracking](https://api.hellofugu.xyz/api/tracking)** · [docs/phase2/TRACKING.md](docs/phase2/TRACKING.md) |
 
 **[Contracts on BscScan](#-live-on-bnb-chain-testnet--verify-it-yourself)** ·
 **[Receipts](#-receipts-not-screenshots)** ·
@@ -85,7 +87,9 @@ it does not go on the card.
 | 🔑 | **Scoped session keys** | An agent never holds your keys. It holds an Altana session key restricted to a contract **and** a function selector, with a daily spend cap and an expiry. Anything else is rejected by the account contract. |
 | 🧮 | **Deterministic strategies** | Every financial decision is bigint arithmetic with a written justification and a backtest. No LLM sits on the path between a price and a transaction. |
 | 🔍 | **On-chain marketplace** | Listing, hiring, streaming payment, and reviews are four upgradeable contracts on BSC testnet. Reviews are gated on the agent actually having been paid. |
-| 📊 | **Real agent data** | The catalog is classified from live 8004scan data, with a four-tier fallback that has been tested by cutting the network, not by flipping a config flag. |
+| ⏹️ | **Hire, cap, cancel** | A hire is a deposit held in escrow and paid out by the second. The price and the deposit are the spend cap; cancelling stops the payout and refunds the rest in the same transaction. |
+| 🗂️ | **My agents** | [`/me`](https://app.hellofugu.xyz/me) shows everything one wallet did here: what is running now with a live countdown, past hires, ratings, and the agents it owns. Each row is read from the chain. |
+| 📊 | **Real agent data** | The catalogue is read straight from the canonical **ERC-8004 IdentityRegistry** on chain 97, no seed rows, no hardcoded list. Our nine agents are ERC-8004 ids **2480–2488**. |
 
 ---
 
@@ -101,7 +105,7 @@ All five are **UUPS upgradeable** and every implementation is **verified on BscS
 
 | Contract | What it holds | Proxy (use this address) | Verified implementation |
 |---|---|---|---|
-| **FuguRegistry** | The agent catalog: listing, category, price, owner vs. agent wallet | [`0xb2f36070E6eae3353E8e755172B477DF213ae248`](https://testnet.bscscan.com/address/0xb2f36070E6eae3353E8e755172B477DF213ae248) | [`0xD68968cf68E9930a689e0fC9d648a898050a548A`](https://testnet.bscscan.com/address/0xD68968cf68E9930a689e0fC9d648a898050a548A) |
+| **FuguRegistry** | The agent catalog: listing, category, price, owner vs. agent wallet, and the ERC-8004 id each listing is bound to (only that id's owner can list it) | [`0xb2f36070E6eae3353E8e755172B477DF213ae248`](https://testnet.bscscan.com/address/0xb2f36070E6eae3353E8e755172B477DF213ae248) | [`0xC4c9668c13380800f9F0a54e9ddb4C3d35cDa2Da`](https://testnet.bscscan.com/address/0xC4c9668c13380800f9F0a54e9ddb4C3d35cDa2Da) |
 | **FuguSubscription** | Escrow + time-streamed payment from renter to agent | [`0xfdb083371f44Cf53181350389D3217e51B431776`](https://testnet.bscscan.com/address/0xfdb083371f44Cf53181350389D3217e51B431776) | [`0x06bc0ba1dbc3b6fd22defe7a0cd9a6cd13c15e97`](https://testnet.bscscan.com/address/0x06bc0ba1dbc3b6fd22defe7a0cd9a6cd13c15e97) |
 | **FuguReputation** | Reviews, gated on the agent having actually been paid | [`0x279B31B00F64C0ce85BCe2Bd7e377CdcAE58d400`](https://testnet.bscscan.com/address/0x279B31B00F64C0ce85BCe2Bd7e377CdcAE58d400) | [`0x30c92ffadad24ca079227a92a33b78683d36fde6`](https://testnet.bscscan.com/address/0x30c92ffadad24ca079227a92a33b78683d36fde6) |
 | **FuguPriceOracle** | Chainlink-backed USD→token quoting, 8-decimal USD base | [`0xB5f72a0ab0bA971c8C4F69D4A075cB7fd7859e65`](https://testnet.bscscan.com/address/0xB5f72a0ab0bA971c8C4F69D4A075cB7fd7859e65) | [`0x864f888330821b6025b2FE670f30E01Ee8776449`](https://testnet.bscscan.com/address/0x864f888330821b6025b2FE670f30E01Ee8776449) |
@@ -236,6 +240,17 @@ the agent was paid and `true` after. That is the whole content of "only people w
 can review", and it flips at the moment money moves, not at the moment someone subscribes. A
 second review from the same wallet reverts.
 
+### 5. The same lifecycle in a browser, on the live site
+
+`frontend/e2e/my-agents-live.mjs` drives **https://app.hellofugu.xyz** with Playwright and a
+real testnet wallet (the key signs inside the script and is never typed into a page). Last
+run, 27 Sep 2026: connect on `/me` → hire Fugu Guardian from
+[its page](https://app.hellofugu.xyz/agent/97:2480) → `/me` lists **sub #6** under "Running
+now" with a countdown ticking `19:55 → 19:53` → cancel from `/me` → **0.001271 tBNB**
+refunded, and `getSub(6).cancelled == true` on
+[FuguSubscription](https://testnet.bscscan.com/address/0xfdb083371f44Cf53181350389D3217e51B431776#readProxyContract).
+The wallet was asked to sign exactly two things: `subscribe` and `cancel`.
+
 ---
 
 ## 🗺️ How it works
@@ -245,17 +260,16 @@ flowchart LR
     U([👤 User]) -->|browses| FE[Marketplace<br/>Next.js 16]
     FE -->|GET /api/agents| BE[BFF<br/>Hono]
 
-    subgraph SRC[Catalog sources · 4-tier fallback]
+    subgraph SRC[Catalog sources · tiered fallback, no seed]
         direction TB
-        T1[["① 8004scan API<br/>live"]]
-        T2[["② Postgres cache"]]
+        T1[["① ERC-8004 IdentityRegistry<br/>state sweep via Multicall3"]]
+        T2[["② Postgres cache<br/>last good sweep"]]
         T3[["③ On-chain<br/>FuguRegistry"]]
-        T4[["④ Curated seed"]]
-        T1 -.->|down| T2 -.->|cold| T3 -.->|empty| T4
+        T1 -.->|RPC down| T2 -.->|cold| T3
     end
 
     BE --> SRC
-    BE -->|classify| CAT[REBALANCING · GRID<br/>YIELD · HEALTH_FACTOR]
+    BE -->|classify| CAT[9 categories<br/>REBALANCING … TREASURY]
 
     U -->|rent · pay tBNB| SUB[FuguSubscription<br/>escrow + stream]
     SUB --> REG[FuguRegistry]
@@ -285,8 +299,8 @@ flowchart LR
     classDef risk fill:#E69F00,stroke:#05121A,stroke-width:2px,color:#05121A
 
     class U user
-    class FE,BE,CAT,T1,T2,T4 app
-    class REG,SUB,REP,KS,POOL,T3 chain
+    class FE,BE,CAT,T2 app
+    class REG,SUB,REP,KS,POOL,T1,T3 chain
     class READ,DEC,EXE agent
     class LLM llm
     class BLOAT risk
@@ -501,6 +515,15 @@ The `Category` enum, in the order the contract stores it
 `0 REBALANCING` · `1 GRID` · `2 YIELD` · `3 HEALTH_FACTOR` · `4 HIRING` · `5 COMMERCE` ·
 `6 AUTONOMOUS` · `7 STREAMING` · `8 TREASURY`
 
+Per wallet, without BscScan: the tracking API reads the same contracts through Multicall3 and
+stamps every answer with the block it read.
+
+```bash
+curl -s "https://api.hellofugu.xyz/api/tracking/hires?wallet=0x…"    # hires, with category
+curl -s "https://api.hellofugu.xyz/api/tracking/agents?owner=0x…"    # listings + ERC-8004 ids
+curl -s "https://api.hellofugu.xyz/api/tracking/reviews?wallet=0x…"  # ratings
+```
+
 The marketplace reads exactly these functions and shows you the same numbers, so if a page
 and the chain ever disagree, the chain is right and the page has a bug.
 
@@ -558,12 +581,14 @@ listens on **8787**.
 curl -s localhost:8787/api/health | jq
 curl -s localhost:8787/api/categories | jq
 curl -s 'localhost:8787/api/agents?category=GRID&limit=5' | jq
-curl -s localhost:8787/api/agents/97:1912 | jq
+curl -s localhost:8787/api/agents/97:2480 | jq
 ```
 
-`/api/categories` answers from **real 8004scan data** — a live run returned
-`REBALANCING 19 · GRID 42 · YIELD 29` with `source: "scan8004"` and `ageSeconds: 0`. Those are
-our classifications of agents that actually exist, not seed rows.
+`/api/categories` answers from the **ERC-8004 IdentityRegistry itself** (`source: "registry"`):
+the backend sweeps every id by state through Multicall3, pinned to one block, because no free
+BSC testnet RPC serves historical `eth_getLogs`. Those are our classifications of agents that
+actually exist on chain. There is no seed tier in the running service (`seed: null` in
+`backend/src/index.ts`), so an empty catalogue is reported as empty, never padded.
 
 ### 5. Break it on purpose and watch it degrade honestly
 
@@ -581,13 +606,14 @@ curl -s -o /dev/null -w '%{http_code}\n' 'localhost:8787/api/health?strict=1'   
 ```
 
 Two things this shows. First, `?strict=1` tells the truth: it returned 503 when Postgres was
-down and — separately, without us touching anything — when 8004scan itself fell over with an
-intermittent 500. Second, the catalog still answers in **0.57s** with the database gone, down
+down and, separately, when an upstream fell over on its own. Second, the catalog still answers in **0.57s** with the database gone, down
 from 31s before the timeouts were tuned. Degraded, fast, and labelled as degraded.
 
-The four-tier fallback was proven by **blocking DNS**, not by flipping a config flag:
-tier 1 8004scan (real token) → tier 2 Postgres cache → tier 3 on-chain `FuguRegistry` →
-tier 4 curated seed.
+The fallback was proven by **blocking DNS**, not by flipping a config flag: tier 1 the ERC-8004
+registry → tier 2 Postgres cache → tier 3 on-chain `FuguRegistry`. Each RPC read also falls
+back across public endpoints (bnbchain seed node → publicnode → sentio) before a tier is
+declared down. 8004scan is no longer a tier; it is only where a registration tx hash is
+*looked up*, and the page shows that hash only after its receipt proves `Registered(agentId)`.
 
 ### 6. Run the marketplace against your local API
 
@@ -595,13 +621,9 @@ tier 4 curated seed.
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8787 bun --cwd frontend dev
 ```
 
-Built this way, the page renders **"LingoAI Grid Trading Agent"** — the same real 8004scan agent
-`/api/agents?category=GRID` returns. A build during one run showed per-category cards of
-`REBALANCING 19 · GRID 24 · YIELD 24 · HEALTH_FACTOR 21`, and the detail page `/agent/97:1912`
-returned HTTP 200.
-
-Close the 8004scan gate (24 parallel requests will do it) and the page relabels itself, on its
-own, to:
+Built this way, the page renders the same ERC-8004 agents `/api/agents` returns, and
+`/agent/97:2480` is Fugu Guardian. Stop Postgres or cut the RPC and the page relabels itself,
+on its own, to something like:
 
 > **Served from our cache · 9s old · not confirmed fresh**
 
@@ -667,8 +689,15 @@ stated plainly.
   daemon is not yet the thing calling it.
 - **Rebalancer, Grid, and Yield are not wired to on-chain execution.** They have decision engines
   and backtests. They have wallets and registered sessions. They have not sent a transaction.
-- There is **no user-pressable kill switch** yet. There is a one-way kill hook in code, with unit
-  tests. There is no UI where a user sees the agent's permissions and revokes them.
+- **A hire can be revoked from the UI; the agent's session key cannot yet.** Cancelling a hire
+  (on the agent's page or on `/me`) stops the payout and refunds the unspent deposit on chain.
+  What a renter cannot do from the UI is revoke the Altana session key the agent itself runs
+  on: that is `bag wallet session revoke` by the operator. Tying a hire to a renter-scoped
+  session key is the next piece of work.
+- **Every rating on chain today comes from a team wallet.** Listing 1 (Guardian) has one review,
+  left by the deployer, which also owns all nine listings. `FuguReputation` gates reviews on
+  payment but does not stop an owner reviewing their own listing. The team wallets are listed
+  in [`docs/phase2/TRACKING.md`](docs/phase2/TRACKING.md) so they can be excluded.
 
 **On the session key model**
 
@@ -705,9 +734,9 @@ stated plainly.
   the landing page and the marketplace on Vercel, the backend and the agent endpoints through
   nginx on a VPS. The backend serving means the catalogue and the health endpoints answer. It
   does **not** mean an agent runs on a schedule: only `fuguguardian` is in the running stack.
-- No 8004scan API key yet — we are on the anonymous tier, 30 requests/minute. Calls to 8004scan
-  **must** send a browser `User-Agent` or the API answers HTTP 500 (not 429), and they always go
-  through the backend, never from the browser.
+- No 8004scan API key yet — we are on the anonymous tier, 30 requests/minute. It is used only
+  to find registration tx hashes. Calls to 8004scan **must** send a browser `User-Agent` or the
+  API answers HTTP 500 (not 429), and they always go through the backend, never from the browser.
 - The character art is **hand-written parametric SVG** from `docs/brand/generate-svg.py`. Zero
   images came from a generative model — both image MCP servers were disconnected when that work
   ran, four attempts, all failed. The prompts in `docs/brand/image-prompts.md` have never been
@@ -732,7 +761,7 @@ stated plainly.
 | **`ai/fugubroker/`**, **`ai/fugutrader/`** | same, plus ERC-8183 and x402 | `pnpm test` |
 | **`ai/fugupilot/`**, **`ai/fugumeter/`**, **`ai/fugusteward/`** | same, without Studio scaffolding yet | `pnpm test` |
 | **`backend/`** | Hono · Postgres + Drizzle · Redis · viem · vitest · Docker Compose | `cd backend && pnpm test` |
-| **`frontend/`** | Next.js **16** · React **19** · Tailwind **v4** · wagmi + Reown · TanStack Query · bun | `bun --cwd frontend dev` |
+| **`frontend/`** | Next.js **16** · React **19** · Tailwind **v4** · wagmi + Reown · TanStack Query · Playwright E2E · bun | `bun --cwd frontend dev` |
 | **`landingpage/`** | React · Vite · Tailwind **v4** · bun | `bun --cwd landingpage dev` |
 | **`video/`** | Remotion · Chrome DevTools Protocol capture · ElevenLabs | `npm --prefix video run render` |
 
@@ -761,6 +790,8 @@ that work does not have to touch `docker-compose.yml` again.
 | [`docs/research/05-competitive-landscape.md`](docs/research/05-competitive-landscape.md) | Virtuals, Olas, Almanak, Giza/ARMA, Agentverse — sourced |
 | [`docs/brand/puff-levels.md`](docs/brand/puff-levels.md) | The five puff levels, all six visual channels |
 | [`docs/setup/ENVIRONMENT.md`](docs/setup/ENVIRONMENT.md) | Credentials layout, verified addresses, network constants |
+| [`docs/phase2/TRACKING.md`](docs/phase2/TRACKING.md) | BNB Chain Phase 2 tracking: events, topic0s, API, team wallets |
+| [`docs/phase2/MAINNET.md`](docs/phase2/MAINNET.md) | The mainnet migration plan |
 
 *Most documents in `docs/` are written in Indonesian; identifiers and code are English.*
 
@@ -773,6 +804,8 @@ Solo.
 | Name | Role | Links |
 |---|---|---|
 | **Axel Urwawuska Atarubby** | Everything: contracts, agents, backend, both front ends, infrastructure | [GitHub](https://github.com/Lexirieru) · [X](https://x.com/lexirieru) · Telegram `@lexilexy` |
+
+Project account: **[@hellofuguai](https://x.com/hellofuguai)** on X.
 
 ---
 
