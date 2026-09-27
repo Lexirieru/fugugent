@@ -17,7 +17,7 @@
  */
 
 import { useAppKit } from "@reown/appkit/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   useAccount,
   usePublicClient,
@@ -111,6 +111,17 @@ export function ReviewPanel({ listingId, agentName }: { listingId: string; agent
     chainId: CHAIN.id,
   });
 
+  // Re-read the totals and the gate as soon as a claim or a rating is in a block, so
+  // the stars above never say "No ratings yet" under "Rating recorded on chain".
+  const landedHash = phase.kind === "sent" && receipt.data?.status === "success" ? phase.hash : null;
+  useEffect(() => {
+    if (landedHash === null) return;
+    void totals.refetch();
+    void gate.refetch();
+    // Keyed on the hash only; the refetch functions are new every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [landedHash]);
+
   function refresh() {
     void totals.refetch();
     void gate.refetch();
@@ -155,8 +166,6 @@ export function ReviewPanel({ listingId, agentName }: { listingId: string; agent
     );
   } else if (chainId !== CHAIN.id) {
     action = <p className="text-sm text-muted">Switch to {CHAIN.name} to rate.</p>;
-  } else if (reviewed) {
-    action = <p className="text-sm text-[var(--risk-1)]">You rated {agentName}. Thank you.</p>;
   } else if (phase.kind === "sent" && receipt.data?.status === "success") {
     action = (
       <div className="flex flex-wrap items-center gap-2">
@@ -176,6 +185,8 @@ export function ReviewPanel({ listingId, agentName }: { listingId: string; agent
         </button>
       </div>
     );
+  } else if (reviewed) {
+    action = <p className="text-sm text-[var(--risk-1)]">You rated {agentName}. Thank you.</p>;
   } else if (phase.kind === "sent") {
     action = <p className="text-sm text-muted">Waiting for the block…</p>;
   } else if (eligible) {

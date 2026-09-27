@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Card, Page, PageHeader, Section, SectionHeader } from "@/components/ui";
+import { InfoTip } from "@/components/info-tip";
 import { MyAgents } from "@/components/wallet/my-agents";
-import { CHAIN, CONTRACTS, addressUrl, shorten } from "@/lib/chain";
+import { CONTRACTS, addressUrl, shorten } from "@/lib/chain";
 import { walletEnabled } from "@/lib/wallet/config";
 
 export const metadata: Metadata = {
@@ -17,7 +18,7 @@ export default function ListPage() {
         <PageHeader
           eyebrow="For builders"
           title="List your agent."
-          lede={`Any agent registered in the ERC-8004 IdentityRegistry on ${CHAIN.name} can be listed here by its owner. You set the price and the period; renters pay into escrow and it is released to you for the time your agent serves.`}
+          lede="Register it on ERC-8004, then set a price here. Earnings go to you."
         />
       </Section>
 
@@ -36,7 +37,7 @@ export default function ListPage() {
         <SectionHeader
           id="how"
           title="How it works"
-          lede="Three steps. Only the last one happens on this site."
+          lede="Three steps."
         />
         <ol className="space-y-4">
           <li>
@@ -57,10 +58,11 @@ export default function ListPage() {
               <pre className="mt-3 overflow-x-auto rounded-lg border border-line bg-bg-elev px-3 py-2 font-mono text-xs text-fg">
                 bag erc8004 register --endpoint https://your-agent.example
               </pre>
-              <p className="mt-2 text-pretty text-xs leading-relaxed text-muted">
-                Put a name and a description that say what it does in the registration file:
-                they are what renters read, and they are how this catalogue decides whether your
-                agent is yield, grid, rebalancing or health factor.
+              <p className="mt-2 inline-flex items-center gap-2 text-xs text-muted">
+                Describe what it does
+                <InfoTip label="Why the description matters" align="start">
+                  Renters read it, and it decides whether your agent is yield, grid, rebalancing or health factor.
+                </InfoTip>
               </p>
             </Card>
           </li>
@@ -68,18 +70,18 @@ export default function ListPage() {
             <Card>
               <p className="text-xs uppercase tracking-[0.14em] text-faint">2 · Wait a few minutes</p>
               <p className="mt-2 text-pretty text-sm leading-relaxed text-fg">
-                This site reads the whole registry every five minutes, straight from the contract.
-                Your agent appears under &ldquo;Your agents&rdquo; above once it has been read.
+                It appears under &ldquo;Your agents&rdquo; within five minutes.
               </p>
             </Card>
           </li>
           <li>
             <Card>
               <p className="text-xs uppercase tracking-[0.14em] text-faint">3 · List it</p>
-              <p className="mt-2 text-pretty text-sm leading-relaxed text-fg">
-                Open it, choose a category, a price and a period, and sign once. The contract checks
-                that your wallet owns the ERC-8004 identity before it accepts the listing, so nobody
-                else can list your agent and collect what it earns.
+              <p className="mt-2 inline-flex items-center gap-2 text-sm text-fg">
+                Pick a category, price and period, then sign once.
+                <InfoTip label="Who can list it" align="end">
+                  The contract checks that your wallet owns the ERC-8004 identity, so nobody else can list your agent.
+                </InfoTip>
               </p>
             </Card>
           </li>
