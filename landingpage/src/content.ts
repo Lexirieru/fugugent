@@ -27,11 +27,11 @@ export const LIST_URL = `${APP_URL}/list`;
 export const SUPPORT_URL = `${REPO_URL}/issues/new`;
 
 export const GUARDIAN_URL = "https://agents.hellofugu.xyz/guardian/";
-/** The builder's own account. There is no HelloFugu account, and we will not imply one. */
 /** The aircraft video behind the first screen (PlaneHero). */
 export const PLANE_VIDEO_URL =
   "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260801_022931_e13cbef4-690a-42d2-b5ee-5b3b1f483c83.mp4";
-export const X_URL = "https://x.com/lexirieru";
+/** HelloFugu's own account on X. */
+export const X_URL = "https://x.com/hellofuguai";
 
 /* ── The catalogue, counted ─────────────────────────────────────────
  *

@@ -63,7 +63,7 @@ export default function SiteFooter() {
               <Ext href={REPO_URL} label="HelloFugu source code on GitHub">
                 <GitHubIcon />
               </Ext>
-              <Ext href={X_URL} label="The builder's account on X">
+              <Ext href={X_URL} label="HelloFugu on X">
                 <XIcon />
               </Ext>
             </div>

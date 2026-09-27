@@ -56,6 +56,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "HelloFugu, hire a DeFi agent you can check",
     description,
+    site: "@hellofuguai",
   },
 };
 
@@ -157,6 +158,9 @@ function SiteFooter() {
             </a>
             <a href="https://github.com/Lexirieru/fugugent" target="_blank" rel="noreferrer noopener" className={link}>
               GitHub ↗
+            </a>
+            <a href="https://x.com/hellofuguai" target="_blank" rel="noreferrer noopener" className={link}>
+              X ↗
             </a>
             <a href="https://hellofugu.xyz" target="_blank" rel="noreferrer noopener" className={link}>
               About ↗
