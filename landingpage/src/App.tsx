@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import {
   AGENTS_URL,
-  APP_URL,
   HF_AFTER,
   HF_BEFORE,
   LIST_URL,
@@ -12,6 +11,7 @@ import {
   UPGRADE_TX_URL,
 } from "./content";
 import SiteFooter from "./Footer";
+import PlaneHero from "./PlaneHero";
 import InfoTip from "./InfoTip";
 import { Ext, d } from "./ui";
 import { startReveal } from "./reveal";
@@ -24,20 +24,6 @@ import {
   NextSection,
   ProofBento,
 } from "./Sections";
-
-function Header() {
-  return (
-    <header className="topbar wrap">
-      <a className="brand" href="#top" aria-label="HelloFugu home">
-        <img src="/logos/hellofugu-logo.webp" alt="" width={28} height={28} decoding="async" />
-        <span>HelloFugu</span>
-      </a>
-      <Ext href={APP_URL} className="btn btn--ink btn--sm">
-        Open the app
-      </Ext>
-    </header>
-  );
-}
 
 /*
  * Split hero, adapted from MotionSites "Crypto Vault" (premium): copy in a rounded
@@ -52,7 +38,7 @@ function Hero() {
     <section className="hero wrap" aria-labelledby="hero-title">
       <div className="hero__copy">
         <p className="eyebrow hero-in" style={d(0)}>
-          an agent marketplace on BNB Chain
+          how it works
         </p>
         <h1 className="hero__title" id="hero-title">
           <span className="hero-in" style={d(90)}>
@@ -139,8 +125,8 @@ export default function App() {
 
   return (
     <div className="site" id="top">
-      <Header />
       <main>
+        <PlaneHero />
         <Hero />
         <BuiltOn />
         <ProofBento />

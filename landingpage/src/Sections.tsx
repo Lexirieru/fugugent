@@ -374,7 +374,7 @@ export function NextSection() {
             <InfoTip label={`About ${build.title}`}>
               {build.does}. Altana piece: {build.piece}.
             </InfoTip>
-            <span className="chip chip--planned">Not built yet</span>
+            <span className="chip chip--planned">Coming soon</span>
           </li>
         ))}
       </ol>
