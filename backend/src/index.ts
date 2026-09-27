@@ -26,7 +26,7 @@
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { pathToFileURL } from "node:url";
-import { createPublicClient, http as viemHttp } from "viem";
+import { createPublicClient, fallback, http as viemHttp } from "viem";
 import { bscTestnet } from "viem/chains";
 import { loadConfig } from "./config.js";
 import { connectDb, ensureSchema, type DbHandle } from "./db/client.js";
@@ -88,12 +88,18 @@ export const CACHE_WRITE_CHUNK = 500;
  */
 export function buildServer(env: NodeJS.ProcessEnv = process.env): BuiltServer {
   const config = loadConfig(env);
+  // One transport for every chain read: the configured RPC first, then the public
+  // fallbacks, so a single provider going down does not take the catalogue with it.
+  const rpcTransport =
+    config.rpcFallbackUrls.length === 0
+      ? viemHttp(config.rpcUrl)
+      : fallback([viemHttp(config.rpcUrl), ...config.rpcFallbackUrls.map((u) => viemHttp(u))]);
 
   const httpClient = createHttpClient({ fetchImpl: fetch, now: () => Date.now() });
   const scan8004 = createScan8004Source({ http: httpClient, config });
 
   const onchain = createOnchainSource({
-    client: createPublicClient({ chain: bscTestnet, transport: viemHttp(config.rpcUrl) }),
+    client: createPublicClient({ chain: bscTestnet, transport: rpcTransport }),
     config,
   });
 
@@ -112,7 +118,7 @@ export function buildServer(env: NodeJS.ProcessEnv = process.env): BuiltServer {
   // longer asked for the catalogue; it survives only as the place a mint
   // transaction hash is *found*, and every such hash is checked against a
   // receipt from our own RPC before it is shown (`registry-proof.ts`).
-  const rpcClient = createPublicClient({ chain: bscTestnet, transport: viemHttp(config.rpcUrl) });
+  const rpcClient = createPublicClient({ chain: bscTestnet, transport: rpcTransport });
   const registryAddress = config.contracts.identityRegistry;
   const db = dbHandle?.db;
   const registry = createRegistryIndex({
@@ -158,7 +164,7 @@ export function buildServer(env: NodeJS.ProcessEnv = process.env): BuiltServer {
     // Auditor reputation comes from the FuguReputation contract that is already
     // live on BSC testnet, rather than from a second scoreboard invented here.
     reputation: createReputationSource(
-      createPublicClient({ chain: bscTestnet, transport: viemHttp(config.rpcUrl) }),
+      createPublicClient({ chain: bscTestnet, transport: rpcTransport }),
       config.contracts.reputation,
     ),
     chainId: config.chainId,

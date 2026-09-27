@@ -16,6 +16,35 @@ export const CHAIN_ID = 97;
 /** The SDK default uses the `binance.org` domain, which is blocked from Indonesia. Must be overridden. */
 export const DEFAULT_RPC_URL = "https://data-seed-prebsc-1-s1.bnbchain.org:8545";
 
+/**
+ * Checked on 2026-09-27 from chainlist's chain 97 list: of fifteen public endpoints
+ * these two answered chain 97, served state 300 blocks back, and took a burst of 30
+ * requests without a failure. PublicNode had been down (Cloudflare 520) earlier that
+ * morning, which is why there are two.
+ */
+export const DEFAULT_RPC_FALLBACK_URLS = [
+  "https://bsc-testnet-rpc.publicnode.com",
+  "https://bsc-testnet.rpc.sentio.xyz",
+] as const;
+
+function isLoopback(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    return host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "::1";
+  } catch {
+    return false;
+  }
+}
+
+export function fallbackRpcUrls(primary: string, raw: string | undefined): readonly string[] {
+  if (isLoopback(primary)) return [];
+  const list =
+    raw === undefined
+      ? [...DEFAULT_RPC_FALLBACK_URLS]
+      : raw.split(",").map((u) => u.trim()).filter((u) => u !== "");
+  return list.filter((u) => u !== primary);
+}
+
 export const DEFAULT_SCAN8004_BASE_URL = "https://api.8004scan.io/api/v1";
 export const DEFAULT_DGRID_BASE_URL = "https://api.dgrid.ai/v1";
 
@@ -72,6 +101,13 @@ export interface UpstreamSourceConfig {
 export interface FugugentConfig {
   chainId: number;
   rpcUrl: string;
+  /**
+   * Tried in order when `rpcUrl` fails at the transport level (down, 5xx, rate
+   * limited). A revert is an answer, not an outage, and never falls through. Empty
+   * when `rpcUrl` is a local node: a fork must never be quietly swapped for the
+   * live chain.
+   */
+  rpcFallbackUrls: readonly string[];
   /** See `DEFAULT_ALLOWED_ORIGINS`. Never empty: an empty list would allow nothing. */
   allowedOrigins: readonly string[];
   contracts: ContractAddresses;
@@ -130,6 +166,7 @@ export function loadConfig(env: EnvLike = process.env): FugugentConfig {
   return {
     chainId: CHAIN_ID,
     rpcUrl: readEnv(env, "RPC_URL") ?? DEFAULT_RPC_URL,
+    rpcFallbackUrls: fallbackRpcUrls(readEnv(env, "RPC_URL") ?? DEFAULT_RPC_URL, readEnv(env, "RPC_FALLBACK_URLS")),
     allowedOrigins: parseAllowedOrigins(readEnv(env, "ALLOWED_ORIGINS")),
     contracts: CONTRACT_ADDRESSES,
     scan8004: buildUpstreamConfig(

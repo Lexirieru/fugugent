@@ -53,3 +53,29 @@ describe("loadConfig", () => {
     expect(JSON.stringify(config)).not.toContain("secret-123");
   });
 });
+
+describe("RPC fallbacks", () => {
+  it("adds the public fallbacks behind a remote primary, without repeating it", async () => {
+    const { fallbackRpcUrls, DEFAULT_RPC_FALLBACK_URLS } = await import("../config.js");
+    expect(fallbackRpcUrls("https://data-seed-prebsc-1-s1.bnbchain.org:8545", undefined)).toEqual([
+      ...DEFAULT_RPC_FALLBACK_URLS,
+    ]);
+    expect(fallbackRpcUrls("https://bsc-testnet-rpc.publicnode.com", undefined)).toEqual([
+      "https://bsc-testnet.rpc.sentio.xyz",
+    ]);
+  });
+
+  it("never falls back from a local node to the live chain", async () => {
+    const { fallbackRpcUrls } = await import("../config.js");
+    expect(fallbackRpcUrls("http://127.0.0.1:8546", undefined)).toEqual([]);
+    expect(fallbackRpcUrls("http://localhost:8545", "https://bsc-testnet.rpc.sentio.xyz")).toEqual([]);
+  });
+
+  it("takes an explicit comma-separated list", async () => {
+    const { fallbackRpcUrls } = await import("../config.js");
+    expect(fallbackRpcUrls("https://a.example", " https://b.example , https://c.example ")).toEqual([
+      "https://b.example",
+      "https://c.example",
+    ]);
+  });
+});
