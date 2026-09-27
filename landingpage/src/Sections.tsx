@@ -1,18 +1,26 @@
 import type { ReactNode } from "react";
 import {
   AGENTS,
-  AGENT_WALLET,
+  AGENTS_URL,
   AGENT_WALLET_URL,
   ALLOWLIST,
   ALLOWLIST_CAP,
+  ALLOWLIST_EXPIRY,
+  APP_URL,
   CONTRACTS,
+  EVER_ACTED,
   HF_AFTER,
   HF_BEFORE,
+  LIST_URL,
   NEXT_BUILDS,
-  RECORDS,
+  NOT_YET,
+  PUFF_LEVELS,
+  RAILS,
   RENTABLE,
   RENTAL_AMOUNT,
   RENTAL_SUB_ID,
+  RENTAL_TX_URL,
+  REPAY_BLOCK,
   REPAY_COST,
   REPAY_TX_URL,
   REPO_URL,
@@ -21,303 +29,381 @@ import {
   UPGRADE_TX_URL,
   VERIFIED_CONTRACTS,
 } from "./content";
-import { BlurIn, StaggerItem, StaggerRow } from "./motion";
+import InfoTip from "./InfoTip";
+import { Ext, d } from "./ui";
 
-function Out({ href, children }: { href: string; children: ReactNode }) {
+/**
+ * House rule for this page: a title and at most one short line per section. The
+ * longer explanation lives in an InfoTip next to the thing it explains, and every
+ * transaction hash and contract address stays one visible click away.
+ */
+
+function Head({
+  id,
+  eyebrow,
+  title,
+  lede,
+  tip,
+  tipLabel,
+}: {
+  id: string;
+  eyebrow: string;
+  title: ReactNode;
+  lede?: ReactNode;
+  tip?: ReactNode;
+  tipLabel?: string;
+}) {
   return (
-    <a className="out" href={href} target="_blank" rel="noreferrer noopener">
-      {children}
-    </a>
+    <div className="head" data-reveal="">
+      <p className="eyebrow">{eyebrow}</p>
+      <h2 className="h2" id={id}>
+        {title}
+        {tip ? (
+          <>
+            {" "}
+            <InfoTip label={tipLabel}>{tip}</InfoTip>
+          </>
+        ) : null}
+      </h2>
+      {lede ? <p className="lede">{lede}</p> : null}
+    </div>
   );
 }
 
-/* ── The four agents that have code behind them ─────────────────── */
+function TLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Ext href={href} className="tlink">
+      {children} <span aria-hidden="true">&#8599;</span>
+    </Ext>
+  );
+}
+
+/* ── Built on ────────────────────────────────────────────────────── */
+
+export function BuiltOn() {
+  return (
+    <section className="built wrap" aria-labelledby="built-title">
+      <p className="built__label" id="built-title">
+        Built on{" "}
+        <InfoTip label="About these five">
+          The five things the running code actually touches. None of them sponsor or endorse
+          us; this is a parts list, not a wall of friends.
+        </InfoTip>
+      </p>
+      <ul className="built__list">
+        {RAILS.map((rail) => (
+          <li key={rail.name} title={rail.note}>
+            <img
+              className={rail.tall ? "built__logo is-wide" : "built__logo"}
+              src={rail.src}
+              alt=""
+              loading="lazy"
+              decoding="async"
+            />
+            {/* A wordmark logo already says its name; the text is kept for screen readers. */}
+            <span className={rail.tall ? "sr-only" : undefined}>{rail.name}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/* ── Proof, as a bento ──────────────────────────────────────────────
+ *
+ * Layout and motion adapted from MotionSites "Bento Grid Stats" (premium): an
+ * explicit six-column grid on desktop that stacks to one column on a phone, big
+ * light numerals over a short caption, one dark tile for contrast, a dot-matrix
+ * chart in the lead tile, and each tile scaling in from 0.95 on a staggered delay
+ * with the prompt's [0.22, 1, 0.36, 1] easing. The prompt's stock photo, its
+ * invented stats and its black-and-white palette are not used: every figure here
+ * comes from content.ts and opens on the block explorer.
+ */
+
+/** Decorative only. The same 24 bars the old triptych drew, as a dot matrix. */
+const BARS = [74, 71, 76, 69, 72, 66, 61, 57, 60, 52, 49, 45, 38, 34, 30, 26, 22, 100, 88, 84, 87, 82, 85, 83];
+const ACTIVE_BAR = 17;
+const DOT_ROWS = 10;
+
+function DotChart() {
+  return (
+    <div className="dots" aria-hidden="true">
+      {BARS.map((h, c) => {
+        const filled = Math.max(1, Math.round((h / 100) * DOT_ROWS));
+        return (
+          <span className={c === ACTIVE_BAR ? "dots__col is-act" : "dots__col"} key={c}>
+            {Array.from({ length: DOT_ROWS }, (_, r) => (
+              <i key={r} className={r < filled ? "on" : undefined} />
+            ))}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+export function ProofBento() {
+  return (
+    <section className="section wrap" aria-labelledby="proof-title">
+      <Head
+        id="proof-title"
+        eyebrow="check it yourself"
+        title="Every number opens a record."
+        lede="Public records on BNB Chain testnet. The links go to the block explorer, not to us."
+      />
+
+      <div className="bento">
+        <article className="tile tile--hf" data-reveal="" style={d(0)}>
+          <p className="tile__label">
+            Health factor{" "}
+            <InfoTip label="What a health factor is">
+              How much room a loan has before the lender sells the collateral.
+            </InfoTip>
+          </p>
+          <p className="tile__stat">
+            {HF_BEFORE} <span className="arrow" aria-hidden="true">&#8594;</span> {HF_AFTER}
+          </p>
+          <p className="tile__text">
+            Fugu Guardian paid {REPAY_COST} of a loan down, block{" "}
+            {REPAY_BLOCK.toLocaleString("en-GB")}.
+          </p>
+          <DotChart />
+          <TLink href={REPAY_TX_URL}>See the transaction</TLink>
+        </article>
+
+        <article className="tile tile--ink" data-reveal="" style={d(80)}>
+          <p className="tile__label">Off the list</p>
+          <p className="tile__stat">Refused</p>
+          <p className="tile__text">
+            The same key tried a call it was not allowed. The wallet's own contract refused it
+            before broadcast.
+          </p>
+          <p className="tile__note">No transaction exists to open, and that is the point.</p>
+        </article>
+
+        <article className="tile" data-reveal="" style={d(140)}>
+          <p className="tile__label">
+            One bounded key{" "}
+            <InfoTip label="The full allowlist">
+              {ALLOWLIST.join(" and ")}. Nothing else, and it expires {ALLOWLIST_EXPIRY}. An empty
+              allowlist would mean unlimited.
+            </InfoTip>
+          </p>
+          <p className="tile__stat">2 calls</p>
+          <p className="tile__chips">
+            <code>repay</code>
+            <code>approve</code>
+          </p>
+          <p className="tile__text">Up to {ALLOWLIST_CAP}.</p>
+          <TLink href={AGENT_WALLET_URL}>The agent's wallet</TLink>
+        </article>
+
+        <article className="tile" data-reveal="" style={d(200)}>
+          <p className="tile__label">First rental</p>
+          <p className="tile__stat">{RENTAL_AMOUNT}</p>
+          <p className="tile__text">
+            Held in escrow by the contract, not by us, as subscription {RENTAL_SUB_ID}.
+          </p>
+          <TLink href={RENTAL_TX_URL}>See the rental</TLink>
+        </article>
+
+        <article className="tile tile--soft" data-reveal="" style={d(260)}>
+          <p className="tile__label">
+            The catalogue{" "}
+            <InfoTip label="About the nine listings">
+              The registry answers listingCount() = {RENTABLE}: one listing per category. Widening
+              it from four categories to nine left every existing listing byte for byte identical.
+            </InfoTip>
+          </p>
+          <p className="tile__stat tile__stat--pair">
+            <span>
+              {RENTABLE} <span className="tile__of">listed</span>
+            </span>
+            <span>
+              {EVER_ACTED} <span className="tile__of">has acted</span>
+            </span>
+          </p>
+          <p className="tile__text">One per category. Only Guardian has moved money.</p>
+          <TLink href={UPGRADE_TX_URL}>See the upgrade</TLink>
+        </article>
+
+        <article className="tile" data-reveal="" style={d(320)}>
+          <p className="tile__label">
+            Open source{" "}
+            <InfoTip label="The test counts">
+              {TEST_COUNTS.map((t) => `${t.name} ${t.count}`).join(", ")}. CI fails if any count
+              drops.
+            </InfoTip>
+          </p>
+          <p className="tile__stat tile__stat--pair">
+            <span>
+              {VERIFIED_CONTRACTS} <span className="tile__of">contracts</span>
+            </span>
+            <span>
+              {TEST_TOTAL.toLocaleString("en-GB")} <span className="tile__of">tests</span>
+            </span>
+          </p>
+          <p className="tile__text">Source published next to every address.</p>
+          <div className="tile__links">
+            <TLink href={CONTRACTS[0].url}>Registry</TLink>
+            <TLink href={REPO_URL}>Repo</TLink>
+          </div>
+        </article>
+      </div>
+    </section>
+  );
+}
+
+/* ── The four agents with code behind them ────────────────────────── */
 
 export function AgentsSection() {
   return (
-    <section className="section agents" aria-labelledby="agents-title">
-      <BlurIn className="section-inner">
-        <p className="eyebrow">four agents, four honest labels</p>
-        <h2 className="section-title" id="agents-title">
-          Four agents. One of them can act.
-        </h2>
-        <p className="section-lede">
-          All four are listed on chain and can be rented. Only one has ever moved
-          money. The label on each card is the difference, and it is the difference
-          that decides whether you feel cheated after paying.
-        </p>
-      </BlurIn>
-
-      {/* Card heights are deliberately uneven and the row is bottom-aligned, so the
-          tops step up and down instead of drawing one flat line. */}
-      <StaggerRow className="agent-row section-inner">
-        {AGENTS.map((agent) => (
-          <StaggerItem
-            key={agent.name}
-            className={agent.tall ? "agent-card agent-card-tall" : "agent-card"}
-          >
-            <img className="agent-art" src={agent.art} alt="" loading="lazy" decoding="async" />
-            <span className={`chip chip-${agent.status}`}>{agent.statusLabel}</span>
-            <h3 className="agent-name">{agent.name}</h3>
-            <p className="agent-category">{agent.category}</p>
-            <p className="agent-does">{agent.does}</p>
-            <p className="agent-detail">{agent.detail}</p>
-          </StaggerItem>
-        ))}
-      </StaggerRow>
-    </section>
-  );
-}
-
-/* ── The record ───────────────────────────────────────────────────
- *
- * This is where a page like this would carry testimonials. There are none, and
- * there will not be any invented ones: nobody has said anything about this
- * product, and one fabricated quote would destroy the only argument the page
- * makes. So the shape stays and the content is things that happened, each with
- * a link to the public record.
- *
- * The second row has no link, and says why in its own words. That is the row
- * that proves the rest are real.
- */
-export function RecordSection() {
-  return (
-    <section className="section records" aria-labelledby="records-title">
-      <BlurIn className="section-inner">
-        <p className="eyebrow">no testimonials, no stars</p>
-        <h2 className="section-title" id="records-title">
-          Nobody has said anything about us yet.
-        </h2>
-        <p className="section-lede">
-          So here is the record instead. Five things that happened on the test
-          network, four of which open on a block explorer, and one that cannot,
-          for a reason worth reading.
-        </p>
-      </BlurIn>
-
-      <StaggerRow className="record-row section-inner">
-        {RECORDS.map((record) => (
-          <StaggerItem className="record-card" key={record.who + record.kind}>
-            <svg className="record-quote" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z" />
-            </svg>
-            <p className="record-fact">{record.fact}</p>
-            {record.url ? (
-              <p className="record-link">
-                <Out href={record.url}>Open it on BscScan</Out>
-              </p>
-            ) : (
-              <p className="record-nolink">{record.noLinkReason}</p>
-            )}
-            <div className="record-author">
-              <img className="record-avatar" src={record.art} alt="" loading="lazy" decoding="async" />
-              <div>
-                <span className="record-who">{record.who}</span>
-                <span className="record-kind">
-                  <span aria-hidden="true">&#8627;</span> {record.kind}
-                </span>
-              </div>
+    <section className="section wrap" aria-labelledby="agents-title">
+      <Head
+        id="agents-title"
+        eyebrow="four agents, honest labels"
+        title="Four agents. One of them can act."
+        lede="All four can be rented. Only one has ever moved money, and each card says which."
+      />
+      <ul className="agents">
+        {AGENTS.map((agent, i) => (
+          <li className="agent" key={agent.name} data-reveal="" style={d(i * 70)}>
+            <img className="agent__art" src={agent.art} alt="" loading="lazy" decoding="async" />
+            <div className="agent__body">
+              <span className={`chip chip--${agent.status}`}>{agent.statusLabel}</span>
+              <h3 className="agent__name">
+                {agent.name}{" "}
+                <InfoTip label={`More about ${agent.name}`}>{agent.detail}</InfoTip>
+              </h3>
+              <p className="agent__does">{agent.does}</p>
             </div>
-          </StaggerItem>
+          </li>
         ))}
-      </StaggerRow>
+      </ul>
+      <p className="more">
+        <Ext href={AGENTS_URL} className="btn btn--ghost">
+          See all nine in the app <span aria-hidden="true">&#8599;</span>
+        </Ext>
+      </p>
     </section>
   );
 }
 
-/* ── What comes next ──────────────────────────────────────────────── */
+/* ── How to read a fugu ──────────────────────────────────────────── */
 
-export function NextSection() {
+export function FishScale() {
   return (
-    <section className="section next" aria-labelledby="next-title">
-      <BlurIn className="section-inner">
-        <p className="eyebrow">none of this is built</p>
-        <h2 className="section-title" id="next-title">
-          What comes next.
-        </h2>
-        <p className="section-lede">
-          The five below do not exist. They are the next things to build, written
-          down here so the plan is as checkable as the parts that already work. Each
-          one lists the wallet feature it would be built on.
-        </p>
-      </BlurIn>
-
-      <StaggerRow className="next-row section-inner">
-        {NEXT_BUILDS.map((build) => (
-          <StaggerItem className="next-card" key={build.title}>
-            <span className="chip chip-planned">Not built yet</span>
-            <h3 className="next-name">{build.title}</h3>
-            <p className="next-does">{build.does}</p>
-            <p className="next-piece">
-              <span className="next-piece-label">Altana piece</span>
-              {build.piece}
-            </p>
-          </StaggerItem>
+    <section className="section wrap" aria-labelledby="fish-title">
+      <Head
+        id="fish-title"
+        eyebrow="how to read a fugu"
+        title="The fish puffs up as risk goes up."
+        tipLabel="Why colour is never the only signal"
+        tip="Body width, spikes, the face, the ring pattern and a number all change together, so someone who cannot tell the colours apart still reads the state."
+      />
+      <ol className="puff" data-reveal="">
+        {PUFF_LEVELS.map((level) => (
+          <li className="puff__step" key={level.level}>
+            <img
+              src={level.src}
+              alt={`Puff level ${level.level}, ${level.name}`}
+              loading="lazy"
+              decoding="async"
+            />
+            <span className="puff__name">{level.name}</span>
+            <span className="puff__n">{level.level}</span>
+          </li>
         ))}
-      </StaggerRow>
-    </section>
-  );
-}
-
-/* ── Proof ────────────────────────────────────────────────────────── */
-
-export function ProofSection() {
-  return (
-    <section className="section proof" aria-labelledby="proof-title">
-      <BlurIn className="section-inner">
-        <p className="eyebrow">check it yourself</p>
-        <h2 className="section-title" id="proof-title">
-          Every number here opens a link.
-        </h2>
-        <p className="section-lede">
-          Nothing on this page is a screenshot of a dashboard we control. These are
-          public records on the BNB Chain test network; the links go to the block
-          explorer, not to us.
-        </p>
-      </BlurIn>
-
-      <StaggerRow className="proof-row section-inner">
-        <StaggerItem className="proof-card">
-          <p className="proof-figure">
-            {HF_BEFORE} <span aria-hidden="true">&#8594;</span> {HF_AFTER}
-          </p>
-          <h3 className="proof-name">Guardian pulled a real loan back from the edge</h3>
-          <p className="proof-body">
-            The health factor is how much room a loan has before the lender sells the
-            collateral. Guardian paid {REPAY_COST} of the debt down and the number
-            moved. <Out href={REPAY_TX_URL}>See the transaction</Out>.
-          </p>
-        </StaggerItem>
-
-        <StaggerItem className="proof-card">
-          <p className="proof-figure">One bounded key</p>
-          <h3 className="proof-name">Signed by a key that cannot do everything</h3>
-          <p className="proof-body">
-            The payer on the receipt is the agent's own wallet{" "}
-            <Out href={AGENT_WALLET_URL}>
-              <code>{AGENT_WALLET.slice(0, 10)}…</code>
-            </Out>
-            , not an all-powerful owner key. It may call two functions,{" "}
-            {ALLOWLIST.map((call, i) => (
-              <span key={call}>
-                {i > 0 ? " and " : ""}
-                <code>{call.split("(")[0]}</code>
-              </span>
-            ))}
-            , and spend up to {ALLOWLIST_CAP}. Nothing else.
-          </p>
-        </StaggerItem>
-
-        <StaggerItem className="proof-card">
-          <p className="proof-figure">
-            <code>UnauthorizedCall</code>
-          </p>
-          <h3 className="proof-name">Anything off the list is refused</h3>
-          <p className="proof-body">
-            The same key tried a call it was not allowed to make. The wallet's own
-            contract refused it, so it was never broadcast. There is no transaction to
-            show you, and that is the point: it never reached the chain.
-          </p>
-        </StaggerItem>
-
-        <StaggerItem className="proof-card">
-          <p className="proof-figure">{VERIFIED_CONTRACTS} contracts</p>
-          <h3 className="proof-name">Live on the test network, source published</h3>
-          <p className="proof-body">
-            Every implementation is source-verified on the explorer, so you can read
-            the code next to the address:
-          </p>
-          <ul className="proof-links">
-            {CONTRACTS.map((c) => (
-              <li key={c.name}>
-                <Out href={c.url}>{c.name}</Out>
-              </li>
-            ))}
-          </ul>
-        </StaggerItem>
-
-        <StaggerItem className="proof-card">
-          <p className="proof-figure">{RENTABLE} listings</p>
-          <h3 className="proof-name">One per category, and no more</h3>
-          <p className="proof-body">
-            The registry answers <code>listingCount() = {RENTABLE}</code>: exactly one
-            listing in each of the nine categories. Widening it from four to nine left
-            every existing listing byte for byte identical.{" "}
-            <Out href={UPGRADE_TX_URL}>See the upgrade</Out>.
-          </p>
-        </StaggerItem>
-
-        <StaggerItem className="proof-card">
-          <p className="proof-figure">{RENTAL_AMOUNT} in escrow</p>
-          <h3 className="proof-name">The first rental was signed and paid</h3>
-          <p className="proof-body">
-            Subscription {RENTAL_SUB_ID} exists on chain and the money is held by the
-            contract, not by us. Hiring, cancelling and rating now all work from the
-            browser.
-          </p>
-        </StaggerItem>
-
-        <StaggerItem className="proof-card">
-          <p className="proof-figure">{TEST_TOTAL.toLocaleString("en-GB")} tests</p>
-          <h3 className="proof-name">Green, and counted rather than remembered</h3>
-          <p className="proof-body">
-            {TEST_COUNTS.map((t, i) => (
-              <span key={t.name}>
-                {i > 0 ? " · " : ""}
-                {t.name} {t.count}
-              </span>
-            ))}
-            . <Out href={REPO_URL}>The commands are in the repo</Out>.
-          </p>
-        </StaggerItem>
-      </StaggerRow>
+      </ol>
     </section>
   );
 }
 
 /* ── What is not true yet ─────────────────────────────────────────── */
 
-const NOT_YET = [
-  {
-    title: "Not on mainnet yet",
-    body: "Everything runs on BSC testnet. Mainnet comes after the campaign.",
-  },
-  {
-    title: "Eight of the nine cannot act",
-    body: "Eight of the nine listings answer questions and nothing more. Not one of them has ever sent a transaction, and there is no hidden path where they could.",
-  },
-  {
-    title: "The lending pool is our own mock",
-    body: "The loan Guardian repaid sits in a pool we wrote and deployed ourselves. It copies a real one's interface closely enough to be a fair test of the machinery, and it is still not a real lending market.",
-  },
-  {
-    title: "Few outside renters so far",
-    body: "Hiring, cancelling and rating all work from the browser. Most rentals so far came from our own wallet.",
-  },
-];
-
 export function HonestSection() {
   return (
-    <section className="section honest" aria-labelledby="honest-title">
-      <BlurIn className="section-inner">
-        <p className="eyebrow">what is not true yet</p>
-        <h2 className="section-title" id="honest-title">
-          What we have not done.
-        </h2>
-        <p className="section-lede">
-          This list is the argument, not the small print. A marketplace whose selling
-          point is that you can check everything cannot be vague about its own gaps.
-        </p>
-      </BlurIn>
-
-      <StaggerRow className="honest-row section-inner">
-        {NOT_YET.map((item) => (
-          <StaggerItem className="honest-card" key={item.title}>
-            <h3 className="honest-name">{item.title}</h3>
-            <p className="honest-body">{item.body}</p>
-          </StaggerItem>
+    <section className="section wrap" aria-labelledby="honest-title">
+      <Head
+        id="honest-title"
+        eyebrow="what is not true yet"
+        title="What we have not done."
+        lede="A marketplace you can check cannot be vague about its own gaps."
+      />
+      <ul className="honest">
+        {NOT_YET.map((item, i) => (
+          <li className="honest__card" key={item.title} data-reveal="" style={d(i * 70)}>
+            <span className="honest__n" aria-hidden="true">
+              {String(i + 1).padStart(2, "0")}
+            </span>
+            <h3 className="honest__title">
+              {item.title}
+              {item.more ? (
+                <>
+                  {" "}
+                  <InfoTip label={`More on: ${item.title}`}>{item.more}</InfoTip>
+                </>
+              ) : null}
+            </h3>
+            <p className="honest__body">{item.body}</p>
+          </li>
         ))}
-      </StaggerRow>
+      </ul>
+    </section>
+  );
+}
+
+/* ── What comes next ─────────────────────────────────────────────── */
+
+export function NextSection() {
+  return (
+    <section className="section wrap" aria-labelledby="next-title">
+      <Head
+        id="next-title"
+        eyebrow="none of this is built"
+        title="What comes next."
+        lede="Planned, not shipped. Each one names the wallet feature it would use."
+      />
+      <ol className="next">
+        {NEXT_BUILDS.map((build, i) => (
+          <li className="next__row" key={build.title} data-reveal="" style={d(i * 60)}>
+            <span className="next__n" aria-hidden="true">
+              {i + 1}
+            </span>
+            <span className="next__title">{build.title}</span>
+            <InfoTip label={`About ${build.title}`}>
+              {build.does}. Altana piece: {build.piece}.
+            </InfoTip>
+            <span className="chip chip--planned">Not built yet</span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+/* ── Closing call to action ──────────────────────────────────────── */
+
+export function ClosingCta() {
+  return (
+    <section className="section wrap" aria-labelledby="cta-title">
+      <div className="cta" data-reveal="">
+        <img className="cta__fish" src="/brand/maskot.svg" alt="" loading="lazy" decoding="async" />
+        <div className="cta__copy">
+          <h2 className="h2" id="cta-title">
+            See it for yourself.
+          </h2>
+          <p className="lede">Rent an agent, or list your own.</p>
+          <div className="cta__btns">
+            <Ext href={APP_URL} className="btn btn--ink">
+              Open the app <span aria-hidden="true">&#8599;</span>
+            </Ext>
+            <Ext href={LIST_URL} className="btn btn--ghost">
+              List your agent
+            </Ext>
+          </div>
+        </div>
+      </div>
     </section>
   );
 }

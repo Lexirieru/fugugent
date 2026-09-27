@@ -23,14 +23,9 @@ export const API_HEALTH_URL = "https://api.hellofugu.xyz/api/health";
 export const AGENTS_URL = `${APP_URL}/agents`;
 export const SKILLS_URL = `${APP_URL}/skills`;
 export const AUDITORS_URL = `${APP_URL}/auditors`;
+export const LIST_URL = `${APP_URL}/list`;
+export const SUPPORT_URL = `${REPO_URL}/issues/new`;
 
-/**
- * The hero video, and the same file again behind the footer's left card. It is
- * the one asset the cream ground was measured against, so it is named once here
- * rather than pasted into two components that could drift apart.
- */
-export const PLANE_VIDEO_URL =
-  "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260801_022931_e13cbef4-690a-42d2-b5ee-5b3b1f483c83.mp4";
 export const GUARDIAN_URL = "https://agents.hellofugu.xyz/guardian/";
 /** The builder's own account. There is no HelloFugu account, and we will not imply one. */
 export const X_URL = "https://x.com/lexirieru";
@@ -377,3 +372,31 @@ export const RECORDS: Record_[] = [
     url: CONTRACTS[0].url,
   },
 ];
+
+/* ── What is not true yet ───────────────────────────────────────────
+ *
+ * The honest list. Shortened for the page, never trimmed: every limitation that
+ * was here stays here. `more` is the longer version, shown in a tooltip.
+ */
+export const NOT_YET = [
+  {
+    title: "Not on mainnet yet",
+    body: "Everything runs on BSC testnet. Mainnet comes after the campaign.",
+    more: null,
+  },
+  {
+    title: "Eight of the nine cannot act",
+    body: "They answer questions. None has ever sent a transaction.",
+    more: "There is no hidden path where they could. Only Fugu Guardian has moved money.",
+  },
+  {
+    title: "The lending pool is our own mock",
+    body: "The loan Guardian repaid sits in a pool we deployed ourselves.",
+    more: "It copies a real pool's interface closely enough to be a fair test of the machinery. It is still not a real lending market.",
+  },
+  {
+    title: "Few outside renters so far",
+    body: "Hiring, cancelling and rating work. Most rentals came from our own wallet.",
+    more: null,
+  },
+] as const;

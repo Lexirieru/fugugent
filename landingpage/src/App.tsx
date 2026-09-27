@@ -1,153 +1,155 @@
 import { useEffect } from "react";
-import { PLANE_VIDEO_URL } from "./content";
-import { startEntrance } from "./entrance";
-import Features from "./Features";
+import {
+  AGENTS_URL,
+  APP_URL,
+  HF_AFTER,
+  HF_BEFORE,
+  LIST_URL,
+  RENTABLE,
+  RENTAL_AMOUNT,
+  RENTAL_TX_URL,
+  REPAY_TX_URL,
+  UPGRADE_TX_URL,
+} from "./content";
 import SiteFooter from "./Footer";
-import RailMarquee from "./RailMarquee";
+import InfoTip from "./InfoTip";
+import { Ext, d } from "./ui";
 import { startReveal } from "./reveal";
 import {
   AgentsSection,
+  BuiltOn,
+  ClosingCta,
+  FishScale,
   HonestSection,
   NextSection,
-  ProofSection,
-  RecordSection,
+  ProofBento,
 } from "./Sections";
-import Showcase from "./Showcase";
-import Triptych from "./Triptych";
 
-function LogoMark() {
+function Header() {
   return (
-    <img
-      className="logo-mark"
-      src="/logos/hellofugu-logo.webp"
-      alt=""
-      aria-hidden="true"
-      width={22}
-      height={22}
-      decoding="async"
-    />
+    <header className="topbar wrap">
+      <a className="brand" href="#top" aria-label="HelloFugu home">
+        <img src="/logos/hellofugu-logo.webp" alt="" width={28} height={28} decoding="async" />
+        <span>HelloFugu</span>
+      </a>
+      <Ext href={APP_URL} className="btn btn--ink btn--sm">
+        Open the app
+      </Ext>
+    </header>
   );
 }
 
-/**
- * The marketplace lives on its own subdomain, so this is a link and not a button.
- * It was a `<button>` with no handler, which looked right and did nothing at all.
- *
- * `target="_blank"` because the two are separate products and a reader who opens
- * the app has not finished with this page. `rel="noopener"` goes with it: without
- * it the opened tab can reach back through `window.opener` and navigate this one.
+/*
+ * Split hero, adapted from MotionSites "Crypto Vault" (premium): copy in a rounded
+ * pane on the left, a showcase pane on the right, the headline lines blurring in one
+ * after another, and a card that flips into place inside decorative rings with a
+ * dot travelling round them. Rebuilt in our light tokens; the card is our own Fugu
+ * Guardian plate from /brand, not the prompt's stock art or video. It mirrors the
+ * marketplace hero at app.hellofugu.xyz, which was built from the same prompt.
  */
-function LaunchButton() {
+function Hero() {
   return (
-    <a
-      href="https://app.hellofugu.xyz"
-      className="download-btn"
-      target="_blank"
-      rel="noopener noreferrer"
-      aria-label="Launch the HelloFugu app in a new tab"
-    >
-      <span className="download-btn-label">Launch app</span>
-    </a>
+    <section className="hero wrap" aria-labelledby="hero-title">
+      <div className="hero__copy">
+        <p className="eyebrow hero-in" style={d(0)}>
+          an agent marketplace on BNB Chain
+        </p>
+        <h1 className="hero__title" id="hero-title">
+          <span className="hero-in" style={d(90)}>
+            Hire an agent.
+          </span>
+          <span className="hero-in" style={d(190)}>
+            Check its work
+          </span>
+          <span className="hero-in hero__accent" style={d(290)}>
+            on chain.
+          </span>
+        </h1>
+        <p className="hero__lede hero-in" style={d(420)}>
+          DeFi agents built on BNB Agent Studio. Rent one, and the chain enforces its spending
+          limit.{" "}
+          <InfoTip label="What an agent is">
+            An agent is a small program that watches a position for you and acts on it. Its key
+            may only call a short, written list of functions, up to a daily cap.
+          </InfoTip>
+        </p>
+        <div className="hero__ctas hero-in" style={d(520)}>
+          <Ext href={AGENTS_URL} className="btn btn--accent">
+            Browse agents <span aria-hidden="true">&#8599;</span>
+          </Ext>
+          <Ext href={LIST_URL} className="btn btn--ghost">
+            List your agent
+          </Ext>
+        </div>
+      </div>
+
+      <div className="hero__show">
+        <span className="hero__live">
+          <span className="live-dot" aria-hidden="true" /> Live on BSC testnet
+        </span>
+        <div className="orbit" aria-hidden="true">
+          <svg className="orbit__rings" viewBox="0 0 400 400">
+            <circle cx="200" cy="200" r="198" />
+            <circle cx="200" cy="200" r="148" />
+            <circle cx="200" cy="200" r="98" />
+          </svg>
+          <span className="orbit__arm">
+            <span className="orbit__dot" />
+          </span>
+        </div>
+        <div className="hero__card">
+          <img
+            src="/brand/guardian.svg"
+            alt="Fugu Guardian, the one agent that has repaid a real loan on chain"
+            width={512}
+            height={512}
+            decoding="async"
+            fetchPriority="high"
+          />
+        </div>
+        <ul className="hero__pills">
+          <li className="hero-pop" style={d(700)}>
+            <Ext href={REPAY_TX_URL} className="pill">
+              Health factor {HF_BEFORE} <span aria-hidden="true">&#8594;</span> {HF_AFTER}
+            </Ext>
+          </li>
+          <li className="hero-pop" style={d(790)}>
+            <Ext href={UPGRADE_TX_URL} className="pill">
+              {RENTABLE} listings on chain
+            </Ext>
+          </li>
+          <li className="hero-pop" style={d(880)}>
+            <Ext href={RENTAL_TX_URL} className="pill">
+              First rental: {RENTAL_AMOUNT}
+            </Ext>
+          </li>
+        </ul>
+      </div>
+    </section>
   );
 }
 
 export default function App() {
   /*
-   * Two controllers, and both of them are written to end in the page you would
-   * get if they had never run.
-   *
-   * `startEntrance` plays the hero once and then removes every class it added,
-   * so the finished hero is the stylesheet's hero and nothing else. That is not
-   * a nicety: the composition below was calibrated against the aircraft video by
-   * hand, `--video-offset-y` is a lever the repo owner set himself, and an
-   * entrance that left a transform behind would move it by a hair.
-   *
-   * `startReveal` is the one that can silently destroy the page, so it is the
-   * one with three separate ways to fail open. The long note in reveal.ts has
-   * the argument.
-   *
-   * `useEffect` rather than `useLayoutEffect`: the hidden state comes from the
-   * inline script in index.html, which has already run, so there is nothing to
-   * flash. React's own render is not on the critical path for it.
+   * The scroll reveal fails OPEN: nothing is hidden until every target is being
+   * observed, reduced motion skips it entirely, and a 3s safety timer reveals
+   * everything regardless. The long argument is in reveal.ts.
    */
-  useEffect(() => {
-    const stopEntrance = startEntrance();
-    const stopReveal = startReveal();
-    return () => {
-      stopEntrance();
-      stopReveal();
-    };
-  }, []);
+  useEffect(() => startReveal(), []);
 
   return (
     <div className="site" id="top">
-      <main className="site-main">
-        <div className="page">
-          {/* Background layer. It sits outside <main> on purpose: as a child of <main> an
-          absolutely positioned video anchors to <main>, which is only as tall as the
-          hero, so it collapses into a band and paints over the headline. */}
-          <video
-            className="media-placeholder"
-            aria-label="HelloFugu product preview"
-            autoPlay
-            loop
-            muted
-            playsInline
-            preload="metadata"
-          >
-            <source src={PLANE_VIDEO_URL} type="video/mp4" />
-          </video>
-
-          <header className="site-header">
-            <a className="logo" href="#top" aria-label="HelloFugu home">
-              <LogoMark />
-              <span className="logo-word">HelloFugu</span>
-            </a>
-            <LaunchButton />
-          </header>
-
-          <div className="hero-body">
-            <section className="hero" aria-labelledby="hero-title">
-              <div className="hero-left">
-                <p className="hero-eyebrow">
-                  an agent marketplace on BNB Chain
-                </p>
-                <h1 className="hero-title" id="hero-title">
-                  Buy an agent like you buy an app.
-                </h1>
-                <LaunchButton />
-              </div>
-              <p className="hero-desc">
-                Built on BNB Agent Studio. Rent one, and the chain enforces its
-                spending limit.
-              </p>
-            </section>
-          </div>
-        </div>
-
-        <RailMarquee />
-
-        {/*
-         * The scaled part of the page. Everything inside measures itself against
-         * this element with container query units rather than against the
-         * viewport, because container units exclude the scrollbar and `vw` does
-         * not: on Windows that difference is seventeen pixels of horizontal
-         * overflow at every width. The `vw` form is still there as the fallback
-         * for browsers without container queries.
-         */}
-        <div className="scale-root">
-          <Features />
-          <Showcase />
-        </div>
-
-        <Triptych />
+      <Header />
+      <main>
+        <Hero />
+        <BuiltOn />
+        <ProofBento />
         <AgentsSection />
-        <RecordSection />
-        <ProofSection />
-        <NextSection />
+        <FishScale />
         <HonestSection />
+        <NextSection />
+        <ClosingCta />
       </main>
-
       <SiteFooter />
     </div>
   );
