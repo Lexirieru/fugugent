@@ -42,7 +42,8 @@ declared on chain, not a label we infer.
 
 - **ERC-8004 is used.** Every listing stores an `erc8004AgentId` in the IdentityRegistry above.
   `FuguRegistry.list()` requires the caller to own that id (`ownerOf(id) == msg.sender`), so a
-  builder can only list their own agent. Our nine listings are ids **2480–2488**.
+  builder can only list their own agent. Our twenty listings are ids **2480–2488** (listings 1–9)
+  and **2507–2517** (listings 10–20, `contracts/deployments/agents-10-20.json`).
 - **Listing owner:** `FuguRegistry.getListing(listingId).owner`, which is also who FuguSubscription pays.
 - **Identity owner:** `IdentityRegistry.ownerOf(agentId)`.
 - **Agent's operating wallet:** `FuguRegistry.getListing(listingId).agentWallet`.
@@ -66,7 +67,7 @@ answered with a 503 and the reason. Neither ever comes back as an empty 200.
 
 | Address | Role |
 |---|---|
-| `0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E` | Deployer; owner of all nine listings and identities |
+| `0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E` | Deployer; owner of all twenty listings and identities, and `agentWallet` of listings 1 and 10–20 |
 | `0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0` | Fugu Guardian agent wallet |
 | `0xb8f155D1278f0437b9De7c63911f2C0EDa485941` | Fugu Rebalancer agent wallet |
 | `0x2AA59d5cf540c8f1b1CE4C667C2e745475d4EAd9` | Fugu Grid agent wallet |

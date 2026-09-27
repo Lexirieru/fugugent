@@ -26,7 +26,7 @@ const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 
 /** The team's own wallets, so their activity can be excluded from quest counts. */
 export const TEAM_WALLETS: { address: Address; role: string }[] = [
-  { address: "0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E", role: "deployer, owner of all nine listings and their ERC-8004 identities" },
+  { address: "0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E", role: "deployer, owner of all twenty listings and their ERC-8004 identities, and the agentWallet of listings 1 and 10-20" },
   { address: "0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0", role: "Fugu Guardian agent wallet (Altana)" },
   { address: "0xb8f155D1278f0437b9De7c63911f2C0EDa485941", role: "Fugu Rebalancer agent wallet (Altana)" },
   { address: "0x2AA59d5cf540c8f1b1CE4C667C2e745475d4EAd9", role: "Fugu Grid agent wallet (Altana)" },

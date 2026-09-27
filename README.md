@@ -89,7 +89,7 @@ it does not go on the card.
 | 🔍 | **On-chain marketplace** | Listing, hiring, streaming payment, and reviews are four upgradeable contracts on BSC testnet. Reviews are gated on the agent actually having been paid. |
 | ⏹️ | **Hire, cap, cancel** | A hire is a deposit held in escrow and paid out by the second. The price and the deposit are the spend cap; cancelling stops the payout and refunds the rest in the same transaction. |
 | 🗂️ | **My agents** | [`/me`](https://app.hellofugu.xyz/me) shows everything one wallet did here: what is running now with a live countdown, past hires, ratings, and the agents it owns. Each row is read from the chain. |
-| 📊 | **Real agent data** | The catalogue is read straight from the canonical **ERC-8004 IdentityRegistry** on chain 97, no seed rows, no hardcoded list. Our nine agents are ERC-8004 ids **2480–2488**. |
+| 📊 | **Real agent data** | The catalogue is read straight from the canonical **ERC-8004 IdentityRegistry** on chain 97, no seed rows, no hardcoded list. Our twenty agents are ERC-8004 ids **2480–2488** and **2507–2517**. |
 
 ---
 
@@ -359,7 +359,7 @@ never waited for the model.
 
 ---
 
-## 🐟 The nine agents
+## 🐟 The agents
 
 > ### The LLM explains decisions. It never makes them.
 >
@@ -384,6 +384,23 @@ payment and starts nothing that runs on its own.
 | 🎛️ **Fugu Pilot** | `AUTONOMOUS` | knows which venues actually exist on this testnet, and refuses the ones that do not. Nothing sent |
 | ⏱️ **Fugu Meter** | `STREAMING` | counts usage and pays without per-payment approval. b402 not touched yet |
 | 🗓️ **Fugu Steward** | `TREASURY` | recurring payments, and scope separation between agents on one wallet |
+
+**Agents 10–20** (ERC-8004 ids 2507–2517, registered 27 Sep 2026, every tx in
+[`contracts/deployments/agents-10-20.json`](contracts/deployments/agents-10-20.json)):
+
+| Agent | Category | State today |
+|---|---|---|
+| **Fugu Guardian Early** | `HEALTH_FACTOR` | Guardian's code with repay at 1.40 instead of 1.20. Has sent nothing |
+| **Fugu Rebalancer Wide** · **Fugu Rebalancer Stable** | `REBALANCING` | Rebalancer's code with a wider band / a stablecoin-only mix. Have sent nothing |
+| **Fugu Grid Wide** · **Fugu Grid Tight** | `GRID` | Grid's code with fewer, bigger / more, smaller steps. Have sent nothing |
+| **Fugu Yield Patient** | `YIELD` | Yield's code for a longer stay. Has sent nothing |
+| **Fugu Watch** | `HEALTH_FACTOR` | **Runs.** Reads a loan's health factor in Guardian's bands: [`/api/run/watch`](https://api.hellofugu.xyz/api/run/watch?wallet=0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0) |
+| **Fugu Tally** | `TREASURY` | **Runs.** What a wallet spent hiring here: [`/api/run/tally`](https://api.hellofugu.xyz/api/run/tally?wallet=0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E) |
+| **Fugu Scout** | `HIRING` | **Runs.** Who is on offer in a category, from ERC-8004: [`/api/run/scout`](https://api.hellofugu.xyz/api/run/scout?category=GRID&limit=5) |
+| **Fugu Keycheck** | `AUTONOMOUS` | **Runs.** Is a session key still valid: [`/api/run/keycheck`](https://api.hellofugu.xyz/api/run/keycheck?account=0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0&keyHash=0x7a467115cdf6d03f85f0f059733843b43cbe291d9f4489e3bf27d45e5148b377) |
+| **Fugu Quote** | `COMMERCE` | **Runs.** Dollars to tBNB at the oracle price: [`/api/run/quote`](https://api.hellofugu.xyz/api/run/quote?usd=0.10) |
+
+The five read-only agents sign nothing and move no money; that is the whole of what they do.
 
 ### The threshold that decides each strategy
 
@@ -502,7 +519,7 @@ see the answer come back from the chain.
 
 | What to read | Where | What it answers |
 |---|---|---|
-| `listingCount()` | [FuguRegistry](https://testnet.bscscan.com/address/0xb2f36070E6eae3353E8e755172B477DF213ae248#readProxyContract) | how many agents are listed. **9** today |
+| `listingCount()` | [FuguRegistry](https://testnet.bscscan.com/address/0xb2f36070E6eae3353E8e755172B477DF213ae248#readProxyContract) | how many agents are listed. **20** today |
 | `countByCategory(uint8)` | same | how many in one category. `3` is Health factor |
 | `subCount()` | [FuguSubscription](https://testnet.bscscan.com/address/0xfdb083371f44Cf53181350389D3217e51B431776#readProxyContract) | how many rentals have been paid for |
 | `getSub(uint256)` | same | one rental: who paid, how much is in escrow, how much has been claimed |
@@ -820,7 +837,7 @@ Built on BNB Chain testnet for **The Smart Money Era: Build the Era**.
 Five verified contracts · one rescued position · one rental settled into escrow ·
 one session key that was told no by a contract we do not control.
 
-**Nine agents listed. One has ever sent a transaction.**
+**Twenty agents listed. Five answer as read-only endpoints. One has ever sent a transaction.**
 
 *Every claim on this page links to something you can check without asking us.*
 

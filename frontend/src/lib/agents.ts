@@ -139,6 +139,20 @@ export const FIRST_PARTY: Record<string, FuguKind> = {
   "97:2486": "pilot",
   "97:2487": "meter",
   "97:2488": "steward",
+  // Agents 10-20, minted 2026-09-27 (contracts/deployments/agents-10-20.json).
+  // Variants wear their base agent's prop; each read-only agent wears the prop of the
+  // family its job belongs to.
+  "97:2507": "guardian", // Guardian Early
+  "97:2508": "rebalancer", // Rebalancer Wide
+  "97:2509": "rebalancer", // Rebalancer Stable
+  "97:2510": "grid", // Grid Wide
+  "97:2511": "grid", // Grid Tight
+  "97:2512": "yield", // Yield Patient
+  "97:2513": "meter", // Watch
+  "97:2514": "steward", // Tally
+  "97:2515": "broker", // Scout
+  "97:2516": "pilot", // Keycheck
+  "97:2517": "trader", // Quote
 };
 
 /**

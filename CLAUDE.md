@@ -18,8 +18,12 @@ What the rules forbid, and what must therefore never come back:
 
 - **No seed, no mock, no hardcoded agent list.** The catalogue is read from the ERC-8004
   IdentityRegistry `0x8004A818…BD9e` on chain 97 (`seed: null` in `backend/src/index.ts`).
-- Our nine agents are ERC-8004 ids **2480–2488** = FuguRegistry listings **1–9** (Guardian
-  is `97:2480`, listing 1). `FuguRegistry.list()` only accepts an id the caller owns.
+- Our twenty agents: ERC-8004 ids **2480–2488** = listings **1–9** (Guardian is `97:2480`),
+  and ids **2507–2517** = listings **10–20** (`contracts/deployments/agents-10-20.json`,
+  registered by `backend/scripts/register-more-agents.ts`). Listings 10–15 are settings
+  variants of Guardian/Rebalancer/Grid/Yield that have sent nothing; 16–20 are read-only
+  agents that answer at `api.hellofugu.xyz/api/run/<slug>` and sign nothing.
+  `FuguRegistry.list()` only accepts an id the caller owns.
 - Every hire is capped (the deposit), revocable (`cancel` refunds the rest), and visible on
   `/me` and in `/api/tracking/hires?wallet=`.
 - **Team wallets are listed in TRACKING.md so they can be excluded.** Do not pad ratings or
@@ -41,7 +45,7 @@ What the rules forbid, and what must therefore never come back:
 
 | Folder | Contents | Status |
 |---|---|---|
-| `contracts/` | 5 UUPS contracts (Foundry) | live and source-verified on testnet; 9 categories, 9 listings bound to ERC-8004 ids; addresses in `contracts/deployments/bsc-testnet.json` |
+| `contracts/` | 5 UUPS contracts (Foundry) | live and source-verified on testnet; 9 categories, 20 listings bound to ERC-8004 ids; addresses in `contracts/deployments/bsc-testnet.json` |
 | `ai/` | 9 Fugu agents (BNB Agent Studio, Altana wallets) | **Only Guardian has ever sent a transaction.** Rebalancer/Grid/Yield have a decision engine and a backtest and are listed, but cannot execute. Broker/Trader/Pilot/Meter/Steward are newer still: listed, tested, wallets funded with nothing, no session key granted, nothing sent. Pilot/Meter/Steward have no `bag` scaffolding yet either |
 | `backend/` | Hono + Postgres + Redis: BFF, ERC-8004 registry sweep, classifier, tracking API | live at `api.hellofugu.xyz`; registry → cache → FuguRegistry fallback, RPC fallback across three public endpoints |
 | `frontend/` | Next.js 16 marketplace: catalogue, agent pages with hire/cancel/rate, `/me` console, `/list` for builders | live at `app.hellofugu.xyz`; live-testnet E2E in `frontend/e2e/` |

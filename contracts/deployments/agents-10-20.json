@@ -1,0 +1,128 @@
+{
+  "note": "HelloFugu agents 10-20, registered by backend/scripts/register-more-agents.ts: an ERC-8004 identity each (IdentityRegistry 0x8004A818BFB912233c491871b3d84c89A494BD9e), then a FuguRegistry listing bound to it. Variants reuse an existing agent's decision code with other settings and have sent no transaction; read-only agents answer at https://api.hellofugu.xyz/api/run/<slug> and sign nothing.",
+  "chainId": 97,
+  "owner": "0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E",
+  "agents": {
+    "guardian-early": {
+      "slug": "guardian-early",
+      "name": "Fugu Guardian Early",
+      "category": "HEALTH_FACTOR",
+      "kind": "variant",
+      "agentId": "2507",
+      "registerTx": "0x1a63ccabda85cc5fa88099076d57f18b4fd6f1d1d4c0703787ff9693b6b359c1",
+      "listingId": "10",
+      "listTx": "0x6ab8edbf00c3f6b4cf29ed5dd27be652cba3c32aea5234b277acc343327feedc",
+      "setUriTx": "0xb461b885e103c03b884baabc963d74fb838d27dd0b5d10c96bdc0440486d90f1"
+    },
+    "rebalancer-wide": {
+      "slug": "rebalancer-wide",
+      "name": "Fugu Rebalancer Wide",
+      "category": "REBALANCING",
+      "kind": "variant",
+      "agentId": "2508",
+      "registerTx": "0x3d476afb897c85658c952f490d5fc485825f6f7fb1df9552b6e691caf86b6822",
+      "listingId": "11",
+      "listTx": "0xe4489ca56376824e72b490baaa642d8bb1ecad6669c16d5357e0c480a162b00c",
+      "setUriTx": "0xa84267515a4432f1bf07b5ca845eefbbe8334d0eb34631db0ff9dfcf7d3299a5"
+    },
+    "rebalancer-stable": {
+      "slug": "rebalancer-stable",
+      "name": "Fugu Rebalancer Stable",
+      "category": "REBALANCING",
+      "kind": "variant",
+      "agentId": "2509",
+      "registerTx": "0xf4b99fafe482fece5a3d44fabec64f0b03480bafbde4822ea05be37e6a9e006e",
+      "listingId": "12",
+      "listTx": "0xe2a9ee9e139d20ccd131bcb5c259b48cc1e6b5aa74fc2b2c41baae41148c76e7",
+      "setUriTx": "0xb963559139c7aa507b3051d0dea46f34912919468d377d7e2cc5478f5eac9ab7"
+    },
+    "grid-wide": {
+      "slug": "grid-wide",
+      "name": "Fugu Grid Wide",
+      "category": "GRID",
+      "kind": "variant",
+      "agentId": "2510",
+      "registerTx": "0xc971f93991d8650fa94dc9544240be8cfd3f607c95e446fdcc5e2d4b1eae7603",
+      "listingId": "13",
+      "listTx": "0x4f269853b044d62f3032dff7ef890347a7221887dc59467ce21daf62a579f524",
+      "setUriTx": "0xbed9605c33cafdbd9b7f446c9c05d8f2ad4fc410d9bb75c0f6e201c083f6ff03"
+    },
+    "grid-tight": {
+      "slug": "grid-tight",
+      "name": "Fugu Grid Tight",
+      "category": "GRID",
+      "kind": "variant",
+      "agentId": "2511",
+      "registerTx": "0x56192db3c21a25aec17d9fd9c021aef2f118a6419f9b5d20f0cd382588e3887b",
+      "listingId": "14",
+      "listTx": "0xa3b36ec4a2f150572b2576f18bdff8e07cb81b86a914f94b0ccf9d46e7af813c",
+      "setUriTx": "0x08cef3fb66b6faba1c8a5e8360e6beb1a427909ea72dbfce0380b25bac6fa19d"
+    },
+    "yield-patient": {
+      "slug": "yield-patient",
+      "name": "Fugu Yield Patient",
+      "category": "YIELD",
+      "kind": "variant",
+      "agentId": "2512",
+      "registerTx": "0x85b519abcc2dd071bc8eeed2e25e921101b1e78e1191bfbfe0545188df1f4535",
+      "listingId": "15",
+      "listTx": "0x2f6e4e4614de7daf33c57b247b34c0266a91099f162ee29d1af937eb2a10bf4a",
+      "setUriTx": "0x4b7021f246295ee9345d221d2389df1fe825d7ae195d66df393feeaf3109102d"
+    },
+    "watch": {
+      "slug": "watch",
+      "name": "Fugu Watch",
+      "category": "HEALTH_FACTOR",
+      "kind": "read-only",
+      "agentId": "2513",
+      "registerTx": "0x9b5d22cf9f9c3f081a4355a677330c1056cc9cd23f0198bc943a6e35a0463514",
+      "listingId": "16",
+      "listTx": "0xcce12ab41709c261f06ba0e08abc03c2e073a7dd8d2c2455031539851a16df83",
+      "setUriTx": "0x42ad0fffbb5a784a6f583345a1e5f1b3ff1c213f62ef66eb03808ad697b5d88a"
+    },
+    "tally": {
+      "slug": "tally",
+      "name": "Fugu Tally",
+      "category": "TREASURY",
+      "kind": "read-only",
+      "agentId": "2514",
+      "registerTx": "0x55ed9ba0082703bf9f1bc3ec6288d83bb9fac8b1560b6aba35c4c7d28892dee9",
+      "listingId": "17",
+      "listTx": "0xe6c0a4fd0d587a67fd28e73b28c801215bb466eaba2486c89f27f0518cb47e01",
+      "setUriTx": "0x3e141b02cac695b9e8b06976ca3af23efe8b2d8dc382f0c4cd42f667999f7b9d"
+    },
+    "scout": {
+      "slug": "scout",
+      "name": "Fugu Scout",
+      "category": "HIRING",
+      "kind": "read-only",
+      "agentId": "2515",
+      "registerTx": "0x9a09b9d2eb606ae1952c138960dc5c853295173fd4771496bf591b00eae72bf5",
+      "listingId": "18",
+      "listTx": "0x5b07f501d62531cf3526919e54ec7371b5120c1149ea12ef9cff3fea965cf82b",
+      "setUriTx": "0x79acd2fd08886e58d91dd0539aa06b047b620c4a255a5bd7197628eda4b12298"
+    },
+    "keycheck": {
+      "slug": "keycheck",
+      "name": "Fugu Keycheck",
+      "category": "AUTONOMOUS",
+      "kind": "read-only",
+      "agentId": "2516",
+      "registerTx": "0x4bcf0891b46084ebb58ded739ea269ee076e0e7592de043c6644c5fab8503dcd",
+      "listingId": "19",
+      "listTx": "0x157a604e8dff39d5cdaa5a148232d0e8c28d8b332ecab2c96735df74880e36c9",
+      "setUriTx": "0x636b1ea4e0083d564c6883dfa859c93591784220e71a0ae8d58d5cb698335a1e"
+    },
+    "quote": {
+      "slug": "quote",
+      "name": "Fugu Quote",
+      "category": "COMMERCE",
+      "kind": "read-only",
+      "agentId": "2517",
+      "registerTx": "0xfbd51889e0e20616bd4dd16596c20c36a6ad2d6d9f9f9319f52c47f4e31bda3d",
+      "listingId": "20",
+      "listTx": "0xd8a37065a1e0981c50865c285d3eaa83bb008a965a8b93c46cedaec50f489cec",
+      "setUriTx": "0xe6ff8d2db2572a41c7f12a783aece3e4b8398b815d8d86e40d3ef020291643b0"
+    }
+  }
+}
