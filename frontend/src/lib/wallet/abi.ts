@@ -40,6 +40,20 @@ export const SUBSCRIPTION_ABI = [
   },
   {
     type: "function",
+    name: "claim",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "subId", type: "uint256" }],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "claimable",
+    stateMutability: "view",
+    inputs: [{ name: "subId", type: "uint256" }],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
     name: "subCount",
     stateMutability: "view",
     inputs: [],
@@ -177,6 +191,24 @@ export const KEYSTORE_ABI = [
  * has opened is a worse way to find out.
  */
 export const REGISTRY_WRITE_ABI = [
+  // Named so a simulated revert reads as its name, not as a four-byte selector.
+  {
+    type: "error",
+    name: "NotAgentIdentityOwner",
+    inputs: [
+      { name: "erc8004AgentId", type: "uint256" },
+      { name: "caller", type: "address" },
+      { name: "identityOwner", type: "address" },
+    ],
+  },
+  {
+    type: "error",
+    name: "AgentAlreadyListed",
+    inputs: [
+      { name: "erc8004AgentId", type: "uint256" },
+      { name: "existingListingId", type: "uint256" },
+    ],
+  },
   {
     type: "function",
     name: "list",
@@ -202,3 +234,45 @@ export const REGISTRY_WRITE_ABI = [
 
 /** Native coin. `FuguSubscription` uses `address(0)` for tBNB. */
 export const NATIVE_TOKEN = "0x0000000000000000000000000000000000000000" as const;
+
+/** `FuguReputation.sol`: ratings, gated on having actually paid the agent. */
+export const REPUTATION_ABI = [
+  {
+    type: "function",
+    name: "review",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "listingId", type: "uint256" },
+      { name: "score", type: "uint8" },
+      { name: "uri", type: "string" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "hasReviewed",
+    stateMutability: "view",
+    inputs: [
+      { name: "listingId", type: "uint256" },
+      { name: "user", type: "address" },
+    ],
+    outputs: [{ type: "bool" }],
+  },
+  {
+    type: "function",
+    name: "reviewCount",
+    stateMutability: "view",
+    inputs: [{ name: "listingId", type: "uint256" }],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "averageScoreX100",
+    stateMutability: "view",
+    inputs: [{ name: "listingId", type: "uint256" }],
+    outputs: [{ type: "uint256" }],
+  },
+  { type: "error", name: "NotASubscriber", inputs: [] },
+  { type: "error", name: "AlreadyReviewed", inputs: [] },
+  { type: "error", name: "InvalidScore", inputs: [{ name: "score", type: "uint8" }] },
+] as const;

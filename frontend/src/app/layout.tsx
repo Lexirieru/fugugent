@@ -144,6 +144,9 @@ function SiteFooter() {
           <Link href="/auditors" className="text-muted transition hover:text-fg">
             Auditors
           </Link>
+          <Link href="/list" className="text-muted transition hover:text-fg">
+            List your agent
+          </Link>
           <a
             href="https://hellofugu.xyz"
             className="text-muted transition hover:text-fg"

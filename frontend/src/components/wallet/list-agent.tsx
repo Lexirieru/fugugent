@@ -8,19 +8,17 @@
  * dead end: the agent's own owner signs one transaction and their agent becomes
  * hireable, with the money going to them.
  *
- * ## Why only the owner, and why that gate is ours rather than the chain's
+ * ## Why only the owner, and who enforces it
  *
- * `FuguRegistry.list()` is permissionless and writes `owner: msg.sender`, and
- * `FuguSubscription.claim()` pays `listing.owner`. So whoever signs is whoever gets
- * paid. If this app listed an agent on its owner's behalf, every renter's money would
- * arrive at us. That is the whole reason the button is gated.
+ * `FuguRegistry.list()` writes `owner: msg.sender`, and `FuguSubscription.claim()` pays
+ * `listing.owner`. So whoever signs is whoever gets paid. If this app listed an agent
+ * on its owner's behalf, every renter's money would arrive at us.
  *
- * The gate compares the connected wallet against the `ownerAddress` the catalogue
- * holds. **The contract does not check that.** Its own comments say so: `list()` never
- * asks the ERC-8004 registry whether the signer owns the id, and all it guarantees is
- * that one agent id maps to one listing, first come first served. The screen says that
- * too, because a check the reader thinks the chain is making, and it is not, is worse
- * than no check at all.
+ * Since 2026-09-25 the contract enforces it: `list()` asks the ERC-8004
+ * IdentityRegistry for `ownerOf(agentId)` and reverts with `NotAgentIdentityOwner`
+ * unless the signer is that owner. The gate on this screen, which compares the
+ * connected wallet with the catalogue's `ownerAddress`, is now a courtesy that saves a
+ * failed signature, not the protection. The screen says which is which.
  *
  * ## Three fields are permanent
  *
@@ -41,6 +39,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import {
   useAccount,
+  usePublicClient,
   useReadContract,
   useSwitchChain,
   useWaitForTransactionReceipt,
@@ -175,6 +174,7 @@ function Panel(props: ListAgentProps) {
   const { address, isConnected, chainId } = useAccount();
   const { switchChain, isPending: switching } = useSwitchChain();
   const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient({ chainId: CHAIN.id });
 
   const onRightChain = chainId === CHAIN.id;
   const isOwner = sameAddress(address, ownerAddress);
@@ -239,7 +239,7 @@ function Panel(props: ListAgentProps) {
         catalogueSource,
         listedAt: new Date().toISOString(),
       });
-      const hash = await writeContractAsync({
+      const call = {
         address: CONTRACTS.registry,
         abi: REGISTRY_WRITE_ABI,
         functionName: "list",
@@ -251,8 +251,11 @@ function Panel(props: ListAgentProps) {
           periodSeconds,
           metadataURI,
         ],
-        chainId: CHAIN.id,
-      });
+      } as const;
+      // Simulate first, as the hire does: the contract's ownership check against the
+      // ERC-8004 registry is found before the wallet opens, not after a failed signature.
+      if (publicClient && address) await publicClient.simulateContract({ ...call, account: address });
+      const hash = await writeContractAsync({ ...call, chainId: CHAIN.id });
       setPhase({ kind: "sent", hash });
     } catch (err) {
       setPhase({ kind: "failed", message: explainWriteError(err) });
@@ -560,11 +563,9 @@ function Panel(props: ListAgentProps) {
           take back the time that was not served, and that is the whole of their protection.
         </p>
         <p className="mt-3 text-pretty text-sm leading-relaxed text-fg">
-          The registry does not ask anyone whether you own agent id {tokenId}. The check that
-          put this form in front of you is ours, made against the catalogue&apos;s record of
-          the owner. What the contract guarantees is only that one agent id maps to one
-          listing, first come first served. Its own comments say so, and it is one of the
-          reasons none of this is on the main network.
+          The contract checks that you own agent id {tokenId} in the ERC-8004 registry before it
+          accepts the listing, so nobody else can list your agent and collect its earnings. One
+          agent id can have one listing.
         </p>
       </div>
 

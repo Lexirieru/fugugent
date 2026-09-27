@@ -47,6 +47,21 @@ export function explainWriteError(err: unknown): string {
   if (text.includes("listinginactive")) {
     return "The owner deactivated this listing while you were deciding. It cannot be hired right now.";
   }
+  if (text.includes("notagentidentityowner")) {
+    return "The contract checked the ERC-8004 registry and the connected wallet does not own this agent id, so it refused the listing. Nothing was written. Connect the wallet that owns the agent and try again.";
+  }
+  if (text.includes("agentalreadylisted")) {
+    return "This agent id already has a listing, and one id can only have one. Nothing was written.";
+  }
+  if (text.includes("notasubscriber")) {
+    return "The contract only accepts a rating from a wallet that has actually paid this agent for at least half a period. Release its earned payment first, then rate.";
+  }
+  if (text.includes("alreadyreviewed")) {
+    return "This wallet has already rated this agent. One rating per wallet, so ratings cannot be stuffed.";
+  }
+  if (text.includes("nothingtoclaim")) {
+    return "There is nothing to release yet: the agent has not earned anything since the last release. Wait a little and try again.";
+  }
   if (text.includes("notsubscriber")) {
     return "Only the wallet that paid for this subscription can cancel it, and the connected wallet is a different one. Switch to the paying wallet and try again.";
   }

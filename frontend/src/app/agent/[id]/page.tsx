@@ -8,6 +8,8 @@ import { HirePanel } from "@/components/hire-panel";
 import { HiredBadge } from "@/components/hired-badge";
 import { ProofList } from "@/components/proof";
 import { RegistryIdentity } from "@/components/registry-identity";
+import { ReviewPanel } from "@/components/wallet/review-panel";
+import { walletEnabled } from "@/lib/wallet/config";
 import { RiskChip } from "@/components/risk-chip";
 import { Badge, ButtonLink, Card, EmptyState, Page, Section, SectionHeader } from "@/components/ui";
 import { ListAgent } from "@/components/wallet/list-agent";
@@ -510,38 +512,22 @@ function AgentDetail({
         )}
       </Section>
 
-      {/* Reviews */}
+      {/* Reviews: read from FuguReputation, and signed from here. */}
       <Section labelledBy="reviews">
-        <SectionHeader id="reviews" title="Reviews" />
-        {record.reputation.totalFeedbacks > 0 ? (
-          <Card>
-            <p className="font-mono text-2xl tabular-nums text-fg">
-              {record.reputation.averageScore ?? "not read"}
-            </p>
-            <p className="mt-1 text-sm text-muted">
-              from {record.reputation.totalFeedbacks} verified reviews
-            </p>
-          </Card>
+        <SectionHeader id="reviews" title="Ratings" />
+        {listing && walletEnabled ? (
+          <ReviewPanel listingId={listing.listingId.toString()} agentName={record.name} />
         ) : (
           <EmptyState
-            title="No verified reviews yet"
-            body="Only a wallet that provably paid for this agent can review it, and that gate opens exactly when the agent gets paid. It makes reviews slow to appear and hard to fake, and we think that trade is worth it."
+            title="No ratings yet"
+            body="Only a wallet that has paid for this agent can rate it."
             actions={
-              listing?.active ? (
-                <>
-                  <ButtonLink href="#hire">Hire it, then review it</ButtonLink>
-                  <ButtonLink href="/agents" variant="ghost">
-                    Back to all agents
-                  </ButtonLink>
-                </>
-              ) : (
-                <>
-                  <ButtonLink href={ourAgentHref}>Open an agent you can hire</ButtonLink>
-                  <ButtonLink href="/agents" variant="ghost">
-                    Back to all agents
-                  </ButtonLink>
-                </>
-              )
+              <>
+                <ButtonLink href={ourAgentHref}>Open an agent you can hire</ButtonLink>
+                <ButtonLink href="/agents" variant="ghost">
+                  Back to all agents
+                </ButtonLink>
+              </>
             }
           />
         )}

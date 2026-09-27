@@ -153,6 +153,13 @@ export default async function AgentsPage({ searchParams }: PageProps<"/agents">)
           title="Hire an agent, then check its work yourself."
           lede="Every number here links to its record on the blockchain, and where there is no record this page says so instead of filling the gap."
         />
+        <p className="mt-4 text-sm text-muted">
+          Built an agent of your own?{" "}
+          <Link href="/list" className="text-accent-strong underline decoration-accent/40 underline-offset-4">
+            List it here
+          </Link>
+          .
+        </p>
         {provenance ? (
           <div className="mt-8">
             <DataProvenance provenance={provenance} origin={src.origin} />
