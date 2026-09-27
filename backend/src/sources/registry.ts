@@ -73,7 +73,36 @@ export const IDENTITY_REGISTRY_ABI = [
     inputs: [{ name: "agentId", type: "uint256" }],
     outputs: [{ name: "", type: "address" }],
   },
+  // OpenZeppelin ERC-721's revert for an id that was never minted (selector
+  // 0x7e273289). Declared so a failed `ownerOf` can be told apart from any other
+  // failure: only this one means "no such agent".
+  {
+    type: "error",
+    name: "ERC721NonexistentToken",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+  },
 ] as const;
+
+/**
+ * `true` only when a failed call is the registry saying "this id was never minted".
+ *
+ * Everything else that can fail a call inside a multicall (out of gas on a large
+ * batch, an RPC or fork backend dropping a storage read) is NOT absence. Treating it
+ * as absence is how a sweep once read 60 agents out of 2,500 on a fork and would have
+ * published that as the whole registry: 200 unrelated failures in a row look exactly
+ * like the end of the ids.
+ */
+export function isNonexistentToken(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; current != null && depth < 8; depth++) {
+    const e = current as { data?: { errorName?: string } | string; message?: string; cause?: unknown };
+    if (typeof e.data === "object" && e.data?.errorName === "ERC721NonexistentToken") return true;
+    if (typeof e.data === "string" && e.data.startsWith("0x7e273289")) return true;
+    if (typeof e.message === "string" && e.message.includes("ERC721NonexistentToken")) return true;
+    current = e.cause;
+  }
+  return false;
+}
 
 /** Ids per Multicall3 batch: three calls each, well under a public RPC's gas cap. */
 export const REGISTRY_BATCH_SIZE = 200;
@@ -83,6 +112,8 @@ export const REGISTRY_BATCH_SIZE = 200;
  * burned in the middle.
  */
 export const REGISTRY_GAP_LIMIT = 200;
+/** Ids per call when a full batch had to be retried. */
+export const RETRY_CHUNK = 25;
 /** A hard stop, so a registry that suddenly holds a million ids cannot pin the process. */
 export const REGISTRY_MAX_IDS = 50_000;
 /** How often the registry is swept. */
@@ -135,14 +166,23 @@ export function createViemIdentityReader(
       const results = await multicall(client, { contracts, allowFailure: true, blockNumber });
       return ids.map((tokenId, index) => {
         const [owner, uri, wallet] = results.slice(index * 3, index * 3 + 3);
-        // `ownerOf` reverting is how ERC-721 says "no such token".
-        if (owner === undefined || owner.status !== "success") return null;
+        if (owner === undefined) throw new Error(`multicall returned no result for ownerOf(${tokenId})`);
+        if (owner.status !== "success") {
+          // Only the registry's own "never minted" revert means absence.
+          if (isNonexistentToken(owner.error)) return null;
+          throw new Error(`ownerOf(${tokenId}) failed without saying the id does not exist`);
+        }
+        // An id that exists has a tokenURI; a failure here is the read failing, not an
+        // empty URI, and must not be published as "the owner registered nothing".
+        if (uri === undefined || uri.status !== "success") {
+          throw new Error(`tokenURI(${tokenId}) failed for an id that exists`);
+        }
         const walletAddress =
           wallet !== undefined && wallet.status === "success" ? (wallet.result as Address) : null;
         return {
           tokenId,
           owner: owner.result as Address,
-          agentURI: uri !== undefined && uri.status === "success" ? (uri.result as string) : "",
+          agentURI: uri.result as string,
           agentWallet:
             walletAddress === null || walletAddress.toLowerCase() === ZERO_ADDRESS ? null : walletAddress,
         };
@@ -324,9 +364,14 @@ export function createRegistryIndex(options: RegistryIndexOptions): RegistryInde
       try {
         rows = await options.reader.readIds(ids, blockNumber);
       } catch {
-        // One retry: public RPCs drop a request now and then. A second failure
-        // aborts the sweep — publishing ids 0–399 as "the registry" would be a lie.
-        rows = await options.reader.readIds(ids, blockNumber);
+        // Retry in smaller pieces: a public RPC drops a request now and then, and a
+        // large batch can run out of the node's gas cap for `eth_call`. If a piece
+        // still fails, the sweep aborts — publishing a partial registry as the whole
+        // one would be a lie.
+        rows = [];
+        for (let i = 0; i < ids.length; i += RETRY_CHUNK) {
+          rows.push(...(await options.reader.readIds(ids.slice(i, i + RETRY_CHUNK), blockNumber)));
+        }
       }
       for (const row of rows) {
         if (row === null) {

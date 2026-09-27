@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createRegistryIndex,
+  isNonexistentToken,
   toRegistryRecord,
   type IdentityRegistryReader,
   type RawIdentity,
@@ -247,6 +248,41 @@ describe("createRegistryIndex", () => {
     await idx.refresh();
     await idx.refresh();
     expect(resolved).toBe(2);
+  });
+});
+
+describe("isNonexistentToken", () => {
+  it("recognises the registry's never-minted revert, however viem wraps it", () => {
+    expect(isNonexistentToken({ cause: { data: { errorName: "ERC721NonexistentToken" } } })).toBe(true);
+    expect(isNonexistentToken({ cause: { cause: { data: "0x7e2732890000000000000000000000000000000000000000000000000000000000000abc" } } })).toBe(true);
+    expect(isNonexistentToken(new Error('reverted with the following reason: ERC721NonexistentToken(999999)'))).toBe(true);
+  });
+
+  it("does not mistake any other failure for absence", () => {
+    expect(isNonexistentToken(new Error("out of gas"))).toBe(false);
+    expect(isNonexistentToken({ cause: { data: "0x08c379a0" } })).toBe(false);
+    expect(isNonexistentToken(undefined)).toBe(false);
+  });
+});
+
+describe("a batch that is too big for the node", () => {
+  it("is re-read in small pieces instead of being published short", async () => {
+    const uris = Array.from({ length: 30 }, () => GRID);
+    const sizes: number[] = [];
+    const reader: IdentityRegistryReader = {
+      blockNumber: async () => 1n,
+      async readIds(ids) {
+        if (ids.length > 25) throw new Error("out of gas");
+        sizes.push(ids.length);
+        return ids.map((id) => (uris[Number(id)] ? { tokenId: id, owner: OWNER, agentURI: GRID, agentWallet: null } : null));
+      },
+    };
+    const idx = createRegistryIndex({ reader, metadata: inlineOnly, registryAddress: REGISTRY, chainId: 97, now, batchSize: 50, gapLimit: 50 });
+    const report = await idx.refresh();
+    expect(report.ok).toBe(true);
+    expect(report.agents).toBe(30);
+    // Every read that succeeded was a small piece; the 50-id batches all failed.
+    expect(Math.max(...sizes)).toBeLessThanOrEqual(25);
   });
 });
 
