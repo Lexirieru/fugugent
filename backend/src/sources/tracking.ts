@@ -91,6 +91,23 @@ export interface RawListing {
   priceUsd8PerPeriod: bigint;
   periodSeconds: number;
   active: boolean;
+  /** The `name` in the listing's on-chain metadata, when it carries one. */
+  metadataName?: string | null;
+}
+
+/**
+ * The `name` field of a `data:application/json;base64,` listing URI, or null. Only
+ * inline data is read: nothing is fetched, so a listing cannot make this API call out.
+ */
+export function nameFromMetadataUri(uri: string | undefined): string | null {
+  const prefix = "data:application/json;base64,";
+  if (!uri?.startsWith(prefix)) return null;
+  try {
+    const name = (JSON.parse(Buffer.from(uri.slice(prefix.length), "base64").toString("utf8")) as { name?: unknown }).name;
+    return typeof name === "string" && name.trim() !== "" ? name.trim().slice(0, 80) : null;
+  } catch {
+    return null;
+  }
 }
 
 export interface ChainSnapshot {
@@ -161,6 +178,7 @@ export function createViemTrackingChain(
           priceUsd8PerPeriod: bigint;
           periodSeconds: number;
           active: boolean;
+          metadataURI: string;
         }>(
           listingCount as bigint,
           (id) => ({ address: contracts.registry, abi: FUGU_REGISTRY_ABI, functionName: "getListing", args: [id] }),
@@ -180,6 +198,7 @@ export function createViemTrackingChain(
           priceUsd8PerPeriod: value.priceUsd8PerPeriod,
           periodSeconds: value.periodSeconds,
           active: value.active,
+          metadataName: nameFromMetadataUri(value.metadataURI),
         })),
       };
     },
@@ -348,7 +367,9 @@ export function createTrackingService(options: TrackingServiceOptions): Tracking
             listingId: sub.listingId.toString(),
             erc8004AgentId: listing?.erc8004AgentId.toString() ?? null,
             agentKey,
-            agentName: agentKey === null ? null : nameOf(agentKey),
+            // The registry's name first; the listing's own metadata while the first
+            // registry sweep after a restart is still running.
+            agentName: (agentKey === null ? null : nameOf(agentKey)) ?? listing?.metadataName ?? null,
             category: listing?.category ?? null,
             payToken: sub.payToken,
             deposited: sub.deposited.toString(),
@@ -381,7 +402,7 @@ export function createTrackingService(options: TrackingServiceOptions): Tracking
           listingId: l.listingId.toString(),
           erc8004AgentId: l.erc8004AgentId.toString(),
           agentKey: keyOf(l.erc8004AgentId),
-          agentName: nameOf(keyOf(l.erc8004AgentId)),
+          agentName: nameOf(keyOf(l.erc8004AgentId)) ?? l.metadataName ?? null,
           category: l.category,
           active: l.active,
           priceUsd8PerPeriod: l.priceUsd8PerPeriod.toString(),

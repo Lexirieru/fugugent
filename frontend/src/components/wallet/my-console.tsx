@@ -98,10 +98,16 @@ function Empty({ children }: { children: React.ReactNode }) {
   return <p className="text-sm text-muted">{children}</p>;
 }
 
-function AgentLine({ hire, children }: { hire: Hire; children?: React.ReactNode }) {
+function AgentLine({ hire, stacked = false, children }: { hire: Hire; stacked?: boolean; children?: React.ReactNode }) {
   const href = hire.agentKey ? `/agent/${encodeURIComponent(hire.agentKey)}` : "/agents";
+  // A running hire carries a chip, a countdown and a cancel button: side by side they
+  // crush the name into one word per line inside a half-width panel, so they stack.
   return (
-    <li className="flex flex-col gap-2 border-t border-line py-3 first:border-t-0 first:pt-0 sm:flex-row sm:items-center sm:justify-between">
+    <li
+      className={`flex flex-col gap-3 border-t border-line py-3 first:border-t-0 first:pt-0 ${
+        stacked ? "" : "sm:flex-row sm:items-center sm:justify-between"
+      }`}
+    >
       <div className="flex min-w-0 items-center gap-3">
         {/* The agent's own fish: Guardian as Guardian, Grid as Grid. Drawn hollow, as
             everywhere on this site when there is no live risk reading; a puff level
@@ -123,7 +129,7 @@ function AgentLine({ hire, children }: { hire: Hire; children?: React.ReactNode 
         </p>
         </div>
       </div>
-      <div className="flex shrink-0 flex-wrap items-center gap-2">{children}</div>
+      <div className={`flex flex-wrap items-center gap-2 ${stacked ? "[&>*:nth-child(2)]:min-w-40 [&>*:nth-child(2)]:flex-1" : "shrink-0"}`}>{children}</div>
     </li>
   );
 }
@@ -204,7 +210,7 @@ export function MyConsole() {
           ) : (
             <ul>
               {active.map((h) => (
-                <AgentLine key={h.subId} hire={h}>
+                <AgentLine key={h.subId} hire={h} stacked>
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--risk-1)] px-2 py-0.5 text-[11px] font-semibold text-[var(--risk-1)]">
                     <span aria-hidden className="size-1.5 animate-pulse rounded-full bg-[var(--risk-1)] motion-reduce:animate-none" />
                     Running

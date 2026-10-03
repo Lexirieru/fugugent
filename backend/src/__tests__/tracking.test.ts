@@ -211,3 +211,18 @@ describe("tracking routes", () => {
     expect(((await res.json()) as { message: string }).message).toContain("rpc down");
   });
 });
+
+describe("nameFromMetadataUri", () => {
+  const uri = (o: unknown) => `data:application/json;base64,${Buffer.from(JSON.stringify(o)).toString("base64")}`;
+  it("reads the name from inline listing metadata", async () => {
+    const { nameFromMetadataUri } = await import("../sources/tracking.js");
+    expect(nameFromMetadataUri(uri({ name: " Fugu Guardian " }))).toBe("Fugu Guardian");
+  });
+  it("returns null for anything it would have to fetch, or cannot parse", async () => {
+    const { nameFromMetadataUri } = await import("../sources/tracking.js");
+    expect(nameFromMetadataUri("https://example.com/agent.json")).toBeNull();
+    expect(nameFromMetadataUri("data:application/json;base64,!!!")).toBeNull();
+    expect(nameFromMetadataUri(uri({ name: 7 }))).toBeNull();
+    expect(nameFromMetadataUri(undefined)).toBeNull();
+  });
+});
