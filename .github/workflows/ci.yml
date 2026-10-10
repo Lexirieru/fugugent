@@ -72,7 +72,7 @@ env:
 
 jobs:
   contracts:
-    name: contracts (forge test, baseline 786)
+    name: contracts (forge test, baseline 256)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
