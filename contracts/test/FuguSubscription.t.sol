@@ -85,6 +85,23 @@ contract FuguSubscriptionTest is Test {
         assertEq(usdt.balanceOf(address(subs)), 10e18);
     }
 
+    /// @dev The five categories appended on 2026-09-09. The FuguSubscription implementation
+    ///      live until 2026-10-11 was compiled against the four-value enum, so reading a
+    ///      listing in any of these categories failed to decode and `subscribe` reverted
+    ///      with empty data: 14 listings on testnet could not be hired. This pins that the
+    ///      current source handles every category.
+    function test_subscribeWorksForEveryAppendedCategory() public {
+        Category[5] memory added =
+            [Category.HIRING, Category.COMMERCE, Category.AUTONOMOUS, Category.STREAMING, Category.TREASURY];
+        for (uint256 i = 0; i < added.length; i++) {
+            vm.prank(creator);
+            uint256 id = registry.list(100 + i, address(0xA6E17), added[i], 10_00000000, 30 days, "");
+            vm.prank(user);
+            uint256 subId = subs.subscribe(id, 1, address(usdt), type(uint256).max, block.timestamp + 1 hours);
+            assertGt(subId, 0);
+        }
+    }
+
     function test_nothingClaimableImmediately() public {
         uint256 id = _subscribeOnePeriod();
         assertEq(subs.claimable(id), 0);

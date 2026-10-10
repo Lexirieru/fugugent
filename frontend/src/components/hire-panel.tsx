@@ -17,6 +17,7 @@
 import { useMemo, useState } from "react";
 import { InfoTip } from "@/components/info-tip";
 import { HireAction } from "@/components/wallet/hire-action";
+import { RatingGate } from "@/components/wallet/rating-gate";
 import { CONTRACTS, addressUrl, txUrl } from "@/lib/chain";
 import { useHires } from "@/lib/hired";
 import { estimateCost, formatDuration, formatUsd8, formatPeriod } from "@/lib/money";
@@ -134,13 +135,15 @@ export function HirePanel({
 
       {/* Signing in the browser, which is the only way to hire from this page. */}
       {walletEnabled ? (
-        <HireAction
-          agentId={agentId}
-          agentName={agentName}
-          listingId={listingId}
-          periods={est.periods}
-          catalogPriceUsd8={priceUsd8}
-        />
+        <RatingGate listingId={listingId}>
+          <HireAction
+            agentId={agentId}
+            agentName={agentName}
+            listingId={listingId}
+            periods={est.periods}
+            catalogPriceUsd8={priceUsd8}
+          />
+        </RatingGate>
       ) : (
         <div className="mt-6 rounded-xl border border-line bg-bg-elev p-4 sm:p-5">
           <p className="text-sm font-medium text-fg">This build cannot open a wallet.</p>

@@ -72,7 +72,7 @@ env:
 
 jobs:
   contracts:
-    name: contracts (forge test, baseline 256)
+    name: contracts (forge test, baseline 257)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -109,7 +109,7 @@ jobs:
         working-directory: contracts
         run: |
           set -euo pipefail
-          baseline=256
+          baseline=257
           # "Ran 10 test suites ...: 150 tests passed, 0 failed, 0 skipped (150 total tests)"
           actual=$(grep -oE '[0-9]+ tests passed' forge-test.log | tail -1 | grep -oE '[0-9]+')
           echo "forge: $actual passed, baseline $baseline"

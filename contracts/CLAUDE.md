@@ -20,6 +20,13 @@ Foundry. Solidity `^0.8.30`, OpenZeppelin 5.7.0 (a submodule in `lib/`). BSC tes
   a value silently relabels listings that already exist. Nothing reverts and nothing warns.
   `test/CategoryUpgradeSafety.t.sol` is the tripwire; it upgrades a proxy from the frozen
   pre-expansion source in `test/legacy/` and reads the old listings back.
+- **A change to `Category` or `Listing` means upgrading FuguSubscription too, not only
+  FuguRegistry.** FuguSubscription decodes `getListing()` with the types it was compiled
+  against. Widening `Category` on 2026-09-09 upgraded only the registry, and every
+  listing in categories 4-8 then reverted on `subscribe` with empty data for a month
+  (14 listings, fixed 2026-10-11, see `subscriptionCategoryFix` in
+  `deployments/bsc-testnet.json`). After any such change, simulate `subscribe` for one
+  listing per category on the live proxy.
 - **Do not write `__gap`.** OZ 5.x uses ERC-7201 namespaced storage, so a parent cannot
   shift a child's slots. What does apply: **append-only** — a new variable goes only at the
   end, never inserted and never removed. Guarded by `test/Upgrade.t.sol`.

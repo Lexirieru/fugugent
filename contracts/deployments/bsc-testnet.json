@@ -16,11 +16,12 @@
     "verify": "curl -s \"https://api.etherscan.io/v2/api?chainid=97&module=contract&action=getsourcecode&address=<impl>&apikey=$BSCSCAN_API_KEY\" (endpoint V1 api-testnet.bscscan.com sudah deprecated dan menjawab NOTOK)",
     "FuguPriceOracle": "0x864f888330821b6025b2fe670f30e01ee8776449",
     "FuguRegistry": "0xc4c9668c13380800f9f0a54e9ddb4c3d35cda2da",
-    "FuguSubscription": "0x06bc0ba1dbc3b6fd22defe7a0cd9a6cd13c15e97",
+    "FuguSubscription": "0xfbde18e19fc5e7ebc9404c05b081945def3ce5c7",
     "FuguReputation": "0x30c92ffadad24ca079227a92a33b78683d36fde6",
     "FuguAuditEscrow": "0xf7a0e340455af3c476564d7af283d9be4d2cfabb",
     "FuguRegistryPrevious": "0xd68968cf68e9930a689e0fc9d648a898050a548a",
-    "FuguRegistryBeforeIdentity": "0x13836c1bc0d32def6b6c0ec2acf120c2f342f3eb"
+    "FuguRegistryBeforeIdentity": "0x13836c1bc0d32def6b6c0ec2acf120c2f342f3eb",
+    "FuguSubscriptionBeforeCategoryFix": "0x06bc0ba1dbc3b6fd22defe7a0cd9a6cd13c15e97"
   },
   "listings": {
     "listedAt": "2026-09-09 (listings 1-4), 2026-09-09 (listings 5-9, when the catalog was widened to nine categories)",
@@ -43,9 +44,9 @@
       "guardian": "10000000 = $0,10 per 120 detik",
       "tigaAgentLain": "5000000 = $0,05 per 120 detik",
       "alasanHarga": "Setengah harga Guardian, disengaja: Guardian sudah terbukti mengeksekusi transaksi on-chain (repay lewat session key Altana), ketiga agent lain baru mesin keputusan + backtest. Selisih harga menyatakan selisih kemampuan yang sama yang ditulis di metadata. Harga 0 ditolak kontrak (InvalidPrice), dan $0,05 masih membuat escrow/claim/fee 5% berjalan dengan angka bukan-nol.",
-      "alasanPeriode": "120 detik mengikuti listing Guardian yang sudah live. Pendek BUKAN karena ini harga komersial ($0,05 per 2 menit jelas bukan), tetapi karena gerbang anti-sybil FuguSubscription.hasSubscribed baru terbuka setelah agent benar-benar MENERIMA >= 50% (minPaidBpsOfPeriod) harga SATU periode, dan claim proporsional terhadap waktu berjalan. Periode 30 hari berarti hak review baru terbuka setelah 15 hari — siklus sewa -> claim -> review tidak akan pernah selesai di depan juri; 120 detik membuatnya selesai dalam ~60 detik."
+      "alasanPeriode": "120 detik mengikuti listing Guardian yang sudah live. Pendek BUKAN karena ini harga komersial ($0,05 per 2 menit jelas bukan), tetapi karena gerbang anti-sybil FuguSubscription.hasSubscribed baru terbuka setelah agent benar-benar MENERIMA >= 50% (minPaidBpsOfPeriod) harga SATU periode, dan claim proporsional terhadap waktu berjalan. Periode 30 hari berarti hak review baru terbuka setelah 15 hari \u2014 siklus sewa -> claim -> review tidak akan pernah selesai di depan juri; 120 detik membuatnya selesai dalam ~60 detik."
     },
-    "metadataFormat": "Keempat listing kini memakai `data:application/json;base64,...` — metadata ditanam on-chain, bisa dibaca tanpa server, IPFS, atau API key. Field yang dibaca backend: name, summary (atau description), onchainExecution, limits, verify, agentWallet.",
+    "metadataFormat": "Keempat listing kini memakai `data:application/json;base64,...` \u2014 metadata ditanam on-chain, bisa dibaca tanpa server, IPFS, atau API key. Field yang dibaca backend: name, summary (atau description), onchainExecution, limits, verify, agentWallet.",
     "metadataDecode": "cast call --rpc-url \"$BSC_TESTNET_RPC_URL\" 0xb2f36070E6eae3353E8e755172B477DF213ae248 'getListing(uint256)((uint256,address,address,uint8,uint128,uint32,bool,bool,string))' 2 | sed -E 's/.*base64,//; s/\"\\)$//' | base64 -d",
     "items": [
       {
@@ -61,7 +62,7 @@
         "periodSeconds": 120,
         "metadataURI": "data:application/json;base64,... (didekode di bawah; ditulis oleh script/UpdateGuardianMetadata.s.sol)",
         "txHash": "0x590d2f13731bef32c6409d32c9f278af8b897766a0a82e0b504acf6799ffeab7",
-        "note": "Didaftarkan saat e2e 2026-09-08, BUKAN oleh script/ListAgents.s.sol. metadataURI-nya semula placeholder `ipfs://fugu-guardian-v1` yang tidak bisa dibaca backend (pembaca metadata sengaja menolak URI non-`data:` dan tidak pernah menyentuh jaringan), sehingga satu-satunya agent yang sudah benar-benar mengeksekusi on-chain tampil sebagai `Agent #8004` di marketplace sendiri. Diperbaiki 2026-09-09 lewat `updateListing` — satu transaksi, harga 10000000 dan periode 120 dibaca dari rantai lalu dikirim kembali apa adanya (updateListing menimpa ketiganya sekaligus), dan diverifikasi tidak berubah sesudahnya. `onchainExecution: true` di metadata Guardian adalah satu-satunya pembeda dari tiga listing lain, dan itu klaim tentang bukti (tx repay 0x619cfbe3…), bukan pemasaran. SISA KETERBATASAN: `agentWallet` masih EOA deployer, bukan wallet Altana Guardian 0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0. `updateListing` tidak menyentuh field itu dan FuguRegistry tidak punya setternya, jadi hanya listing baru yang bisa memperbaikinya — dan itu akan membuat countByCategory(3) menjadi 2. Metadata karena itu mendeklarasikan wallet Altana yang sungguhan menandatangani, dan backend melaporkan ketidakcocokannya (`agentWalletMatchesListing: false`) alih-alih menyajikan salah satu sebagai bukti.",
+        "note": "Didaftarkan saat e2e 2026-09-08, BUKAN oleh script/ListAgents.s.sol. metadataURI-nya semula placeholder `ipfs://fugu-guardian-v1` yang tidak bisa dibaca backend (pembaca metadata sengaja menolak URI non-`data:` dan tidak pernah menyentuh jaringan), sehingga satu-satunya agent yang sudah benar-benar mengeksekusi on-chain tampil sebagai `Agent #8004` di marketplace sendiri. Diperbaiki 2026-09-09 lewat `updateListing` \u2014 satu transaksi, harga 10000000 dan periode 120 dibaca dari rantai lalu dikirim kembali apa adanya (updateListing menimpa ketiganya sekaligus), dan diverifikasi tidak berubah sesudahnya. `onchainExecution: true` di metadata Guardian adalah satu-satunya pembeda dari tiga listing lain, dan itu klaim tentang bukti (tx repay 0x619cfbe3\u2026), bukan pemasaran. SISA KETERBATASAN: `agentWallet` masih EOA deployer, bukan wallet Altana Guardian 0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0. `updateListing` tidak menyentuh field itu dan FuguRegistry tidak punya setternya, jadi hanya listing baru yang bisa memperbaikinya \u2014 dan itu akan membuat countByCategory(3) menjadi 2. Metadata karena itu mendeklarasikan wallet Altana yang sungguhan menandatangani, dan backend melaporkan ketidakcocokannya (`agentWalletMatchesListing: false`) alih-alih menyajikan salah satu sebagai bukti.",
         "metadataUpdateTxHash": "0x80a2b11a5a3556d0c393c3d618dbd0fffadb5fd697f87792dfd8a24ac75d31fd",
         "metadataUpdateBlock": 129910392,
         "metadataUpdateGasUsed": 1923013,
@@ -224,9 +225,9 @@
         "erc8004MintTx": "0x92f31d5c8fddcf75fd532042aa0a211f4da3680e5186455720378bc851db9711"
       }
     ],
-    "honesty": "Listing 2-4 TIDAK mengklaim eksekusi on-chain. Metadata masing-masing menyatakan sendiri: mesin keputusan deterministik + backtest saja, belum pernah mengirim satu transaksi pun, dan menyewa mereka mencatat pembayaran di escrow tanpa memulai loop otonom (docs/STATUS.md §B3). Keempat listing `curated: false` — deployer memang kurator, tetapi FuguRegistry.setCurated menolak kurator yang mengkurasi listing miliknya sendiri (CannotCurateOwnListing), jadi tidak ada satu pun listing kita yang berstempel verifikasi.",
+    "honesty": "Listing 2-4 TIDAK mengklaim eksekusi on-chain. Metadata masing-masing menyatakan sendiri: mesin keputusan deterministik + backtest saja, belum pernah mengirim satu transaksi pun, dan menyewa mereka mencatat pembayaran di escrow tanpa memulai loop otonom (docs/STATUS.md \u00a7B3). Keempat listing `curated: false` \u2014 deployer memang kurator, tetapi FuguRegistry.setCurated menolak kurator yang mengkurasi listing miliknya sendiri (CannotCurateOwnListing), jadi tidak ada satu pun listing kita yang berstempel verifikasi.",
     "biayaTotal": "0,000327803188 tBNB untuk tiga pendaftaran (3.278.032 gas @ 0,1 gwei) + 0,0001923013 tBNB untuk updateListing Guardian (1.923.013 gas). Saldo deployer 0,086027768612945404 -> 0,085507664112945404 tBNB.",
-    "backendCheck": "Diperiksa di container hidup 2026-09-09 (`curl 'localhost:8787/api/agents?category=<KATEGORI>'`): REBALANCING Fugu Rebalancer $0,05 onchainExecution=false · GRID Fugu Grid $0,05 false · YIELD Fugu Yield $0,05 false · HEALTH_FACTOR Fugu Guardian $0,10 true (agentWalletMatchesListing=false). Tidak ada lagi nama placeholder.",
+    "backendCheck": "Diperiksa di container hidup 2026-09-09 (`curl 'localhost:8787/api/agents?category=<KATEGORI>'`): REBALANCING Fugu Rebalancer $0,05 onchainExecution=false \u00b7 GRID Fugu Grid $0,05 false \u00b7 YIELD Fugu Yield $0,05 false \u00b7 HEALTH_FACTOR Fugu Guardian $0,10 true (agentWalletMatchesListing=false). Tidak ada lagi nama placeholder.",
     "newAgentWallets": {
       "why": "agentWallet cannot be corrected after list(): FuguRegistry has no setter and updateListing does not reach that field. The five agent directories held no wallet when the listings were registered, so five brand-new testnet EOAs were generated with `cast wallet new` and written into the listings.",
       "keys": "contracts/.env, as AGENT_WALLET_<NAME>_PRIVATE_KEY. Gitignored, never committed, never used anywhere else, zero balance.",
@@ -257,7 +258,7 @@
     "MockPriceFeedBNB": "0x0aA42416bAccdb2fd4768B61111DeB7F7D212F9B",
     "liquidityProvider": {
       "address": "0xdDBC1c5FC604A8d91e73Ab6Dd69EA472a17c7eFF",
-      "note": "Alamat kunci-uji deterministik (bukan rahasia — testnet saja) yang menyuplai 50.000 mUSD likuiditas ke pool, dipisah dari deployer agar tidak tercampur dengan posisi contoh."
+      "note": "Alamat kunci-uji deterministik (bukan rahasia \u2014 testnet saja) yang menyuplai 50.000 mUSD likuiditas ke pool, dipisah dari deployer agar tidak tercampur dengan posisi contoh."
     },
     "samplePosition": {
       "owner": "0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E",
@@ -301,7 +302,7 @@
       "jobId": 1,
       "developer": "0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E",
       "auditor": "0x26bE190729B79c3CCfAc47b520Da9799F56301a7",
-      "auditorNote": "Kunci uji deterministik keccak256(\"fugu-audit-escrow-auditor-testnet-seed\") — bukan rahasia, testnet saja. Dibutuhkan karena kontrak menolak job yang developer dan auditornya alamat yang sama (SelfAudit).",
+      "auditorNote": "Kunci uji deterministik keccak256(\"fugu-audit-escrow-auditor-testnet-seed\") \u2014 bukan rahasia, testnet saja. Dibutuhkan karena kontrak menolak job yang developer dan auditornya alamat yang sama (SelfAudit).",
       "skillHash": "0x7afd6c0463f6abd3073d34849802b132ab9d7a081dd8f9b02dd091ff0a9557b3",
       "fee": "5000000000000000000 (5 mUSD)",
       "bond": "2000000000000000000 (2 mUSD)",
@@ -315,7 +316,7 @@
       "verify": "cast call --rpc-url \"$BSC_TESTNET_RPC_URL\" 0x0354d2a4be40f118e4d1301915ee2ff54eec8a52 'getJob(uint256)((address,address,uint256,uint256,bool,bool,uint8,bytes32))' 1"
     },
     "biaya": "Deploy 1.893.317 gas @ 0,1 gwei = 0,0001893317 tBNB; e2e 617.535 gas = 0,0000617535 tBNB; ditambah stipend gas 0,002 tBNB ke wallet auditor. Saldo deployer 0,095355113612945404 -> 0,093114489012945404 tBNB.",
-    "keamanan": "Port dari references/ethnyc/hardhat/contracts/MarsEscrow.sol dengan lima perbaikan keamanan: (1) release/slash tidak lagi permissionless — release hanya developer atau arbiter, slash hanya arbiter; (2) fundFee/postBond tidak lagi menerima parameter jumlah dari pemanggil mana pun (di aslinya siapa pun bisa menguras allowance developer); (3) SafeERC20 menggantikan transfer/transferFrom mentah; (4) jumlah yang dibukukan adalah selisih saldo nyata, bukan jumlah yang diminta, sehingga token fee-on-transfer tidak membuat satu job dibayar dari dana job lain; (5) `cancel` menambah jalan keluar untuk job yang hanya didanai satu pihak — di aslinya dana itu terkunci selamanya. Ditambah ReentrancyGuard, penolakan self-audit, dan penolakan auditor sebagai reporter saat slash."
+    "keamanan": "Port dari references/ethnyc/hardhat/contracts/MarsEscrow.sol dengan lima perbaikan keamanan: (1) release/slash tidak lagi permissionless \u2014 release hanya developer atau arbiter, slash hanya arbiter; (2) fundFee/postBond tidak lagi menerima parameter jumlah dari pemanggil mana pun (di aslinya siapa pun bisa menguras allowance developer); (3) SafeERC20 menggantikan transfer/transferFrom mentah; (4) jumlah yang dibukukan adalah selisih saldo nyata, bukan jumlah yang diminta, sehingga token fee-on-transfer tidak membuat satu job dibayar dari dana job lain; (5) `cancel` menambah jalan keluar untuk job yang hanya didanai satu pihak \u2014 di aslinya dana itu terkunci selamanya. Ditambah ReentrancyGuard, penolakan self-audit, dan penolakan auditor sebagai reporter saat slash."
   },
   "categoryExpansion": {
     "upgradedAt": "2026-09-09",
@@ -572,5 +573,18 @@
       "tx": "0x780d8c890e508d31c7b5a884c0776b0ecfdae99525e50bf6f4f0796cc6732428",
       "note": "Shortened from 126 to 48 words for the simplified UI; every limitation kept (one scripted repay, scheduled copy never sent a tx, hiring starts nothing yet, stop switch proven in tests only, listing wallet is ours). Price and period unchanged; no other field changed."
     }
-  ]
+  ],
+  "subscriptionCategoryFix": {
+    "upgradedAt": "2026-10-11",
+    "what": "FuguSubscription re-deployed from unchanged source so it decodes all nine Category values. The implementation live since 2026-09-08 was compiled against the four-value enum; after FuguRegistry widened Category on 2026-09-09, reading any listing in categories 4-8 failed to decode and subscribe() reverted with empty data. 14 listings (5-9, 17-20, 24) could not be hired.",
+    "proxy": "0xfdb083371f44Cf53181350389D3217e51B431776",
+    "implementationBefore": "0x06bc0ba1dbc3b6fd22defe7a0cd9a6cd13c15e97",
+    "implementationAfter": "0xfbde18e19fc5e7ebc9404c05b081945def3ce5c7",
+    "implementationDeployTxHash": "0x342df3abcc0110a8bcbdeb05591d1096cc0226f6258a41f715886edeba581fcc",
+    "upgradeTxHash": "0x412ccc67581e3176069da3fd4ddf027426a2b8f65b411ae6857051d06006ea51",
+    "initData": "empty. Source unchanged (git diff c7a3421..HEAD -- src/FuguSubscription.sol is empty); initializeV2 already ran (minPaidBpsOfPeriod = 5000).",
+    "verified": "https://testnet.bscscan.com/address/0xfbde18e19fc5e7ebc9404c05b081945def3ce5c7#code",
+    "proof": "Before: eth_call subscribe(listing, 1, native, quote, deadline) reverted for listings 5-9, 17-20, 24. After: all 25 listings return a subId; subCount 21, minPaidBpsOfPeriod 5000 and owner unchanged. Rehearsed first on an anvil fork, where the rating-gate E2E hired Fugu Quote (listing 20).",
+    "test": "test/FuguSubscription.t.sol test_subscribeWorksForEveryAppendedCategory"
+  }
 }

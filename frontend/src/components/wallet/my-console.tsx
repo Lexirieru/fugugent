@@ -24,6 +24,7 @@ import { CancelSubscription, type CancelOutcome } from "@/components/wallet/canc
 import { useState } from "react";
 import { HireCountdown } from "@/components/wallet/hire-countdown";
 import { AgentResult } from "@/components/wallet/agent-result";
+import { RatingGate } from "@/components/wallet/rating-gate";
 import { formatTbnb } from "@/lib/wallet/format";
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ?? "";
@@ -185,6 +186,8 @@ export function MyConsole() {
 
   return (
     <div className="space-y-4" data-testid="my-console">
+      {/* Owed ratings come first: the next hire waits for them. */}
+      <RatingGate>{null}</RatingGate>
       <p className="text-xs text-faint">
         {shorten(address)} · read at block {blockNumber}
       </p>
