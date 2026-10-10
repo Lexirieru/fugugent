@@ -23,6 +23,7 @@ import { CHAIN, shorten, txUrl } from "@/lib/chain";
 import { CancelSubscription, type CancelOutcome } from "@/components/wallet/cancel-subscription";
 import { useState } from "react";
 import { HireCountdown } from "@/components/wallet/hire-countdown";
+import { AgentResult } from "@/components/wallet/agent-result";
 import { formatTbnb } from "@/lib/wallet/format";
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ?? "";
@@ -233,6 +234,7 @@ export function MyConsole() {
                       void data.refetch();
                     }}
                   />
+                  <AgentResult agentKey={h.agentKey} wallet={address} />
                 </AgentLine>
               ))}
             </ul>

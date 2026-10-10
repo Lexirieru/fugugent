@@ -11,12 +11,13 @@ import { HiredBadge } from "@/components/hired-badge";
 import { ProofList } from "@/components/proof";
 import { RegistryIdentity } from "@/components/registry-identity";
 import { ReviewPanel } from "@/components/wallet/review-panel";
+import { QuestReadiness } from "@/components/quest/readiness";
 import { walletEnabled } from "@/lib/wallet/config";
 import { RiskChip } from "@/components/risk-chip";
 import { Badge, ButtonLink, Card, EmptyState, Page, Section, SectionHeader } from "@/components/ui";
 import { ListAgent } from "@/components/wallet/list-agent";
 import { PermissionCheck } from "@/components/wallet/permission-check";
-import { CATEGORY_META, categoryOf, fuguKindFor, guardianHref } from "@/lib/agents";
+import { CATEGORY_META, FIRST_PARTY, categoryOf, fuguKindFor, guardianHref } from "@/lib/agents";
 import { addressUrl, shorten, txUrl } from "@/lib/chain";
 import { source } from "@/lib/data";
 import type { AgentView } from "@/lib/data/types";
@@ -165,6 +166,19 @@ function AgentDetail({
         />
         <RegistryIdentity record={record} />
       </Section>
+
+      {/* For a builder's own agent: would it count for Set and Earn? Not shown on ours,
+          because the team's agents cannot enter the quest. */}
+      {FIRST_PARTY[record.id] ? null : (
+        <Section id="quest" labelledBy="quest-heading">
+          <SectionHeader
+            id="quest-heading"
+            title="Set and Earn checklist"
+            lede="The six things BNB Chain checks about an agent you build. Read from public data."
+          />
+          <QuestReadiness agentId={record.id} />
+        </Section>
+      )}
 
       {/* The limits of the claim, stated before anything that flatters. */}
       {notShipped ? (

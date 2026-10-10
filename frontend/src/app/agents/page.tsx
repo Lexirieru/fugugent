@@ -1,3 +1,4 @@
+import { QuestBanner } from "@/components/quest/banner";
 import { InfoTip } from "@/components/info-tip";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -148,6 +149,7 @@ export default async function AgentsPage({ searchParams }: PageProps<"/agents">)
 
   return (
     <Page>
+      <QuestBanner />
       <Section>
         <PageHeader
           eyebrow="Agents"

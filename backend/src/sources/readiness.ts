@@ -135,7 +135,7 @@ export function createReadiness(deps: ReadinessDeps) {
           id: "hired",
           title: `Hired by ${MIN_OTHER_HIRERS} other wallets`,
           status: others.size >= MIN_OTHER_HIRERS ? "pass" : "fail",
-          detail: `${others.size} of ${MIN_OTHER_HIRERS} completed hires here from wallets other than the owner and the agent. BNB also excludes wallets you funded, which only they can see; hires on other marketplaces are not counted here.`,
+          detail: `${others.size} completed ${others.size === 1 ? "hire" : "hires"} here from other wallets, ${MIN_OTHER_HIRERS} needed. The owner and the agent wallet do not count. BNB also excludes wallets you funded, which only they can see; hires on other marketplaces are not counted here.`,
           href: null,
         });
       }

@@ -148,7 +148,7 @@ describe("readiness checks", () => {
     ];
     const c = await byId(readiness({ hires }));
     expect(c.hired.status).toBe("fail");
-    expect(c.hired.detail).toMatch(/^2 of 3/);
+    expect(c.hired.detail).toMatch(/^2 completed hires here from other wallets, 3 needed/);
     const enough = await byId(readiness({ hires: [...hires, { subId: "8", subscriber: w(5), status: "ended" }] }));
     expect(enough.hired.status).toBe("pass");
   });

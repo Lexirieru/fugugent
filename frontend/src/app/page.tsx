@@ -1,3 +1,4 @@
+import { QuestBanner } from "@/components/quest/banner";
 import Link from "next/link";
 import { ChainNotesCarousel } from "@/components/chain-notes-carousel";
 import { Fugu } from "@/components/fugu";
@@ -32,6 +33,7 @@ export default async function StartPage() {
 
   return (
     <Page>
+      <QuestBanner />
       {/*
         Split hero, after MotionSites' "Crypto Vault": copy in a rounded pane on the left,
         a showcase pane on the right, lines blurring in one after another. Rebuilt in this
