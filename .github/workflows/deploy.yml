@@ -159,7 +159,11 @@ jobs:
           # The three advisory agents are excluded on purpose: they live behind the
           # `advisors` profile and are not running (see the compose header's
           # memory arithmetic), so waiting on them would time out every time.
-          CORE="postgres redis api fuguguardian"
+          # fuguguardian is not in it either: an agent whose Altana session has
+          # expired restarts until someone re-grants it, and that must not hold the
+          # marketplace API hostage (it did on 2026-10-10: two deploys and their
+          # rollbacks failed waiting on it). Its state is still printed below.
+          CORE="postgres redis api"
 
           cd "$REPO"
 
@@ -242,6 +246,15 @@ jobs:
 
           if wait_healthy; then
             echo "deploy ok at $SHA"
+            # Not a gate, but not hidden either.
+            gcid="$($COMPOSE ps -q fuguguardian 2>/dev/null || true)"
+            if [ -n "$gcid" ]; then
+              gstate="$(docker inspect -f '{{.State.Status}}/{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$gcid" 2>/dev/null || echo unknown)"
+              case "$gstate" in
+                running/healthy) echo "fuguguardian: $gstate" ;;
+                *) echo "::warning::fuguguardian is $gstate. Its Altana session may have expired; see ai/CLAUDE.md." ;;
+              esac
+            fi
             exit 0
           fi
 
