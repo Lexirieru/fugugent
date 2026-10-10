@@ -92,14 +92,22 @@ The five newest hold a zero balance, so no session has been granted for any of t
 none can sign anything. The wallets are real and already named by their on-chain listings;
 what is missing is funding and a grant, not an address.
 
-Every session on the first four: **10 U/day + 0.02 tBNB/day, expiry 30 days (8 Oct 2026)**,
-`register=true`.
+Every session on the first four: **10 U/day + 0.02 tBNB/day, 30 days**, `register=true`.
+The first grants expired on **8 Oct 2026** and Guardian stopped at boot (and, until the
+deploy gate was fixed, blocked every API deploy). Guardian's two sessions were renewed on
+**11 Oct 2026 and expire 9 Nov 2026**; Rebalancer, Grid and Yield were not renewed (they
+send nothing). Renew from a workstation that holds `.studio/` (the admin keystore plus
+`.studio/.env.local` with `WALLET_PASSWORD`): `bag wallet session grant --force --yes`,
+then `bag wallet session grant --approve-only --yes` if the ERC-8183 step reports
+PENDING, then `FORCE_REGRANT=1 npx tsx scripts/grant-session-guardian.ts`; copy both
+session files to the VPS and restart `fuguguardian`.
 
 `fuguguardian` has a **second session** dedicated to DeFi, separate from the commercial
 session above: the file `.studio/wallets/altana-session-guardian.json`, an allowlist of only
 `MockLendingPool.repay(address,uint256)` + `mUSD.approve(address,uint256)`, caps of
 0.02 tBNB + 100 mUSD/day, keyHash
-`0x7a467115cdf6d03f85f0f059733843b43cbe291d9f4489e3bf27d45e5148b377`.
+`0x1a64e047eee99ee93787c6418709a907c1501693ae24ccaba864ff7aaec79b2c` (renewed 2026-10-11; the key that signed the 2026-09-08 repay was
+`0x7a467115cdf6d03f85f0f059733843b43cbe291d9f4489e3bf27d45e5148b377`, now expired).
 It is granted through `app/agent/scripts/grant-session-guardian.ts`, not
 `bag wallet session grant` (that CLI has no allowlist option). This session **cannot** be
 loaded through `ensureAltanaSessionLoaded()`/`getWallet()`: the studio runtime rejects a

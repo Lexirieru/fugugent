@@ -93,8 +93,8 @@ cast call --rpc-url https://data-seed-prebsc-1-s1.bnbchain.org:8545 \
   0x6b8361C29d05D498b1a12B54A37310f94171E94A \
   'isValidKey(address,bytes32)(bool)' \
   0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0 \
-  0x7a467115cdf6d03f85f0f059733843b43cbe291d9f4489e3bf27d45e5148b377
-# true
+  0x1a64e047eee99ee93787c6418709a907c1501693ae24ccaba864ff7aaec79b2c
+# true   (the renewed key; the original 0x7a467115cd… expired on 2026-10-08)
 ```
 
 Agent Studio runs: `bag doctor` gives 14 PASS / 0 FAIL, `bag dev` serves A2A + MCP on `:9000`,

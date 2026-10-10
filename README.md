@@ -180,9 +180,12 @@ find `isValidKey`, and paste these two values:
 | Field | Value |
 |---|---|
 | `account` | `0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0` |
-| `keyHash` | `0x7a467115cdf6d03f85f0f059733843b43cbe291d9f4489e3bf27d45e5148b377` |
+| `keyHash` | `0x1a64e047eee99ee93787c6418709a907c1501693ae24ccaba864ff7aaec79b2c` |
 
-It answers `true`. The permission is registered on the chain, not asserted by us, and the
+It answers `true`. That is the current key: the one that signed the repay above
+(`0x7a467115cd…`) expired on 8 Oct 2026 and now answers `false`, and the session was
+renewed on 11 Oct 2026 with the same two-entry allowlist and the same caps
+([grant tx](https://testnet.bscscan.com/tx/0x86b6bb7aec29f39838054fc2105fe74564a2ea713b6a591f220d095c667d8c7c)), valid until 9 Nov 2026. The permission is registered on the chain, not asserted by us, and the
 marketplace shows the same call's result on
 [Fugu Guardian's page](https://app.hellofugu.xyz/agent/97:2480).
 
@@ -397,7 +400,7 @@ payment and starts nothing that runs on its own.
 | **Fugu Watch** | `HEALTH_FACTOR` | **Runs.** Reads a loan's health factor in Guardian's bands: [`/api/run/watch`](https://api.hellofugu.xyz/api/run/watch?wallet=0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0) |
 | **Fugu Tally** | `TREASURY` | **Runs.** What a wallet spent hiring here: [`/api/run/tally`](https://api.hellofugu.xyz/api/run/tally?wallet=0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E) |
 | **Fugu Scout** | `HIRING` | **Runs.** Who is on offer in a category, from ERC-8004: [`/api/run/scout`](https://api.hellofugu.xyz/api/run/scout?category=GRID&limit=5) |
-| **Fugu Keycheck** | `AUTONOMOUS` | **Runs.** Is a session key still valid: [`/api/run/keycheck`](https://api.hellofugu.xyz/api/run/keycheck?account=0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0&keyHash=0x7a467115cdf6d03f85f0f059733843b43cbe291d9f4489e3bf27d45e5148b377) |
+| **Fugu Keycheck** | `AUTONOMOUS` | **Runs.** Is a session key still valid: [`/api/run/keycheck`](https://api.hellofugu.xyz/api/run/keycheck?account=0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0&keyHash=0x1a64e047eee99ee93787c6418709a907c1501693ae24ccaba864ff7aaec79b2c) |
 | **Fugu Quote** | `COMMERCE` | **Runs.** Dollars to tBNB at the oracle price: [`/api/run/quote`](https://api.hellofugu.xyz/api/run/quote?usd=0.10) |
 
 The five read-only agents sign nothing and move no money; that is the whole of what they do.
