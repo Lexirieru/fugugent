@@ -20,6 +20,12 @@
 //      bun run build && bun run start -p 3100)
 //   cd frontend && bunx --bun playwright install chromium && AGENT=97:2480 node e2e/hire-flow.mjs
 //
+// Use a fork younger than about an hour: the price feeds stop updating at the fork
+// block while anvil's clock runs on, and after the oracle's staleness window every
+// hire reverts with StalePrice. Restart anvil rather than debugging the UI.
+// For builder-flow, run the backend with REGISTRY_FIRST_ID=2470 so its sweep covers
+// only recent ids: a full sweep through a lazy fork does not finish.
+//
 // Screenshots of every step land in `e2e/out/`.
 import { chromium } from "playwright";
 import { createPublicClient, createWalletClient, http, parseEther, formatEther, decodeFunctionData } from "viem";
@@ -27,7 +33,7 @@ import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { bscTestnet } from "viem/chains";
 
 const FORK = "http://127.0.0.1:8546";
-const APP = "http://127.0.0.1:3100";
+const APP = process.env.APP ?? "http://127.0.0.1:3100";
 const AGENT = process.env.AGENT ?? "97:2480";
 const SUBSCRIPTION = "0xfdb083371f44Cf53181350389D3217e51B431776";
 const OUT = new URL("./out/", import.meta.url).pathname;

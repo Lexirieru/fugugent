@@ -19,7 +19,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { bscTestnet } from "viem/chains";
 
 const FORK = "http://127.0.0.1:8546";
-const APP = "http://127.0.0.1:3100";
+const APP = process.env.APP ?? "http://127.0.0.1:3100";
 const REGISTRY = "0xb2f36070E6eae3353E8e755172B477DF213ae248";
 const REPUTATION = "0x279B31B00F64C0ce85BCe2Bd7e377CdcAE58d400";
 const OUT = new URL("./out/", import.meta.url).pathname;

@@ -129,6 +129,8 @@ export function buildServer(env: NodeJS.ProcessEnv = process.env): BuiltServer {
     metadata: createMetadataResolver(),
     registryAddress,
     chainId: config.chainId,
+    // Test stacks on an anvil fork only; see `RegistryIndexOptions.firstId`.
+    firstId: env.REGISTRY_FIRST_ID ? BigInt(env.REGISTRY_FIRST_ID) : undefined,
     log: (message) => console.log(`[fugugent] ${message}`),
     // Each published snapshot is written to Postgres, so a restart serves the
     // last sweep (flagged stale) instead of nothing while the first sweep runs.

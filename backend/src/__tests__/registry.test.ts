@@ -156,6 +156,12 @@ describe("createRegistryIndex", () => {
     expect(idx.all().map((r) => r.tokenId)).toEqual(["0", "1", "3", "4", "5"]);
   });
 
+  it("starts at firstId when a test stack sets one", async () => {
+    const { idx } = index([GRID, HEALTH, null, YIELD, "", GRID], { firstId: 3n });
+    expect((await idx.refresh()).ok).toBe(true);
+    expect(idx.all().map((r) => r.tokenId)).toEqual(["3", "4", "5"]);
+  });
+
   it("serves categories from the snapshot, with the total the category really has", async () => {
     const { idx } = index([GRID, GRID, HEALTH, YIELD]);
     await idx.refresh();

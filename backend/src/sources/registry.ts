@@ -241,6 +241,12 @@ export interface RegistryIndexOptions {
   now?: () => Date;
   batchSize?: number;
   gapLimit?: number;
+  /**
+   * The first id to read. 0 in production. Only for a test stack on an anvil fork,
+   * where every id costs remote round trips and a full sweep never finishes: there a
+   * window near the ids under test is enough. Never set this on the live API.
+   */
+  firstId?: bigint;
   /** Called after each published snapshot — the cache write-through hangs here. */
   onSnapshot?: (records: readonly AgentRecord[], report: RegistrySweepReport) => void | Promise<void>;
   log?: (message: string) => void;
@@ -358,7 +364,7 @@ export function createRegistryIndex(options: RegistryIndexOptions): RegistryInde
   async function readAll(blockNumber: bigint): Promise<RawIdentity[]> {
     const out: RawIdentity[] = [];
     let misses = 0;
-    for (let start = 0n; misses < gapLimit && start < BigInt(REGISTRY_MAX_IDS); start += BigInt(batchSize)) {
+    for (let start = options.firstId ?? 0n; misses < gapLimit && start < BigInt(REGISTRY_MAX_IDS); start += BigInt(batchSize)) {
       const ids = Array.from({ length: batchSize }, (_, i) => start + BigInt(i));
       let rows: (RawIdentity | null)[];
       try {

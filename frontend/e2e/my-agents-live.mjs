@@ -111,9 +111,16 @@ await hire.waitFor({ timeout: 90000 });
 await hire.scrollIntoViewIfNeeded();
 await hire.click();
 await page.getByText("Hired. The transaction is in a block.").waitFor({ timeout: 90000 });
-const subId = await pub.readContract({ address: SUBSCRIPTION, abi: SUB_ABI, functionName: "subCount" });
-const sub = await pub.readContract({ address: SUBSCRIPTION, abi: SUB_ABI, functionName: "getSub", args: [subId] });
-if (subId !== before + 1n || sub.subscriber !== account.address) throw new Error("hire did not land");
+// Real users hire on this contract too, so the new sub is not simply `before + 1`:
+// it is the newest one after `before` that this wallet paid for.
+const count = await pub.readContract({ address: SUBSCRIPTION, abi: SUB_ABI, functionName: "subCount" });
+let subId = 0n;
+let sub = null;
+for (let id = count; id > before; id--) {
+  const s = await pub.readContract({ address: SUBSCRIPTION, abi: SUB_ABI, functionName: "getSub", args: [id] });
+  if (s.subscriber === account.address) { subId = id; sub = s; break; }
+}
+if (sub === null) throw new Error("hire did not land");
 log(`hired on testnet: sub #${subId}, ends in ${Number(sub.endsAt - sub.startedAt)}s`);
 
 // 3. It shows under "Running now" with a ticking countdown.
