@@ -311,6 +311,25 @@ export interface TrackingService {
    * builder's checklist reads. `null` when no listing claims that id.
    */
   listingHires(erc8004AgentId: bigint): Promise<ListingHiresAnswer | null>;
+  /** Marketplace-wide counts, with the team's own wallets split out. */
+  stats(team: readonly Address[]): Promise<StatsAnswer>;
+}
+
+export interface StatsAnswer extends Snapshotted {
+  /** `FuguRegistry.listingCount()`. */
+  listings: number;
+  /** Listings owned by a team wallet. */
+  ourListings: number;
+  /** Listings owned by anyone else. */
+  otherListings: number;
+  /** Distinct owners of `otherListings`. */
+  otherBuilders: number;
+  /** `FuguSubscription.subCount()`. */
+  hires: number;
+  /** Hires paid for by a wallet that is not the team's. */
+  hiresByOthers: number;
+  /** Distinct non-team wallets that have hired. */
+  hirers: number;
 }
 
 export interface ListingHiresAnswer extends Snapshotted {
@@ -362,6 +381,23 @@ export function createTrackingService(options: TrackingServiceOptions): Tracking
   const keyOf = (id: bigint) => `${options.chainId}:${id.toString()}`;
 
   return {
+    async stats(team) {
+      const s = await snapshot();
+      const isTeam = (a: string) => team.some((t) => same(t, a));
+      const other = s.snapshot.listings.filter((l) => !isTeam(l.owner));
+      const outside = s.snapshot.subs.filter((sub) => !isTeam(sub.subscriber));
+      return {
+        ...envelope(s),
+        listings: s.snapshot.listings.length,
+        ourListings: s.snapshot.listings.length - other.length,
+        otherListings: other.length,
+        otherBuilders: new Set(other.map((l) => l.owner.toLowerCase())).size,
+        hires: s.snapshot.subs.length,
+        hiresByOthers: outside.length,
+        hirers: new Set(outside.map((sub) => sub.subscriber.toLowerCase())).size,
+      };
+    },
+
     async listingHires(erc8004AgentId) {
       const s = await snapshot();
       const listing = s.snapshot.listings.find((l) => l.erc8004AgentId === erc8004AgentId);

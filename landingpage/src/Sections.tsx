@@ -16,7 +16,6 @@ import {
   NOT_YET,
   PUFF_LEVELS,
   RAILS,
-  RENTABLE,
   RENTAL_AMOUNT,
   RENTAL_SUB_ID,
   RENTAL_TX_URL,
@@ -31,6 +30,7 @@ import {
 } from "./content";
 import InfoTip from "./InfoTip";
 import { Ext, d } from "./ui";
+import { useStats } from "./useStats";
 
 /**
  * House rule for this page: a title and at most one short line per section. The
@@ -143,6 +143,7 @@ function DotChart() {
 }
 
 export function ProofBento() {
+  const stats = useStats();
   return (
     <section className="section wrap" aria-labelledby="proof-title">
       <Head
@@ -210,20 +211,25 @@ export function ProofBento() {
         <article className="tile tile--soft" data-reveal="" style={d(260)}>
           <p className="tile__label">
             The catalogue{" "}
-            <InfoTip label="About the nine listings">
-              The registry answers listingCount() = {RENTABLE}: one listing per category. Widening
-              it from four categories to nine left every existing listing byte for byte identical.
+            <InfoTip label="About the listings">
+              Read live from FuguRegistry.listingCount(). Anyone who owns an ERC-8004 agent can list
+              it, so this number grows on its own. Widening the registry from four categories to
+              nine left every existing listing byte for byte identical.
             </InfoTip>
           </p>
           <p className="tile__stat tile__stat--pair">
             <span>
-              {RENTABLE} <span className="tile__of">listed</span>
+              {stats ? stats.listings : "…"} <span className="tile__of">listed</span>
             </span>
             <span>
               {EVER_ACTED} <span className="tile__of">has acted</span>
             </span>
           </p>
-          <p className="tile__text">One per category. Only Guardian has moved money.</p>
+          <p className="tile__text">
+            {stats && stats.otherListings > 0
+              ? `${stats.ourListings} ours, ${stats.otherListings} from ${stats.otherBuilders} other ${stats.otherBuilders === 1 ? "builder" : "builders"}. Only Guardian has moved money.`
+              : "Only Guardian has moved money."}
+          </p>
           <TLink href={UPGRADE_TX_URL}>See the upgrade</TLink>
         </article>
 
@@ -257,13 +263,18 @@ export function ProofBento() {
 /* ── The four agents with code behind them ────────────────────────── */
 
 export function AgentsSection() {
+  const stats = useStats();
   return (
     <section className="section wrap" aria-labelledby="agents-title">
       <Head
         id="agents-title"
-        eyebrow="four agents, honest labels"
-        title="Four agents. One of them can act."
-        lede="All four can be rented. Only one has ever moved money, and each card says which."
+        eyebrow="four of ours, honest labels"
+        title="Four of our agents. One of them can act."
+        lede={
+          stats
+            ? `${stats.listings} agents are listed in the app. Of these four, only one has ever moved money, and each card says which.`
+            : "Of these four, only one has ever moved money, and each card says which."
+        }
       />
       <ul className="agents">
         {AGENTS.map((agent, i) => (
@@ -282,7 +293,7 @@ export function AgentsSection() {
       </ul>
       <p className="more">
         <Ext href={AGENTS_URL} className="btn btn--ghost">
-          See all nine in the app <span aria-hidden="true">&#8599;</span>
+          {stats ? `See all ${stats.listings} in the app` : "See them all in the app"} <span aria-hidden="true">&#8599;</span>
         </Ext>
       </p>
     </section>

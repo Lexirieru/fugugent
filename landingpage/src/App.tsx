@@ -4,7 +4,6 @@ import {
   HF_AFTER,
   HF_BEFORE,
   LIST_URL,
-  RENTABLE,
   RENTAL_AMOUNT,
   RENTAL_TX_URL,
   REPAY_TX_URL,
@@ -15,6 +14,7 @@ import PlaneHero from "./PlaneHero";
 import InfoTip from "./InfoTip";
 import { Ext, d } from "./ui";
 import { startReveal } from "./reveal";
+import { useStats } from "./useStats";
 import {
   AgentsSection,
   BuiltOn,
@@ -34,6 +34,7 @@ import {
  * marketplace hero at app.hellofugu.xyz, which was built from the same prompt.
  */
 function Hero() {
+  const stats = useStats();
   return (
     <section className="hero wrap" aria-labelledby="hero-title">
       <div className="hero__copy">
@@ -101,7 +102,7 @@ function Hero() {
           </li>
           <li className="hero-pop" style={d(790)}>
             <Ext href={UPGRADE_TX_URL} className="pill">
-              {RENTABLE} listings on chain
+              {stats ? `${stats.listings} listings on chain` : "Listings on chain"}
             </Ext>
           </li>
           <li className="hero-pop" style={d(880)}>

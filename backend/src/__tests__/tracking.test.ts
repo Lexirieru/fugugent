@@ -226,3 +226,13 @@ describe("nameFromMetadataUri", () => {
     expect(nameFromMetadataUri(undefined)).toBeNull();
   });
 });
+
+describe("stats", () => {
+  it("splits listings and hires into the team's and everyone else's", async () => {
+    const { tracking } = service();
+    // Listings 1-3 are OWNER's, 4 is BOB's. Five subs: four by ALICE, one by BOB.
+    expect(await tracking.stats([OWNER])).toMatchObject({ listings: 4, ourListings: 3, otherListings: 1, otherBuilders: 1, hires: 5, hiresByOthers: 5, hirers: 2 });
+    // Counting BOB as team too removes his listing and his hire.
+    expect(await tracking.stats([OWNER, BOB])).toMatchObject({ otherListings: 0, otherBuilders: 0, hiresByOthers: 4, hirers: 1 });
+  });
+});

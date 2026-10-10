@@ -65,6 +65,7 @@ function tracking(hires: ListingHiresAnswer["hires"], listed: { owner: Address }
     hires: async () => { throw new Error("unused"); },
     agents: async () => { throw new Error("unused"); },
     reviews: async () => { throw new Error("unused"); },
+    stats: async () => { throw new Error("unused"); },
     listingHires: async () => listed === null ? null : ({
       chainId: 97,
       blockNumber: "1",

@@ -148,6 +148,10 @@ export function createTrackingRoutes(deps: TrackingRoutesDeps): Hono {
     }
   }
 
+  // Marketplace-wide counts for the landing page, so its numbers follow the chain
+  // instead of being typed into a static build.
+  app.get("/stats", (c) => answer(c, () => deps.tracking.stats(TEAM_WALLETS.map((w) => w.address))));
+
   app.get("/tracking/hires", (c) => {
     const wallet = c.req.query("wallet");
     if (wallet === undefined || !ADDRESS.test(wallet)) return badAddress(c, "wallet", wallet);

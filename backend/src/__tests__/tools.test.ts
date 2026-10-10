@@ -43,7 +43,7 @@ function hires(rows: Partial<HiresAnswer["hires"][number]>[]): TrackingService {
       ...r,
     })),
   };
-  return { hires: async () => answer, agents: async () => { throw new Error("unused"); }, reviews: async () => { throw new Error("unused"); }, listingHires: async () => null };
+  return { hires: async () => answer, agents: async () => { throw new Error("unused"); }, reviews: async () => { throw new Error("unused"); }, listingHires: async () => null, stats: async () => { throw new Error("unused"); } };
 }
 
 function tools(over: { chain?: ToolsChain; tracking?: TrackingService } = {}) {

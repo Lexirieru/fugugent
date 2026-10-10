@@ -20,6 +20,8 @@ export const REPO_URL = "https://github.com/Lexirieru/fugugent";
 export const STATUS_DOC_URL = `${REPO_URL}/blob/main/docs/STATUS.md`;
 export const APP_URL = "https://app.hellofugu.xyz";
 export const API_HEALTH_URL = "https://api.hellofugu.xyz/api/health";
+/** Live listing and hire counts; see `useStats.ts`. */
+export const STATS_URL = "https://api.hellofugu.xyz/api/stats";
 export const AGENTS_URL = `${APP_URL}/agents`;
 export const SKILLS_URL = `${APP_URL}/skills`;
 export const AUDITORS_URL = `${APP_URL}/auditors`;
@@ -48,12 +50,12 @@ export const X_URL = "https://x.com/hellofuguai";
  * moment somebody happened to measure, with no way for a reader to tell. So the page
  * quotes only what cannot move underneath it.
  *
- * `RENTABLE` is the nine listings in `FuguRegistry`: `listingCount()` answers 9, one per
- * category, and anyone can read it (ENVIRONMENT.md §G3). `EVER_ACTED` is one, and that
- * gap is the honest part.
+ * The number of listings is NOT here: it grows whenever anyone lists an agent, so the
+ * page reads it live from `/api/stats` (`useStats.ts`). `EVER_ACTED` is how many of OUR
+ * agents have ever sent a transaction; it changes only when we ship, and the gap
+ * between it and the listing count is the honest part.
  */
 export const CATEGORY_COUNT = 9;
-export const RENTABLE = 9;
 export const EVER_ACTED = 1;
 export const VERIFIED_CONTRACTS = 5;
 
@@ -388,9 +390,9 @@ export const NOT_YET = [
     more: null,
   },
   {
-    title: "Eight of the nine cannot act",
-    body: "They answer questions. None has ever sent a transaction.",
-    more: "There is no hidden path where they could. Only Fugu Guardian has moved money.",
+    title: "Only one of our agents has moved money",
+    body: "Fugu Guardian has. The others answer questions or read the chain for you, and have never sent a transaction.",
+    more: "There is no hidden path where they could. Each agent's page says what it cannot do yet.",
   },
   {
     title: "The lending pool is our own mock",
