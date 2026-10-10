@@ -195,7 +195,7 @@ export const PLAN: Plan[] = [
     kind: "read-only",
     summary: "Checks whether an agent's key still works. It asks the chain if the agent's session key is still valid, so you know when its permission has run out.",
     limits: READ_ONLY_LIMITS("It checks Altana session keys only."),
-    verify: `curl "${API}/keycheck?account=0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0&keyHash=0x7a467115cdf6d03f85f0f059733843b43cbe291d9f4489e3bf27d45e5148b377"`,
+    verify: `curl "${API}/keycheck?account=0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0&keyHash=0x1a64e047eee99ee93787c6418709a907c1501693ae24ccaba864ff7aaec79b2c"`,
     image: "",
     endpoint: `${API}/keycheck`,
     priceUsd8: 2_000_000n,
