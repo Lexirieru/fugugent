@@ -16,6 +16,8 @@ import { createHealthRoutes } from "./health.js";
 import { createSkillRoutes } from "./skills.js";
 import { createTrackingRoutes, type TrackingRoutesDeps } from "./tracking.js";
 import { createToolRoutes } from "./tools.js";
+import { createQuestRoutes } from "./quest.js";
+import type { Readiness } from "../sources/readiness.js";
 import type { Tools } from "../sources/tools.js";
 
 export interface ApiDeps {
@@ -38,6 +40,8 @@ export interface ApiDeps {
   tracking?: TrackingRoutesDeps;
   /** The read-only agents (`/api/run/*`). Optional, like `skills`. */
   tools?: Tools;
+  /** The Set and Earn build checklist (`/api/quest/*`). Optional, like `skills`. */
+  readiness?: Readiness;
   /** Injected so failure-envelope timestamps are deterministic in tests. */
   now?: () => Date;
 }
@@ -81,6 +85,7 @@ export function createApp(deps: ApiDeps): Hono {
   }
   if (deps.tracking !== undefined) app.route("/api", createTrackingRoutes(deps.tracking));
   if (deps.tools !== undefined) app.route("/api", createToolRoutes(deps.tools));
+  if (deps.readiness !== undefined) app.route("/api", createQuestRoutes(deps.readiness));
 
   // JSON on every path, including the wrong ones: this client can only read
   // JSON, and an HTML "Not Found" page would reach it as a confusing parse

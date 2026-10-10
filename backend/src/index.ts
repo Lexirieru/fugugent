@@ -27,6 +27,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { pathToFileURL } from "node:url";
 import { createPublicClient, fallback, http as viemHttp } from "viem";
+import { getTransactionCount } from "viem/actions";
 import { bscTestnet } from "viem/chains";
 import { loadConfig } from "./config.js";
 import { connectDb, ensureSchema, type DbHandle } from "./db/client.js";
@@ -44,6 +45,7 @@ import {
 import { createScan8004Source } from "./sources/scan8004.js";
 import { createTrackingService, createViemTrackingChain } from "./sources/tracking.js";
 import { createTools, createViemToolsChain } from "./sources/tools.js";
+import { createReadiness } from "./sources/readiness.js";
 import { createApp } from "./routes/app.js";
 import { createDbSkillStore } from "./skills/repo.js";
 import { createMemorySkillStore } from "./skills/store.js";
@@ -202,6 +204,15 @@ export function buildServer(env: NodeJS.ProcessEnv = process.env): BuiltServer {
     },
   });
 
+  // The Set and Earn build checklist, from the same public data BNB says it reads.
+  const readiness = createReadiness({
+    agent: async (id) => (await service.getAgentDetail(id)).agent,
+    tracking,
+    metadata: createMetadataResolver(),
+    sentCount: (address) => getTransactionCount(rpcClient, { address }),
+    explorer: "https://testnet.bscscan.com",
+  });
+
   const handle = dbHandle;
   let stopRegistry: (() => void) | null = null;
   return {
@@ -215,6 +226,7 @@ export function buildServer(env: NodeJS.ProcessEnv = process.env): BuiltServer {
         contracts: { ...trackingContracts, identityRegistry: config.contracts.identityRegistry },
       },
       tools,
+      readiness,
     }),
     config,
     hasCache: handle !== null,

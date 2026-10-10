@@ -306,6 +306,19 @@ export interface TrackingService {
   hires(wallet: Address): Promise<HiresAnswer>;
   agents(owner: Address): Promise<AgentsAnswer>;
   reviews(wallet: Address): Promise<ReviewsAnswer>;
+  /**
+   * The listing bound to one ERC-8004 id, and every hire of it with who paid: what a
+   * builder's checklist reads. `null` when no listing claims that id.
+   */
+  listingHires(erc8004AgentId: bigint): Promise<ListingHiresAnswer | null>;
+}
+
+export interface ListingHiresAnswer extends Snapshotted {
+  listingId: string;
+  owner: Address;
+  agentWallet: Address;
+  category: Category | null;
+  hires: { subId: string; subscriber: Address; status: HireStatus }[];
 }
 
 export const TRACKING_TTL_MS = 15_000;
@@ -349,6 +362,26 @@ export function createTrackingService(options: TrackingServiceOptions): Tracking
   const keyOf = (id: bigint) => `${options.chainId}:${id.toString()}`;
 
   return {
+    async listingHires(erc8004AgentId) {
+      const s = await snapshot();
+      const listing = s.snapshot.listings.find((l) => l.erc8004AgentId === erc8004AgentId);
+      if (listing === undefined) return null;
+      return {
+        ...envelope(s),
+        listingId: listing.listingId.toString(),
+        owner: listing.owner,
+        agentWallet: listing.agentWallet,
+        category: listing.category,
+        hires: s.snapshot.subs
+          .filter((sub) => sub.listingId === listing.listingId)
+          .map((sub) => ({
+            subId: sub.subId.toString(),
+            subscriber: sub.subscriber,
+            status: sub.cancelled ? "cancelled" : sub.endsAt > s.snapshot.blockTimestamp ? "active" : "ended",
+          })),
+      };
+    },
+
     async hires(wallet) {
       const s = await snapshot();
       const listings = new Map(s.snapshot.listings.map((l) => [l.listingId, l]));
