@@ -18,6 +18,7 @@
  * the only one allowed to declare an answer impossible to confirm fresh.
  */
 
+import { proofsFromText } from "@/lib/data/proofs";
 import type { AgentSource, SourceHealth } from "@/lib/agent-types";
 import { isCategory } from "@/lib/agents";
 import type {
@@ -111,7 +112,7 @@ function toView(record: ReturnType<typeof parseAgentRecord>): AgentView {
     record,
     risk: null,
     session: null,
-    proofs: [],
+    proofs: proofsFromText(meta?.proof),
     notShipped: meta?.limits ?? null,
     outcomes: meta?.proof ? [meta.proof] : [],
   };
