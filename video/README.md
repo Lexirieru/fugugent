@@ -54,3 +54,21 @@ the other, and a take went out with the new narration over the old footage.
 music worth using carries a licence, most "royalty free" libraries still want attribution a
 hackathon video will forget to give, and this removes the question. It is four chords, mixed
 about 20 dB under the speech, and deliberately unremarkable.
+
+## The launch film (`src/launch/`)
+
+A second, shorter film: 54 seconds, captions instead of narration, landing page to app,
+cut on the beat of its own synthesised music.
+
+```bash
+npm run capture:launch   # 2x stills of the live site; hire and /me on an anvil fork
+npm run music:launch     # 120 BPM, risers and impacts on the cuts in timeline.json
+npm run render:launch    # out/hellofugu-launch.mp4, 1920x1080, 60 fps
+```
+
+`src/launch/timeline.json` is the edit: scene boundaries, impacts and risers. The music
+reads it too, so moving a cut there moves its impact. The camera, the cursor and the
+auto-zooms are done in `Launch.tsx`, aimed at element boxes the capture measured from
+the DOM (`captured.json`), which is what keeps text sharp at 2x zoom. `ONLY=landing,app`
+re-records just those parts; the hire and /me shots need the fork stack described at the
+top of `scripts/capture-launch.mjs`.

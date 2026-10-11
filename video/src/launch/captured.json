@@ -1,0 +1,245 @@
+{
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "scale": 2,
+  "shots": {
+    "landing-hero-ui": {
+      "file": "launch/landing-hero-ui.png",
+      "width": 1440,
+      "height": 900,
+      "video": {
+        "x": 0,
+        "y": 290,
+        "w": 1440,
+        "h": 810
+      },
+      "bg": "rgb(241, 230, 225)"
+    },
+    "landing-below": {
+      "file": "launch/landing-below.png",
+      "width": 1440,
+      "height": 2700
+    },
+    "app-home": {
+      "file": "launch/app-home.png",
+      "width": 1440,
+      "height": 1800
+    },
+    "agents-all": {
+      "file": "launch/agents-all.png",
+      "width": 1440,
+      "height": 900,
+      "tab": {
+        "x": 560,
+        "y": 278,
+        "w": 137,
+        "h": 34
+      }
+    },
+    "agents-hf": {
+      "file": "launch/agents-hf.png",
+      "width": 1440,
+      "height": 900,
+      "tab": {
+        "x": 545,
+        "y": 309,
+        "w": 154,
+        "h": 34
+      },
+      "card": {
+        "x": 144,
+        "y": 421,
+        "w": 368,
+        "h": 336
+      }
+    },
+    "agent-page": {
+      "file": "launch/agent-page.png",
+      "width": 1440,
+      "height": 3000,
+      "title": {
+        "x": 296,
+        "y": 220,
+        "w": 1000,
+        "h": 36
+      },
+      "evidence": {
+        "x": 169,
+        "y": 718,
+        "w": 541,
+        "h": 17
+      },
+      "registered": {
+        "x": 730,
+        "y": 718,
+        "w": 541,
+        "h": 17
+      }
+    },
+    "me-connect": {
+      "file": "launch/me-connect.png",
+      "width": 1440,
+      "height": 900,
+      "connect": {
+        "x": 649,
+        "y": 360,
+        "w": 141,
+        "h": 40
+      }
+    },
+    "me-modal": {
+      "file": "launch/me-modal.png",
+      "width": 1440,
+      "height": 900,
+      "option": {
+        "x": 603,
+        "y": 344,
+        "w": 87,
+        "h": 18
+      }
+    },
+    "hire-before": {
+      "file": "launch/hire-before.png",
+      "width": 1440,
+      "height": 900,
+      "hire": {
+        "x": 190,
+        "y": 270,
+        "w": 223,
+        "h": 40
+      },
+      "panel": {
+        "x": 0,
+        "y": -339,
+        "w": 1440,
+        "h": 696
+      }
+    },
+    "hire-after": {
+      "file": "launch/hire-after.png",
+      "width": 1440,
+      "height": 900,
+      "done": {
+        "x": 190,
+        "y": 394,
+        "w": 1060,
+        "h": 20
+      }
+    },
+    "me-running-0": {
+      "file": "launch/me-running-0.png",
+      "width": 1440,
+      "height": 900,
+      "countdown": {
+        "x": 250,
+        "y": 464,
+        "w": 164,
+        "h": 26
+      },
+      "row": {
+        "x": 169,
+        "y": 396,
+        "w": 518,
+        "h": 114
+      },
+      "cancel": {
+        "x": 422,
+        "y": 468,
+        "w": 265,
+        "h": 30
+      }
+    },
+    "me-running-1": {
+      "file": "launch/me-running-1.png",
+      "width": 1440,
+      "height": 900,
+      "countdown": {
+        "x": 250,
+        "y": 464,
+        "w": 164,
+        "h": 26
+      },
+      "row": {
+        "x": 169,
+        "y": 396,
+        "w": 518,
+        "h": 114
+      }
+    },
+    "me-running-2": {
+      "file": "launch/me-running-2.png",
+      "width": 1440,
+      "height": 900,
+      "countdown": {
+        "x": 250,
+        "y": 464,
+        "w": 164,
+        "h": 26
+      },
+      "row": {
+        "x": 169,
+        "y": 396,
+        "w": 518,
+        "h": 114
+      }
+    },
+    "me-running-3": {
+      "file": "launch/me-running-3.png",
+      "width": 1440,
+      "height": 900,
+      "countdown": {
+        "x": 250,
+        "y": 464,
+        "w": 164,
+        "h": 26
+      },
+      "row": {
+        "x": 169,
+        "y": 396,
+        "w": 518,
+        "h": 114
+      }
+    },
+    "me-running-4": {
+      "file": "launch/me-running-4.png",
+      "width": 1440,
+      "height": 900,
+      "countdown": {
+        "x": 250,
+        "y": 464,
+        "w": 164,
+        "h": 26
+      },
+      "row": {
+        "x": 169,
+        "y": 396,
+        "w": 518,
+        "h": 114
+      }
+    },
+    "me-confirm": {
+      "file": "launch/me-confirm.png",
+      "width": 1440,
+      "height": 900,
+      "yes": {
+        "x": 182,
+        "y": 584,
+        "w": 155,
+        "h": 30
+      }
+    },
+    "me-cancelled": {
+      "file": "launch/me-cancelled.png",
+      "width": 1440,
+      "height": 900,
+      "notice": {
+        "x": 169,
+        "y": 396,
+        "w": 518,
+        "h": 16
+      }
+    }
+  }
+}

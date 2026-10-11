@@ -7,3 +7,7 @@ public/audio/
 public/music.wav
 out/
 assets/
+# The launch film's stills, music and aircraft clip: `npm run capture:launch` and
+# `npm run music:launch` rebuild them. `src/launch/captured.json` (where each element
+# sits) is kept, so the composition still reads without a capture.
+public/launch/

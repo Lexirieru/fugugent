@@ -1,0 +1,18 @@
+{
+  "note": "Shared by the film (Launch.tsx) and the music (scripts/music-launch.mjs), so every cut lands on a beat and every impact lands on a cut. Seconds. 120 BPM: a beat is 0.5 s, a bar 2 s.",
+  "fps": 60,
+  "bpm": 120,
+  "scenes": [
+    { "id": "hook", "start": 0, "end": 4 },
+    { "id": "logo", "start": 4, "end": 6 },
+    { "id": "landing", "start": 6, "end": 12 },
+    { "id": "catalogue", "start": 12, "end": 18 },
+    { "id": "agent", "start": 18, "end": 24 },
+    { "id": "hire", "start": 24, "end": 32 },
+    { "id": "me", "start": 32, "end": 42 },
+    { "id": "stats", "start": 42, "end": 48 },
+    { "id": "end", "start": 48, "end": 54 }
+  ],
+  "impacts": [4, 6, 12, 18, 24, 32, 42, 43.5, 45, 46.5, 48],
+  "risers": [2, 40]
+}

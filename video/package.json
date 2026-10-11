@@ -9,10 +9,15 @@
     "voice": "node scripts/voice.mjs",
     "studio": "remotion studio src/index.ts",
     "render": "remotion render src/index.ts Demo out/hellofugu-demo.mp4 --concurrency 2",
-    "music": "node scripts/music.mjs 76"
+    "music": "node scripts/music.mjs 76",
+    "capture:launch": "node scripts/capture-launch.mjs",
+    "music:launch": "node scripts/music-launch.mjs",
+    "studio:launch": "remotion studio src/launch/index.ts",
+    "render:launch": "remotion render src/launch/index.ts Launch out/hellofugu-launch.mp4 --concurrency 4"
   },
   "dependencies": {
     "@remotion/cli": "4.0.400",
+    "@remotion/google-fonts": "^4.0.400",
     "@remotion/media-utils": "4.0.400",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -21,6 +26,8 @@
   },
   "devDependencies": {
     "@types/react": "19.2.14",
-    "typescript": "5.9.3"
+    "playwright": "^1.63.0",
+    "typescript": "5.9.3",
+    "viem": "^2.56.3"
   }
 }
