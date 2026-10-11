@@ -1,0 +1,18 @@
+{
+  "note": "The Set and Earn film. Shared by Quest.tsx and scripts/music-launch.mjs (run with this file). Seconds, 120 BPM.",
+  "fps": 60,
+  "bpm": 120,
+  "scenes": [
+    { "id": "hook", "start": 0, "end": 4 },
+    { "id": "quest", "start": 4, "end": 10 },
+    { "id": "pick", "start": 10, "end": 14 },
+    { "id": "hire", "start": 14, "end": 20 },
+    { "id": "found", "start": 20, "end": 26 },
+    { "id": "rate", "start": 26, "end": 32 },
+    { "id": "build", "start": 32, "end": 38 },
+    { "id": "cta", "start": 38, "end": 42 },
+    { "id": "end", "start": 42, "end": 48 }
+  ],
+  "impacts": [4, 10, 14, 20, 26, 32, 38, 39.5, 41, 42],
+  "risers": [2, 36]
+}

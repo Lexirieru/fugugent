@@ -14,7 +14,11 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const T = JSON.parse(readFileSync(join(ROOT, "src/launch/timeline.json"), "utf8"));
+// Defaults to the launch film; `node scripts/music-launch.mjs src/quest/timeline.json public/quest/music.wav`
+// writes the Set and Earn film's track from its own timeline.
+const TIMELINE = process.argv[2] ?? "src/launch/timeline.json";
+const OUTFILE = process.argv[3] ?? "public/launch/music.wav";
+const T = JSON.parse(readFileSync(join(ROOT, TIMELINE), "utf8"));
 const RATE = 48_000;
 const BEAT = 60 / T.bpm;
 const LENGTH = T.scenes.at(-1).end;
@@ -127,5 +131,5 @@ header.write("RIFF", 0); header.writeUInt32LE(36 + data.length, 4); header.write
 header.write("fmt ", 12); header.writeUInt32LE(16, 16); header.writeUInt16LE(1, 20); header.writeUInt16LE(2, 22);
 header.writeUInt32LE(RATE, 24); header.writeUInt32LE(RATE * 4, 28); header.writeUInt16LE(4, 32); header.writeUInt16LE(16, 34);
 header.write("data", 36); header.writeUInt32LE(data.length, 40);
-writeFileSync(join(ROOT, "public/launch/music.wav"), Buffer.concat([header, data]));
-console.log(`public/launch/music.wav: ${LENGTH}s at ${T.bpm} BPM, ${T.impacts.length} impacts, ${T.risers.length} risers`);
+writeFileSync(join(ROOT, OUTFILE), Buffer.concat([header, data]));
+console.log(`${OUTFILE}: ${LENGTH}s at ${T.bpm} BPM, ${T.impacts.length} impacts, ${T.risers.length} risers`);

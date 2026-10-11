@@ -13,7 +13,10 @@
     "capture:launch": "node scripts/capture-launch.mjs",
     "music:launch": "node scripts/music-launch.mjs",
     "studio:launch": "remotion studio src/launch/index.ts",
-    "render:launch": "remotion render src/launch/index.ts Launch out/hellofugu-launch.mp4 --concurrency 4"
+    "render:launch": "remotion render src/launch/index.ts Launch out/hellofugu-launch.mp4 --concurrency 4",
+    "capture:quest": "node scripts/capture-quest.mjs",
+    "music:quest": "node scripts/music-launch.mjs src/quest/timeline.json public/quest/music.wav",
+    "render:quest": "remotion render src/quest/index.ts Quest out/hellofugu-set-and-earn.mp4 --concurrency 4"
   },
   "dependencies": {
     "@remotion/cli": "4.0.400",

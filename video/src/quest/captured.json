@@ -1,0 +1,157 @@
+{
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "scale": 2,
+  "shots": {
+    "quest-page": {
+      "file": "quest/quest-page.png",
+      "width": 1440,
+      "height": 2100,
+      "register": {
+        "x": 622,
+        "y": 436,
+        "w": 218,
+        "h": 18
+      },
+      "faucet": {
+        "x": 604,
+        "y": 557,
+        "w": 120,
+        "h": 18
+      },
+      "watch": {
+        "x": 217,
+        "y": 710,
+        "w": 343,
+        "h": 100
+      },
+      "picks": {
+        "x": 217,
+        "y": 710,
+        "w": 1054,
+        "h": 100
+      },
+      "check": {
+        "x": 449,
+        "y": 1048,
+        "w": 142,
+        "h": 38
+      }
+    },
+    "checklist": {
+      "file": "quest/checklist.png",
+      "width": 1440,
+      "height": 900,
+      "card": {
+        "x": 144,
+        "y": 351,
+        "w": 1152,
+        "h": 517
+      },
+      "score": {
+        "x": 169,
+        "y": 377,
+        "w": 58,
+        "h": 24
+      }
+    },
+    "watch-hire": {
+      "file": "quest/watch-hire.png",
+      "width": 1440,
+      "height": 900,
+      "hire": {
+        "x": 190,
+        "y": 680,
+        "w": 208,
+        "h": 40
+      },
+      "one": {
+        "x": 1094,
+        "y": 272,
+        "w": 31,
+        "h": 26
+      },
+      "cost": {
+        "x": 170,
+        "y": 329,
+        "w": 366,
+        "h": 77
+      }
+    },
+    "watch-hired": {
+      "file": "quest/watch-hired.png",
+      "width": 1440,
+      "height": 900,
+      "done": {
+        "x": 190,
+        "y": 804,
+        "w": 1060,
+        "h": 20
+      }
+    },
+    "me-found": {
+      "file": "quest/me-found.png",
+      "width": 1440,
+      "height": 900,
+      "found": {
+        "x": 169,
+        "y": 506,
+        "w": 518,
+        "h": 36
+      },
+      "countdown": {
+        "x": 250,
+        "y": 464,
+        "w": 179,
+        "h": 26
+      }
+    },
+    "gate": {
+      "file": "quest/gate.png",
+      "width": 1440,
+      "height": 900,
+      "gate": {
+        "x": 169,
+        "y": 249,
+        "w": 1102,
+        "h": 243
+      },
+      "release": {
+        "x": 215,
+        "y": 408,
+        "w": 294,
+        "h": 38
+      }
+    },
+    "gate-stars": {
+      "file": "quest/gate-stars.png",
+      "width": 1440,
+      "height": 900,
+      "five": {
+        "x": 330,
+        "y": 414,
+        "w": 25,
+        "h": 24
+      },
+      "rate": {
+        "x": 366,
+        "y": 408,
+        "w": 174,
+        "h": 36
+      }
+    },
+    "gate-open": {
+      "file": "quest/gate-open.png",
+      "width": 1440,
+      "height": 900,
+      "hire": {
+        "x": 190,
+        "y": 181,
+        "w": 196,
+        "h": 40
+      }
+    }
+  }
+}

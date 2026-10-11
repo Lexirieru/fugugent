@@ -11,3 +11,4 @@ assets/
 # `npm run music:launch` rebuild them. `src/launch/captured.json` (where each element
 # sits) is kept, so the composition still reads without a capture.
 public/launch/
+public/quest/

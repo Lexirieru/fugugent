@@ -28,34 +28,34 @@ import {
 import captured from "./captured.json";
 import timeline from "./timeline.json";
 
-const { fontFamily: SANS } = loadGeist("normal", { weights: ["500", "600", "700", "800"] });
-const { fontFamily: MONO } = loadMono("normal", { weights: ["500"] });
+export const { fontFamily: SANS } = loadGeist("normal", { weights: ["500", "600", "700", "800"] });
+export const { fontFamily: MONO } = loadMono("normal", { weights: ["500"] });
 
 export const FPS = timeline.fps;
 export const WIDTH = 1920;
 export const HEIGHT = 1080;
 export const DURATION = Math.round(timeline.scenes[timeline.scenes.length - 1]!.end * FPS);
 
-const ORANGE = "#ea580c";
-const CREAM = "#f1e6e1";
-const INK = "#0b0b0b";
+export const ORANGE = "#ea580c";
+export const CREAM = "#f1e6e1";
+export const INK = "#0b0b0b";
 
-type Box = { x: number; y: number; w: number; h: number };
-type Shot = { file: string; width: number; height: number; [k: string]: unknown };
+export type Box = { x: number; y: number; w: number; h: number };
+export type Shot = { file: string; width: number; height: number; [k: string]: unknown };
 const SHOTS = captured.shots as Record<string, Shot>;
 const box = (shot: string, key: string) => SHOTS[shot]![key] as Box;
-const center = (b: Box) => ({ x: b.x + b.w / 2, y: b.y + b.h / 2 });
+export const center = (b: Box) => ({ x: b.x + b.w / 2, y: b.y + b.h / 2 });
 
 const scene = (id: string) => timeline.scenes.find((s) => s.id === id)!;
 const f = (s: number) => Math.round(s * FPS);
 
 // ── Keyframes ──────────────────────────────────────────────────────────────────────
 
-type Key = { t: number; v: number[] };
-const SMOOTH = Easing.bezier(0.45, 0, 0.15, 1);
+export type Key = { t: number; v: number[] };
+export const SMOOTH = Easing.bezier(0.45, 0, 0.15, 1);
 
 /** Values at local second `t`, eased between keyframes and held outside them. */
-function track(t: number, keys: Key[], ease = SMOOTH): number[] {
+export function track(t: number, keys: Key[], ease = SMOOTH): number[] {
   if (t <= keys[0]!.t) return keys[0]!.v;
   for (let i = 0; i < keys.length - 1; i++) {
     const a = keys[i]!;
@@ -77,7 +77,7 @@ const WIN_H = 900 * S + CHROME;
 const WIN_X = (WIDTH - WIN_W) / 2;
 const WIN_Y = (HEIGHT - WIN_H) / 2 + 6;
 /** The viewport point that sits at the centre of the frame at zoom 1. */
-const MID = { x: 720, y: (HEIGHT / 2 - WIN_Y - CHROME) / S };
+export const MID = { x: 720, y: (HEIGHT / 2 - WIN_Y - CHROME) / S };
 
 function Backdrop() {
   const frame = useCurrentFrame();
@@ -134,7 +134,7 @@ function Chrome({ url }: { url: string }) {
  * The window, and the camera on it. `cam` is [zoom, x, y] with x and y in the
  * screenshot's viewport pixels: the point the camera centres on.
  */
-function Stage({ cam, url, children, lift = 0 }: { cam: number[]; url: string; children: ReactNode; lift?: number }) {
+export function Stage({ cam, url, children, lift = 0 }: { cam: number[]; url: string; children: ReactNode; lift?: number }) {
   const [z, x, y] = cam as [number, number, number];
   const fx = WIN_X + x * S;
   const fy = WIN_Y + CHROME + y * S;
@@ -169,13 +169,13 @@ function Stage({ cam, url, children, lift = 0 }: { cam: number[]; url: string; c
   );
 }
 
-function ShotImg({ name, scroll = 0, opacity = 1 }: { name: string; scroll?: number; opacity?: number }) {
-  const s = SHOTS[name]!;
+export function ShotImg({ name, scroll = 0, opacity = 1, shots = SHOTS }: { name: string; scroll?: number; opacity?: number; shots?: Record<string, Shot> }) {
+  const s = shots[name]!;
   return <Img src={staticFile(s.file)} style={{ position: "absolute", left: 0, top: -scroll, width: 1440, height: s.height, opacity }} />;
 }
 
 /** A cursor that travels along `path` and presses at each time in `clicks`. */
-function Cursor({ t, path, clicks }: { t: number; path: Key[]; clicks: number[] }) {
+export function Cursor({ t, path, clicks }: { t: number; path: Key[]; clicks: number[] }) {
   const [x, y] = track(t, path) as [number, number];
   const pressed = clicks.some((c) => t >= c && t < c + 0.14);
   const ring = clicks.map((c) => t - c).find((d) => d >= 0 && d < 0.6);
@@ -210,7 +210,7 @@ function Cursor({ t, path, clicks }: { t: number; path: Key[]; clicks: number[] 
 // ── Text ───────────────────────────────────────────────────────────────────────────
 
 /** A caption pill at the bottom, words rising in one after another. */
-function Caption({ text, from, to }: { text: string; from: number; to: number }) {
+export function Caption({ text, from, to }: { text: string; from: number; to: number }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const t = frame / fps;
@@ -251,7 +251,7 @@ function Caption({ text, from, to }: { text: string; from: number; to: number })
 }
 
 /** A line that slams in: oversized and blurred, then hard into place. */
-function Slam({ children, at, style }: { children: ReactNode; at: number; style?: CSSProperties }) {
+export function Slam({ children, at, style }: { children: ReactNode; at: number; style?: CSSProperties }) {
   const frame = useCurrentFrame();
   const d = frame - f(at);
   if (d < 0) return null;
@@ -264,9 +264,9 @@ function Slam({ children, at, style }: { children: ReactNode; at: number; style?
 // ── Cuts ───────────────────────────────────────────────────────────────────────────
 
 /** A white flash and a short shake on every impact in the timeline. */
-function Impacts({ children }: { children: ReactNode }) {
+export function Impacts({ children, at = timeline.impacts }: { children: ReactNode; at?: number[] }) {
   const frame = useCurrentFrame();
-  const since = timeline.impacts.map((s) => frame - f(s)).filter((d) => d >= 0).at(-1) ?? 999;
+  const since = at.map((s) => frame - f(s)).filter((d) => d >= 0).at(-1) ?? 999;
   const k = since < 10 ? (10 - since) / 10 : 0;
   const shake = k > 0 ? { x: Math.sin(since * 2.1) * 14 * k, y: Math.cos(since * 2.7) * 10 * k } : { x: 0, y: 0 };
   return (
@@ -278,7 +278,7 @@ function Impacts({ children }: { children: ReactNode }) {
 }
 
 /** How a scene arrives: a slam (scale and blur) or a whip (horizontal blur and slide). */
-function Enter({ kind, children }: { kind: "slam" | "whip"; children: ReactNode }) {
+export function Enter({ kind, children }: { kind: "slam" | "whip"; children: ReactNode }) {
   const frame = useCurrentFrame();
   const p = interpolate(frame, [0, kind === "whip" ? 12 : 9], [0, 1], { extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
   const style: CSSProperties =
@@ -289,7 +289,7 @@ function Enter({ kind, children }: { kind: "slam" | "whip"; children: ReactNode 
 }
 
 /** Local time in seconds inside a Sequence. */
-function useT() {
+export function useT() {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   return frame / fps;
