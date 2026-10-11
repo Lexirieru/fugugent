@@ -1,0 +1,124 @@
+# Uptime: is everything a user or a BNB Chain prober touches still working?
+#
+# Written after Fugu Guardian sat dead for three days (8-11 Oct 2026, expired Altana
+# session) and 14 listings sat unhireable for a month (FuguSubscription decoding the old
+# four-value Category) without anyone noticing either. Every 30 minutes this checks:
+#
+#   - the app, the landing page, the API, and Guardian's public A2A card answer 200;
+#   - /api/stats reads the chain;
+#   - Guardian's repay session key is still valid in the Altana Keystore, and warns
+#     five days before the session's known expiry;
+#   - every FuguRegistry listing can be hired: `subscribe` is simulated with eth_call
+#     (nothing is sent, nothing is spent) for one period at the oracle's own quote.
+#
+# A failure opens an issue labelled `uptime` (GitHub emails the repo owner), or comments
+# on the one already open. When everything passes again, that issue is closed.
+name: Uptime
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+env:
+  RPC: https://bsc-testnet.rpc.sentio.xyz
+  REGISTRY: "0xb2f36070E6eae3353E8e755172B477DF213ae248"
+  SUBSCRIPTION: "0xfdb083371f44Cf53181350389D3217e51B431776"
+  ORACLE: "0xB5f72a0ab0bA971c8C4F69D4A075cB7fd7859e65"
+  KEYSTORE: "0x6b8361C29d05D498b1a12B54A37310f94171E94A"
+  GUARDIAN_WALLET: "0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0"
+  # Guardian's repay session, granted 2026-10-11. Update both lines on every renewal
+  # (ai/CLAUDE.md has the steps).
+  GUARDIAN_KEY_HASH: "0x1a64e047eee99ee93787c6418709a907c1501693ae24ccaba864ff7aaec79b2c"
+  GUARDIAN_SESSION_EXPIRES: "2026-11-09"
+  # Any address works for the hire simulation; this one holds no special rights.
+  SIMULATE_FROM: "0x000000000000000000000000000000000000dEaD"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: run the checks
+        id: checks
+        shell: bash
+        run: |
+          set -u
+          report=report.md
+          : > "$report"
+          fail=0
+          bad() { echo "- ❌ $1" >> "$report"; fail=1; }
+          good() { echo "- ✅ $1" >> "$report"; }
+
+          for url in \
+            https://app.hellofugu.xyz \
+            https://hellofugu.xyz \
+            https://api.hellofugu.xyz/api/health \
+            https://agents.hellofugu.xyz/guardian/.well-known/agent-card.json; do
+            code=$(curl -s -o /dev/null -m 30 -w '%{http_code}' "$url" || echo 000)
+            if [ "$code" = 200 ]; then good "$url"; else bad "$url answered $code"; fi
+          done
+
+          listings=$(curl -s -m 30 https://api.hellofugu.xyz/api/stats | jq -r '.listings // empty' || true)
+          if [ -n "$listings" ]; then good "/api/stats reads the chain: $listings listings"; else bad "/api/stats did not answer with a listing count"; fi
+
+          valid=$(cast call --rpc-url "$RPC" "$KEYSTORE" 'isValidKey(address,bytes32)(bool)' "$GUARDIAN_WALLET" "$GUARDIAN_KEY_HASH" 2>&1 || true)
+          if [ "$valid" = true ]; then good "Guardian's repay session key is valid"; else bad "Guardian's repay session key is not valid ($valid). Renew it: ai/CLAUDE.md"; fi
+          days=$(( ( $(date -d "$GUARDIAN_SESSION_EXPIRES" +%s) - $(date +%s) ) / 86400 ))
+          if [ "$days" -le 5 ]; then bad "Guardian's sessions expire in $days day(s) ($GUARDIAN_SESSION_EXPIRES). Renew them: ai/CLAUDE.md"; else good "Guardian's sessions have $days days left"; fi
+
+          count=$(cast call --rpc-url "$RPC" "$REGISTRY" 'listingCount()(uint256)' | cut -d' ' -f1)
+          unhireable=""
+          for id in $(seq 1 "$count"); do
+            row=$(cast call --rpc-url "$RPC" "$REGISTRY" 'getListing(uint256)((uint256,address,address,uint8,uint128,uint32,bool,bool,string))' "$id")
+            active=$(echo "$row" | cut -d, -f7 | tr -d ' ')
+            [ "$active" = true ] || continue
+            price=$(echo "$row" | cut -d, -f5 | tr -d ' ' | cut -d'[' -f1)
+            amount=$(cast call --rpc-url "$RPC" "$ORACLE" 'quote(address,uint256)(uint256)' 0x0000000000000000000000000000000000000000 "$price" | cut -d' ' -f1)
+            out=$(cast call --rpc-url "$RPC" "$SUBSCRIPTION" 'subscribe(uint256,uint32,address,uint256,uint256)(uint256)' \
+              "$id" 1 0x0000000000000000000000000000000000000000 "$amount" 9999999999 \
+              --value "$amount" --from "$SIMULATE_FROM" 2>&1 | tail -1)
+            [[ "$out" =~ ^[0-9]+$ ]] || unhireable="$unhireable $id"
+          done
+          if [ -z "$unhireable" ]; then good "all active listings of $count can be hired (simulated, nothing sent)"; else bad "listings that cannot be hired:$unhireable"; fi
+
+          cat "$report"
+          echo "fail=$fail" >> "$GITHUB_OUTPUT"
+
+      - name: open or update the issue
+        if: steps.checks.outputs.fail == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh label create uptime --color B60205 --description "Opened by the Uptime workflow" 2>/dev/null || true
+          body="$(cat report.md)
+
+          Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          open=$(gh issue list --label uptime --state open --json number -q '.[0].number')
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --body "$body"
+          else
+            gh issue create --title "Uptime: something on hellofugu.xyz is down" --label uptime --body "$body"
+          fi
+          exit 1
+
+      - name: close the issue once everything passes
+        if: steps.checks.outputs.fail == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          for n in $(gh issue list --label uptime --state open --json number -q '.[].number'); do
+            gh issue close "$n" --comment "All checks pass again: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          done
