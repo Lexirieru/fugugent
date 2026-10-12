@@ -16,7 +16,10 @@
     "render:launch": "remotion render src/launch/index.ts Launch out/hellofugu-launch.mp4 --concurrency 4",
     "capture:quest": "node scripts/capture-quest.mjs",
     "music:quest": "node scripts/music-launch.mjs src/quest/timeline.json public/quest/music.wav",
-    "render:quest": "remotion render src/quest/index.ts Quest out/hellofugu-set-and-earn.mp4 --concurrency 4"
+    "render:quest": "remotion render src/quest/index.ts Quest out/hellofugu-set-and-earn.mp4 --concurrency 4",
+    "data:agents": "node scripts/data-agents.mjs",
+    "music:agents": "node scripts/music-saas.mjs src/agents/timeline.json public/agents/music.wav",
+    "render:agents": "remotion render src/agents/index.ts Agents out/hellofugu-agents.mp4 --concurrency 4"
   },
   "dependencies": {
     "@remotion/cli": "4.0.400",

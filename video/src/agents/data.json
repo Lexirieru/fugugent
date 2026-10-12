@@ -1,0 +1,328 @@
+{
+  "readAt": "2026-10-12T14:07:56.520Z",
+  "note": "Live reads for the agents film. Agent outputs are /api/run answers at readAt; listings are FuguRegistry state on BSC testnet.",
+  "stats": {
+    "listings": 25,
+    "ours": 20,
+    "others": 5,
+    "builders": 3,
+    "hiresByOthers": 14,
+    "hirers": 9
+  },
+  "categories": {
+    "REBALANCING": 30,
+    "GRID": 44,
+    "YIELD": 48,
+    "HEALTH_FACTOR": 50,
+    "HIRING": 60,
+    "COMMERCE": 35,
+    "AUTONOMOUS": 5,
+    "STREAMING": 1,
+    "TREASURY": 3
+  },
+  "registryAgents": 276,
+  "listings": [
+    {
+      "listingId": 1,
+      "id": "97:2480",
+      "name": "Fugu Guardian",
+      "category": "HEALTH_FACTOR",
+      "price": 0.1,
+      "periodSeconds": 120,
+      "ours": true,
+      "reviews": 2
+    },
+    {
+      "listingId": 2,
+      "id": "97:2481",
+      "name": "Fugu Rebalancer",
+      "category": "REBALANCING",
+      "price": 0.05,
+      "periodSeconds": 120,
+      "ours": true,
+      "reviews": 0
+    },
+    {
+      "listingId": 3,
+      "id": "97:2482",
+      "name": "Fugu Grid",
+      "category": "GRID",
+      "price": 0.05,
+      "periodSeconds": 120,
+      "ours": true,
+      "reviews": 0
+    },
+    {
+      "listingId": 4,
+      "id": "97:2483",
+      "name": "Fugu Yield",
+      "category": "YIELD",
+      "price": 0.05,
+      "periodSeconds": 120,
+      "ours": true,
+      "reviews": 0
+    },
+    {
+      "listingId": 5,
+      "id": "97:2484",
+      "name": "Fugu Broker",
+      "category": "HIRING",
+      "price": 0.05,
+      "periodSeconds": 120,
+      "ours": true,
+      "reviews": 0
+    },
+    {
+      "listingId": 6,
+      "id": "97:2485",
+      "name": "Fugu Trader",
+      "category": "COMMERCE",
+      "price": 0.05,
+      "periodSeconds": 120,
+      "ours": true,
+      "reviews": 0
+    },
+    {
+      "listingId": 7,
+      "id": "97:2486",
+      "name": "Fugu Pilot",
+      "category": "AUTONOMOUS",
+      "price": 0.05,
+      "periodSeconds": 120,
+      "ours": true,
+      "reviews": 0
+    },
+    {
+      "listingId": 8,
+      "id": "97:2487",
+      "name": "Fugu Meter",
+      "category": "STREAMING",
+      "price": 0.05,
+      "periodSeconds": 120,
+      "ours": true,
+      "reviews": 0
+    },
+    {
+      "listingId": 9,
+      "id": "97:2488",
+      "name": "Fugu Steward",
+      "category": "TREASURY",
+      "price": 0.05,
+      "periodSeconds": 120,
+      "ours": true,
+      "reviews": 0
+    },
+    {
+      "listingId": 10,
+      "id": "97:2507",
+      "name": "Fugu Guardian Early",
+      "category": "HEALTH_FACTOR",
+      "price": 0.05,
+      "periodSeconds": 120,
+      "ours": true,
+      "reviews": 0
+    },
+    {
+      "listingId": 11,
+      "id": "97:2508",
+      "name": "Fugu Rebalancer Wide",
+      "category": "REBALANCING",
+      "price": 0.05,
+      "periodSeconds": 120,
+      "ours": true,
+      "reviews": 0
+    },
+    {
+      "listingId": 12,
+      "id": "97:2509",
+      "name": "Fugu Rebalancer Stable",
+      "category": "REBALANCING",
+      "price": 0.05,
+      "periodSeconds": 120,
+      "ours": true,
+      "reviews": 0
+    },
+    {
+      "listingId": 13,
+      "id": "97:2510",
+      "name": "Fugu Grid Wide",
+      "category": "GRID",
+      "price": 0.05,
+      "periodSeconds": 120,
+      "ours": true,
+      "reviews": 0
+    },
+    {
+      "listingId": 14,
+      "id": "97:2511",
+      "name": "Fugu Grid Tight",
+      "category": "GRID",
+      "price": 0.05,
+      "periodSeconds": 120,
+      "ours": true,
+      "reviews": 0
+    },
+    {
+      "listingId": 15,
+      "id": "97:2512",
+      "name": "Fugu Yield Patient",
+      "category": "YIELD",
+      "price": 0.05,
+      "periodSeconds": 120,
+      "ours": true,
+      "reviews": 0
+    },
+    {
+      "listingId": 16,
+      "id": "97:2513",
+      "name": "Fugu Watch",
+      "category": "HEALTH_FACTOR",
+      "price": 0.02,
+      "periodSeconds": 120,
+      "ours": true,
+      "reviews": 0
+    },
+    {
+      "listingId": 17,
+      "id": "97:2514",
+      "name": "Fugu Tally",
+      "category": "TREASURY",
+      "price": 0.02,
+      "periodSeconds": 120,
+      "ours": true,
+      "reviews": 0
+    },
+    {
+      "listingId": 18,
+      "id": "97:2515",
+      "name": "Fugu Scout",
+      "category": "HIRING",
+      "price": 0.02,
+      "periodSeconds": 120,
+      "ours": true,
+      "reviews": 0
+    },
+    {
+      "listingId": 19,
+      "id": "97:2516",
+      "name": "Fugu Keycheck",
+      "category": "AUTONOMOUS",
+      "price": 0.02,
+      "periodSeconds": 120,
+      "ours": true,
+      "reviews": 0
+    },
+    {
+      "listingId": 20,
+      "id": "97:2517",
+      "name": "Fugu Quote",
+      "category": "COMMERCE",
+      "price": 0.02,
+      "periodSeconds": 120,
+      "ours": true,
+      "reviews": 0
+    },
+    {
+      "listingId": 21,
+      "id": "97:2545",
+      "name": "Aex Rebalancer",
+      "category": "REBALANCING",
+      "price": 0.05,
+      "periodSeconds": 120,
+      "ours": false,
+      "reviews": 0
+    },
+    {
+      "listingId": 22,
+      "id": "97:2550",
+      "name": "Yield Proof",
+      "category": "YIELD",
+      "price": 0.001,
+      "periodSeconds": 120,
+      "ours": false,
+      "reviews": 0
+    },
+    {
+      "listingId": 23,
+      "id": "97:2554",
+      "name": "Venus Yield Keeper",
+      "category": "YIELD",
+      "price": 0.05,
+      "periodSeconds": 900,
+      "ours": false,
+      "reviews": 1
+    },
+    {
+      "listingId": 24,
+      "id": "97:2555",
+      "name": "Runway Treasurer",
+      "category": "TREASURY",
+      "price": 0.05,
+      "periodSeconds": 900,
+      "ours": false,
+      "reviews": 0
+    },
+    {
+      "listingId": 25,
+      "id": "97:2556",
+      "name": "Venus Rate Router",
+      "category": "REBALANCING",
+      "price": 0.05,
+      "periodSeconds": 900,
+      "ours": false,
+      "reviews": 0
+    }
+  ],
+  "outputs": {
+    "watch": {
+      "wallet": "0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0",
+      "healthFactor": "8.495",
+      "says": "Safe. Above 1.50, Fugu Guardian would do nothing.",
+      "block": "136371328"
+    },
+    "quote": {
+      "usd": 1,
+      "tbnb": "0.001338",
+      "bnbUsd": 747.43041196,
+      "block": "136371328"
+    },
+    "keycheck": {
+      "valid": true,
+      "block": "136371328"
+    },
+    "tally": {
+      "hires": 8,
+      "spentTbnb": "0.000457",
+      "block": "136371326"
+    },
+    "scout": {
+      "YIELD": [
+        "Fugu Yield",
+        "Fugu Yield Patient",
+        "Yield Proof"
+      ],
+      "GRID": [
+        "Fugu Grid",
+        "Fugu Grid Wide",
+        "Fugu Grid Tight"
+      ],
+      "REBALANCING": [
+        "Fugu Rebalancer",
+        "Fugu Rebalancer Stable",
+        "Aex Rebalancer"
+      ],
+      "HEALTH_FACTOR": [
+        "Fugu Guardian",
+        "Fugu Guardian Early",
+        "Fugu Watch"
+      ]
+    }
+  },
+  "guardianProof": {
+    "tx": "0x619cfbe351703913ebafd0e76db86af0f90953bbff33335d78d8dbf1e41e08cc",
+    "hfBefore": "1.14",
+    "hfAfter": "1.50",
+    "repaid": "$4.03",
+    "block": 129852222
+  }
+}

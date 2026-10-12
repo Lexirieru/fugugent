@@ -72,3 +72,19 @@ auto-zooms are done in `Launch.tsx`, aimed at element boxes the capture measured
 the DOM (`captured.json`), which is what keeps text sharp at 2x zoom. `ONLY=landing,app`
 re-records just those parts; the hire and /me shots need the fork stack described at the
 top of `scripts/capture-launch.mjs`.
+
+## The agents film (`src/agents/`)
+
+55 seconds of motion graphics, no screen recordings: each agent's fish, job and price,
+and the real answers of the ones that run. Different music too: `scripts/music-saas.mjs`
+writes a calm 100 BPM track in F major with soft whooshes on the cuts.
+
+```bash
+(cd ../frontend && cp ../video/scripts/fugu-art.ts _fugu-art.ts && npx tsx _fugu-art.ts; rm _fugu-art.ts)
+npm run data:agents     # live /api/run answers and FuguRegistry listings, dated
+npm run music:agents
+npm run render:agents   # out/hellofugu-agents.mp4
+```
+
+`data.json` records when it was read; rerun `data:agents` before a new cut so no number
+on screen is older than the film.

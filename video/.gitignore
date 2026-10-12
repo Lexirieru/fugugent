@@ -12,3 +12,4 @@ assets/
 # sits) is kept, so the composition still reads without a capture.
 public/launch/
 public/quest/
+public/agents/

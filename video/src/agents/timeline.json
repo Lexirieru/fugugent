@@ -1,0 +1,17 @@
+{
+  "note": "The agents film. 100 BPM, so a bar is 2.4 s; every cut is on a bar line. Shared by Agents.tsx and scripts/music-saas.mjs.",
+  "fps": 60,
+  "bpm": 100,
+  "scenes": [
+    { "id": "intro", "start": 0, "end": 4.8 },
+    { "id": "kinds", "start": 4.8, "end": 9.6 },
+    { "id": "guardian", "start": 9.6, "end": 19.2 },
+    { "id": "watch", "start": 19.2, "end": 24.0 },
+    { "id": "quote", "start": 24.0, "end": 28.8 },
+    { "id": "scout", "start": 28.8, "end": 33.6 },
+    { "id": "keys", "start": 33.6, "end": 38.4 },
+    { "id": "variants", "start": 38.4, "end": 43.2 },
+    { "id": "builders", "start": 43.2, "end": 48.0 },
+    { "id": "cta", "start": 48.0, "end": 55.2 }
+  ]
+}
