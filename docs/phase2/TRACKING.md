@@ -68,6 +68,7 @@ answered with a 503 and the reason. Neither ever comes back as an empty 200.
 | Address | Role |
 |---|---|
 | `0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E` | Deployer; owner of all twenty listings and identities, and `agentWallet` of listings 1 and 10–20 |
+| `0x9F594C130cADB4a928C86f1AFe85C6888892494e` | Demo wallet, funded by the deployer on 2026-09-09; made subscription 2, the first end-to-end rental |
 | `0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0` | Fugu Guardian agent wallet |
 | `0xb8f155D1278f0437b9De7c63911f2C0EDa485941` | Fugu Rebalancer agent wallet |
 | `0x2AA59d5cf540c8f1b1CE4C667C2e745475d4EAd9` | Fugu Grid agent wallet |
