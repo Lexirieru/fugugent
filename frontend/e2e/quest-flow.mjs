@@ -76,8 +76,8 @@ log("/quest renders its four steps and three starter picks");
 // 2. A builder's checklist.
 await page.goto(`${APP}/agent/${encodeURIComponent(BUILDER_AGENT)}#quest`, { waitUntil: "load" });
 const checklist = page.getByTestId("quest-readiness");
-await checklist.getByText(/\d of 6/).waitFor({ timeout: 90000 });
-const summary = await checklist.getByText(/\d of 6/).innerText();
+await checklist.getByText(/\d of \d/).waitFor({ timeout: 90000 });
+const summary = await checklist.getByText(/\d of \d/).innerText();
 await checklist.scrollIntoViewIfNeeded();
 await page.screenshot({ path: `${OUT}quest-2-checklist.png` });
 log(`${BUILDER_AGENT} checklist: ${summary} pass`);

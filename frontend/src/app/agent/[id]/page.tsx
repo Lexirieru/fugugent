@@ -174,7 +174,7 @@ function AgentDetail({
           <SectionHeader
             id="quest-heading"
             title="Set and Earn checklist"
-            lede="The six things BNB Chain checks about an agent you build. Read from public data."
+            lede="What BNB Chain checks about an agent you build, read from public data."
           />
           <QuestReadiness agentId={record.id} />
         </Section>

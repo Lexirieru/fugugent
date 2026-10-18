@@ -15,6 +15,11 @@ export interface RegistrationInput {
   endpoint: string;
   /** Optional, https only: it is shown in visitors' browsers. */
   image: string;
+  /**
+   * Optional public GitHub repo. BNB Chain asks for one that shows the agent's
+   * registry ID and chain; recorded as a `repo` service so the checklist can read it.
+   */
+  repo: string;
 }
 
 export function serviceName(endpoint: string): "A2A" | "MCP" | "API" {
@@ -31,7 +36,10 @@ export function registrationJson(input: RegistrationInput): string {
     name: input.name.trim(),
     description: input.description.trim(),
     ...(image.startsWith("https://") ? { image } : {}),
-    services: [{ name: serviceName(input.endpoint), endpoint: input.endpoint.trim() }],
+    services: [
+      { name: serviceName(input.endpoint), endpoint: input.endpoint.trim() },
+      ...(input.repo.trim() ? [{ name: "repo", endpoint: input.repo.trim() }] : []),
+    ],
     registrations: [],
     active: true,
     x402Support: false,
@@ -60,5 +68,7 @@ export function registrationErrors(input: RegistrationInput): Partial<Record<key
   }
   const image = input.image.trim();
   if (image !== "" && !image.startsWith("https://")) out.image = "Leave empty, or an https:// image address.";
+  const repo = input.repo.trim();
+  if (repo !== "" && !/^https:\/\/(www\.)?github\.com\/[^/\s]+\/[^/\s]+/.test(repo)) out.repo = "A https://github.com/owner/repo address, or leave it empty.";
   return out;
 }

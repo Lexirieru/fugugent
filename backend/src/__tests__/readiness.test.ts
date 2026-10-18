@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createApp } from "../routes/app.js";
-import { createReadiness, declaredCategories, probeTarget } from "../sources/readiness.js";
+import { createReadiness, declaredCategories, githubRepo, probeTarget, readmeShowsId } from "../sources/readiness.js";
 import type { RegistrationFile, ResolvedMetadata } from "../sources/registry-metadata.js";
 import type { ListingHiresAnswer, TrackingService } from "../sources/tracking.js";
 import type { Address, AgentRecord } from "../types.js";
@@ -80,13 +80,14 @@ function tracking(hires: ListingHiresAnswer["hires"], listed: { owner: Address }
   };
 }
 
-function readiness(opts: { agent?: AgentRecord | null; probe?: ResolvedMetadata; hires?: ListingHiresAnswer["hires"]; sent?: number; listed?: { owner: Address } | null } = {}) {
+function readiness(opts: { agent?: AgentRecord | null; probe?: ResolvedMetadata; hires?: ListingHiresAnswer["hires"]; sent?: number; listed?: { owner: Address } | null; readme?: string | null } = {}) {
   return createReadiness({
     agent: async () => (opts.agent === undefined ? record() : opts.agent),
     tracking: tracking(opts.hires ?? [], opts.listed === undefined ? { owner: OWNER } : opts.listed),
     metadata: { resolve: async () => opts.probe ?? { status: "fetched", reason: null, file: file() } },
     sentCount: async () => opts.sent ?? 0,
     explorer: "https://testnet.bscscan.com",
+    readme: async () => opts.readme === undefined ? null : opts.readme,
   });
 }
 
@@ -168,6 +169,30 @@ describe("readiness checks", () => {
 
   it("returns null for an agent that does not exist", async () => {
     expect(await readiness({ agent: null }).check("97:1")).toBeNull();
+  });
+});
+
+describe("public repo check", () => {
+  const withRepo = () => {
+    const r = record();
+    r.evidence = { ...r.evidence!, endpoints: [...r.evidence!.endpoints, { name: "repo", endpoint: "https://github.com/aex/rebalancer", version: null }] };
+    return r;
+  };
+  it("parses owner and repo from a GitHub URL, and nothing else", () => {
+    expect(githubRepo("https://github.com/aex/rebalancer")).toEqual({ owner: "aex", repo: "rebalancer" });
+    expect(githubRepo("https://github.com/aex/rebalancer.git")).toEqual({ owner: "aex", repo: "rebalancer" });
+    expect(githubRepo("https://github.com/aex/rebalancer/tree/main")).toEqual({ owner: "aex", repo: "rebalancer" });
+    expect(githubRepo("https://gitlab.com/aex/rebalancer")).toBeNull();
+  });
+  it("finds the id as a whole number, and a chain", () => {
+    expect(readmeShowsId("ERC-8004 agent 2545 on BSC testnet (chain 97)", "2545")).toEqual({ id: true, chain: true });
+    expect(readmeShowsId("agent 125451", "2545").id).toBe(false);
+  });
+  it("is check without a repo, pass when the README names id and chain, fail otherwise", async () => {
+    expect((await byId(readiness())).repo.status).toBe("check");
+    expect((await byId(readiness({ agent: withRepo(), readme: "Registry ID 2545, chain 97" }))).repo.status).toBe("pass");
+    expect((await byId(readiness({ agent: withRepo(), readme: "A rebalancer." }))).repo.status).toBe("fail");
+    expect((await byId(readiness({ agent: withRepo(), readme: null }))).repo.detail).toContain("must be public");
   });
 });
 

@@ -17,6 +17,7 @@ const COUNTS = [
   { title: "It answers", body: "The address you give must stay up. BNB Chain calls it at random times." },
   { title: "Three other people hire it", body: "Completed hires from three wallets that are not yours and not funded by you." },
   { title: "It acts on chain", body: "At least five transactions from the agent, on three different days, that fit its kind." },
+  { title: "Its repo is public", body: "A public GitHub repo whose README shows the agent's registry ID and chain (97 or 56)." },
 ];
 
 export default function ListPage() {
@@ -59,7 +60,7 @@ export default function ListPage() {
           title="To count for Set and Earn"
           lede="Listing it is the start. BNB Chain also checks that it really works."
         />
-        <ul className="grid gap-3 sm:grid-cols-3">
+        <ul className="grid gap-3 sm:grid-cols-2">
           {COUNTS.map((c) => (
             <li key={c.title}>
               <Card className="h-full">
@@ -70,7 +71,7 @@ export default function ListPage() {
           ))}
         </ul>
         <p className="mt-4 text-sm text-muted">
-          Your agent&apos;s page shows a checklist of all six. <Link href="/quest" className="text-accent-strong underline underline-offset-4">How Set and Earn works</Link>
+          Your agent&apos;s page shows a checklist of all of them. <Link href="/quest" className="text-accent-strong underline underline-offset-4">How Set and Earn works</Link>
         </p>
       </Section>
 

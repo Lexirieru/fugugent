@@ -70,11 +70,11 @@ const browser = await chromium.launch();
 
   await page.goto(`${PROD}/agent/${encodeURIComponent(BUILDER_AGENT)}`, { waitUntil: "load" });
   const card = page.getByTestId("quest-readiness");
-  await card.getByText(/\d of 6/).waitFor({ timeout: 90000 });
+  await card.getByText(/\d of \d/).waitFor({ timeout: 90000 });
   await card.scrollIntoViewIfNeeded();
   await page.evaluate(() => window.scrollBy(0, -120));
   await page.waitForTimeout(800);
-  await shot(page, "checklist", { card: await box(card), score: await box(card.getByText(/\d of 6/)) });
+  await shot(page, "checklist", { card: await box(card), score: await box(card.getByText(/\d of \d/)) });
   await ctx.close();
 }
 

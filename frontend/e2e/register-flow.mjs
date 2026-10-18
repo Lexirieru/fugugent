@@ -90,6 +90,10 @@ await page.locator("#reg-category").selectOption("YIELD");
 await page.locator("#reg-desc").fill("Finds the best paying lending pool for idle stablecoins and says when moving is worth the fee.");
 await page.locator("#reg-endpoint").fill("https://example.com/.well-known/agent-card.json");
 await page.locator("#reg-price").fill("0.03");
+await page.locator("#reg-repo").fill("gitlab.com/nope");
+await form.getByRole("button", { name: "Register on ERC-8004" }).click();
+await form.getByText("A https://github.com/owner/repo address, or leave it empty.").waitFor();
+await page.locator("#reg-repo").fill("https://github.com/example/e2e-yield-scout");
 await form.screenshot({ path: `${OUT}register-1-form.png` });
 await form.getByRole("button", { name: "Register on ERC-8004" }).click();
 const listBtn = form.getByRole("button", { name: /^List agent #\d+$/ });
@@ -99,8 +103,10 @@ const owner = await pub.readContract({ address: IDENTITY, abi: ABI, functionName
 if (owner !== account.address) throw new Error(`id ${agentId} owned by ${owner}`);
 const uri = await pub.readContract({ address: IDENTITY, abi: ABI, functionName: "tokenURI", args: [agentId] });
 const file = JSON.parse(Buffer.from(uri.split(",")[1], "base64").toString());
-if (file.name !== "E2E Yield Scout" || file.services[0].name !== "A2A") throw new Error(`registration file: ${JSON.stringify(file)}`);
-log(`step 1: ERC-8004 #${agentId} minted to the wallet, file names it and its A2A endpoint`);
+if (file.name !== "E2E Yield Scout" || file.services[0].name !== "A2A" || file.services[1]?.name !== "repo" || file.services[1]?.endpoint !== "https://github.com/example/e2e-yield-scout") {
+  throw new Error(`registration file: ${JSON.stringify(file)}`);
+}
+log(`step 1: ERC-8004 #${agentId} minted to the wallet, file names it, its A2A endpoint and its repo`);
 
 await listBtn.click();
 await page.getByTestId("register-done").waitFor({ timeout: 90000 });

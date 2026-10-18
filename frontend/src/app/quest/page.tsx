@@ -100,7 +100,7 @@ export default function QuestPage() {
           <Step n={4} title="Build 1 agent and list it">
             <p>
               Register it on the ERC-8004 registry with your campaign wallet, then{" "}
-              <Link href="/list" className={ext}>list it here</Link>. To count, it needs a working agent card, at least 3 completed hires from other people, and at least 5 real transactions on 3 different days.
+              <Link href="/list" className={ext}>list it here</Link>. To count, it needs a working agent card, at least 3 completed hires from other people, at least 5 real transactions on 3 different days, and a public GitHub repo that shows its registry ID and chain.
             </p>
             <CheckAgent />
           </Step>

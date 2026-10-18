@@ -64,7 +64,7 @@ export function RegisterAgent() {
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient({ chainId: CHAIN.id });
 
-  const [form, setForm] = useState<RegistrationInput>({ name: "", description: "", endpoint: "", image: "" });
+  const [form, setForm] = useState<RegistrationInput>({ name: "", description: "", endpoint: "", image: "", repo: "" });
   const [category, setCategory] = useState<Category>("YIELD");
   const [priceText, setPriceText] = useState("0.05");
   const [period, setPeriod] = useState(120);
@@ -277,6 +277,13 @@ export function RegisterAgent() {
               </option>
             ))}
           </select>
+        </div>
+        <div className="sm:col-span-2">
+          <label htmlFor="reg-repo" className={label}>Public GitHub repo (recommended)</label>
+          <input id="reg-repo" className={`${input} font-mono`} placeholder="https://github.com/you/your-agent" value={form.repo} onChange={(e) => setForm({ ...form, repo: e.target.value })} />
+          {fieldError("repo") ?? (
+            <p className="mt-1 text-xs text-faint">Set and Earn asks for a public repo whose README shows the agent&apos;s registry ID and chain. You get the ID after step 1.</p>
+          )}
         </div>
         <div className="sm:col-span-2">
           <label htmlFor="reg-image" className={label}>Image (optional)</label>

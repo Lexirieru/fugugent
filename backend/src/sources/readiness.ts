@@ -15,7 +15,7 @@ import type { Address, AgentRecord } from "../types.js";
 export type CheckStatus = "pass" | "fail" | "check";
 
 export interface ReadinessCheck {
-  id: "registered" | "discoverable" | "live" | "hired" | "executes" | "matches";
+  id: "registered" | "discoverable" | "live" | "hired" | "executes" | "matches" | "repo";
   title: string;
   status: CheckStatus;
   detail: string;
@@ -42,6 +42,24 @@ export interface ReadinessDeps {
   /** `eth_getTransactionCount` of an address: how many transactions it has sent. */
   sentCount(address: Address): Promise<number>;
   explorer: string;
+  /**
+   * The README of a public GitHub repo, or `null` when there is none to read
+   * (private, missing, or unreachable). Only ever called with a raw.githubusercontent.com URL.
+   */
+  readme(owner: string, repo: string): Promise<string | null>;
+}
+
+/** `owner/repo` from a github.com URL, or null. */
+export function githubRepo(url: string): { owner: string; repo: string } | null {
+  const m = /^https:\/\/(?:www\.)?github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?(?:[/?#].*)?$/.exec(url.trim());
+  return m ? { owner: m[1]!, repo: m[2]! } : null;
+}
+
+/** Does this README show the agent's registry ID and its chain, as BNB Chain asks? */
+export function readmeShowsId(readme: string, tokenId: string): { id: boolean; chain: boolean } {
+  const id = new RegExp(`(^|[^0-9])${tokenId}([^0-9]|$)`).test(readme);
+  const chain = /\b(97|56)\b|bnb smart chain|bsc testnet|bsc mainnet|chain id/i.test(readme);
+  return { id, chain };
 }
 
 /** The words that say which of the four quest categories an agent works in. */
@@ -160,6 +178,25 @@ export function createReadiness(deps: ReadinessDeps) {
         });
       }
 
+      // 7. A public repo that shows the registry ID and chain (BNB's blog, 2026-10-01).
+      const repoLink = (agent.evidence?.endpoints ?? []).map((e) => githubRepo(e.endpoint)).find((r) => r !== null) ?? null;
+      if (loading) {
+        checks.push({ id: "repo", title: "Public repo shows its registry ID", status: "check", detail: "The ERC-8004 registry is still being read after a restart. Try again in a minute.", href: null });
+      } else if (repoLink === null) {
+        checks.push({ id: "repo", title: "Public repo shows its registry ID", status: "check", detail: `BNB Chain asks for a public GitHub repo that shows registry ID ${agent.tokenId} and the chain. Its registration names no GitHub repo, so check yours by hand, or add it when you register.`, href: null });
+      } else {
+        const url = `https://github.com/${repoLink.owner}/${repoLink.repo}`;
+        const readme = await deps.readme(repoLink.owner, repoLink.repo).catch(() => null);
+        const shows = readme === null ? null : readmeShowsId(readme, agent.tokenId);
+        checks.push(
+          shows === null
+            ? { id: "repo", title: "Public repo shows its registry ID", status: "fail", detail: `${url} has no README anyone can read. The repo must be public.`, href: url }
+            : shows.id && shows.chain
+              ? { id: "repo", title: "Public repo shows its registry ID", status: "pass", detail: `The README of ${url} names registry ID ${agent.tokenId} and the chain.`, href: url }
+              : { id: "repo", title: "Public repo shows its registry ID", status: "fail", detail: `The README of ${url} does not show ${shows.id ? "the chain (97 for testnet, 56 for mainnet)" : `registry ID ${agent.tokenId}`}. Add it.`, href: url },
+        );
+      }
+
       // 6. Does what it says: only a reader can judge that.
       checks.push({
         id: "matches",
@@ -176,7 +213,7 @@ export function createReadiness(deps: ReadinessDeps) {
         checks,
         passed: checks.filter((c) => c.status === "pass").length,
         complete: !loading,
-        note: "A checklist from public data, not BNB Chain's decision. BNB also requires the agent to be listed after its Phase 2 announcement on X, not a cosmetic copy of another agent, and owned by your registered campaign wallet.",
+        note: "A checklist from public data, not BNB Chain's decision. It follows the Set and Earn rules and BNB Chain's 1 Oct blog, which adds the public repo. BNB also requires the agent to be listed after its Phase 2 announcement on X, not a cosmetic copy of another agent, and owned by your registered campaign wallet.",
       };
     },
   };

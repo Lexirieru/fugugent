@@ -49,7 +49,7 @@ export function QuestReadiness({ agentId }: { agentId: string }) {
         <p className="flex items-center gap-2 text-sm text-muted">
           {data.data ? (
             <>
-              <span className="font-mono text-base font-semibold text-fg">{data.data.passed} of 6</span> pass
+              <span className="font-mono text-base font-semibold text-fg">{data.data.passed} of {data.data.checks.length}</span> pass
             </>
           ) : data.isError ? (
             "Could not run the checks just now."
@@ -57,7 +57,7 @@ export function QuestReadiness({ agentId }: { agentId: string }) {
             "Running the checks…"
           )}
           <InfoTip label="About this checklist" align="start">
-            {data.data?.note ?? "The six things BNB Chain checks about an agent you build for Set and Earn, read from public data."}
+            {data.data?.note ?? "What BNB Chain checks about an agent you build for Set and Earn, read from public data."}
           </InfoTip>
         </p>
         <button

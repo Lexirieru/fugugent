@@ -213,6 +213,14 @@ export function buildServer(env: NodeJS.ProcessEnv = process.env): BuiltServer {
     metadata: createMetadataResolver(),
     sentCount: (address) => getTransactionCount(rpcClient, { address }),
     explorer: "https://testnet.bscscan.com",
+    // A fixed host and a size cap: the owner and repo come from somebody's registration.
+    readme: async (owner, repo) => {
+      const res = await fetch(`https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/HEAD/README.md`, {
+        signal: AbortSignal.timeout(5_000),
+      });
+      if (!res.ok) return null;
+      return (await res.text()).slice(0, 200_000);
+    },
   });
 
   const handle = dbHandle;
