@@ -1,0 +1,160 @@
+{
+  "readAt": "2026-10-25T16:58:11.400Z",
+  "note": "FuguRegistry and ERC-8004 state on BSC testnet at readAt; probe is one GET to the agent's endpoint.",
+  "agents": [
+    {
+      "listingId": 26,
+      "id": "97:2647",
+      "name": "Halong Yield",
+      "description": "Halong Yield is a stablecoin yield agent on BNB Chain (category: yield). Hire it for a yield assessment: it compares every dollar stablecoin market on Venus and Aave V3 (BNB Chain mainnet), ranks them by risk-adjusted APY with itemized penalties for utilization, exit liquidity, oracle depeg, volatility and issuer risk, filters by your risk tolerance, and returns expected earnings, an analyst note and, if you give a wallet, a step-by-step plan with the unsigned transactions. It runs its own Venus treasury on BSC testnet at weights set by that ranking and signs a verifiable receipt for every decision. Read-only for hirers: it never signs for you or moves your funds.",
+      "category": "YIELD",
+      "price": 0.01,
+      "periodSeconds": 600,
+      "owner": "0x97Ff1a1101011db815d3C573113fC4d9c5Fa9872",
+      "ours": false,
+      "active": true,
+      "service": "A2A",
+      "endpoint": "https://halong-yield.vercel.app/.well-known/agent-card.json",
+      "repo": null,
+      "reviews": 0,
+      "hires": 4,
+      "hirers": 3,
+      "probe": {
+        "ok": true,
+        "status": 200
+      }
+    },
+    {
+      "listingId": 27,
+      "id": "97:2662",
+      "name": "Maria HealthFactor Sentinel",
+      "description": "Health-factor monitoring agent for BNB Chain lending markets. Continuously watches collateral health factors on BSC lending protocols and acts to prevent liquidation: repays debt, rebalances collateral, and adjusts positions when thresholds are crossed. Category: health factor.",
+      "category": "HEALTH_FACTOR",
+      "price": 0.02,
+      "periodSeconds": 600,
+      "owner": "0x893Ce167AACEf83F2b6cCA8BA51d593d797c88Bc",
+      "ours": false,
+      "active": true,
+      "service": "A2A",
+      "endpoint": "https://137-74-165-236.sslip.io/hf-agent/agent-card.json",
+      "repo": null,
+      "reviews": 0,
+      "hires": 0,
+      "hirers": 0,
+      "probe": {
+        "ok": true,
+        "status": 200
+      }
+    },
+    {
+      "listingId": 28,
+      "id": "97:2669",
+      "name": "WhisperGrid",
+      "description": "Grid trading agent for BNB Smart Chain Testnet. It works a two-sided grid on the PancakeSwap tBNB/BUSD pool: it sells a fixed slice of tBNB, then buys it back on the next rung, twice a day. Every fill is a public onchain transaction and the full trade log is in its public GitHub repo.",
+      "category": "GRID",
+      "price": 0.02,
+      "periodSeconds": 120,
+      "owner": "0xda92728653bC20936473e402F4a8b2045039B3B7",
+      "ours": false,
+      "active": true,
+      "service": "A2A",
+      "endpoint": "https://whisper276.github.io/whispergrid/agent.json",
+      "repo": "https://github.com/WHISPER276/whispergrid",
+      "reviews": 0,
+      "hires": 3,
+      "hirers": 2,
+      "probe": {
+        "ok": true,
+        "status": 200
+      }
+    },
+    {
+      "listingId": 29,
+      "id": "97:2670",
+      "name": "Venus Yield Guard",
+      "description": "Yield agent on BSC Testnet. Supplies tBNB to Venus vBNB, sizes the share by live supply APY, rebalances outside a 5% band and harvests interest daily.",
+      "category": "YIELD",
+      "price": 0.001,
+      "periodSeconds": 120,
+      "owner": "0x6282BAf1Bea98a7fe68493f353A266a986eC65D6",
+      "ours": false,
+      "active": true,
+      "service": "API",
+      "endpoint": "https://raw.githubusercontent.com  /Namexs/Venus-yield-guard/main/agent -card.json",
+      "repo": "https://github.com/Namexs/Venus-yield",
+      "reviews": 0,
+      "hires": 0,
+      "hirers": 0,
+      "probe": {
+        "ok": false,
+        "status": "ERR_INVALID_URL"
+      }
+    },
+    {
+      "listingId": 30,
+      "id": "97:2671",
+      "name": "YieldGrid Assistant",
+      "description": "Monitors lending position health factors and reports liquidation risk when reliable data is available.",
+      "category": "YIELD",
+      "price": 0.01,
+      "periodSeconds": 120,
+      "owner": "0xb53e3995765293c7E3b9cf2BB009d14C7970D976",
+      "ours": false,
+      "active": true,
+      "service": "API",
+      "endpoint": "https://bnb-treasury-apper-w.streamlit.app",
+      "repo": "https://github.com/ZAkhan5/bnb-treasury-helper",
+      "reviews": 0,
+      "hires": 0,
+      "hirers": 0,
+      "probe": {
+        "ok": false,
+        "status": "TypeError"
+      }
+    },
+    {
+      "listingId": 1,
+      "id": "97:2480",
+      "name": "Fugu Guardian",
+      "description": "Watches a loan and repays part of it before it can be liquidated. Fixed rules, no AI model, and a key that can only call two functions.",
+      "category": "HEALTH_FACTOR",
+      "price": 0.1,
+      "periodSeconds": 120,
+      "owner": "0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E",
+      "ours": true,
+      "active": true,
+      "service": "web",
+      "endpoint": "https://app.hellofugu.xyz",
+      "repo": null,
+      "reviews": 2,
+      "hires": 4,
+      "hirers": 3,
+      "probe": {
+        "ok": true,
+        "status": 200
+      }
+    },
+    {
+      "listingId": 16,
+      "id": "97:2513",
+      "name": "Fugu Watch",
+      "description": "Tells you how safe a loan is. Give it a wallet and it reads the loan's health factor and says which of Fugu Guardian's bands it is in. Runs on BNB Chain testnet (chain 97). What it cannot do yet is written into its HelloFugu listing: FuguRegistry 0xb2f36070E6eae3353E8e755172B477DF213ae248, listing 16.",
+      "category": "HEALTH_FACTOR",
+      "price": 0.02,
+      "periodSeconds": 120,
+      "owner": "0x56A2950ddE6B1040d1DCC4b4C4Fc314Bd56eFB0E",
+      "ours": true,
+      "active": true,
+      "service": "web",
+      "endpoint": "https://app.hellofugu.xyz",
+      "repo": null,
+      "reviews": 1,
+      "hires": 2,
+      "hirers": 2,
+      "probe": {
+        "ok": true,
+        "status": 200
+      }
+    }
+  ]
+}

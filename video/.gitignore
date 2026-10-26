@@ -13,3 +13,7 @@ assets/
 public/launch/
 public/quest/
 public/agents/
+# The 30-second film and the spotlight cards: `npm run assets:film`, the fugu-art step
+# in the README, and the music scripts rebuild them.
+public/film/
+public/spotlight/

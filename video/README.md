@@ -88,3 +88,47 @@ npm run render:agents   # out/hellofugu-agents.mp4
 
 `data.json` records when it was read; rerun `data:agents` before a new cut so no number
 on screen is older than the film.
+
+## The spotlight (`src/spotlight/`)
+
+A 14-second square card for one agent: "New on HelloFugu" for a builder's agent, "Meet
+the agents" for ours. One template, rendered once per agent, so a new listing can be
+posted the day it appears.
+
+```bash
+npm run data:spotlight -- 27 1     # listing ids -> src/spotlight/data.json, endpoints probed
+(cd ../frontend && cp ../video/scripts/fugu-art.ts _fugu-art.ts && npx tsx _fugu-art.ts; rm _fugu-art.ts)
+npm run music:spotlight
+npx remotion render src/spotlight/index.ts Spotlight out/spotlight-2662.mp4 --props='{"id":"97:2662"}'
+```
+
+Everything on the card is read from FuguRegistry and the agent's ERC-8004 registration
+file, except the one-line job: registration descriptions run to a paragraph, so
+`lines.json` holds a shortening of each one that adds no claim of its own. A builder's
+agent whose endpoint did not answer when the data was read refuses to render, and the
+card says on which day the endpoint was checked.
+
+## The 30-second film (`src/film/`)
+
+A dark, cinematic launch spot: kinetic type on a perspective grid, the fish puffing as
+a health factor falls, a real 3D coin (`@remotion/three`) in a column of light, neon
+keywords drawn by beams and circuits, the real app on floating screens, a feature ring,
+and an end card.
+
+```bash
+npm run assets:film   # the CC0 HDRI and track, md5-checked, plus the brand marks
+npm run music:film    # the CC0 track, cut so its drop lands on "meet", with accents under it
+npm run render:film   # out/hellofugu-film.mp4, 1920x1080, 30 fps
+```
+
+The music is "Techno" from Pro Sensory's "Electronic" pack on OpenGameArt
+(opengameart.org/content/electronic), licensed CC0. It is 120 BPM like the edit, and
+`scripts/music-film-mix.mjs` starts it at 58.042 s so its drop lands on the cut where
+HelloFugu appears; the synthesised impacts and risers sit 10 dB under it. Running
+`node scripts/music-film.mjs` alone still writes the fully synthesised score instead.
+
+The coin's metal reflects `public/film/studio_small_09_1k.hdr`, "Studio Small 09" by
+Sergej Majboroda from Poly Haven, licensed CC0. Fish art in `public/film/` is drawn by
+`frontend/src/lib/fugu.ts`; the screens are the stills `capture-quest.mjs` took. Every
+line on screen is something the product does today: hires are capped, revocable and
+public, Guardian has repaid a live loan, Watch and Scout answer.

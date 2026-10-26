@@ -19,19 +19,31 @@
     "render:quest": "remotion render src/quest/index.ts Quest out/hellofugu-set-and-earn.mp4 --concurrency 4",
     "data:agents": "node scripts/data-agents.mjs",
     "music:agents": "node scripts/music-saas.mjs src/agents/timeline.json public/agents/music.wav",
-    "render:agents": "remotion render src/agents/index.ts Agents out/hellofugu-agents.mp4 --concurrency 4"
+    "render:agents": "remotion render src/agents/index.ts Agents out/hellofugu-agents.mp4 --concurrency 4",
+    "data:spotlight": "node scripts/data-spotlight.mjs",
+    "music:spotlight": "node scripts/music-saas.mjs src/spotlight/timeline.json public/spotlight/music.wav",
+    "studio:spotlight": "remotion studio src/spotlight/index.ts",
+    "music:film": "SFX_ONLY=1 node scripts/music-film.mjs && node scripts/music-film-mix.mjs",
+    "studio:film": "remotion studio src/film/index.ts",
+    "render:film": "remotion render src/film/index.ts Film out/hellofugu-film.mp4 --concurrency 4",
+    "assets:film": "node scripts/assets-film.mjs"
   },
   "dependencies": {
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.2",
     "@remotion/cli": "4.0.400",
     "@remotion/google-fonts": "^4.0.400",
     "@remotion/media-utils": "4.0.400",
+    "@remotion/three": "^4.0.400",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "remotion": "4.0.400",
+    "three": "^0.186.1",
     "ws": "^8.21.3"
   },
   "devDependencies": {
     "@types/react": "19.2.14",
+    "@types/three": "^0.186.0",
     "playwright": "^1.63.0",
     "typescript": "5.9.3",
     "viem": "^2.56.3"

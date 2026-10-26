@@ -1,0 +1,10 @@
+{
+  "note": "One spotlight. 100 BPM, so a bar is 2.4 s. Shared by Spotlight.tsx and scripts/music-saas.mjs.",
+  "fps": 30,
+  "bpm": 100,
+  "scenes": [
+    { "id": "hello", "start": 0, "end": 2.4 },
+    { "id": "facts", "start": 2.4, "end": 9.6 },
+    { "id": "cta", "start": 9.6, "end": 14.4 }
+  ]
+}

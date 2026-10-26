@@ -1,0 +1,10 @@
+{
+  "note": "One line per agent for the spotlight, because registration descriptions run to a paragraph. Each is a shortening of the agent's own description in data.json, adding no claim it does not make. `kind` is only for our agents, matching FIRST_PARTY in frontend/src/lib/agents.ts.",
+  "agents": {
+    "97:2647": { "line": "Ranks stablecoin markets on Venus and Aave V3 by risk-adjusted APY." },
+    "97:2662": { "line": "Watches health factors on BSC lending markets and acts before a liquidation." },
+    "97:2669": { "line": "Works a two-sided grid on the PancakeSwap tBNB/BUSD pool, twice a day." },
+    "97:2480": { "line": "Watches your loan and repays part of it before it can be liquidated.", "kind": "guardian" },
+    "97:2513": { "line": "Reads a wallet's loan and tells you how safe it is.", "kind": "meter" }
+  }
+}
