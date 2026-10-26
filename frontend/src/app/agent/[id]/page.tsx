@@ -17,7 +17,7 @@ import { RiskChip } from "@/components/risk-chip";
 import { Badge, ButtonLink, Card, EmptyState, Page, Section, SectionHeader } from "@/components/ui";
 import { ListAgent } from "@/components/wallet/list-agent";
 import { PermissionCheck } from "@/components/wallet/permission-check";
-import { CATEGORY_META, FIRST_PARTY, categoryOf, fuguKindFor, guardianHref } from "@/lib/agents";
+import { CATEGORY_META, FIRST_PARTY, categoryOf, fuguKindFor } from "@/lib/agents";
 import { addressUrl, shorten, txUrl } from "@/lib/chain";
 import { source } from "@/lib/data";
 import type { AgentView } from "@/lib/data/types";
@@ -72,7 +72,6 @@ export default async function AgentPage({ params }: PageProps<"/agent/[id]">) {
       view={result.agent}
       provenance={result.provenance}
       origin={src.origin}
-      ourAgentHref={guardianHref(src.kind)}
     />
   );
 }
@@ -81,13 +80,10 @@ function AgentDetail({
   view,
   provenance,
   origin,
-  ourAgentHref,
 }: {
   view: AgentView;
   provenance: Provenance;
   origin: string;
-  /** Fugu Guardian, addressed by the id of whichever catalogue answered. */
-  ourAgentHref: string;
 }) {
   const { record, risk, session, proofs, outcomes, notShipped } = view;
   const kind = fuguKindFor(record);
@@ -95,6 +91,23 @@ function AgentDetail({
   const meta = category ? CATEGORY_META[category] : null;
   const listing = record.fuguListing;
   const spec = risk ? BLOAT[risk.level] : null;
+  // The empty states below point at this agent's own trail, never at another agent:
+  // on a builder's page, a button to Fugu Guardian read as us advertising on their page.
+  const wallet = listing?.agentWallet ?? record.agentWallet;
+  const ownTrail = (
+    <>
+      {wallet ? (
+        <ButtonLink href={addressUrl(wallet)} external>
+          See its wallet on BscScan ↗
+        </ButtonLink>
+      ) : listing && listing.active ? (
+        <ButtonLink href="#hire">Hire {record.name}</ButtonLink>
+      ) : null}
+      <ButtonLink href="/agents" variant="ghost">
+        Back to all agents
+      </ButtonLink>
+    </>
+  );
   // The action band is Guardian's ladder. Showing it for another kind would put a
   // transaction name next to an agent that cannot send it. See `lib/risk.ts`.
   const action = risk && category === "HEALTH_FACTOR" ? guardianActionFor(risk.level) : null;
@@ -320,16 +333,9 @@ function AgentDetail({
           </ul>
         ) : (
           <EmptyState
-            title="No runs yet"
-            body="Fugu Guardian has run on testnet; its transactions are open to read."
-            actions={
-              <>
-                <ButtonLink href={ourAgentHref}>Open Fugu Guardian</ButtonLink>
-                <ButtonLink href="/agents" variant="ghost">
-                  Back to all agents
-                </ButtonLink>
-              </>
-            }
+            title="No results written here yet"
+            body={wallet ? `${record.name}'s owner has not added any. What its wallet did is on BscScan.` : `${record.name}'s owner has not added any.`}
+            actions={ownTrail}
           />
         )}
       </Section>
@@ -449,14 +455,7 @@ function AgentDetail({
              * quoting its on-chain repay two sections above.
              */
             body="Nobody has attached a transaction here yet."
-            actions={
-              <>
-                <ButtonLink href={ourAgentHref}>See an agent that has</ButtonLink>
-                <ButtonLink href="/agents" variant="ghost">
-                  Back to all agents
-                </ButtonLink>
-              </>
-            }
+            actions={ownTrail}
           />
         )}
       </Section>
@@ -511,10 +510,7 @@ function AgentDetail({
             body="Only a wallet that has paid for this agent can rate it."
             actions={
               <>
-                <ButtonLink href={ourAgentHref}>Open an agent you can hire</ButtonLink>
-                <ButtonLink href="/agents" variant="ghost">
-                  Back to all agents
-                </ButtonLink>
+                <ButtonLink href="/agents">Find an agent you can hire</ButtonLink>
               </>
             }
           />
