@@ -35,10 +35,10 @@ env:
   ORACLE: "0xB5f72a0ab0bA971c8C4F69D4A075cB7fd7859e65"
   KEYSTORE: "0x6b8361C29d05D498b1a12B54A37310f94171E94A"
   GUARDIAN_WALLET: "0xbdc69c2d7FE7337C86d6Ab63E1B3A89D67e5A0c0"
-  # Guardian's repay session, granted 2026-10-11. Update both lines on every renewal
+  # Guardian's repay session, granted 2026-11-09. Update both lines on every renewal
   # (ai/CLAUDE.md has the steps).
-  GUARDIAN_KEY_HASH: "0x1a64e047eee99ee93787c6418709a907c1501693ae24ccaba864ff7aaec79b2c"
-  GUARDIAN_SESSION_EXPIRES: "2026-11-09"
+  GUARDIAN_KEY_HASH: "0x1da32ed5bd354d74bb9595da93482beafcd6990bff571bd3cd7c6d2da2989b4b"
+  GUARDIAN_SESSION_EXPIRES: "2026-12-09"
   # Any address works for the hire simulation; this one holds no special rights.
   SIMULATE_FROM: "0x000000000000000000000000000000000000dEaD"
 
